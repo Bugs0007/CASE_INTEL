@@ -22,3 +22,7 @@ sentence-transformers>=3.0,<4.0
 
 # Utilities
 numpy>=2.0,<3.0
+
+# Document processing
+PyPDF2>=3.0,<4.0
+python-docx>=1.0,<2.0
