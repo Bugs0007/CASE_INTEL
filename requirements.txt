@@ -1,0 +1,24 @@
+# Django
+Django>=6.0,<7.0
+djangorestframework>=3.15,<4.0
+
+# Database
+psycopg2-binary>=2.9,<3.0
+pgvector>=0.4,<0.5
+
+# Environment
+python-decouple>=3.8,<4.0
+
+# AI / LLM
+openai>=1.60,<2.0
+tiktoken>=0.8,<1.0
+
+# LangGraph
+langgraph>=0.2,<1.0
+langchain-core>=0.3,<1.0
+
+# Embeddings & Re-ranking
+sentence-transformers>=3.0,<4.0
+
+# Utilities
+numpy>=2.0,<3.0
