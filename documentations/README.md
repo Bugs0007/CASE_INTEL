@@ -21,29 +21,34 @@ A Django REST API for legal case management with AI-powered document search and 
 ### Installation
 
 1. **Clone the repository**
+
    ```bash
    git clone <repository-url>
    cd Case_INTEL
    ```
 
 2. **Create virtual environment**
+
    ```bash
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
 3. **Install dependencies**
+
    ```bash
    pip install -r requirements.txt
    ```
 
 4. **Configure environment**
+
    ```bash
    cp .env.example .env
    # Edit .env with your settings
    ```
 
 5. **Run migrations**
+
    ```bash
    python manage.py migrate
    ```
@@ -64,12 +69,14 @@ API will be available at `http://localhost:8000/api/`
 1. **Install Ollama**: Visit [ollama.ai](https://ollama.ai)
 
 2. **Download models**:
+
    ```bash
    ollama pull llama3.1:8b
    ollama pull nomic-embed-text
    ```
 
 3. **Update .env**:
+
    ```bash
    USE_OLLAMA=true
    OLLAMA_BASE_URL=http://localhost:11434
@@ -78,11 +85,13 @@ API will be available at `http://localhost:8000/api/`
    ```
 
 4. **Start Ollama server**:
+
    ```bash
    ollama serve
    ```
 
 5. **Run database migration** (changes embedding dimensions from 1536 to 768):
+
    ```bash
    python manage.py migrate
    ```
@@ -101,6 +110,7 @@ See [OLLAMA_SETUP.md](OLLAMA_SETUP.md) for detailed setup guide.
 1. **Get OpenAI API key**: https://platform.openai.com/api-keys
 
 2. **Update .env**:
+
    ```bash
    USE_OLLAMA=false
    OPENAI_API_KEY=sk-your-api-key-here
@@ -116,6 +126,7 @@ See [OLLAMA_SETUP.md](OLLAMA_SETUP.md) for detailed setup guide.
 ## API Endpoints
 
 ### Documents
+
 - `POST /api/documents/upload/` - Upload a document
 - `GET /api/documents/` - List documents
 - `GET /api/documents/{id}/` - Get document details
@@ -123,6 +134,7 @@ See [OLLAMA_SETUP.md](OLLAMA_SETUP.md) for detailed setup guide.
 - `DELETE /api/documents/{id}/` - Delete document
 
 ### Cases
+
 - `GET /api/cases/` - List cases
 - `POST /api/cases/` - Create case
 - `GET /api/cases/{id}/` - Get case details
@@ -130,16 +142,18 @@ See [OLLAMA_SETUP.md](OLLAMA_SETUP.md) for detailed setup guide.
 - `DELETE /api/cases/{id}/` - Delete case
 
 ### Chat & Q&A
+
 - `POST /api/chat/` - Ask a question about documents
   ```json
   {
     "user_query": "What were the key arguments in the motion?",
     "case_id": 1,
-    "conversation_id": 5  // optional
+    "conversation_id": 5 // optional
   }
   ```
 
 ### Conversations
+
 - `GET /api/conversations/` - List conversations
 - `GET /api/conversations/{id}/` - Get conversation details
 - `DELETE /api/conversations/{id}/` - Delete conversation
@@ -147,6 +161,7 @@ See [OLLAMA_SETUP.md](OLLAMA_SETUP.md) for detailed setup guide.
 ## Architecture
 
 ### Models (14 total)
+
 - `Case` - Legal case
 - `Document` - Case documents with metadata
 - `DocumentChunk` - Text chunks with pgvector embeddings
@@ -156,6 +171,7 @@ See [OLLAMA_SETUP.md](OLLAMA_SETUP.md) for detailed setup guide.
 - And more for tags, versions, emails, etc.
 
 ### Services
+
 - **AIWorkflowService** - Orchestrates LangGraph pipeline
 - **LLMClient** / **OllamaLLMClient** - Chat completion interfaces
 - **EmbeddingService** / **OllamaEmbeddingService** - Text embedding generators
@@ -164,6 +180,7 @@ See [OLLAMA_SETUP.md](OLLAMA_SETUP.md) for detailed setup guide.
 - **DocumentProcessor** - Document ingestion pipeline
 
 ### LangGraph Workflow
+
 ```
 route_query
     ├─ clarify → END
@@ -211,11 +228,13 @@ AI_MAX_CONVERSATION_HISTORY=5
 ### Integration Tests
 
 Test Ollama integration:
+
 ```bash
 python test_ollama_integration.py
 ```
 
 Tests:
+
 - ✓ Ollama connection
 - ✓ Embedding generation
 - ✓ LLM text generation
@@ -225,6 +244,7 @@ Tests:
 ### Unit Tests
 
 Run Django tests:
+
 ```bash
 python manage.py test core
 ```
@@ -232,6 +252,7 @@ python manage.py test core
 ## Performance
 
 ### Embedding Dimensions
+
 - OpenAI text-embedding-3-small: 1536
 - Ollama nomic-embed-text: 768
 
@@ -239,16 +260,17 @@ python manage.py test core
 
 ### Response Times
 
-| Operation | Ollama | OpenAI |
-|-----------|--------|--------|
-| Embed text | 100ms | 50ms |
-| Vector search | <100ms | <100ms |
-| LLM response | 50-200ms/token | 30-100ms/token |
-| Full Q&A | 1-5s | 1-3s |
+| Operation     | Ollama         | OpenAI         |
+| ------------- | -------------- | -------------- |
+| Embed text    | 100ms          | 50ms           |
+| Vector search | <100ms         | <100ms         |
+| LLM response  | 50-200ms/token | 30-100ms/token |
+| Full Q&A      | 1-5s           | 1-3s           |
 
 ## Development
 
 ### Project Structure
+
 ```
 Case_INTEL/
 ├── case_intel_project/          # Django project settings
@@ -285,30 +307,37 @@ Case_INTEL/
 ## Troubleshooting
 
 ### Database Connection Error
+
 ```
 FATAL: password authentication failed for user "postgres"
 ```
+
 - Check `.env` database credentials
 - Ensure PostgreSQL is running
 - Verify pgvector extension: `CREATE EXTENSION IF NOT EXISTS vector;`
 
 ### Ollama Connection Error
+
 ```
 Cannot connect to Ollama at http://localhost:11434
 ```
+
 - Start Ollama: `ollama serve`
 - Check `OLLAMA_BASE_URL` in `.env`
 - Verify models: `ollama list`
 
 ### Embedding Dimension Mismatch
+
 ```
 Dimension mismatch: expected 768, got 1536
 ```
+
 - You switched providers but didn't migrate
 - Run: `python manage.py migrate`
 - Re-process documents: See [OLLAMA_SETUP.md](OLLAMA_SETUP.md)
 
 ### Out of Memory
+
 - Reduce model: `ollama pull mistral:7b`
 - Check system RAM: `free -h` (Linux) or Task Manager (Windows)
 - Close other applications
@@ -318,9 +347,11 @@ See [OLLAMA_SETUP.md](OLLAMA_SETUP.md) for more troubleshooting.
 ## Integration with External Tools
 
 ### Postman Collection
+
 Import the provided Postman collection to test all API endpoints directly.
 
 ### Python Client
+
 ```python
 import requests
 
@@ -337,6 +368,7 @@ print(response.json())
 ```
 
 ### cURL
+
 ```bash
 curl -X POST http://localhost:8000/api/chat/ \
   -H "Content-Type: application/json" \
@@ -360,6 +392,7 @@ curl -X POST http://localhost:8000/api/chat/ \
 ## Support
 
 For issues, questions, or suggestions:
+
 1. Check the [OLLAMA_SETUP.md](OLLAMA_SETUP.md) guide
 2. Review API documentation
 3. Run integration tests: `python test_ollama_integration.py`
@@ -368,6 +401,7 @@ For issues, questions, or suggestions:
 ## Changelog
 
 ### Version 1.0.0
+
 - Initial release
 - Ollama integration with llama3.1:8b and nomic-embed-text
 - OpenAI fallback support

@@ -1,0 +1,726 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Case Intel - Legal Case Management & AI Chat</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        display: grid;
+        grid-template-columns: 280px 1fr 380px;
+        gap: 0;
+        min-height: 100vh;
+        background: #f5f5f5;
+        color: #333;
+      }
+
+      /* Sidebar */
+      .sidebar {
+        background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+        color: white;
+        padding: 20px;
+        overflow-y: auto;
+        border-right: 2px solid #1a252f;
+      }
+
+      .sidebar h1 {
+        font-size: 18px;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .btn-new-case {
+        width: 100%;
+        padding: 10px;
+        background: #e74c3c;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+        margin-bottom: 15px;
+      }
+
+      .btn-new-case:hover {
+        background: #c0392b;
+      }
+
+      .cases-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .case-item {
+        padding: 12px 10px;
+        background: rgba(255, 255, 255, 0.1);
+        border-left: 3px solid transparent;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .case-item:hover {
+        background: rgba(255, 255, 255, 0.2);
+        border-left-color: #3498db;
+      }
+
+      .case-item.active {
+        background: #e74c3c;
+        border-left-color: #fff;
+        font-weight: bold;
+      }
+
+      .case-item-number {
+        font-size: 12px;
+        opacity: 0.8;
+      }
+
+      .case-item-title {
+        font-weight: 500;
+        font-size: 14px;
+        margin: 3px 0;
+      }
+
+      .case-item-meta {
+        font-size: 11px;
+        opacity: 0.7;
+      }
+
+      /* Main Content */
+      .main {
+        background: white;
+        padding: 25px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .main h2 {
+        font-size: 24px;
+        margin-bottom: 10px;
+        color: #2c3e50;
+      }
+
+      .case-meta {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+        margin-bottom: 25px;
+        padding-bottom: 20px;
+        border-bottom: 2px solid #ecf0f1;
+      }
+
+      .case-meta-field {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .case-meta-label {
+        font-size: 12px;
+        color: #7f8c8d;
+        text-transform: uppercase;
+        font-weight: bold;
+        margin-bottom: 5px;
+      }
+
+      .case-meta-value {
+        font-size: 16px;
+        color: #2c3e50;
+        font-weight: 500;
+      }
+
+      .documents-section h3 {
+        font-size: 16px;
+        margin-top: 25px;
+        margin-bottom: 15px;
+        color: #2c3e50;
+        border-bottom: 2px solid #e74c3c;
+        padding-bottom: 8px;
+      }
+
+      .document-item {
+        display: grid;
+        grid-template-columns: 1fr auto auto;
+        gap: 15px;
+        align-items: center;
+        padding: 12px;
+        background: #f8f9fa;
+        margin-bottom: 10px;
+        border-radius: 4px;
+        border-left: 3px solid #3498db;
+      }
+
+      .document-info {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+
+      .document-name {
+        font-weight: 500;
+        color: #2c3e50;
+      }
+
+      .document-status {
+        font-size: 12px;
+        color: #7f8c8d;
+      }
+
+      .document-status.pending {
+        color: #f39c12;
+      }
+
+      .document-status.processing {
+        color: #3498db;
+      }
+
+      .document-status.completed {
+        color: #27ae60;
+      }
+
+      .document-actions {
+        display: flex;
+        gap: 8px;
+      }
+
+      .btn-small {
+        padding: 6px 12px;
+        font-size: 12px;
+        background: #3498db;
+        color: white;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+
+      .btn-small:hover {
+        background: #2980b9;
+      }
+
+      .btn-small.danger {
+        background: #e74c3c;
+      }
+
+      .btn-small.danger:hover {
+        background: #c0392b;
+      }
+
+      .main-buttons {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+        flex-wrap: wrap;
+      }
+
+      .btn-primary {
+        padding: 10px 20px;
+        background: #3498db;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 14px;
+      }
+
+      .btn-primary:hover {
+        background: #2980b9;
+      }
+
+      /* Chat Panel */
+      .chat-panel {
+        background: #ecf0f1;
+        padding: 15px;
+        display: flex;
+        flex-direction: column;
+        border-left: 2px solid #bdc3c7;
+      }
+
+      .chat-title {
+        font-size: 14px;
+        font-weight: bold;
+        color: #2c3e50;
+        margin-bottom: 10px;
+        min-height: 20px;
+      }
+
+      .messages-container {
+        flex: 1;
+        overflow-y: auto;
+        margin-bottom: 15px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .message {
+        padding: 10px 12px;
+        border-radius: 6px;
+        word-wrap: break-word;
+        font-size: 14px;
+        line-height: 1.4;
+      }
+
+      .message.user {
+        background: #3498db;
+        color: white;
+        margin-left: 20px;
+        text-align: right;
+      }
+
+      .message.assistant {
+        background: white;
+        margin-right: 20px;
+        color: #2c3e50;
+        border: 1px solid #bdc3c7;
+      }
+
+      .message.info {
+        background: #f9e79f;
+        text-align: center;
+        font-size: 12px;
+        color: #7d6608;
+        margin: 0 5px;
+      }
+
+      .message.error {
+        background: #f5b7b1;
+        color: #78281f;
+        margin: 0 5px;
+      }
+
+      .citation-block {
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid rgba(0, 0, 0, 0.1);
+        font-size: 12px;
+        color: #555;
+      }
+
+      .citation {
+        padding: 4px 0;
+        margin: 2px 0;
+      }
+
+      .chat-input-area {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .chat-textarea {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #bdc3c7;
+        border-radius: 4px;
+        font-family: inherit;
+        font-size: 13px;
+        resize: none;
+        min-height: 60px;
+      }
+
+      .chat-textarea:focus {
+        outline: none;
+        border-color: #3498db;
+        box-shadow: 0 0 4px rgba(52, 152, 219, 0.3);
+      }
+
+      .chat-buttons {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .btn-chat {
+        flex: 1;
+        min-width: 100px;
+        padding: 8px;
+        background: #3498db;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 13px;
+      }
+
+      .btn-chat:hover {
+        background: #2980b9;
+      }
+
+      .btn-chat.secondary {
+        background: #95a5a6;
+      }
+
+      .btn-chat.secondary:hover {
+        background: #7f8c8d;
+      }
+
+      /* Modal */
+      .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .modal.active {
+        display: flex;
+      }
+
+      .modal-content {
+        background: white;
+        padding: 25px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        width: 90%;
+        max-width: 450px;
+      }
+
+      .modal h3 {
+        margin-bottom: 20px;
+        color: #2c3e50;
+        font-size: 18px;
+      }
+
+      .form-group {
+        margin-bottom: 15px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .form-group label {
+        font-weight: 500;
+        margin-bottom: 5px;
+        color: #2c3e50;
+        font-size: 13px;
+      }
+
+      .form-group input,
+      .form-group select,
+      .form-group textarea {
+        padding: 10px;
+        border: 1px solid #bdc3c7;
+        border-radius: 4px;
+        font-family: inherit;
+        font-size: 13px;
+      }
+
+      .form-group input:focus,
+      .form-group select:focus,
+      .form-group textarea:focus {
+        outline: none;
+        border-color: #3498db;
+        box-shadow: 0 0 4px rgba(52, 152, 219, 0.3);
+      }
+
+      .file-drop-zone {
+        border: 2px dashed #3498db;
+        border-radius: 4px;
+        padding: 30px;
+        text-align: center;
+        background: #ecf0f1;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .file-drop-zone:hover {
+        border-color: #2980b9;
+        background: #d5dbf0;
+      }
+
+      .file-drop-zone.drag-over {
+        border-color: #27ae60;
+        background: #d5f4e6;
+      }
+
+      .modal-buttons {
+        display: flex;
+        gap: 10px;
+        margin-top: 25px;
+        justify-content: flex-end;
+      }
+
+      .btn-cancel {
+        padding: 10px 20px;
+        background: #95a5a6;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+
+      .btn-cancel:hover {
+        background: #7f8c8d;
+      }
+
+      .btn-submit {
+        padding: 10px 20px;
+        background: #27ae60;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+      }
+
+      .btn-submit:hover {
+        background: #229954;
+      }
+
+      /* Empty state */
+      .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: #95a5a6;
+        padding: 40px 20px;
+        text-align: center;
+      }
+
+      .empty-state h3 {
+        color: #7f8c8d;
+        margin-bottom: 10px;
+      }
+
+      /* Responsive */
+      @media (max-width: 1400px) {
+        body {
+          grid-template-columns: 250px 1fr;
+        }
+
+        .chat-panel {
+          display: none;
+        }
+      }
+
+      @media (max-width: 900px) {
+        body {
+          grid-template-columns: 200px 1fr;
+        }
+
+        .sidebar {
+          padding: 15px;
+        }
+
+        .case-meta {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 600px) {
+        body {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          display: none;
+        }
+
+        .document-item {
+          grid-template-columns: 1fr;
+        }
+
+        .document-actions {
+          justify-content: flex-end;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <h1>📁 Case Intel</h1>
+      <button class="btn-new-case" onclick="showNewCaseModal()">
+        + New Case
+      </button>
+      <div class="cases-list" id="cases-list">
+        <div class="empty-state" style="padding: 20px 10px">
+          <p>No cases yet</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main">
+      <div id="case-details">
+        <div class="empty-state">
+          <h3>📋 Select a Case to Begin</h3>
+          <p>Click on a case in the sidebar or create a new one</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chat Panel -->
+    <div class="chat-panel">
+      <div class="chat-title" id="chat-title">💬 Chat</div>
+      <div class="messages-container" id="messages-container"></div>
+      <div class="chat-input-area">
+        <textarea
+          class="chat-textarea"
+          id="query-input"
+          placeholder="Ask a question about this case..."
+          autocomplete="off"
+        ></textarea>
+        <div class="chat-buttons">
+          <button class="btn-chat" onclick="sendChat()">Send ➤</button>
+          <button class="btn-chat secondary" onclick="clearChat()">
+            Clear
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modals -->
+
+    <!-- New Case Modal -->
+    <div id="new-case-modal" class="modal">
+      <div class="modal-content">
+        <h3>Create New Case</h3>
+        <form onsubmit="submitNewCase(event)">
+          <div class="form-group">
+            <label for="case-number">Case Number *</label>
+            <input
+              type="text"
+              id="case-number"
+              required
+              placeholder="2024-001"
+            />
+          </div>
+          <div class="form-group">
+            <label for="case-title">Case Title *</label>
+            <input
+              type="text"
+              id="case-title"
+              required
+              placeholder="vs. Party Name"
+            />
+          </div>
+          <div class="form-group">
+            <label for="case-client">Client Name *</label>
+            <input
+              type="text"
+              id="case-client"
+              required
+              placeholder="John Doe"
+            />
+          </div>
+          <div class="form-group">
+            <label for="case-opposing">Opposing Party</label>
+            <input
+              type="text"
+              id="case-opposing"
+              placeholder="Jane Smith (optional)"
+            />
+          </div>
+          <div class="form-group">
+            <label for="case-type">Case Type</label>
+            <select id="case-type">
+              <option value="civil">Civil</option>
+              <option value="criminal">Criminal</option>
+              <option value="family">Family</option>
+              <option value="corporate">Corporate</option>
+              <option value="ip">Intellectual Property</option>
+              <option value="labor">Labor</option>
+              <option value="tax">Tax</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="case-priority">Priority</label>
+            <select id="case-priority">
+              <option value="low">Low</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High</option>
+              <option value="critical">Critical</option>
+            </select>
+          </div>
+          <div class="modal-buttons">
+            <button
+              type="button"
+              class="btn-cancel"
+              onclick="closeModal('new-case-modal')"
+            >
+              Cancel
+            </button>
+            <button type="submit" class="btn-submit">Create Case</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Upload Document Modal -->
+    <div id="upload-modal" class="modal">
+      <div class="modal-content">
+        <h3>Upload Document</h3>
+        <form onsubmit="submitUpload(event)">
+          <div class="form-group">
+            <label for="doc-type">Document Type</label>
+            <select id="doc-type">
+              <option value="contract">Contract</option>
+              <option value="pleading">Pleading</option>
+              <option value="evidence">Evidence</option>
+              <option value="correspondence">Correspondence</option>
+              <option value="brief">Brief</option>
+              <option value="motion">Motion</option>
+              <option value="order">Order</option>
+              <option value="other" selected>Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Select File</label>
+            <div class="file-drop-zone" id="file-drop-zone">
+              <p>📁 Drop files here or click to browse</p>
+              <p style="font-size: 12px; color: #7f8c8d; margin-top: 8px">
+                Allowed: PDF, DOCX, DOC, TXT (Max 50 MB)
+              </p>
+              <input
+                type="file"
+                id="doc-file"
+                accept=".pdf,.docx,.doc,.txt"
+                style="display: none"
+              />
+            </div>
+            <small
+              id="file-name"
+              style="color: #27ae60; margin-top: 8px; display: none"
+            ></small>
+          </div>
+          <div class="modal-buttons">
+            <button
+              type="button"
+              class="btn-cancel"
+              onclick="closeModal('upload-modal')"
+            >
+              Cancel
+            </button>
+            <button type="submit" class="btn-submit" id="upload-btn">
+              Upload Document
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
