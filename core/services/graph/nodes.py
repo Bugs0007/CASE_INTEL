@@ -236,9 +236,10 @@ def vector_search(state: AgentState, search_service: VectorSearchService) -> Age
     """Retrieve relevant document chunks from pgvector."""
     query = state["user_query"]
     case_id = state.get("case_id")
-    filters = state.get("extracted_filters", {})
 
-    doc_types = filters.get("document_types") or None
+    # Don't filter by document types - just search all documents in case
+    # Document type filtering causes false negatives when document_type doesn't match
+    doc_types = None
 
     results = search_service.search(
         query=query,

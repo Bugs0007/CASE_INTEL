@@ -21,8 +21,7 @@ from django.utils import timezone
 from core.models import Citation, Conversation, DocumentChunk, Message
 from core.services.graph.builder import build_legal_ai_graph
 from core.services.graph.state import AgentState
-from core.services.llm_client import LLMClient
-from core.services.embedding_service import EmbeddingService
+from core.services.ai_service_factory import get_llm_client, get_embedding_service
 from core.services.vector_search_service import VectorSearchService
 
 logger = logging.getLogger(__name__)
@@ -60,8 +59,8 @@ class AIWorkflowService:
 
     def __init__(
         self,
-        llm: Optional[LLMClient] = None,
-        embedding_service: Optional[EmbeddingService] = None,
+        llm=None,
+        embedding_service=None,
         search_service: Optional[VectorSearchService] = None,
     ) -> None:
         self._llm = llm
@@ -73,14 +72,14 @@ class AIWorkflowService:
     # Lazy initialization
     # ------------------------------------------------------------------
 
-    def _get_llm(self) -> LLMClient:
+    def _get_llm(self):
         if self._llm is None:
-            self._llm = LLMClient()
+            self._llm = get_llm_client()
         return self._llm
 
-    def _get_embedding_service(self) -> EmbeddingService:
+    def _get_embedding_service(self):
         if self._embedding_service is None:
-            self._embedding_service = EmbeddingService()
+            self._embedding_service = get_embedding_service()
         return self._embedding_service
 
     def _get_search_service(self) -> VectorSearchService:

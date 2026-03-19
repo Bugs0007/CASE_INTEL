@@ -8,7 +8,9 @@ class DocumentChunk(models.Model):
     )
     chunk_index = models.IntegerField()
     chunk_text = models.TextField()
-    embedding = VectorField(dimensions=1536, blank=True, null=True)
+    # Embedding dimensions: 768 for Ollama nomic-embed-text (default)
+    # Note: For OpenAI text-embedding-3-small (1536), adjust dimensions or use conversion
+    embedding = VectorField(dimensions=768, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

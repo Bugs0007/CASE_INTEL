@@ -12,7 +12,7 @@ from django.conf import settings
 from pgvector.django import CosineDistance
 
 from core.models import DocumentChunk
-from core.services.embedding_service import EmbeddingService
+from core.services.ai_service_factory import get_embedding_service
 
 logger = logging.getLogger(__name__)
 
@@ -49,8 +49,8 @@ class VectorSearchService:
     case_id and document_type.
     """
 
-    def __init__(self, embedding_service: Optional[EmbeddingService] = None) -> None:
-        self._embedding_service = embedding_service or EmbeddingService()
+    def __init__(self, embedding_service=None) -> None:
+        self._embedding_service = embedding_service or get_embedding_service()
 
     def search(
         self,

@@ -41,11 +41,13 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
+    "corsheaders",
     "core",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -137,11 +139,30 @@ REST_FRAMEWORK = {
     "EXCEPTION_HANDLER": "rest_framework.views.exception_handler",
 }
 
+# CORS Configuration
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
+]
+CORS_ALLOW_CREDENTIALS = True
 
-# OpenAI Configuration
+
+# ============================================================================
+# AI Provider Configuration
+# ============================================================================
+
+# Toggle between OpenAI and Ollama (set to "true" for local Ollama)
+USE_OLLAMA = config("USE_OLLAMA", default=False, cast=bool)
+
+# OpenAI Configuration (used when USE_OLLAMA=false)
 OPENAI_API_KEY = config("OPENAI_API_KEY", default="")
 OPENAI_MODEL = config("OPENAI_MODEL", default="gpt-4o")
 OPENAI_EMBEDDING_MODEL = config("OPENAI_EMBEDDING_MODEL", default="text-embedding-3-small")
+
+# Ollama Configuration (used when USE_OLLAMA=true)
+OLLAMA_BASE_URL = config("OLLAMA_BASE_URL", default="http://localhost:11434")
+OLLAMA_MODEL = config("OLLAMA_MODEL", default="llama3.1:8b")
+OLLAMA_EMBEDDING_MODEL = config("OLLAMA_EMBEDDING_MODEL", default="nomic-embed-text")
 
 # AI Workflow Configuration
 AI_SEARCH_TOP_K = config("AI_SEARCH_TOP_K", default=10, cast=int)
@@ -149,8 +170,22 @@ AI_RERANK_TOP_K = config("AI_RERANK_TOP_K", default=5, cast=int)
 AI_CONFIDENCE_THRESHOLD = config("AI_CONFIDENCE_THRESHOLD", default=0.5, cast=float)
 AI_MAX_CONVERSATION_HISTORY = config("AI_MAX_CONVERSATION_HISTORY", default=5, cast=int)
 
-# Embedding dimensions (must match DocumentChunk.embedding VectorField)
-EMBEDDING_DIMENSIONS = 1536
+# Embedding dimensions - DYNAMIC based on provider
+# OpenAI text-embedding-3-small: 1536
+# Ollama nomic-embed-text: 768
+_EMBEDDING_DIMENSIONS_MAP = {
+    "text-embedding-3-small": 1536,
+    "text-embedding-3-large": 3072,
+    "text-embedding-ada-002": 1536,
+    "nomic-embed-text": 768,
+    "mxbai-embed-large": 1024,
+    "all-minilm": 384,
+}
+
+if USE_OLLAMA:
+    EMBEDDING_DIMENSIONS = _EMBEDDING_DIMENSIONS_MAP.get(OLLAMA_EMBEDDING_MODEL, 768)
+else:
+    EMBEDDING_DIMENSIONS = _EMBEDDING_DIMENSIONS_MAP.get(OPENAI_EMBEDDING_MODEL, 1536)
 
 # Media files (uploaded documents)
 MEDIA_ROOT = BASE_DIR / "media"
