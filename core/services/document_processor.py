@@ -18,7 +18,7 @@ from typing import Optional
 from django.db import transaction
 
 from core.models import Document, DocumentChunk
-from core.services.embedding_service import EmbeddingService
+from core.services.ai_service_factory import get_embedding_service
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ class DocumentProcessor:
 
     def __init__(
         self,
-        embedding_service: Optional[EmbeddingService] = None,
+        embedding_service=None,
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         chunk_overlap: int = DEFAULT_CHUNK_OVERLAP,
     ) -> None:
@@ -47,9 +47,9 @@ class DocumentProcessor:
         self._chunk_size = chunk_size
         self._chunk_overlap = chunk_overlap
 
-    def _get_embedding_service(self) -> EmbeddingService:
+    def _get_embedding_service(self):
         if self._embedding_service is None:
-            self._embedding_service = EmbeddingService()
+            self._embedding_service = get_embedding_service()
         return self._embedding_service
 
     # ------------------------------------------------------------------
