@@ -670,10 +670,18 @@
         color: white;
       }
 
-      .priority-badge.low { background: #95a5a6; }
-      .priority-badge.medium { background: #f39c12; }
-      .priority-badge.high { background: #e67e22; }
-      .priority-badge.critical { background: #e74c3c; }
+      .priority-badge.low {
+        background: #95a5a6;
+      }
+      .priority-badge.medium {
+        background: #f39c12;
+      }
+      .priority-badge.high {
+        background: #e67e22;
+      }
+      .priority-badge.critical {
+        background: #e74c3c;
+      }
 
       .doc-count {
         margin-left: auto;
@@ -705,6 +713,111 @@
         color: #95a5a6;
         font-style: italic;
         font-size: 14px;
+      }
+
+      /* Hearings Section */
+      .hearings-section h3 {
+        font-size: 16px;
+        margin-top: 25px;
+        margin-bottom: 15px;
+        color: #2c3e50;
+        border-bottom: 2px solid #9b59b6;
+        padding-bottom: 8px;
+      }
+
+      .hearings-subsection {
+        margin-bottom: 20px;
+      }
+
+      .hearings-subsection h4 {
+        font-size: 13px;
+        color: #7f8c8d;
+        margin-bottom: 10px;
+        text-transform: uppercase;
+      }
+
+      .hearing-item {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 15px;
+        align-items: center;
+        padding: 12px;
+        background: #f8f9fa;
+        margin-bottom: 10px;
+        border-radius: 4px;
+        border-left: 3px solid #9b59b6;
+      }
+
+      .hearing-item.upcoming {
+        border-left-color: #27ae60;
+        background: #f0fff4;
+      }
+
+      .hearing-item.past {
+        border-left-color: #95a5a6;
+        opacity: 0.9;
+      }
+
+      .hearing-info {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+
+      .hearing-date {
+        font-weight: 600;
+        color: #2c3e50;
+        font-size: 14px;
+      }
+
+      .hearing-type-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        background: #9b59b6;
+        color: white;
+        border-radius: 3px;
+        font-size: 11px;
+        margin-left: 8px;
+      }
+
+      .hearing-details {
+        font-size: 12px;
+        color: #7f8c8d;
+      }
+
+      .hearing-status {
+        font-size: 11px;
+        padding: 2px 6px;
+        border-radius: 3px;
+        margin-top: 4px;
+        display: inline-block;
+      }
+
+      .hearing-status.scheduled {
+        background: #3498db;
+        color: white;
+      }
+
+      .hearing-status.completed {
+        background: #27ae60;
+        color: white;
+      }
+
+      .hearing-status.cancelled {
+        background: #e74c3c;
+        color: white;
+      }
+
+      .hearing-status.postponed {
+        background: #f39c12;
+        color: white;
+      }
+
+      .hearing-outcome {
+        font-size: 12px;
+        color: #2c3e50;
+        margin-top: 4px;
+        font-style: italic;
       }
 
       .sidebar-nav {
@@ -784,8 +897,12 @@
 
       <!-- Navigation -->
       <div class="sidebar-nav">
-        <button class="nav-btn active" id="nav-cases" onclick="showCasesView()">Cases</button>
-        <button class="nav-btn" id="nav-dashboard" onclick="showDashboard()">Dashboard</button>
+        <button class="nav-btn active" id="nav-cases" onclick="showCasesView()">
+          Cases
+        </button>
+        <button class="nav-btn" id="nav-dashboard" onclick="showDashboard()">
+          Dashboard
+        </button>
       </div>
 
       <button class="btn-new-case" onclick="showNewCaseModal()">
@@ -794,10 +911,34 @@
 
       <!-- Status Tabs -->
       <div class="status-tabs">
-        <button class="status-tab active" data-status="open" onclick="filterCases('open')">Active</button>
-        <button class="status-tab" data-status="pending" onclick="filterCases('pending')">Pending</button>
-        <button class="status-tab" data-status="closed" onclick="filterCases('closed')">Closed</button>
-        <button class="status-tab" data-status="archived" onclick="filterCases('archived')">Archived</button>
+        <button
+          class="status-tab active"
+          data-status="open"
+          onclick="filterCases('open')"
+        >
+          Active
+        </button>
+        <button
+          class="status-tab"
+          data-status="pending"
+          onclick="filterCases('pending')"
+        >
+          Pending
+        </button>
+        <button
+          class="status-tab"
+          data-status="closed"
+          onclick="filterCases('closed')"
+        >
+          Closed
+        </button>
+        <button
+          class="status-tab"
+          data-status="archived"
+          onclick="filterCases('archived')"
+        >
+          Archived
+        </button>
       </div>
 
       <div class="cases-list" id="cases-list">
@@ -810,7 +951,7 @@
     <!-- Main Content -->
     <div class="main">
       <!-- Dashboard View -->
-      <div class="dashboard-view" id="dashboard-view" style="display: none;">
+      <div class="dashboard-view" id="dashboard-view" style="display: none">
         <h2>Dashboard</h2>
 
         <!-- Stats Cards -->
@@ -1031,20 +1172,92 @@
         <div id="gmail-status-content">
           <p>Loading...</p>
         </div>
-        <div id="gmail-connect-section" style="display: none;">
-          <p style="margin-bottom: 15px;">Connect your Gmail account to sync emails with your cases.</p>
-          <button class="btn-submit" onclick="connectGmail()">Connect Gmail</button>
+        <div id="gmail-connect-section" style="display: none">
+          <p style="margin-bottom: 15px">
+            Connect your Gmail account to sync emails with your cases.
+          </p>
+          <button class="btn-submit" onclick="connectGmail()">
+            Connect Gmail
+          </button>
         </div>
-        <div id="gmail-connected-section" style="display: none;">
-          <p style="margin-bottom: 10px;">Connected: <strong id="gmail-email"></strong></p>
-          <div style="display: flex; gap: 10px; margin-top: 15px;">
-            <button class="btn-primary" onclick="syncGmail()">Sync Emails</button>
-            <button class="btn-small danger" onclick="disconnectGmail()">Disconnect</button>
+        <div id="gmail-connected-section" style="display: none">
+          <p style="margin-bottom: 10px">
+            Connected: <strong id="gmail-email"></strong>
+          </p>
+          <div style="display: flex; gap: 10px; margin-top: 15px">
+            <button class="btn-primary" onclick="syncGmail()">
+              Sync Emails
+            </button>
+            <button class="btn-small danger" onclick="disconnectGmail()">
+              Disconnect
+            </button>
           </div>
         </div>
         <div class="modal-buttons">
-          <button class="btn-cancel" onclick="closeModal('gmail-modal')">Close</button>
+          <button class="btn-cancel" onclick="closeModal('gmail-modal')">
+            Close
+          </button>
         </div>
+      </div>
+    </div>
+
+    <!-- Hearing Modal -->
+    <div id="hearing-modal" class="modal">
+      <div class="modal-content">
+        <h3 id="hearing-modal-title">Add Hearing</h3>
+        <form onsubmit="submitHearing(event)">
+          <input type="hidden" id="hearing-id" value="" />
+          <div class="form-group">
+            <label for="hearing-date">Date & Time *</label>
+            <input type="datetime-local" id="hearing-date" required />
+          </div>
+          <div class="form-group">
+            <label for="hearing-type">Hearing Type *</label>
+            <select id="hearing-type" required>
+              <option value="preliminary">Preliminary Hearing</option>
+              <option value="motion">Motion Hearing</option>
+              <option value="trial">Trial</option>
+              <option value="appeal">Appeal</option>
+              <option value="sentencing">Sentencing</option>
+              <option value="arraignment">Arraignment</option>
+              <option value="status">Status Conference</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="hearing-location">Location / Court</label>
+            <input type="text" id="hearing-location" placeholder="e.g., Courtroom 3A" />
+          </div>
+          <div class="form-group">
+            <label for="hearing-judge">Judge</label>
+            <input type="text" id="hearing-judge" placeholder="e.g., Hon. Jane Smith" />
+          </div>
+          <div class="form-group">
+            <label for="hearing-status">Status</label>
+            <select id="hearing-status">
+              <option value="scheduled">Scheduled</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="postponed">Postponed</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="hearing-notes">Notes</label>
+            <textarea id="hearing-notes" rows="2" placeholder="Optional notes..."></textarea>
+          </div>
+          <div class="form-group" id="hearing-outcome-group" style="display: none;">
+            <label for="hearing-outcome">Outcome</label>
+            <textarea id="hearing-outcome" rows="2" placeholder="Hearing outcome..."></textarea>
+          </div>
+          <div class="modal-buttons">
+            <button type="button" class="btn-cancel" onclick="closeModal('hearing-modal')">
+              Cancel
+            </button>
+            <button type="submit" class="btn-submit" id="hearing-submit-btn">
+              Save Hearing
+            </button>
+          </div>
+        </form>
       </div>
     </div>
 

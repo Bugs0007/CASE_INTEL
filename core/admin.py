@@ -20,6 +20,7 @@ from core.models import (
     EmailAttachment,
     Folder,
     GmailCredential,
+    Hearing,
     Message,
     Task,
 )
@@ -131,6 +132,15 @@ class TaskAdmin(admin.ModelAdmin):
     list_filter = ("status",)
     search_fields = ("title", "description")
     readonly_fields = ("created_at",)
+
+
+@admin.register(Hearing)
+class HearingAdmin(admin.ModelAdmin):
+    list_display = ("case", "hearing_type", "hearing_date", "location", "judge", "status", "created_at")
+    list_filter = ("status", "hearing_type", "case")
+    search_fields = ("location", "judge", "notes")
+    readonly_fields = ("created_at", "updated_at")
+    date_hierarchy = "hearing_date"
 
 
 @admin.register(ActivityLog)

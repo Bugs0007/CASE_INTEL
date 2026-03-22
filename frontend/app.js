@@ -127,6 +127,9 @@ async function selectCase(caseId) {
     const docRes = await fetch(`${API_BASE}/documents/?case_id=${caseId}`);
     const docs = docRes.ok ? await docRes.json() : [];
 
+    // Load hearings
+    const hearings = await loadHearings(caseId);
+
     // Update sidebar
     document.querySelectorAll(".case-item").forEach((el) => {
       el.classList.remove("active");
@@ -166,6 +169,9 @@ async function selectCase(caseId) {
           <div class="case-meta-value">${caseData.case_type || "N/A"}</div>
         </div>
       </div>
+
+      <!-- Hearings Section -->
+      ${renderHearings(hearings)}
 
       <div class="documents-section">
         <h3>📄 Documents</h3>
@@ -674,4 +680,206 @@ async function syncGmail() {
 
 function disconnectGmail() {
   alert("Disconnect functionality not implemented yet");
+}
+
+// ===== HEARINGS =====
+
+let currentHearingId = null;
+
+async function loadHearings(caseId) {
+  try {
+    const res = await fetch(`${API_BASE}/hearings/?case_id=${caseId}`);
+    if (!res.ok) return [];
+    return await res.json();
+  } catch (err) {
+    console.error("Failed to load hearings:", err);
+    return [];
+  }
+}
+
+function renderHearings(hearings) {
+  const now = new Date();
+  const upcoming = hearings.filter(h => new Date(h.hearing_date) >= now && h.status === "scheduled");
+  const past = hearings.filter(h => new Date(h.hearing_date) < now || h.status !== "scheduled");
+
+  let html = '<div class="hearings-section"><h3>⚖️ Hearings</h3>';
+
+  // Upcoming hearings
+  html += '<div class="hearings-subsection"><h4>Upcoming</h4>';
+  if (upcoming.length === 0) {
+    html += '<p style="color: #95a5a6; font-style: italic;">No upcoming hearings</p>';
+  } else {
+    html += upcoming.map(h => renderHearingItem(h, true)).join("");
+  }
+  html += '</div>';
+
+  // Past hearings
+  html += '<div class="hearings-subsection"><h4>Past</h4>';
+  if (past.length === 0) {
+    html += '<p style="color: #95a5a6; font-style: italic;">No past hearings</p>';
+  } else {
+    html += past.map(h => renderHearingItem(h, false)).join("");
+  }
+  html += '</div>';
+
+  html += '<button class="btn-primary" style="background: #9b59b6; margin-top: 10px;" onclick="showHearingModal()">+ Add Hearing</button>';
+  html += '</div>';
+
+  return html;
+}
+
+function renderHearingItem(h, isUpcoming) {
+  const date = new Date(h.hearing_date);
+  const dateStr = date.toLocaleDateString() + " " + date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+  return `
+    <div class="hearing-item ${isUpcoming ? "upcoming" : "past"}">
+      <div class="hearing-info">
+        <div class="hearing-date">
+          ${dateStr}
+          <span class="hearing-type-badge">${h.hearing_type_display || h.hearing_type}</span>
+        </div>
+        <div class="hearing-details">
+          ${h.location ? `📍 ${h.location}` : ""}
+          ${h.judge ? ` | 👨‍⚖️ ${h.judge}` : ""}
+        </div>
+        <span class="hearing-status ${h.status}">${h.status_display || h.status}</span>
+        ${h.outcome ? `<div class="hearing-outcome">Outcome: ${h.outcome}</div>` : ""}
+        ${h.notes ? `<div class="hearing-details" style="margin-top: 4px;">📝 ${h.notes}</div>` : ""}
+      </div>
+      <div class="document-actions">
+        <button class="btn-small" onclick="editHearing(${h.id}, event)">Edit</button>
+        <button class="btn-small danger" onclick="deleteHearing(${h.id}, event)">Delete</button>
+      </div>
+    </div>
+  `;
+}
+
+function showHearingModal(hearingData = null) {
+  if (!currentCaseId) {
+    alert("Please select a case first");
+    return;
+  }
+
+  // Reset form
+  document.getElementById("hearing-id").value = "";
+  document.getElementById("hearing-date").value = "";
+  document.getElementById("hearing-type").value = "motion";
+  document.getElementById("hearing-location").value = "";
+  document.getElementById("hearing-judge").value = "";
+  document.getElementById("hearing-status").value = "scheduled";
+  document.getElementById("hearing-notes").value = "";
+  document.getElementById("hearing-outcome").value = "";
+  document.getElementById("hearing-outcome-group").style.display = "none";
+
+  if (hearingData) {
+    document.getElementById("hearing-modal-title").textContent = "Edit Hearing";
+    document.getElementById("hearing-id").value = hearingData.id;
+
+    // Format datetime for input
+    const dt = new Date(hearingData.hearing_date);
+    const localDt = new Date(dt.getTime() - dt.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    document.getElementById("hearing-date").value = localDt;
+
+    document.getElementById("hearing-type").value = hearingData.hearing_type;
+    document.getElementById("hearing-location").value = hearingData.location || "";
+    document.getElementById("hearing-judge").value = hearingData.judge || "";
+    document.getElementById("hearing-status").value = hearingData.status;
+    document.getElementById("hearing-notes").value = hearingData.notes || "";
+    document.getElementById("hearing-outcome").value = hearingData.outcome || "";
+
+    if (hearingData.status === "completed") {
+      document.getElementById("hearing-outcome-group").style.display = "block";
+    }
+  } else {
+    document.getElementById("hearing-modal-title").textContent = "Add Hearing";
+  }
+
+  // Show/hide outcome field based on status
+  document.getElementById("hearing-status").addEventListener("change", function() {
+    document.getElementById("hearing-outcome-group").style.display =
+      this.value === "completed" ? "block" : "none";
+  });
+
+  openModal("hearing-modal");
+}
+
+async function editHearing(hearingId, event) {
+  event.stopPropagation();
+
+  try {
+    const res = await fetch(`${API_BASE}/hearings/${hearingId}/`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const hearingData = await res.json();
+    showHearingModal(hearingData);
+  } catch (err) {
+    alertError(`Failed to load hearing: ${err.message}`);
+  }
+}
+
+async function submitHearing(event) {
+  event.preventDefault();
+
+  const hearingId = document.getElementById("hearing-id").value;
+  const hearingData = {
+    case: currentCaseId,
+    hearing_date: new Date(document.getElementById("hearing-date").value).toISOString(),
+    hearing_type: document.getElementById("hearing-type").value,
+    location: document.getElementById("hearing-location").value || null,
+    judge: document.getElementById("hearing-judge").value || null,
+    status: document.getElementById("hearing-status").value,
+    notes: document.getElementById("hearing-notes").value || null,
+    outcome: document.getElementById("hearing-outcome").value || null,
+  };
+
+  try {
+    let res;
+    if (hearingId) {
+      res = await fetch(`${API_BASE}/hearings/${hearingId}/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(hearingData),
+      });
+    } else {
+      res = await fetch(`${API_BASE}/hearings/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(hearingData),
+      });
+    }
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || JSON.stringify(err) || `HTTP ${res.status}`);
+    }
+
+    closeModal("hearing-modal");
+    alertSuccess(hearingId ? "Hearing updated!" : "Hearing added!");
+    selectCase(currentCaseId);
+  } catch (err) {
+    alertError(`Failed to save hearing: ${err.message}`);
+  }
+}
+
+async function deleteHearing(hearingId, event) {
+  event.stopPropagation();
+
+  if (!confirm("Delete this hearing? This cannot be undone.")) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/hearings/${hearingId}/`, {
+      method: "DELETE",
+    });
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+
+    alertSuccess("Hearing deleted");
+    selectCase(currentCaseId);
+  } catch (err) {
+    alertError(`Delete failed: ${err.message}`);
+  }
 }

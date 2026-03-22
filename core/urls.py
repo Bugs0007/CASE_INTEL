@@ -23,6 +23,8 @@ from core.views import (
     GmailCallbackView,
     GmailStatusView,
     GmailSyncView,
+    HearingDetailView,
+    HearingListCreateView,
 )
 
 app_name = "core"
@@ -45,6 +47,10 @@ urlpatterns = [
     # Cases
     path("cases/", CaseListCreateView.as_view(), name="case-list"),
     path("cases/<int:pk>/", CaseDetailView.as_view(), name="case-detail"),
+
+    # Hearings
+    path("hearings/", HearingListCreateView.as_view(), name="hearing-list"),
+    path("hearings/<int:pk>/", HearingDetailView.as_view(), name="hearing-detail"),
 
     # Documents
     path("documents/", DocumentListView.as_view(), name="document-list"),

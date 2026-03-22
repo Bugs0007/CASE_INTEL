@@ -24,6 +24,7 @@ from .gmail import (
     GmailStatusView,
     GmailSyncView,
 )
+from .hearing import HearingDetailView, HearingListCreateView
 
 __all__ = [
     "CaseDetailView",
@@ -42,4 +43,6 @@ __all__ = [
     "GmailCallbackView",
     "GmailStatusView",
     "GmailSyncView",
+    "HearingDetailView",
+    "HearingListCreateView",
 ]
