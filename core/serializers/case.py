@@ -9,6 +9,9 @@ from core.models import Case
 
 class CaseSerializer(serializers.ModelSerializer):
     document_count = serializers.SerializerMethodField()
+    hearing_count = serializers.SerializerMethodField()
+    thread_count = serializers.IntegerField(read_only=True, default=0)
+    conversation_count = serializers.IntegerField(read_only=True, default=0)
 
     class Meta:
         model = Case
@@ -25,8 +28,14 @@ class CaseSerializer(serializers.ModelSerializer):
             "notes",
             "created_at",
             "document_count",
+            "hearing_count",
+            "thread_count",
+            "conversation_count",
         ]
         read_only_fields = ["id", "created_at"]
 
     def get_document_count(self, obj: Case) -> int:
         return obj.documents.count()
+
+    def get_hearing_count(self, obj: Case) -> int:
+        return obj.hearings.count()

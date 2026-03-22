@@ -15,6 +15,7 @@ from .chat import (
 )
 from .conversation import ConversationDetailSerializer, ConversationListSerializer
 from .document import DocumentSerializer, DocumentUploadSerializer
+from .hearing import HearingSerializer
 
 __all__ = [
     "CaseSerializer",
@@ -25,5 +26,6 @@ __all__ = [
     "ConversationListSerializer",
     "DocumentSerializer",
     "DocumentUploadSerializer",
+    "HearingSerializer",
     "MessageSerializer",
 ]

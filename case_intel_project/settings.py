@@ -191,6 +191,15 @@ else:
 MEDIA_ROOT = BASE_DIR / "media"
 MEDIA_URL = "/media/"
 
+# ============================================================================
+# Gmail OAuth Configuration
+# ============================================================================
+GMAIL_CLIENT_ID = config("GMAIL_CLIENT_ID", default="")
+GMAIL_CLIENT_SECRET = config("GMAIL_CLIENT_SECRET", default="")
+GMAIL_REDIRECT_URI = config(
+    "GMAIL_REDIRECT_URI", default="http://localhost:8000/api/gmail/callback/"
+)
+
 # Logging
 LOGGING = {
     "version": 1,
