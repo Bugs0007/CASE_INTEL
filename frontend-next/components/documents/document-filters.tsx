@@ -47,7 +47,11 @@ export function DocumentFilters({
         />
 
         {/* Case Filter */}
-        <Select onChange={(e) => onCaseChange(e.target.value ? Number(e.target.value) : null)}>
+        <Select
+          onChange={(e) =>
+            onCaseChange(e.target.value ? Number(e.target.value) : null)
+          }
+        >
           <option value="">All Cases</option>
           {cases.map((caseItem) => (
             <option key={caseItem.id} value={caseItem.id}>
@@ -57,7 +61,11 @@ export function DocumentFilters({
         </Select>
 
         {/* Type Filter */}
-        <Select onChange={(e) => onTypeChange((e.target.value as DocumentType) || null)}>
+        <Select
+          onChange={(e) =>
+            onTypeChange((e.target.value as DocumentType) || null)
+          }
+        >
           <option value="">All Types</option>
           {DOCUMENT_TYPES.map((type) => (
             <option key={type} value={type}>
@@ -67,7 +75,11 @@ export function DocumentFilters({
         </Select>
 
         {/* Status Filter */}
-        <Select onChange={(e) => onStatusChange((e.target.value as ProcessingStatus) || null)}>
+        <Select
+          onChange={(e) =>
+            onStatusChange((e.target.value as ProcessingStatus) || null)
+          }
+        >
           <option value="">All Statuses</option>
           {PROCESSING_STATUSES.map((status) => (
             <option key={status} value={status}>

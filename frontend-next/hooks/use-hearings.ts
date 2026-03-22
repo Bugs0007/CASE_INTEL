@@ -1,10 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { hearingsApi } from "@/lib/api/hearings";
-import type {
-  Hearing,
-  HearingCreateInput,
-  HearingUpdateInput,
-} from "@/types";
+import type { Hearing, HearingCreateInput, HearingUpdateInput } from "@/types";
 
 // Query keys factory
 export const hearingKeys = {
@@ -21,12 +17,14 @@ export const hearingKeys = {
 };
 
 // List hearings hook
-export function useHearings(filters: {
-  case_id?: number;
-  status?: string;
-  upcoming?: boolean;
-  past?: boolean;
-} = {}) {
+export function useHearings(
+  filters: {
+    case_id?: number;
+    status?: string;
+    upcoming?: boolean;
+    past?: boolean;
+  } = {},
+) {
   return useQuery({
     queryKey: hearingKeys.list(filters),
     queryFn: () => hearingsApi.list(filters),

@@ -45,18 +45,17 @@ export default function EmailsPage() {
       {/* Top Section: Gmail Status + Sync Config */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <GmailStatusCard
-          status={gmailStatus || {
-            is_connected: false,
-            email_address: "",
-            total_emails_synced: 0,
-            last_sync_time: null,
-          }}
+          status={
+            gmailStatus || {
+              is_connected: false,
+              email_address: "",
+              total_emails_synced: 0,
+              last_sync_time: null,
+            }
+          }
           isLoading={statusLoading}
         />
-        <SyncConfigCard
-          onSync={handleSync}
-          isSyncing={syncEmails.isPending}
-        />
+        <SyncConfigCard onSync={handleSync} isSyncing={syncEmails.isPending} />
       </div>
 
       {/* Emails Table */}

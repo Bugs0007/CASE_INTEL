@@ -11,10 +11,12 @@ export const emailKeys = {
 };
 
 // List emails hook
-export function useEmails(filters: {
-  case_id?: number;
-  linked_status?: string;
-} = {}) {
+export function useEmails(
+  filters: {
+    case_id?: number;
+    linked_status?: string;
+  } = {},
+) {
   return useQuery({
     queryKey: emailKeys.list(filters),
     queryFn: () => emailsApi.list(filters),

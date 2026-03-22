@@ -1,20 +1,22 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { documentsApi } from '@/lib/api/documents';
-import type { Document, DocumentUploadInput } from '@/types';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { documentsApi } from "@/lib/api/documents";
+import type { Document, DocumentUploadInput } from "@/types";
 
 export const documentKeys = {
-  all: ['documents'] as const,
-  lists: () => [...documentKeys.all, 'list'] as const,
+  all: ["documents"] as const,
+  lists: () => [...documentKeys.all, "list"] as const,
   list: (filters: { case_id?: number; document_type?: string }) =>
     [...documentKeys.lists(), filters] as const,
-  details: () => [...documentKeys.all, 'detail'] as const,
+  details: () => [...documentKeys.all, "detail"] as const,
   detail: (id: number) => [...documentKeys.details(), id] as const,
 };
 
-export function useDocuments(filters: {
-  case_id?: number;
-  document_type?: string;
-} = {}) {
+export function useDocuments(
+  filters: {
+    case_id?: number;
+    document_type?: string;
+  } = {},
+) {
   return useQuery({
     queryKey: documentKeys.list(filters),
     queryFn: () => documentsApi.list(filters),

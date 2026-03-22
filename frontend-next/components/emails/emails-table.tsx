@@ -10,15 +10,17 @@ interface EmailsTableProps {
   onLinkEmail: (emailId: number, caseId: number) => void;
 }
 
-export function EmailsTable({ emails, isLoading, onLinkEmail }: EmailsTableProps) {
+export function EmailsTable({
+  emails,
+  isLoading,
+  onLinkEmail,
+}: EmailsTableProps) {
   const [linkingEmailId, setLinkingEmailId] = useState<number | null>(null);
 
   if (isLoading) {
     return (
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <div className="p-12 text-center text-gray-500">
-          Loading emails...
-        </div>
+        <div className="p-12 text-center text-gray-500">Loading emails...</div>
       </div>
     );
   }

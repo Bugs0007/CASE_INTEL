@@ -4,7 +4,11 @@ import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { DocumentFilters } from "@/components/documents/document-filters";
 import { DocumentTable } from "@/components/documents/document-table";
-import { useDocuments, useProcessDocument, useDeleteDocument } from "@/hooks/use-documents";
+import {
+  useDocuments,
+  useProcessDocument,
+  useDeleteDocument,
+} from "@/hooks/use-documents";
 import { Upload } from "lucide-react";
 import type { DocumentType, ProcessingStatus } from "@/types";
 
@@ -12,7 +16,9 @@ export default function DocumentsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCase, setSelectedCase] = useState<number | null>(null);
   const [selectedType, setSelectedType] = useState<DocumentType | null>(null);
-  const [selectedStatus, setSelectedStatus] = useState<ProcessingStatus | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<ProcessingStatus | null>(
+    null,
+  );
 
   const { data: documents = [], isLoading } = useDocuments();
   const processDocument = useProcessDocument();
