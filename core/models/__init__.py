@@ -7,6 +7,7 @@ from .document_tag import DocumentTag, DocumentTagMap
 from .document_chunk import DocumentChunk
 from .email import Email
 from .email_attachment import EmailAttachment
+from .gmail_credential import GmailCredential
 from .conversation import Conversation
 from .message import Message
 from .citation import Citation
@@ -25,6 +26,7 @@ __all__ = [
     "DocumentChunk",
     "Email",
     "EmailAttachment",
+    "GmailCredential",
     "Conversation",
     "Message",
     "Citation",

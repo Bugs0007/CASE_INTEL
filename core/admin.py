@@ -19,6 +19,7 @@ from core.models import (
     Email,
     EmailAttachment,
     Folder,
+    GmailCredential,
     Message,
     Task,
 )
@@ -142,3 +143,11 @@ class ActivityLogAdmin(admin.ModelAdmin):
     def short_description(self, obj: ActivityLog) -> str:
         desc = obj.description or ""
         return desc[:80] + "..." if len(desc) > 80 else desc
+
+
+@admin.register(GmailCredential)
+class GmailCredentialAdmin(admin.ModelAdmin):
+    list_display = ("email_address", "is_active", "created_at", "updated_at")
+    list_filter = ("is_active",)
+    search_fields = ("email_address",)
+    readonly_fields = ("created_at", "updated_at")

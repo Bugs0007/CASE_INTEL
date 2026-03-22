@@ -9,6 +9,8 @@ const API_BASE = "http://localhost:8000/api";
 let currentCaseId = null;
 let currentConversationId = null;
 let isLoading = false;
+let currentStatusFilter = "open";
+let currentView = "cases"; // 'cases' | 'dashboard'
 
 // ===== INITIALIZATION =====
 
@@ -63,9 +65,12 @@ function setupEventListeners() {
 
 // ===== CASE MANAGEMENT =====
 
-async function loadCases() {
+async function loadCases(status = currentStatusFilter) {
   try {
-    const res = await fetch(`${API_BASE}/cases/`);
+    const url = status
+      ? `${API_BASE}/cases/?status=${status}`
+      : `${API_BASE}/cases/`;
+    const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
     const cases = await res.json();
@@ -73,7 +78,7 @@ async function loadCases() {
 
     if (cases.length === 0) {
       list.innerHTML =
-        '<div class="empty-state" style="padding: 20px 10px;"><p>No cases yet</p></div>';
+        '<div class="empty-state" style="padding: 20px 10px;"><p>No cases</p></div>';
       return;
     }
 
@@ -83,7 +88,10 @@ async function loadCases() {
       <div class="case-item ${c.id === currentCaseId ? "active" : ""}" onclick="selectCase(${c.id})">
         <div class="case-item-number">${c.case_number}</div>
         <div class="case-item-title">${c.title}</div>
-        <div class="case-item-meta">${c.document_count} document${c.document_count !== 1 ? "s" : ""}</div>
+        <div class="case-item-meta">
+          ${c.document_count} docs | ${c.thread_count || 0} threads | ${c.conversation_count || 0} chats
+        </div>
+        ${c.case_type ? `<span class="case-type-badge">${c.case_type}</span>` : ""}
       </div>
     `,
       )
@@ -93,6 +101,17 @@ async function loadCases() {
     document.getElementById("cases-list").innerHTML =
       '<div class="empty-state"><p>Failed to load cases</p></div>';
   }
+}
+
+function filterCases(status) {
+  currentStatusFilter = status;
+
+  // Update tab UI
+  document.querySelectorAll(".status-tab").forEach((tab) => {
+    tab.classList.toggle("active", tab.dataset.status === status);
+  });
+
+  loadCases(status);
 }
 
 async function selectCase(caseId) {
@@ -479,3 +498,180 @@ document.getElementById("upload-modal").addEventListener("click", (e) => {
     document.getElementById("file-name").style.display = "none";
   }
 });
+
+// ===== VIEW SWITCHING =====
+
+function showDashboard() {
+  currentView = "dashboard";
+  currentCaseId = null;
+
+  // Update nav buttons
+  document.getElementById("nav-cases").classList.remove("active");
+  document.getElementById("nav-dashboard").classList.add("active");
+
+  // Show dashboard, hide case details
+  document.getElementById("dashboard-view").style.display = "block";
+  document.getElementById("case-details").style.display = "none";
+
+  loadDashboard();
+}
+
+function showCasesView() {
+  currentView = "cases";
+
+  // Update nav buttons
+  document.getElementById("nav-dashboard").classList.remove("active");
+  document.getElementById("nav-cases").classList.add("active");
+
+  // Hide dashboard, show case details
+  document.getElementById("dashboard-view").style.display = "none";
+  document.getElementById("case-details").style.display = "block";
+}
+
+// ===== DASHBOARD =====
+
+async function loadDashboard() {
+  try {
+    const res = await fetch(`${API_BASE}/dashboard/`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const data = await res.json();
+
+    // Update stats
+    document.getElementById("stat-active-cases").textContent =
+      data.stats.active_cases;
+    document.getElementById("stat-total-docs").textContent =
+      data.stats.total_documents;
+    document.getElementById("stat-email-threads").textContent =
+      data.stats.email_threads;
+    document.getElementById("stat-pending").textContent =
+      data.stats.documents_by_status?.pending || 0;
+
+    // Recent emails
+    const emailsHtml =
+      data.recent_emails.length === 0
+        ? '<p class="empty-text">No recent emails</p>'
+        : data.recent_emails
+            .map(
+              (e) => `
+          <div class="recent-item">
+            <div class="recent-item-title">${e.subject || "(No subject)"}</div>
+            <div class="recent-item-meta">${e.sender || "Unknown"} | ${formatDate(e.sent_at)}</div>
+          </div>
+        `,
+            )
+            .join("");
+    document.getElementById("recent-emails-list").innerHTML = emailsHtml;
+
+    // Recent activity
+    const activityHtml =
+      data.recent_activity.length === 0
+        ? '<p class="empty-text">No recent activity</p>'
+        : data.recent_activity
+            .map(
+              (a) => `
+          <div class="recent-item">
+            <div class="recent-item-title">${a.description || a.activity_type}</div>
+            <div class="recent-item-meta">${formatDate(a.created_at)}</div>
+          </div>
+        `,
+            )
+            .join("");
+    document.getElementById("recent-activity-list").innerHTML = activityHtml;
+
+    // Active cases
+    const casesHtml =
+      data.active_cases_summary.length === 0
+        ? '<p class="empty-text">No active cases</p>'
+        : data.active_cases_summary
+            .map(
+              (c) => `
+          <div class="case-summary-item" onclick="selectCaseFromDashboard(${c.id})">
+            <span class="priority-badge ${c.priority}">${c.priority}</span>
+            <strong>${c.case_number}</strong>: ${c.title}
+            <span class="doc-count">${c.document_count} docs</span>
+          </div>
+        `,
+            )
+            .join("");
+    document.getElementById("active-cases-list").innerHTML = casesHtml;
+  } catch (err) {
+    console.error("Failed to load dashboard:", err);
+  }
+}
+
+function selectCaseFromDashboard(caseId) {
+  showCasesView();
+  selectCase(caseId);
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  return (
+    date.toLocaleDateString() +
+    " " +
+    date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+  );
+}
+
+// ===== GMAIL =====
+
+function showGmailModal() {
+  openModal("gmail-modal");
+  checkGmailStatus();
+}
+
+async function checkGmailStatus() {
+  try {
+    const res = await fetch(`${API_BASE}/gmail/status/`);
+    const data = await res.json();
+
+    document.getElementById("gmail-status-content").style.display = "none";
+
+    if (data.connected) {
+      document.getElementById("gmail-connect-section").style.display = "none";
+      document.getElementById("gmail-connected-section").style.display =
+        "block";
+      document.getElementById("gmail-email").textContent = data.email;
+    } else {
+      document.getElementById("gmail-connect-section").style.display = "block";
+      document.getElementById("gmail-connected-section").style.display = "none";
+    }
+  } catch (err) {
+    console.error("Gmail status check failed:", err);
+    document.getElementById("gmail-status-content").innerHTML =
+      '<p style="color: #e74c3c;">Gmail integration not configured yet.</p>';
+    document.getElementById("gmail-connect-section").style.display = "none";
+    document.getElementById("gmail-connected-section").style.display = "none";
+  }
+}
+
+async function connectGmail() {
+  try {
+    const res = await fetch(`${API_BASE}/gmail/auth/`);
+    const data = await res.json();
+    window.location.href = data.auth_url;
+  } catch (err) {
+    alertError("Failed to start Gmail connection");
+  }
+}
+
+async function syncGmail() {
+  try {
+    const res = await fetch(`${API_BASE}/gmail/sync/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ max_results: 50, days_back: 7 }),
+    });
+    const data = await res.json();
+    alert(`Synced ${data.synced_count} emails`);
+    loadDashboard();
+  } catch (err) {
+    alertError("Gmail sync failed");
+  }
+}
+
+function disconnectGmail() {
+  alert("Disconnect functionality not implemented yet");
+}
