@@ -142,10 +142,25 @@ REST_FRAMEWORK = {
 
 # CORS Configuration
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:8080",
-    "http://127.0.0.1:8080",
+    "http://localhost:3000",  # Next.js default port
+    "http://127.0.0.1:3000",  # Next.js default port
+    "http://localhost:8080",  # Alternative frontend port
+    "http://127.0.0.1:8080",  # Alternative frontend port
 ]
 CORS_ALLOW_CREDENTIALS = True
+
+# Additional CORS headers for better API integration
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
 
 
 # ============================================================================
