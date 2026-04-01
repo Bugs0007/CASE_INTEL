@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { MessageSquare, Send, RefreshCw } from "lucide-react";
 import { cn, formatRelativeTime } from "@/lib/utils";
-import type { Message, Citation } from "@/types";
+import { chatApi } from "@/lib/api/chat";
+import type { Message, Citation, ChatResponse } from "@/types";
 
 interface ChatPanelProps {
   caseId: number;
@@ -16,6 +17,8 @@ export function ChatPanel({ caseId, className }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [conversationId, setConversationId] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -39,38 +42,48 @@ export function ChatPanel({ caseId, className }: ChatPanelProps) {
     setMessages((prev) => [...prev, userMessage]);
     setInputValue("");
     setIsLoading(true);
+    setError(null);
 
     try {
-      // TODO: Implement actual API call
-      // const response = await chatApi.send({
-      //   query: inputValue,
-      //   case_id: caseId,
-      // });
+      const response: ChatResponse = await chatApi.send({
+        query: inputValue,
+        case_id: caseId,
+        conversation_id: conversationId || undefined,
+      });
 
-      // Simulate AI response
-      setTimeout(() => {
-        const aiMessage: Message = {
-          id: Date.now() + 1,
-          role: "assistant",
-          content:
-            "I'm analyzing your case documents and legal precedents. Based on the information available, I can help you with legal research, document analysis, and case strategy development. What specific aspect of the case would you like me to focus on?",
-          created_at: new Date().toISOString(),
-          citations: [
-            {
-              id: 1,
-              source_type: "document",
-              document_id: 1,
-              chunk_id: null,
-              citation_text: "Contract Agreement Section 3.2",
-              created_at: new Date().toISOString(),
-            },
-          ],
-        };
-        setMessages((prev) => [...prev, aiMessage]);
-        setIsLoading(false);
-      }, 2000);
-    } catch (error) {
-      console.error("Chat error:", error);
+      // Update conversation ID if new conversation started
+      if (response.conversation_id && !conversationId) {
+        setConversationId(response.conversation_id);
+      }
+
+      const aiMessage: Message = {
+        id: response.message_id || Date.now() + 1,
+        role: "assistant",
+        content: response.answer,
+        created_at: new Date().toISOString(),
+        citations: response.citations,
+      };
+
+      // If clarification is needed, add it to the response
+      if (response.requires_clarification && response.clarification_question) {
+        aiMessage.content += `\n\n*${response.clarification_question}*`;
+      }
+
+      setMessages((prev) => [...prev, aiMessage]);
+    } catch (err) {
+      console.error("Chat error:", err);
+      setError("Failed to send message. Please try again.");
+
+      // Add error message to chat
+      const errorMessage: Message = {
+        id: Date.now() + 1,
+        role: "assistant",
+        content:
+          "I'm sorry, I encountered an error processing your request. Please try again.",
+        created_at: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
       setIsLoading(false);
     }
   };
@@ -84,6 +97,8 @@ export function ChatPanel({ caseId, className }: ChatPanelProps) {
 
   const startNewChat = () => {
     setMessages([]);
+    setConversationId(null);
+    setError(null);
   };
 
   return (

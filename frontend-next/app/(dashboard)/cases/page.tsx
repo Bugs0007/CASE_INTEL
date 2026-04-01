@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { CaseFilters } from "@/components/cases/case-filters";
 import { CaseGrid } from "@/components/cases/case-grid";
+import { CreateCaseDialog } from "@/components/cases/create-case-dialog";
 import { useCases } from "@/hooks/use-cases";
 import { Plus } from "lucide-react";
 import type { CaseStatus } from "@/types";
@@ -11,6 +12,7 @@ import type { CaseStatus } from "@/types";
 export default function CasesPage() {
   const [activeStatus, setActiveStatus] = useState<CaseStatus | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   const { data: cases = [], isLoading, error } = useCases(activeStatus);
 
@@ -53,12 +55,7 @@ export default function CasesPage() {
             Manage and track all your legal cases
           </p>
         </div>
-        <Button
-          variant="primary"
-          onClick={() => {
-            // TODO: Open create case dialog
-          }}
-        >
+        <Button variant="primary" onClick={() => setIsCreateDialogOpen(true)}>
           <Plus className="h-4 w-4" />
           New Case
         </Button>
@@ -84,6 +81,12 @@ export default function CasesPage() {
           {searchQuery && ` matching "${searchQuery}"`}
         </div>
       )}
+
+      {/* Create Case Dialog */}
+      <CreateCaseDialog
+        isOpen={isCreateDialogOpen}
+        onClose={() => setIsCreateDialogOpen(false)}
+      />
     </div>
   );
 }

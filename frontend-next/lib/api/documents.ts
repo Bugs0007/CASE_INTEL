@@ -2,8 +2,8 @@ import { apiClient, uploadFile } from "./client";
 import type { Document, DocumentUploadInput } from "@/types";
 
 export const documentsApi = {
-  list: (caseId?: number) =>
-    apiClient<Document[]>("/documents/", { params: { case_id: caseId } }),
+  list: (filters?: { case_id?: number; document_type?: string }) =>
+    apiClient<Document[]>("/documents/", { params: filters }),
 
   get: (id: number) => apiClient<Document>(`/documents/${id}/`),
 
@@ -17,6 +17,12 @@ export const documentsApi = {
 
   process: (id: number) =>
     apiClient<Document>(`/documents/${id}/process/`, { method: "POST" }),
+
+  // Get processing status for real-time updates
+  getStatus: (id: number) =>
+    apiClient<{ status: string; progress?: number; error?: string }>(
+      `/documents/${id}/status/`,
+    ),
 
   delete: (id: number) =>
     apiClient<void>(`/documents/${id}/`, { method: "DELETE" }),

@@ -10,14 +10,21 @@ export interface Email {
 
 export interface GmailStatus {
   connected: boolean;
+  is_connected?: boolean;
   email?: string;
+  email_address?: string;
   last_sync?: string | null;
+  last_sync_time?: string | null;
+  total_emails_synced?: number;
 }
 
 export interface SyncConfig {
-  labels?: string[];
+  labels?: string[] | string;
   max_results?: number;
   days_back?: number;
+  start_date?: string;
+  end_date?: string;
+  keywords?: string;
 }
 
 export interface SyncResult {

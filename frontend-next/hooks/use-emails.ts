@@ -29,7 +29,7 @@ export function useLinkEmail() {
 
   return useMutation({
     mutationFn: ({ emailId, caseId }: { emailId: number; caseId: number }) =>
-      emailsApi.linkToCase(emailId, caseId),
+      emailsApi.link(emailId, caseId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: emailKeys.lists() });
     },
