@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FileText, Download, Trash2, Play } from "lucide-react";
+import { Download, Trash2, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatDate, getFileIcon } from "@/lib/utils";
 import type { Document } from "@/types";
@@ -19,14 +19,14 @@ export function DocumentRow({
   isProcessing,
   isDeleting,
 }: DocumentRowProps) {
-  const Icon = getFileIcon(document.file_type);
+  const fileIcon = getFileIcon(document.file_type);
 
   return (
     <tr className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
       {/* Name */}
       <td className="py-4 px-6">
         <div className="flex items-center gap-3">
-          <Icon className="h-5 w-5 text-gray-400 flex-shrink-0" />
+          <span className="text-xl flex-shrink-0">{fileIcon}</span>
           <div className="min-w-0">
             <div className="font-medium text-gray-900 truncate">
               {document.file_name}

@@ -4,6 +4,8 @@ import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { DocumentFilters } from "@/components/documents/document-filters";
 import { DocumentTable } from "@/components/documents/document-table";
+import { UploadDocumentDialog } from "@/components/documents/upload-document-dialog";
+import { showToast } from "@/components/ui/toaster";
 import {
   useDocuments,
   useProcessDocument,
@@ -19,6 +21,7 @@ export default function DocumentsPage() {
   const [selectedStatus, setSelectedStatus] = useState<ProcessingStatus | null>(
     null,
   );
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
 
   const { data: documents = [], isLoading } = useDocuments();
   const processDocument = useProcessDocument();
@@ -60,8 +63,16 @@ export default function DocumentsPage() {
   const handleProcess = async (id: number) => {
     try {
       await processDocument.mutateAsync(id);
+      showToast.success(
+        "Processing started",
+        "Document is being analyzed by AI.",
+      );
     } catch (error) {
       console.error("Failed to process document:", error);
+      showToast.error(
+        "Processing failed",
+        "Could not start document processing.",
+      );
     }
   };
 
@@ -70,8 +81,10 @@ export default function DocumentsPage() {
 
     try {
       await deleteDocument.mutateAsync(id);
+      showToast.success("Document deleted", "The document has been removed.");
     } catch (error) {
       console.error("Failed to delete document:", error);
+      showToast.error("Delete failed", "Could not delete the document.");
     }
   };
 
@@ -85,12 +98,7 @@ export default function DocumentsPage() {
             Manage and analyze all case documents
           </p>
         </div>
-        <Button
-          variant="primary"
-          onClick={() => {
-            // TODO: Open upload dialog
-          }}
-        >
+        <Button variant="primary" onClick={() => setIsUploadDialogOpen(true)}>
           <Upload className="h-4 w-4" />
           Upload Document
         </Button>
@@ -127,6 +135,12 @@ export default function DocumentsPage() {
           {selectedStatus && ` with status "${selectedStatus}"`}
         </div>
       )}
+
+      {/* Upload Document Dialog */}
+      <UploadDocumentDialog
+        isOpen={isUploadDialogOpen}
+        onClose={() => setIsUploadDialogOpen(false)}
+      />
     </div>
   );
 }
