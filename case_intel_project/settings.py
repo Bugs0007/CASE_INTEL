@@ -43,6 +43,8 @@ INSTALLED_APPS = [
     "rest_framework",
     "corsheaders",
     "django_extensions",
+    "django_celery_beat",
+    "django_celery_results",
     "core",
 ]
 
@@ -215,6 +217,34 @@ GMAIL_CLIENT_SECRET = config("GMAIL_CLIENT_SECRET", default="")
 GMAIL_REDIRECT_URI = config(
     "GMAIL_REDIRECT_URI", default="http://localhost:8000/api/gmail/callback/"
 )
+
+# ============================================================================
+# Celery Configuration
+# ============================================================================
+CELERY_BROKER_URL = config("CELERY_BROKER_URL", default="redis://localhost:6379/0")
+CELERY_RESULT_BACKEND = config("CELERY_RESULT_BACKEND", default="redis://localhost:6379/0")
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes max per task
+CELERY_TASK_SOFT_TIME_LIMIT = 25 * 60  # Soft limit at 25 minutes
+
+# ============================================================================
+# Cache Configuration (Redis)
+# ============================================================================
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': config("REDIS_URL", default="redis://127.0.0.1:6379/1"),
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django.core.cache.backends.redis.RedisClient',
+        },
+        'KEY_PREFIX': 'case_intel',
+        'TIMEOUT': 300,  # Default 5 minutes
+    }
+}
 
 # Logging
 LOGGING = {

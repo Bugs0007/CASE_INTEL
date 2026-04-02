@@ -74,15 +74,15 @@ ollama serve
 ### Step 5: Start Frontend (Terminal 5)
 
 ```bash
-cd frontend
-python serve.py
+cd frontend-next
+npm run dev
 ```
 
-✅ You should see: `Server running at: http://localhost:8080`
+✅ You should see: `ready - started server on 0.0.0.0:3000`
 
 ### Step 6: Open Browser
 
-Navigate to: **http://localhost:8080** ← Click here
+Navigate to: **http://localhost:3000** ← Click here
 
 ---
 
@@ -128,6 +128,10 @@ curl http://localhost:8000/api/cases/
 ```
 
 If you get "Connection refused", backend isn't running on port 8000.
+
+**Frontend ports:**
+- Next.js development: `http://localhost:3000`
+- Django API: `http://localhost:8000`
 
 ---
 

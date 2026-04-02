@@ -1,6 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { documentsApi } from "@/lib/api/documents";
-import type { Document, DocumentUploadInput } from "@/types";
+import type {
+  Document,
+  DocumentUploadInput,
+  DocumentUpdateInput,
+} from "@/types";
 
 export const documentKeys = {
   all: ["documents"] as const,
@@ -40,6 +44,20 @@ export function useUploadDocument() {
   return useMutation({
     mutationFn: (data: DocumentUploadInput) => documentsApi.upload(data),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: documentKeys.lists() });
+    },
+  });
+}
+
+// Update document mutation
+export function useUpdateDocument() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: DocumentUpdateInput }) =>
+      documentsApi.update(id, data),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: documentKeys.detail(id) });
       queryClient.invalidateQueries({ queryKey: documentKeys.lists() });
     },
   });

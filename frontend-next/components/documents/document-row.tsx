@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Download, Trash2, Play } from "lucide-react";
+import { Download, Trash2, Play, Loader2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatDate, getFileIcon } from "@/lib/utils";
 import type { Document } from "@/types";
@@ -8,6 +8,7 @@ interface DocumentRowProps {
   document: Document;
   onProcess: (id: number) => void;
   onDelete: (id: number) => void;
+  onEdit: (document: Document) => void;
   isProcessing?: boolean;
   isDeleting?: boolean;
 }
@@ -16,6 +17,7 @@ export function DocumentRow({
   document,
   onProcess,
   onDelete,
+  onEdit,
   isProcessing,
   isDeleting,
 }: DocumentRowProps) {
@@ -29,7 +31,7 @@ export function DocumentRow({
           <span className="text-xl flex-shrink-0">{fileIcon}</span>
           <div className="min-w-0">
             <div className="font-medium text-gray-900 truncate">
-              {document.file_name}
+              {document.filename}
             </div>
             <div className="text-xs text-gray-500 capitalize">
               {document.document_type}
@@ -57,7 +59,7 @@ export function DocumentRow({
 
       {/* Date */}
       <td className="py-4 px-6 text-sm text-gray-600">
-        {formatDate(document.upload_date, "MMM d, yyyy")}
+        {formatDate(document.document_date || document.created_at, "MMM d, yyyy")}
       </td>
 
       {/* AI Insight */}
@@ -104,10 +106,23 @@ export function DocumentRow({
               onClick={() => onProcess(document.id)}
               disabled={isProcessing}
             >
-              <Play className="h-4 w-4" />
-              Process
+              {isProcessing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Play className="h-4 w-4" />
+              )}
+              {isProcessing ? "Processing..." : "Process"}
             </Button>
           )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="p-1 h-8 w-8"
+            onClick={() => onEdit(document)}
+            title="Edit"
+          >
+            <Pencil className="h-4 w-4 text-gray-600" />
+          </Button>
           <Button
             variant="ghost"
             size="sm"

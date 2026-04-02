@@ -19,6 +19,7 @@ from core.views import (
     DocumentUploadView,
     EmailLinkView,
     EmailListView,
+    FolderListView,
     GmailAuthView,
     GmailCallbackView,
     GmailStatusView,
@@ -61,6 +62,9 @@ urlpatterns = [
         DocumentProcessView.as_view(),
         name="document-process",
     ),
+
+    # Folders
+    path("folders/", FolderListView.as_view(), name="folder-list"),
 
     # Gmail
     path("gmail/auth/", GmailAuthView.as_view(), name="gmail-auth"),

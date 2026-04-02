@@ -16,6 +16,7 @@ from .document import (
     DocumentProcessView,
     DocumentUploadView,
 )
+from .folder import FolderListView
 from .gmail import (
     EmailLinkView,
     EmailListView,
@@ -39,6 +40,7 @@ __all__ = [
     "DocumentUploadView",
     "EmailLinkView",
     "EmailListView",
+    "FolderListView",
     "GmailAuthView",
     "GmailCallbackView",
     "GmailStatusView",
