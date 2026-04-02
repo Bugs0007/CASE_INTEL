@@ -9,16 +9,19 @@ import { CaseDetailHeader } from "@/components/cases/case-detail-header";
 import { CaseOverview } from "@/components/cases/case-overview";
 import { HearingsList } from "@/components/hearings/hearings-list";
 import { ChatPanel } from "@/components/chat/chat-panel";
+import { UploadDocumentDialog } from "@/components/documents/upload-document-dialog";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Upload, Trash2, Play } from "lucide-react";
+import { FileText, Upload, Trash2, Play, Loader2 } from "lucide-react";
 import { formatDate, getFileIcon } from "@/lib/utils";
+import { showToast } from "@/components/ui/toaster";
 import { useProcessDocument, useDeleteDocument } from "@/hooks/use-documents";
 
 export default function CaseDetailPage() {
   const params = useParams();
   const caseId = Number(params.id);
   const [showChat, setShowChat] = useState(false);
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
 
   const { data: caseItem, isLoading: caseLoading } = useCase(caseId);
   const { data: documents = [], isLoading: docsLoading } = useDocuments({
@@ -57,9 +60,10 @@ export default function CaseDetailPage() {
   const handleProcessDocument = async (docId: number) => {
     try {
       await processDocument.mutateAsync(docId);
-      // Success feedback would go here
+      showToast.success("Processing started", "Document is being analyzed by AI.");
     } catch (error) {
       console.error("Failed to process document:", error);
+      showToast.error("Processing failed", "Could not start document processing.");
     }
   };
 
@@ -68,9 +72,10 @@ export default function CaseDetailPage() {
 
     try {
       await deleteDocument.mutateAsync(docId);
-      // Success feedback would go here
+      showToast.success("Document deleted", "The document has been removed.");
     } catch (error) {
       console.error("Failed to delete document:", error);
+      showToast.error("Delete failed", "Could not delete the document.");
     }
   };
 
@@ -95,7 +100,7 @@ export default function CaseDetailPage() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Recent Documents</CardTitle>
-                <Button variant="primary" size="sm">
+                <Button variant="primary" size="sm" onClick={() => setIsUploadDialogOpen(true)}>
                   <Upload className="h-4 w-4" />
                   Upload Document
                 </Button>
@@ -116,21 +121,23 @@ export default function CaseDetailPage() {
                 ) : (
                   <div className="space-y-2">
                     {documents.slice(0, 5).map((doc) => {
-                      const Icon = getFileIcon(doc.file_type);
+                      const fileIcon = getFileIcon(doc.file_type);
                       return (
                         <div
                           key={doc.id}
                           className="flex items-center justify-between p-3 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors"
                         >
                           <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <Icon className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                            <span className="text-xl flex-shrink-0">
+                              {fileIcon}
+                            </span>
                             <div className="flex-1 min-w-0">
                               <div className="font-medium text-gray-900 truncate">
-                                {doc.file_name}
+                                {doc.filename}
                               </div>
                               <div className="text-xs text-gray-500">
                                 {doc.document_type} •{" "}
-                                {formatDate(doc.upload_date, "MMM d, yyyy")}
+                                {formatDate(doc.created_at, "MMM d, yyyy")}
                               </div>
                             </div>
                           </div>
@@ -142,8 +149,12 @@ export default function CaseDetailPage() {
                                 onClick={() => handleProcessDocument(doc.id)}
                                 disabled={processDocument.isPending}
                               >
-                                <Play className="h-4 w-4" />
-                                Process
+                                {processDocument.isPending && processDocument.variables === doc.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Play className="h-4 w-4" />
+                                )}
+                                {processDocument.isPending && processDocument.variables === doc.id ? "Processing..." : "Process"}
                               </Button>
                             )}
                             <span
@@ -194,6 +205,13 @@ export default function CaseDetailPage() {
           <ChatPanel caseId={caseId} onClose={() => setShowChat(false)} />
         )}
       </div>
+
+      {/* Upload Document Dialog */}
+      <UploadDocumentDialog
+        isOpen={isUploadDialogOpen}
+        onClose={() => setIsUploadDialogOpen(false)}
+        defaultCaseId={caseId}
+      />
     </div>
   );
 }

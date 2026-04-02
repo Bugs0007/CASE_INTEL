@@ -5,9 +5,38 @@
 ### Prerequisites
 - Python 3.10+
 - PostgreSQL running
+- Redis running (for background tasks)
 - Ollama or OpenAI API key
 
-### Step 1: Start Django Backend (Terminal 1)
+### Step 1: Start Redis (Terminal 1)
+
+**Windows:**
+```bash
+# Install Redis (one-time setup)
+# Download from: https://github.com/microsoftarchive/redis/releases
+# OR use Chocolatey:
+choco install redis-64
+
+# Start Redis server
+redis-server
+```
+
+**macOS/Linux:**
+```bash
+# Install Redis (one-time setup)
+# macOS:
+brew install redis
+
+# Linux:
+sudo apt install redis-server
+
+# Start Redis server
+redis-server
+```
+
+✅ You should see: `Ready to accept connections on port 6379`
+
+### Step 2: Start Django Backend (Terminal 2)
 
 ```bash
 cd /path/to/CASE_INTEL
@@ -21,7 +50,20 @@ python manage.py runserver 8000
 
 ✅ You should see: `Starting development server at http://127.0.0.1:8000/`
 
-### Step 2: Start Ollama (Terminal 2, if using local LLM)
+### Step 3: Start Celery Worker (Terminal 3, for background tasks)
+
+```bash
+cd /path/to/CASE_INTEL
+
+# Start Celery worker
+celery -A case_intel_project worker --loglevel=info --pool=solo
+```
+
+**Note:** The `--pool=solo` flag is for Windows. On macOS/Linux, you can omit it.
+
+✅ You should see: `celery@HOSTNAME ready.` with a list of registered tasks
+
+### Step 4: Start Ollama (Terminal 4, if using local LLM)
 
 ```bash
 ollama serve
@@ -29,18 +71,18 @@ ollama serve
 
 ✅ You should see: `listening on 127.0.0.1:11434`
 
-### Step 3: Start Frontend (Terminal 3)
+### Step 5: Start Frontend (Terminal 5)
 
 ```bash
-cd frontend
-python serve.py
+cd frontend-next
+npm run dev
 ```
 
-✅ You should see: `Server running at: http://localhost:8080`
+✅ You should see: `ready - started server on 0.0.0.0:3000`
 
-### Step 4: Open Browser
+### Step 6: Open Browser
 
-Navigate to: **http://localhost:8080** ← Click here
+Navigate to: **http://localhost:3000** ← Click here
 
 ---
 
@@ -87,12 +129,40 @@ curl http://localhost:8000/api/cases/
 
 If you get "Connection refused", backend isn't running on port 8000.
 
+**Frontend ports:**
+- Next.js development: `http://localhost:3000`
+- Django API: `http://localhost:8000`
+
 ---
 
 ## Common Issues & Fixes
 
+### ❌ "Redis connection refused"
+**Fix:** Make sure Redis is running
+```bash
+# Windows: Check if Redis is running
+redis-cli ping
+# Should return: PONG
+
+# If not running, start it:
+redis-server
+```
+
+### ❌ "Celery not picking up tasks"
+**Fix:** Make sure Celery worker is running
+```bash
+# Check if worker is running, then restart:
+celery -A case_intel_project worker --loglevel=info --pool=solo
+```
+
+### ❌ "ModuleNotFoundError: No module named 'celery'"
+**Fix:** Install dependencies
+```bash
+pip install -r requirements.txt
+```
+
 ### ❌ "Failed to load cases"
-**Fix:** Start Django backend first (Step 1)
+**Fix:** Start Django backend first (Step 2)
 
 ### ❌ "Document upload fails"
 **Fix:** Check file type is PDF/DOCX/DOC/TXT and size < 50 MB
@@ -146,6 +216,19 @@ python manage.py runserver 8001  # Use 8001 instead
 5. Conversation saved → database
 ```
 
+### When You Fetch a Court Case (NEW - Court Data Fetching):
+```
+1. User enters case number + court
+2. API creates FetchJob (status: pending)
+3. Celery picks up task → runs in background
+4. Selenium scraper → navigates court website
+5. BeautifulSoup parser → extracts case details
+6. Data saved → Case + Hearings in DB
+7. Job status → success (user sees results)
+```
+
+**Why background tasks?** Court scraping takes 5-15 seconds. Without Celery, your browser would freeze. With Celery, you get instant feedback and can do other work while waiting.
+
 ---
 
 ## Files Overview
@@ -172,7 +255,7 @@ CASE_INTEL/
 
 ## Environment Variables
 
-Create `.env` in project root:
+Create `.env` in project root (copy from `.env.example`):
 
 ```bash
 # Database
@@ -181,6 +264,11 @@ DB_USER=postgres
 DB_PASSWORD=your_password
 DB_HOST=localhost
 DB_PORT=5432
+
+# Redis (for Celery task queue and caching)
+CELERY_BROKER_URL=redis://localhost:6379/0
+CELERY_RESULT_BACKEND=redis://localhost:6379/0
+REDIS_URL=redis://127.0.0.1:6379/1
 
 # AI Provider (choose one)
 USE_OLLAMA=true                    # Local LLM (free)
@@ -194,6 +282,11 @@ OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-4o
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 ```
+
+**Note:** Redis URLs use different database numbers:
+- `redis://localhost:6379/0` - Celery task queue
+- `redis://localhost:6379/1` - Django caching
+- Both use the **same Redis instance** (no extra setup needed)
 
 ---
 

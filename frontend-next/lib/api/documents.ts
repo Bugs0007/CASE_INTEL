@@ -1,5 +1,5 @@
 import { apiClient, uploadFile } from "./client";
-import type { Document, DocumentUploadInput } from "@/types";
+import type { Document, DocumentUploadInput, DocumentUpdateInput } from "@/types";
 
 export const documentsApi = {
   list: (filters?: { case_id?: number; document_type?: string }) =>
@@ -14,6 +14,12 @@ export const documentsApi = {
     if (document_type) formData.append("document_type", document_type);
     return uploadFile<Document>("/documents/upload/", formData);
   },
+
+  update: (id: number, data: DocumentUpdateInput) =>
+    apiClient<Document>(`/documents/${id}/`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
 
   process: (id: number) =>
     apiClient<Document>(`/documents/${id}/process/`, { method: "POST" }),

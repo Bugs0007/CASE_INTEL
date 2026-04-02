@@ -4,18 +4,44 @@ Serializers for documents and document uploads.
 
 from rest_framework import serializers
 
-from core.models import Document
+from core.models import Document, Case, Folder
+
 
 ALLOWED_UPLOAD_EXTENSIONS = {"pdf", "txt", "docx", "doc"}
 MAX_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024  # 50 MB
 
 
+class CaseNestedSerializer(serializers.ModelSerializer):
+    """Nested case serializer for document editing with inline case title editing."""
+    
+    class Meta:
+        model = Case
+        fields = ["id", "title", "case_number", "client_name"]
+        extra_kwargs = {
+            "case_number": {"read_only": True},  # Case number should not be editable
+            "client_name": {"read_only": True},  # Keep client name read-only for now
+        }
+
+
 class DocumentSerializer(serializers.ModelSerializer):
+    # Add nested case serializer for inline editing
+    case = CaseNestedSerializer(required=False, allow_null=True)
+    
+    # Add case_title as a separate field for backward compatibility
+    case_title = serializers.CharField(source='case.title', read_only=True, required=False)
+    
+    # Add folder name for display
+    folder_name = serializers.CharField(source='folder.name', read_only=True, required=False)
+    
     class Meta:
         model = Document
         fields = [
             "id",
             "case_id",
+            "case",
+            "case_title",
+            "folder",
+            "folder_name",
             "filename",
             "file_path",
             "file_type",
@@ -26,7 +52,40 @@ class DocumentSerializer(serializers.ModelSerializer):
             "chunk_count",
             "created_at",
         ]
-        read_only_fields = ["id", "created_at", "processing_status", "chunk_count"]
+        read_only_fields = [
+            "id", 
+            "created_at", 
+            "processing_status", 
+            "chunk_count",
+            "file_path",  # File path should not be user-editable
+            "file_type",  # File type is determined by the file
+            "file_size",  # File size is determined by the file
+        ]
+    
+    def update(self, instance, validated_data):
+        # Handle nested case update
+        case_data = validated_data.pop('case', None)
+        
+        # Update the document instance
+        instance = super().update(instance, validated_data)
+        
+        # Update the related case if case data is provided and case exists
+        if case_data and instance.case:
+            case_serializer = CaseNestedSerializer(instance.case, data=case_data, partial=True)
+            if case_serializer.is_valid():
+                case_serializer.save()
+        
+        return instance
+    
+    def to_representation(self, instance):
+        # Get the standard representation
+        data = super().to_representation(instance)
+        
+        # If case exists, include nested case data
+        if instance.case:
+            data['case'] = CaseNestedSerializer(instance.case).data
+            
+        return data
 
 
 class DocumentUploadSerializer(serializers.Serializer):
@@ -34,6 +93,7 @@ class DocumentUploadSerializer(serializers.Serializer):
 
     file = serializers.FileField()
     case_id = serializers.IntegerField(required=False, allow_null=True)
+    folder_id = serializers.IntegerField(required=False, allow_null=True)
     document_type = serializers.ChoiceField(
         choices=[c[0] for c in Document.DOCUMENT_TYPE_CHOICES],
         required=False,
@@ -57,4 +117,14 @@ class DocumentUploadSerializer(serializers.Serializer):
                 f"File size exceeds the {max_mb} MB limit."
             )
 
+        return value
+    
+    def validate_case_id(self, value):
+        if value is not None and not Case.objects.filter(id=value).exists():
+            raise serializers.ValidationError(f"Case with id {value} does not exist.")
+        return value
+    
+    def validate_folder_id(self, value):
+        if value is not None and not Folder.objects.filter(id=value).exists():
+            raise serializers.ValidationError(f"Folder with id {value} does not exist.")
         return value

@@ -12,13 +12,10 @@ interface DocumentFiltersProps {
 }
 
 const DOCUMENT_TYPES: DocumentType[] = [
-  "pleading",
   "motion",
-  "brief",
   "evidence",
   "correspondence",
   "contract",
-  "order",
   "other",
 ];
 

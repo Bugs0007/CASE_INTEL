@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { DocumentFilters } from "@/components/documents/document-filters";
 import { DocumentTable } from "@/components/documents/document-table";
 import { UploadDocumentDialog } from "@/components/documents/upload-document-dialog";
+import { EditDocumentDialog } from "@/components/documents/edit-document-dialog";
 import { showToast } from "@/components/ui/toaster";
 import {
   useDocuments,
@@ -12,7 +13,7 @@ import {
   useDeleteDocument,
 } from "@/hooks/use-documents";
 import { Upload } from "lucide-react";
-import type { DocumentType, ProcessingStatus } from "@/types";
+import type { Document, DocumentType, ProcessingStatus } from "@/types";
 
 export default function DocumentsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -22,6 +23,7 @@ export default function DocumentsPage() {
     null,
   );
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  const [editingDocument, setEditingDocument] = useState<Document | null>(null);
 
   const { data: documents = [], isLoading } = useDocuments();
   const processDocument = useProcessDocument();
@@ -34,8 +36,8 @@ export default function DocumentsPage() {
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         const matchesSearch =
-          doc.file_name.toLowerCase().includes(query) ||
-          doc.document_type.toLowerCase().includes(query) ||
+          doc.filename?.toLowerCase().includes(query) ||
+          doc.document_type?.toLowerCase().includes(query) ||
           doc.case?.title.toLowerCase().includes(query) ||
           doc.case?.case_number.toLowerCase().includes(query);
         if (!matchesSearch) return false;
@@ -88,6 +90,10 @@ export default function DocumentsPage() {
     }
   };
 
+  const handleEdit = (document: Document) => {
+    setEditingDocument(document);
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       {/* Header */}
@@ -120,6 +126,7 @@ export default function DocumentsPage() {
         isLoading={isLoading}
         onProcess={handleProcess}
         onDelete={handleDelete}
+        onEdit={handleEdit}
         processingId={processDocument.variables}
         deletingId={deleteDocument.variables}
       />
@@ -140,6 +147,13 @@ export default function DocumentsPage() {
       <UploadDocumentDialog
         isOpen={isUploadDialogOpen}
         onClose={() => setIsUploadDialogOpen(false)}
+      />
+
+      {/* Edit Document Dialog */}
+      <EditDocumentDialog
+        isOpen={!!editingDocument}
+        document={editingDocument}
+        onClose={() => setEditingDocument(null)}
       />
     </div>
   );

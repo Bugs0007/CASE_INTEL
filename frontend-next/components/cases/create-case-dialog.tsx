@@ -76,6 +76,8 @@ export function CreateCaseDialog({
 
   // Close on escape key
   useEffect(() => {
+    if (typeof document === "undefined") return;
+
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isOpen) {
         onClose();

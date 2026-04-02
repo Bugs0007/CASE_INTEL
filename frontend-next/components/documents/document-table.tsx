@@ -6,6 +6,7 @@ interface DocumentTableProps {
   isLoading?: boolean;
   onProcess: (id: number) => void;
   onDelete: (id: number) => void;
+  onEdit: (document: Document) => void;
   processingId?: number;
   deletingId?: number;
 }
@@ -15,6 +16,7 @@ export function DocumentTable({
   isLoading,
   onProcess,
   onDelete,
+  onEdit,
   processingId,
   deletingId,
 }: DocumentTableProps) {
@@ -77,6 +79,7 @@ export function DocumentTable({
                 document={doc}
                 onProcess={onProcess}
                 onDelete={onDelete}
+                onEdit={onEdit}
                 isProcessing={processingId === doc.id}
                 isDeleting={deletingId === doc.id}
               />
