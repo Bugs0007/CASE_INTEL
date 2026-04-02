@@ -41,22 +41,25 @@ class GmailService:
     def get_auth_url(self) -> str:
         """Generate OAuth authorization URL."""
         try:
-            from google_auth_oauthlib.flow import Flow
+            from urllib.parse import urlencode
 
-            flow = Flow.from_client_config(
-                self.client_config,
-                scopes=self.SCOPES,
-                redirect_uri=getattr(
-                    settings,
-                    "GMAIL_REDIRECT_URI",
-                    "http://localhost:8000/api/gmail/callback/",
-                ),
+            client_id = getattr(settings, "GMAIL_CLIENT_ID", "")
+            redirect_uri = getattr(
+                settings,
+                "GMAIL_REDIRECT_URI",
+                "http://localhost:8000/api/gmail/callback/",
             )
-            auth_url, _ = flow.authorization_url(
-                access_type="offline",
-                include_granted_scopes="true",
-                prompt="consent",
-            )
+            
+            params = {
+                "client_id": client_id,
+                "redirect_uri": redirect_uri,
+                "response_type": "code",
+                "scope": " ".join(self.SCOPES),
+                "access_type": "offline",
+                "prompt": "consent",
+            }
+            
+            auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
             return auth_url
         except ImportError:
             raise ImportError(
@@ -66,21 +69,37 @@ class GmailService:
 
     def handle_oauth_callback(self, authorization_code: str) -> GmailCredential:
         """Exchange authorization code for tokens and store credentials."""
-        from google_auth_oauthlib.flow import Flow
+        import requests
+        from google.oauth2.credentials import Credentials
         from googleapiclient.discovery import build
 
-        flow = Flow.from_client_config(
-            self.client_config,
-            scopes=self.SCOPES,
-            redirect_uri=getattr(
+        # Exchange authorization code for tokens
+        token_url = "https://oauth2.googleapis.com/token"
+        data = {
+            "code": authorization_code,
+            "client_id": getattr(settings, "GMAIL_CLIENT_ID", ""),
+            "client_secret": getattr(settings, "GMAIL_CLIENT_SECRET", ""),
+            "redirect_uri": getattr(
                 settings,
                 "GMAIL_REDIRECT_URI",
                 "http://localhost:8000/api/gmail/callback/",
             ),
+            "grant_type": "authorization_code",
+        }
+        
+        response = requests.post(token_url, data=data)
+        response.raise_for_status()
+        token_data = response.json()
+        
+        # Create credentials object
+        creds = Credentials(
+            token=token_data.get("access_token"),
+            refresh_token=token_data.get("refresh_token"),
+            token_uri=token_url,
+            client_id=data["client_id"],
+            client_secret=data["client_secret"],
+            scopes=self.SCOPES,
         )
-        flow.fetch_token(code=authorization_code)
-
-        creds = flow.credentials
 
         # Get user email
         service = build("gmail", "v1", credentials=creds)
