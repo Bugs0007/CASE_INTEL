@@ -93,15 +93,15 @@ export function EditDocumentDialog({
 
         if (Array.isArray(payload.case_id) && payload.case_id[0]) {
           message = String(payload.case_id[0]);
-        } else if (Array.isArray(payload.document_type) && payload.document_type[0]) {
+        } else if (
+          Array.isArray(payload.document_type) &&
+          payload.document_type[0]
+        ) {
           message = String(payload.document_type[0]);
         }
       }
 
-      showToast.error(
-        "Update failed",
-        message,
-      );
+      showToast.error("Update failed", message);
     }
   };
 
@@ -172,7 +172,9 @@ export function EditDocumentDialog({
               id="edit_case_id"
               value={selectedCaseId?.toString() || ""}
               onChange={(e) =>
-                setSelectedCaseId(e.target.value ? Number(e.target.value) : null)
+                setSelectedCaseId(
+                  e.target.value ? Number(e.target.value) : null,
+                )
               }
             >
               <option value="">No case selected</option>
