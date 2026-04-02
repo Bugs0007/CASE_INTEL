@@ -30,7 +30,7 @@ export function EditDocumentDialog({
   isOpen,
   onClose,
   onSuccess,
-  document,
+  document: documentData,
 }: EditDocumentDialogProps) {
   const updateDocument = useUpdateDocument();
   const { data: cases = [] } = useCases("all");
@@ -41,34 +41,38 @@ export function EditDocumentDialog({
 
   // Reset form when document changes or dialog opens
   useEffect(() => {
-    if (document && isOpen) {
-      setSelectedCaseId(document.case_id);
+    if (documentData && isOpen) {
+      setSelectedCaseId(documentData.case_id);
       const allowedTypes = new Set(DOCUMENT_TYPES.map((type) => type.value));
-      const currentType = document.document_type;
+      const currentType = documentData.document_type;
       setSelectedDocType(
         currentType && allowedTypes.has(currentType) ? currentType : "other",
       );
-      setDocumentDate(document.document_date || "");
+      setDocumentDate(documentData.document_date || "");
     }
-  }, [document, isOpen]);
+  }, [documentData, isOpen]);
 
   // Close on escape key
   useEffect(() => {
-    if (typeof document === "undefined") return;
+    // Check if we're in the browser (not SSR)
+    if (typeof window === "undefined") return;
 
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isOpen) {
         onClose();
       }
     };
-    document.addEventListener("keydown", handleEscape);
-    return () => document.removeEventListener("keydown", handleEscape);
+
+    window.document.addEventListener("keydown", handleEscape);
+    return () => {
+      window.document.removeEventListener("keydown", handleEscape);
+    };
   }, [isOpen, onClose]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!document) return;
+    if (!documentData) return;
 
     const data: DocumentUpdateInput = {
       case_id: selectedCaseId,
@@ -77,7 +81,7 @@ export function EditDocumentDialog({
     };
 
     try {
-      await updateDocument.mutateAsync({ id: document.id, data });
+      await updateDocument.mutateAsync({ id: documentData.id, data });
       showToast.success(
         "Document updated",
         "Document details have been updated successfully.",
@@ -153,7 +157,7 @@ export function EditDocumentDialog({
               Document Name
             </label>
             <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 text-sm">
-              {document.filename}
+              {documentData.filename}
             </div>
             <p className="mt-1 text-xs text-gray-500">
               Document name cannot be changed
