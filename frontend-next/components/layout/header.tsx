@@ -2,7 +2,7 @@
 
 import { SearchInput } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Bell, Calendar, Upload } from "lucide-react";
+import { Calendar, Upload } from "lucide-react";
 
 export function Header() {
   return (
@@ -26,15 +26,6 @@ export function Header() {
           <Upload className="h-4 w-4" />
           Quick Upload
         </Button>
-
-        <div className="relative">
-          <Button variant="ghost" size="sm" className="p-2">
-            <Bell className="h-5 w-5" />
-          </Button>
-          <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-            3
-          </span>
-        </div>
       </div>
     </header>
   );
