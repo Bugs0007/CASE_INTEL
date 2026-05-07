@@ -11,16 +11,19 @@ from django.conf import settings
 
 # Search parameters
 SEARCH_TOP_K: int = getattr(settings, "AI_SEARCH_TOP_K", 10)
-RERANK_TOP_K: int = getattr(settings, "AI_RERANK_TOP_K", 5)
-CONFIDENCE_THRESHOLD: float = getattr(settings, "AI_CONFIDENCE_THRESHOLD", 0.5)
+RERANK_TOP_K: int = getattr(settings, "AI_RERANK_TOP_K", 6)
+CONFIDENCE_THRESHOLD: float = getattr(settings, "AI_CONFIDENCE_THRESHOLD", 0.35)
 MAX_CONVERSATION_HISTORY: int = getattr(settings, "AI_MAX_CONVERSATION_HISTORY", 5)
 
 # Chunk deduplication: max chunks allowed from a single document
-MAX_CHUNKS_PER_DOCUMENT: int = 2
+MAX_CHUNKS_PER_DOCUMENT: int = 4
 
 # LLM generation parameters
 LLM_TEMPERATURE: float = 0.1
 LLM_MAX_TOKENS: int = 4096
+
+# Reranker preview length
+RERANKER_CHUNK_PREVIEW_CHARS: int = 700
 
 # Query types
 QUERY_TYPE_SIMPLE_QA = "simple_qa"

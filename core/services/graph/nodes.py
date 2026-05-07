@@ -102,7 +102,16 @@ _ANSWER_USER = """Question: {query}
 Context from case documents:
 {context}
 
-Provide a clear, well-structured answer."""
+Instructions:
+- Answer based strictly on the provided context. Do not invent facts.
+- Cite sources inline using the document label, e.g. [Document 1].
+- If multiple documents are relevant, synthesize them and note any
+  contradictions between sources.
+- If the context does not contain enough information to answer
+  confidently, say so explicitly rather than guessing.
+- For legal documents, be precise about dates, clause numbers,
+  party names, and obligations where they appear in the context.
+- Structure your answer clearly. Use short paragraphs."""
 
 _CITATION_SYSTEM = (
     "You are a citation extraction system. Map claims in the answer "
@@ -155,7 +164,13 @@ def _build_context(chunks: list[ChunkData]) -> str:
     parts = []
     for i, chunk in enumerate(chunks):
         filename = chunk.get("metadata", {}).get("filename", "Unknown")
-        parts.append(f"[Document {i + 1}: {filename}]\n{chunk['text']}")
+        chunk_idx = chunk.get("chunk_index", "?")
+        doc_type = chunk.get("metadata", {}).get("document_type", "")
+        type_label = f" | {doc_type}" if doc_type else ""
+        parts.append(
+            f"[Document {i + 1}: {filename}{type_label} | Chunk {chunk_idx}]\n"
+            f"{chunk['text']}"
+        )
     return "\n\n".join(parts)
 
 
@@ -256,7 +271,11 @@ def vector_search(state: AgentState, search_service: VectorSearchService) -> Age
 
     state["retrieved_chunks"] = chunks
     state["chunk_count"] = len(chunks)
-    state["search_confidence"] = chunks[0]["score"] if chunks else 0.0
+    if chunks:
+        top_scores = [c["score"] for c in chunks[:config.RERANK_TOP_K]]
+        state["search_confidence"] = sum(top_scores) / len(top_scores)
+    else:
+        state["search_confidence"] = 0.0
 
     logger.info(
         "Vector search: found %d chunks, top_score=%.3f",
@@ -287,7 +306,10 @@ def chunk_ranker(state: AgentState, llm: LLMClient) -> AgentState:
         f"Question: {query}\n\n"
     )
     for i, chunk in enumerate(chunks):
-        scoring_prompt += f"Excerpt {i}: {chunk['text'][:300]}...\n\n"
+        scoring_prompt += (
+            f"Excerpt {i}: "
+            f"{chunk['text'][:config.RERANKER_CHUNK_PREVIEW_CHARS]}...\n\n"
+        )
 
     scoring_prompt += (
         "Respond ONLY with valid JSON: {\"scores\": [score_for_0, score_for_1, ...]}"
