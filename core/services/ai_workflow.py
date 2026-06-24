@@ -1,14 +1,13 @@
 """
 AI Workflow orchestrator for the Case Intel application.
 
-This module is the primary entry point for Django code to invoke the
-LangGraph AI pipeline. It handles:
-    - Graph lifecycle (lazy initialization)
-    - Conversation persistence (load history, save response)
-    - Citation persistence
+Unchanged in structure from the original — this module owns all Django ORM
+interactions and keeps the graph nodes free of database concerns.
 
-All Django ORM interactions are confined to this module, keeping the
-graph nodes free of database concerns.
+The only change is the updated initial_state dict which now includes
+`hyde_passage` (populated by the hyde_expand node) and removes the old
+fields that no longer exist (requires_clarification, clarification_question,
+extracted_filters) since query routing and analysis are gone.
 """
 
 import logging
@@ -35,27 +34,11 @@ class AIResponse:
     confidence: float
     citations: list[dict]
     query_type: str
-    requires_clarification: bool
-    clarification_question: Optional[str]
     message_id: Optional[int]
 
 
 class AIWorkflowService:
-    """Orchestrates the LangGraph pipeline and persists results.
-
-    This service is designed to be instantiated once and reused across
-    requests. The compiled graph and underlying services are created
-    lazily on first use.
-
-    Usage::
-
-        service = AIWorkflowService()
-        response = service.process_query(
-            user_query="What were the key arguments in the motion to dismiss?",
-            case_id=1,
-            conversation_id=5,
-        )
-    """
+    """Orchestrates the LangGraph pipeline and persists results."""
 
     def __init__(
         self,
@@ -69,7 +52,7 @@ class AIWorkflowService:
         self._graph = None
 
     # ------------------------------------------------------------------
-    # Lazy initialization
+    # Lazy initialisation
     # ------------------------------------------------------------------
 
     def _get_llm(self):
@@ -102,15 +85,11 @@ class AIWorkflowService:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _load_conversation_history(
-        conversation_id: int, limit: int = 5
-    ) -> list[dict]:
-        """Load recent messages from the database for context."""
+    def _load_conversation_history(conversation_id: int, limit: int = 5) -> list[dict]:
         messages = (
             Message.objects.filter(conversation_id=conversation_id)
             .order_by("-created_at")[:limit]
         )
-        # Reverse so oldest is first
         return [
             {"role": msg.role, "content": msg.content}
             for msg in reversed(messages)
@@ -122,7 +101,6 @@ class AIWorkflowService:
 
     @staticmethod
     def _save_user_message(conversation: Conversation, content: str) -> Message:
-        """Persist the user's message."""
         return Message.objects.create(
             conversation=conversation,
             role="user",
@@ -135,25 +113,21 @@ class AIWorkflowService:
         content: str,
         citations_data: list[dict],
     ) -> Message:
-        """Persist the assistant's response and its citations."""
         message = Message.objects.create(
             conversation=conversation,
             role="assistant",
             content=content,
         )
-
-        citation_objects = []
-        for cit in citations_data:
-            citation_objects.append(
-                Citation(
-                    message=message,
-                    source_type=cit.get("source_type", "chunk"),
-                    document_id=cit.get("document_id"),
-                    chunk_id=cit.get("chunk_id"),
-                    citation_text=cit.get("citation_text", ""),
-                )
+        citation_objects = [
+            Citation(
+                message=message,
+                source_type=cit.get("source_type", "chunk"),
+                document_id=cit.get("document_id"),
+                chunk_id=cit.get("chunk_id"),
+                citation_text=cit.get("citation_text", ""),
             )
-
+            for cit in citations_data
+        ]
         if citation_objects:
             Citation.objects.bulk_create(citation_objects)
             logger.info(
@@ -161,7 +135,6 @@ class AIWorkflowService:
                 len(citation_objects),
                 message.id,
             )
-
         return message
 
     @staticmethod
@@ -170,16 +143,13 @@ class AIWorkflowService:
         case_id: Optional[int],
         query: str,
     ) -> Conversation:
-        """Retrieve an existing conversation or create a new one."""
         if conversation_id:
             try:
                 return Conversation.objects.get(id=conversation_id)
             except Conversation.DoesNotExist:
                 logger.warning(
-                    "Conversation %d not found, creating new one.",
-                    conversation_id,
+                    "Conversation %d not found, creating new one.", conversation_id
                 )
-
         title = query[:100] if query else "New Conversation"
         return Conversation.objects.create(
             case_id=case_id,
@@ -198,51 +168,33 @@ class AIWorkflowService:
         case_id: Optional[int] = None,
         conversation_id: Optional[int] = None,
     ) -> AIResponse:
-        """Process a user query through the LangGraph pipeline.
-
-        This is the primary entry point for the Django application.
-        It loads conversation context, runs the graph, and persists
-        the results atomically.
-
-        Args:
-            user_query: The user's natural-language question.
-            case_id: Optional case to scope the search.
-            conversation_id: Optional existing conversation to continue.
-
-        Returns:
-            An AIResponse with the answer, confidence, and citations.
-        """
-        # 1. Conversation setup
+        """Process a user query through the lean 3-node LangGraph pipeline."""
         conversation = self._get_or_create_conversation(
             conversation_id, case_id, user_query
         )
-
-        # 2. Save user message
         self._save_user_message(conversation, user_query)
-
-        # 3. Load conversation history
         history = self._load_conversation_history(conversation.id)
 
-        # 4. Build initial state
+        # AgentState for the new 3-node pipeline
         initial_state: AgentState = {
             "user_query": user_query,
             "case_id": case_id,
             "conversation_id": conversation.id,
             "conversation_history": history,
+            # Populated by hyde_expand
+            "hyde_passage": "",
             "query_type": "",
-            "requires_clarification": False,
-            "clarification_question": None,
-            "extracted_filters": {},
+            # Populated by hybrid_search
             "retrieved_chunks": [],
             "chunk_count": 0,
             "search_confidence": 0.0,
+            # Populated by generate_answer
             "answer": "",
             "answer_confidence": 0.0,
             "citations": [],
             "error": None,
         }
 
-        # 5. Run the graph
         logger.info(
             "Processing query: conversation=%d, case=%s, query='%s...'",
             conversation.id,
@@ -253,7 +205,9 @@ class AIWorkflowService:
         try:
             result = self._get_graph().invoke(initial_state)
         except Exception:
-            logger.exception("Graph execution failed for conversation %d", conversation.id)
+            logger.exception(
+                "Graph execution failed for conversation %d", conversation.id
+            )
             result = {
                 **initial_state,
                 "answer": (
@@ -265,14 +219,12 @@ class AIWorkflowService:
                 "error": "graph_execution_failed",
             }
 
-        # 6. Persist assistant response
         message = self._save_assistant_message(
             conversation,
             result["answer"],
             result.get("citations", []),
         )
 
-        # 7. Update conversation timestamp
         conversation.last_message_at = timezone.now()
         conversation.save(update_fields=["last_message_at"])
 
@@ -281,7 +233,5 @@ class AIWorkflowService:
             confidence=result.get("answer_confidence", 0.0),
             citations=result.get("citations", []),
             query_type=result.get("query_type", ""),
-            requires_clarification=result.get("requires_clarification", False),
-            clarification_question=result.get("clarification_question"),
             message_id=message.id,
         )

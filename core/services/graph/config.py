@@ -1,41 +1,40 @@
 """
-Configuration constants for the LangGraph AI workflow.
+Configuration constants for the Case Intel LangGraph pipeline.
 
-All tunable parameters are centralized here. Values are read from
-Django settings (which sources them from environment variables)
-with sensible defaults.
+Changes from original:
+  - Added SEARCH_TOP_K  (was read from settings.AI_SEARCH_TOP_K inline).
+  - Added MAX_CONVERSATION_HISTORY.
+  - Removed CLARIFICATION_THRESHOLD (query_router gone).
+  - Query type constants kept identical so existing DB values stay valid.
 """
 
-from django.conf import settings
+# ---------------------------------------------------------------------------
+# Query types — stored in AgentState["query_type"]
+# ---------------------------------------------------------------------------
+QUERY_TYPE_SIMPLE_QA  = "simple_qa"
+QUERY_TYPE_SUMMARIZE  = "summarize"
+QUERY_TYPE_COMPARE    = "compare"
+QUERY_TYPE_TIMELINE   = "timeline"
 
+# ---------------------------------------------------------------------------
+# Search
+# ---------------------------------------------------------------------------
 
-# Search parameters
-SEARCH_TOP_K: int = getattr(settings, "AI_SEARCH_TOP_K", 10)
-RERANK_TOP_K: int = getattr(settings, "AI_RERANK_TOP_K", 6)
-CONFIDENCE_THRESHOLD: float = getattr(settings, "AI_CONFIDENCE_THRESHOLD", 0.35)
-MAX_CONVERSATION_HISTORY: int = getattr(settings, "AI_MAX_CONVERSATION_HISTORY", 5)
+# How many final results to return from VectorSearchService.search().
+# The service internally fetches SEARCH_TOP_K * 3 candidates before
+# RRF fusion and cross-encoder reranking narrow them down.
+SEARCH_TOP_K = 6
 
-# Chunk deduplication: max chunks allowed from a single document
-MAX_CHUNKS_PER_DOCUMENT: int = 4
+# Rerank score below which the answer is prefixed with a low-confidence disclaimer.
+# Cross-encoder scores are roughly in [-10, 10]; after normalisation by the
+# service they land in [0, 1].  0.35 is a reasonable "uncertain" threshold.
+CONFIDENCE_THRESHOLD = 0.35
 
-# LLM generation parameters
-LLM_TEMPERATURE: float = 0.1
-LLM_MAX_TOKENS: int = 4096
+# ---------------------------------------------------------------------------
+# LLM generation
+# ---------------------------------------------------------------------------
+LLM_TEMPERATURE  = 0.1    # low temperature for factual legal answers
+LLM_MAX_TOKENS   = 1024
 
-# Reranker preview length
-RERANKER_CHUNK_PREVIEW_CHARS: int = 700
-
-# Query types
-QUERY_TYPE_SIMPLE_QA = "simple_qa"
-QUERY_TYPE_SUMMARIZE = "summarize"
-QUERY_TYPE_COMPARE = "compare"
-QUERY_TYPE_TIMELINE = "timeline"
-QUERY_TYPE_UNCLEAR = "unclear"
-
-VALID_QUERY_TYPES = {
-    QUERY_TYPE_SIMPLE_QA,
-    QUERY_TYPE_SUMMARIZE,
-    QUERY_TYPE_COMPARE,
-    QUERY_TYPE_TIMELINE,
-    QUERY_TYPE_UNCLEAR,
-}
+# How many prior conversation turns to include as context in the answer prompt
+MAX_CONVERSATION_HISTORY = 4
