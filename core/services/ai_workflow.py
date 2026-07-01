@@ -4,10 +4,10 @@ AI Workflow orchestrator for the Case Intel application.
 Unchanged in structure from the original — this module owns all Django ORM
 interactions and keeps the graph nodes free of database concerns.
 
-The only change is the updated initial_state dict which now includes
-`hyde_passage` (populated by the hyde_expand node) and removes the old
-fields that no longer exist (requires_clarification, clarification_question,
-extracted_filters) since query routing and analysis are gone.
+The main changes are the updated initial_state dict, which now includes
+`hyde_passage` (populated by the hyde_expand node), and compatibility
+defaults for `requires_clarification` / `clarification_question` while the
+dedicated clarification route remains removed.
 """
 
 import logging
@@ -34,6 +34,8 @@ class AIResponse:
     confidence: float
     citations: list[dict]
     query_type: str
+    requires_clarification: bool
+    clarification_question: Optional[str]
     message_id: Optional[int]
 
 
@@ -184,6 +186,8 @@ class AIWorkflowService:
             # Populated by hyde_expand
             "hyde_passage": "",
             "query_type": "",
+            "requires_clarification": False,
+            "clarification_question": None,
             # Populated by hybrid_search
             "retrieved_chunks": [],
             "chunk_count": 0,
@@ -216,6 +220,8 @@ class AIWorkflowService:
                 ),
                 "answer_confidence": 0.0,
                 "citations": [],
+                "requires_clarification": False,
+                "clarification_question": None,
                 "error": "graph_execution_failed",
             }
 
@@ -233,5 +239,7 @@ class AIWorkflowService:
             confidence=result.get("answer_confidence", 0.0),
             citations=result.get("citations", []),
             query_type=result.get("query_type", ""),
+            requires_clarification=result.get("requires_clarification", False),
+            clarification_question=result.get("clarification_question"),
             message_id=message.id,
         )

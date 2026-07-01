@@ -176,6 +176,8 @@ def hyde_expand(state: AgentState, llm) -> AgentState:
         hyde_passage = query
 
     state["hyde_passage"] = hyde_passage.strip()
+    state["requires_clarification"] = False
+    state["clarification_question"] = None
     # Determine a simple query type based on keywords (no LLM needed)
     lower = query.lower()
     if any(w in lower for w in ("summarize", "summary", "overview")):
@@ -220,6 +222,7 @@ def hybrid_search(state: AgentState, search_service: VectorSearchService) -> Age
     # expose a separate parameter.  Here we use the hybrid method directly.
     results = search_service.search(
         query=hyde_passage,              # vector leg uses HyDE embedding
+        keyword_query=raw_query,         # keyword leg uses the original user query
         case_id=case_id,
         top_k=config.SEARCH_TOP_K,
     )
@@ -288,6 +291,8 @@ def generate_answer(state: AgentState, llm) -> AgentState:
         state["answer"] = message
         state["citations"] = []
         state["answer_confidence"] = 0.0
+        state["requires_clarification"] = False
+        state["clarification_question"] = None
         return state
 
     # --- Build context ---
@@ -333,6 +338,8 @@ def generate_answer(state: AgentState, llm) -> AgentState:
     state["answer"] = answer
     state["citations"] = citations
     state["answer_confidence"] = round(confidence, 3)
+    state["requires_clarification"] = False
+    state["clarification_question"] = None
 
     logger.info(
         "Answer generated: %d words, %d citations, confidence=%.3f",

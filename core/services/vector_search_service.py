@@ -221,6 +221,7 @@ class VectorSearchService:
     def search(
         self,
         query: str,
+        keyword_query: Optional[str] = None,
         case_id: Optional[int] = None,
         document_types: Optional[list[str]] = None,  # kept for API compatibility
         top_k: Optional[int] = None,
@@ -237,6 +238,7 @@ class VectorSearchService:
             List of VectorSearchResult sorted by descending relevance.
         """
         top_k = top_k or settings.AI_SEARCH_TOP_K
+        keyword_query = keyword_query or query
         # Fetch more candidates than needed so RRF and reranker have room to work
         candidate_k = top_k * 3
 
@@ -245,7 +247,7 @@ class VectorSearchService:
         vector_hits = self._vector_search(query_embedding, case_id, candidate_k)
 
         # --- Stage 1b: keyword search ---
-        keyword_hits = self._keyword_search(query, case_id, candidate_k)
+        keyword_hits = self._keyword_search(keyword_query, case_id, candidate_k)
 
         # --- Stage 2: RRF fusion ---
         fused = self._rrf_fuse(vector_hits, keyword_hits, candidate_k)

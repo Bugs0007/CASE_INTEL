@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.postgres.indexes import GinIndex
 from django.contrib.postgres.search import SearchVectorField
-from pgvector.django import VectorField
+from pgvector.django import HnswIndex, VectorField
 
 
 class DocumentChunk(models.Model):
@@ -28,6 +28,11 @@ class DocumentChunk(models.Model):
         indexes = [
             # GIN index for full-text search — required for fast @@ queries
             GinIndex(fields=["search_vector"], name="document_chunks_svector_gin"),
+            HnswIndex(
+                fields=["embedding"],
+                name="document_chunks_embedding_hnsw",
+                opclasses=["vector_cosine_ops"],
+            ),
         ]
 
     def __str__(self):
