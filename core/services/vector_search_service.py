@@ -32,6 +32,7 @@ from typing import Optional
 
 from django.conf import settings
 from django.contrib.postgres.search import SearchQuery, SearchRank
+from django.db import connection
 from pgvector.django import CosineDistance
 
 from core.models import DocumentChunk
@@ -133,6 +134,22 @@ class VectorSearchService:
     # Keyword search leg
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _build_or_fallback_query(query: str) -> Optional[SearchQuery]:
+        """Build a ranked OR tsquery from PostgreSQL-normalized query lexemes."""
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT plainto_tsquery('english', %s)::text",
+                [query],
+            )
+            tsquery_text = cursor.fetchone()[0]
+
+        if not tsquery_text:
+            return None
+
+        raw_tsquery = tsquery_text.replace(" & ", " | ")
+        return SearchQuery(raw_tsquery, search_type="raw", config="english")
+
     def _keyword_search(
         self,
         query: str,
@@ -150,11 +167,29 @@ class VectorSearchService:
 
         search_query = SearchQuery(query, search_type="websearch", config="english")
 
-        return list(
+        exact_hits = list(
             qs.filter(search_vector=search_query)
             .annotate(rank=SearchRank("search_vector", search_query))
             .order_by("-rank")[:top_k]
         )
+        if exact_hits:
+            return exact_hits
+
+        fallback_query = self._build_or_fallback_query(query)
+        if fallback_query is None:
+            return []
+
+        fallback_hits = list(
+            qs.filter(search_vector=fallback_query)
+            .annotate(rank=SearchRank("search_vector", fallback_query))
+            .order_by("-rank")[:top_k]
+        )
+        if fallback_hits:
+            logger.info(
+                "Keyword search fallback used for query='%s...' with ranked OR tsquery.",
+                query[:50],
+            )
+        return fallback_hits
 
     # ------------------------------------------------------------------
     # RRF fusion
