@@ -159,7 +159,7 @@ CASE_INTEL/
 
 - **Full guide**: See `documentations/QUICKSTART.md`
 - **Redis setup**: See `REDIS_SETUP.md`
-- **API docs**: See `documentations/API_CONTRACTS.md`
+- **API docs**: See `documentations/02-reference/API_CONTRACTS.md`
 - **System design**: See `documentations/SYSTEM_DESIGN.md`
 
 ---
