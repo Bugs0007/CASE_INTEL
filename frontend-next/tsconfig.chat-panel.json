@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "app/(dashboard)/cases/[id]/page.tsx",
+    "components/chat/chat-panel.tsx",
+    "lib/api/chat.ts",
+    "lib/api/client.ts",
+    "types/chat.ts"
+  ]
+}

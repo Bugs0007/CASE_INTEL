@@ -21,9 +21,12 @@ export interface Conversation {
   title: string | null;
   started_at: string;
   last_message_at: string | null;
+  preview?: string;
   message_count?: number;
   messages?: Message[];
 }
+
+export type ConversationExportFormat = "txt" | "md" | "pdf";
 
 export interface ChatRequest {
   query: string;
