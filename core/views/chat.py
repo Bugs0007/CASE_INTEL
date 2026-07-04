@@ -10,7 +10,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.models import Case, Message
+from core.models import Case, Conversation, Message
 from core.serializers import ChatRequestSerializer, ChatResponseSerializer
 from core.services.ai_workflow import AIWorkflowService
 
@@ -47,6 +47,19 @@ class ChatView(APIView):
                 {"detail": f"Case with id {case_id} does not exist."},
                 status=status.HTTP_404_NOT_FOUND,
             )
+
+        if conversation_id is not None:
+            conversation = Conversation.objects.filter(id=conversation_id).first()
+            if conversation is None:
+                return Response(
+                    {"detail": f"Conversation with id {conversation_id} does not exist."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            if case_id is not None and conversation.case_id != case_id:
+                return Response(
+                    {"detail": "The selected conversation does not belong to this case."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         logger.info(
             "Chat request: case=%s, conversation=%s, query='%s...'",

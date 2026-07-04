@@ -85,11 +85,11 @@ export default function CaseDetailPage() {
       <CaseDetailHeader case={caseItem} onStartChat={() => setShowChat(true)} />
 
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden flex">
+      <div className="relative flex flex-1 overflow-hidden">
         {/* Left/Main Section */}
         <div
           className={`flex-1 overflow-y-auto transition-all duration-300 ${
-            showChat ? "mr-[380px]" : ""
+            showChat ? "lg:pr-[680px] xl:pr-[720px]" : ""
           }`}
         >
           <div className="max-w-7xl mx-auto p-6 space-y-6">
@@ -202,7 +202,9 @@ export default function CaseDetailPage() {
 
         {/* Right Chat Panel */}
         {showChat && (
-          <ChatPanel caseId={caseId} onClose={() => setShowChat(false)} />
+          <div className="absolute inset-y-0 right-0 z-20 w-full max-w-[720px]">
+            <ChatPanel caseId={caseId} onClose={() => setShowChat(false)} />
+          </div>
         )}
       </div>
 
