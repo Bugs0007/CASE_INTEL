@@ -18,6 +18,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from core.models import Citation, Conversation, DocumentChunk, Message
+from core.services.conversation_utils import generate_conversation_title
 from core.services.graph.builder import build_legal_ai_graph
 from core.services.graph.state import AgentState
 from core.services.ai_service_factory import get_llm_client, get_embedding_service
@@ -146,16 +147,10 @@ class AIWorkflowService:
         query: str,
     ) -> Conversation:
         if conversation_id:
-            try:
-                return Conversation.objects.get(id=conversation_id)
-            except Conversation.DoesNotExist:
-                logger.warning(
-                    "Conversation %d not found, creating new one.", conversation_id
-                )
-        title = query[:100] if query else "New Conversation"
+            return Conversation.objects.get(id=conversation_id)
         return Conversation.objects.create(
             case_id=case_id,
-            title=title,
+            title=generate_conversation_title(query),
             last_message_at=timezone.now(),
         )
 
@@ -175,6 +170,9 @@ class AIWorkflowService:
             conversation_id, case_id, user_query
         )
         self._save_user_message(conversation, user_query)
+        if not conversation.title:
+            conversation.title = generate_conversation_title(user_query)
+            conversation.save(update_fields=["title"])
         history = self._load_conversation_history(conversation.id)
 
         # AgentState for the new 3-node pipeline

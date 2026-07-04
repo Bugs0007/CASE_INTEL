@@ -11,7 +11,9 @@ from core.views import (
     CaseListCreateView,
     ChatView,
     ConversationDetailView,
+    ConversationExportView,
     ConversationListView,
+    ConversationMessagesView,
     DashboardView,
     DocumentDetailView,
     DocumentListView,
@@ -43,6 +45,16 @@ urlpatterns = [
         "conversations/<int:pk>/",
         ConversationDetailView.as_view(),
         name="conversation-detail",
+    ),
+    path(
+        "conversations/<int:pk>/messages/",
+        ConversationMessagesView.as_view(),
+        name="conversation-messages",
+    ),
+    path(
+        "conversations/<int:pk>/export/",
+        ConversationExportView.as_view(),
+        name="conversation-export",
     ),
 
     # Cases
