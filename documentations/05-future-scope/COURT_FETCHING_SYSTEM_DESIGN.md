@@ -1599,10 +1599,10 @@ Average Case Age: 2.3 years
 
 ## 📚 Related Documentation
 
-- [DB Schema](./DB_SCHEMA.md) - Database structure
-- [API Contracts](./API_CONTRACTS.md) - API specifications
-- [Architecture](./ARCHITECTURE.md) - Overall system architecture
-- [Project Overview](./PROJECT_OVERVIEW.md) - High-level project info
+- [DB Schema](../02-reference/DB_SCHEMA.md) - Database structure
+- [API Contracts](../02-reference/API_CONTRACTS.md) - API specifications
+- [Architecture](../01-architecture/ARCHITECTURE.md) - Overall system architecture
+- [Documentation README](../README.md) - Verified documentation entry point
 
 ---
 

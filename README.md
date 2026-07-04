@@ -157,7 +157,7 @@ ollama serve
 
 - Backend API: http://localhost:8000/api/
 - Next.js Frontend: http://localhost:3000
-- Vanilla JS Frontend: Open `frontend/index.html` or run `cd frontend && python serve.py`
+- Next.js Frontend: Run `cd frontend-next && npm run dev`
 
 ---
 
@@ -305,7 +305,7 @@ case-intel/
 | `PATCH`  | `/api/hearings/{id}/`          | Update hearing    |
 | `DELETE` | `/api/hearings/{id}/`          | Delete hearing    |
 
-> **Full API docs:** See [documentations/API_CONTRACTS.md](documentations/API_CONTRACTS.md)
+> **Full API docs:** See [documentations/02-reference/API_CONTRACTS.md](documentations/02-reference/API_CONTRACTS.md)
 
 ---
 
@@ -438,12 +438,13 @@ cd frontend-next && npm test
 
 | Document                                                  | Description                |
 | --------------------------------------------------------- | -------------------------- |
-| [QUICKSTART.md](documentations/QUICKSTART.md)             | 3-minute setup guide       |
-| [ARCHITECTURE.md](documentations/ARCHITECTURE.md)         | System design & data flows |
-| [API_CONTRACTS.md](documentations/API_CONTRACTS.md)       | Complete API reference     |
-| [DB_SCHEMA.md](documentations/DB_SCHEMA.md)               | Database schema            |
-| [OLLAMA_SETUP.md](documentations/OLLAMA_SETUP.md)         | Local AI configuration     |
-| [PROJECT_OVERVIEW.md](documentations/PROJECT_OVERVIEW.md) | Tabular project summary    |
+| [README.md](documentations/README.md)                                 | Documentation entry point  |
+| [QUICKSTART.md](documentations/QUICKSTART.md)                         | Verified local setup       |
+| [ARCHITECTURE.md](documentations/01-architecture/ARCHITECTURE.md)     | Current system architecture |
+| [API_CONTRACTS.md](documentations/02-reference/API_CONTRACTS.md)      | Current API reference      |
+| [DB_SCHEMA.md](documentations/02-reference/DB_SCHEMA.md)              | Current database schema    |
+| [OLLAMA_SETUP.md](documentations/03-setup/OLLAMA_SETUP.md)            | Local AI configuration     |
+| [INTERVIEW_FAQ.md](documentations/04-interview-prep/INTERVIEW_FAQ.md) | Interview talking points   |
 
 ---
 
