@@ -1,0 +1,1066 @@
+{
+  "communities": {
+    "0": [
+      "core_services_graph_nodes_py",
+      "core_tests_test_graph_nodes_py",
+      "graph_nodes_answer_generator",
+      "graph_nodes_build_context",
+      "graph_nodes_chunk_ranker",
+      "graph_nodes_citation_extractor",
+      "graph_nodes_handle_low_confidence",
+      "graph_nodes_handle_no_results",
+      "graph_nodes_parse_json_safe",
+      "graph_nodes_query_analyzer",
+      "graph_nodes_query_router",
+      "graph_nodes_rationale_1",
+      "graph_nodes_rationale_139",
+      "graph_nodes_rationale_154",
+      "graph_nodes_rationale_167",
+      "graph_nodes_rationale_201",
+      "graph_nodes_rationale_236",
+      "graph_nodes_rationale_274",
+      "graph_nodes_rationale_354",
+      "graph_nodes_rationale_404",
+      "graph_nodes_rationale_456",
+      "graph_nodes_rationale_496",
+      "graph_nodes_rationale_528",
+      "graph_nodes_response_formatter",
+      "graph_nodes_vector_search",
+      "graph_state_agentstate",
+      "graph_state_rationale_32",
+      "testcase",
+      "tests_test_graph_builder_rationale_44",
+      "tests_test_graph_builder_testgraphcompilation",
+      "tests_test_graph_nodes_make_chunk",
+      "tests_test_graph_nodes_make_state",
+      "tests_test_graph_nodes_rationale_1",
+      "tests_test_graph_nodes_rationale_138",
+      "tests_test_graph_nodes_rationale_155",
+      "tests_test_graph_nodes_rationale_201",
+      "tests_test_graph_nodes_rationale_222",
+      "tests_test_graph_nodes_rationale_251",
+      "tests_test_graph_nodes_rationale_275",
+      "tests_test_graph_nodes_rationale_28",
+      "tests_test_graph_nodes_rationale_291",
+      "tests_test_graph_nodes_rationale_68",
+      "tests_test_graph_nodes_rationale_84",
+      "tests_test_graph_nodes_rationale_97",
+      "tests_test_graph_nodes_testanswergenerator",
+      "tests_test_graph_nodes_testanswergenerator_test_generates_answer_with_confidence",
+      "tests_test_graph_nodes_testbuildcontext",
+      "tests_test_graph_nodes_testbuildcontext_test_builds_numbered_context",
+      "tests_test_graph_nodes_testbuildcontext_test_empty_chunks",
+      "tests_test_graph_nodes_testchunkranker",
+      "tests_test_graph_nodes_testchunkranker_test_deduplicates_by_document",
+      "tests_test_graph_nodes_testchunkranker_test_empty_chunks_returns_unchanged",
+      "tests_test_graph_nodes_testchunkranker_test_reranks_by_llm_scores",
+      "tests_test_graph_nodes_testcitationextractor",
+      "tests_test_graph_nodes_testcitationextractor_test_extracts_citations",
+      "tests_test_graph_nodes_testcitationextractor_test_no_chunks_returns_empty_citations",
+      "tests_test_graph_nodes_testhandlelowconfidence",
+      "tests_test_graph_nodes_testhandlelowconfidence_test_adds_disclaimer",
+      "tests_test_graph_nodes_testhandlenoresults",
+      "tests_test_graph_nodes_testhandlenoresults_test_with_case_id",
+      "tests_test_graph_nodes_testhandlenoresults_test_without_case_id",
+      "tests_test_graph_nodes_testparsejsonsafe",
+      "tests_test_graph_nodes_testparsejsonsafe_test_invalid_json_returns_empty_dict",
+      "tests_test_graph_nodes_testparsejsonsafe_test_json_with_code_fences",
+      "tests_test_graph_nodes_testparsejsonsafe_test_valid_json",
+      "tests_test_graph_nodes_testqueryanalyzer",
+      "tests_test_graph_nodes_testqueryanalyzer_test_extracts_filters",
+      "tests_test_graph_nodes_testqueryrouter",
+      "tests_test_graph_nodes_testqueryrouter_test_classifies_query_type",
+      "tests_test_graph_nodes_testqueryrouter_test_defaults_to_simple_qa_on_invalid_type",
+      "tests_test_graph_nodes_testqueryrouter_test_marks_clarification_needed",
+      "tests_test_graph_nodes_testresponseformatter",
+      "tests_test_graph_nodes_testresponseformatter_test_appends_sources_section",
+      "tests_test_graph_nodes_testresponseformatter_test_no_citations_returns_answer_unchanged"
+    ],
+    "1": [
+      "cases_case_filters_casefilters",
+      "cases_create_case_dialog_handlechange",
+      "cases_create_case_dialog_handleescape",
+      "cases_create_case_dialog_handlesubmit",
+      "cases_create_case_dialog_validateform",
+      "chat_chat_panel_cn",
+      "chat_chat_panel_handlekeypress",
+      "chat_chat_panel_handlesend",
+      "chat_chat_panel_scrolltobottom",
+      "chat_chat_panel_startnewchat",
+      "dashboard_page_dashboardpage",
+      "dashboard_quick_actions_quickactions",
+      "dashboard_recent_activity_getactivityicon",
+      "emails_emails_table_getstatusbadge",
+      "emails_emails_table_handlelink",
+      "frontend_next_app_dashboard_cases_id_page_tsx",
+      "frontend_next_app_dashboard_cases_page_tsx",
+      "frontend_next_app_dashboard_page_tsx",
+      "frontend_next_components_cases_case_card_tsx",
+      "frontend_next_components_cases_case_detail_header_tsx",
+      "frontend_next_components_cases_case_filters_tsx",
+      "frontend_next_components_cases_case_grid_tsx",
+      "frontend_next_components_cases_case_overview_tsx",
+      "frontend_next_components_cases_create_case_dialog_tsx",
+      "frontend_next_components_chat_chat_panel_tsx",
+      "frontend_next_components_dashboard_active_cases_tsx",
+      "frontend_next_components_dashboard_quick_actions_tsx",
+      "frontend_next_components_dashboard_recent_activity_tsx",
+      "frontend_next_components_dashboard_stat_cards_tsx",
+      "frontend_next_components_documents_document_row_tsx",
+      "frontend_next_components_documents_document_table_tsx",
+      "frontend_next_components_emails_emails_table_tsx",
+      "frontend_next_components_emails_gmail_status_tsx",
+      "frontend_next_components_emails_sync_config_tsx",
+      "frontend_next_components_hearings_hearings_list_tsx",
+      "frontend_next_components_layout_sidebar_tsx",
+      "frontend_next_components_ui_badge_tsx",
+      "frontend_next_components_ui_button_tsx",
+      "frontend_next_components_ui_card_tsx",
+      "frontend_next_components_ui_input_tsx",
+      "frontend_next_components_ui_select_tsx",
+      "frontend_next_components_ui_textarea_tsx",
+      "frontend_next_hooks_use_cases_ts",
+      "frontend_next_hooks_use_dashboard_ts",
+      "frontend_next_hooks_use_hearings_ts",
+      "frontend_next_lib_utils_ts",
+      "frontend_next_types_index_ts",
+      "hooks_use_cases_usecase",
+      "hooks_use_cases_usecreatecase",
+      "hooks_use_cases_usedeletecase",
+      "hooks_use_cases_useupdatecase",
+      "hooks_use_dashboard_usedashboard",
+      "hooks_use_hearings_usecreatehearing",
+      "hooks_use_hearings_usedeletehearing",
+      "hooks_use_hearings_usehearing",
+      "hooks_use_hearings_usehearings",
+      "hooks_use_hearings_useupdatehearing",
+      "id_page_handledeletedocument",
+      "id_page_handleprocessdocument",
+      "lib_utils_cn",
+      "lib_utils_formatdate",
+      "lib_utils_formatdatetime",
+      "lib_utils_formatrelativetime",
+      "lib_utils_getfileicon",
+      "lib_utils_getprioritycolor",
+      "lib_utils_getstatuscolor",
+      "lib_utils_truncate",
+      "ui_badge_badge",
+      "ui_card_card",
+      "ui_card_cardcontent",
+      "ui_card_cardfooter",
+      "ui_card_cardheader",
+      "ui_card_cardtitle"
+    ],
+    "2": [
+      "core_serializers_document_py",
+      "core_tests_test_document_processor_py",
+      "core_views_document_py",
+      "scripts_migrate_to_ollama_get_migration_status",
+      "scripts_migrate_to_ollama_migrate_all_documents",
+      "scripts_migrate_to_ollama_migrate_document",
+      "scripts_migrate_to_ollama_py",
+      "scripts_migrate_to_ollama_rationale_1",
+      "scripts_migrate_to_ollama_rationale_181",
+      "scripts_migrate_to_ollama_rationale_35",
+      "scripts_migrate_to_ollama_rationale_48",
+      "scripts_migrate_to_ollama_rationale_85",
+      "scripts_migrate_to_ollama_rollback_to_openai",
+      "serializers_document_casenestedserializer",
+      "serializers_document_documentserializer",
+      "serializers_document_documentserializer_to_representation",
+      "serializers_document_documentserializer_update",
+      "serializers_document_documentuploadserializer",
+      "serializers_document_documentuploadserializer_validate_case_id",
+      "serializers_document_documentuploadserializer_validate_file",
+      "serializers_document_documentuploadserializer_validate_folder_id",
+      "serializers_document_meta",
+      "serializers_document_rationale_1",
+      "serializers_document_rationale_15",
+      "serializers_document_rationale_92",
+      "services_document_processor_documentprocessor",
+      "services_document_processor_documentprocessor_init",
+      "services_document_processor_rationale_32",
+      "tests_test_document_processor_rationale_1",
+      "tests_test_document_processor_rationale_134",
+      "tests_test_document_processor_rationale_17",
+      "tests_test_document_processor_rationale_66",
+      "tests_test_document_processor_test_process_document_creates_chunks",
+      "tests_test_document_processor_test_process_document_handles_empty_text",
+      "tests_test_document_processor_test_process_document_handles_failure",
+      "tests_test_document_processor_testdocumentprocessing",
+      "tests_test_document_processor_testdocumentprocessing_setup",
+      "tests_test_document_processor_testdocumentprocessing_test_idempotent_reprocessing",
+      "tests_test_document_processor_testtextchunking",
+      "tests_test_document_processor_testtextchunking_setup",
+      "tests_test_document_processor_testtextchunking_test_chunks_have_overlap",
+      "tests_test_document_processor_testtextchunking_test_empty_text_returns_empty_list",
+      "tests_test_document_processor_testtextchunking_test_long_text_creates_multiple_chunks",
+      "tests_test_document_processor_testtextchunking_test_respects_max_chunks_limit",
+      "tests_test_document_processor_testtextchunking_test_sentence_boundary_detection",
+      "tests_test_document_processor_testtextchunking_test_short_text_returns_single_chunk",
+      "views_document_documentdetailview",
+      "views_document_documentlistview",
+      "views_document_documentlistview_get_queryset",
+      "views_document_documentprocessview",
+      "views_document_documentprocessview_post",
+      "views_document_documentuploadview",
+      "views_document_documentuploadview_post",
+      "views_document_rationale_1",
+      "views_document_rationale_118",
+      "views_document_rationale_22",
+      "views_document_rationale_39",
+      "views_document_rationale_51"
+    ],
+    "3": [
+      "apiview",
+      "core_services_gmail_service_py",
+      "core_views_case_py",
+      "core_views_chat_py",
+      "core_views_dashboard_py",
+      "core_views_gmail_py",
+      "core_views_init_py",
+      "services_gmail_service_gmailservice",
+      "services_gmail_service_gmailservice_extract_body",
+      "services_gmail_service_gmailservice_get_auth_url",
+      "services_gmail_service_gmailservice_handle_oauth_callback",
+      "services_gmail_service_gmailservice_has_attachments",
+      "services_gmail_service_gmailservice_init",
+      "services_gmail_service_gmailservice_process_attachments",
+      "services_gmail_service_gmailservice_sync_emails",
+      "services_gmail_service_rationale_1",
+      "services_gmail_service_rationale_137",
+      "services_gmail_service_rationale_20",
+      "services_gmail_service_rationale_220",
+      "services_gmail_service_rationale_237",
+      "services_gmail_service_rationale_247",
+      "services_gmail_service_rationale_42",
+      "services_gmail_service_rationale_71",
+      "views_case_casedetailview",
+      "views_case_casedetailview_get_queryset",
+      "views_case_caselistcreateview",
+      "views_case_caselistcreateview_get_queryset",
+      "views_case_rationale_1",
+      "views_case_rationale_13",
+      "views_case_rationale_49",
+      "views_chat_chatview",
+      "views_chat_rationale_1",
+      "views_chat_rationale_24",
+      "views_dashboard_dashboardview",
+      "views_dashboard_dashboardview_get",
+      "views_dashboard_rationale_1",
+      "views_dashboard_rationale_13",
+      "views_gmail_emaillinkview",
+      "views_gmail_emaillinkview_post",
+      "views_gmail_emaillistview",
+      "views_gmail_emaillistview_get",
+      "views_gmail_gmailauthview",
+      "views_gmail_gmailauthview_get",
+      "views_gmail_gmailcallbackview",
+      "views_gmail_gmailcallbackview_get",
+      "views_gmail_gmailstatusview",
+      "views_gmail_gmailstatusview_get",
+      "views_gmail_gmailsyncview",
+      "views_gmail_gmailsyncview_post",
+      "views_gmail_rationale_1",
+      "views_gmail_rationale_150",
+      "views_gmail_rationale_185",
+      "views_gmail_rationale_19",
+      "views_gmail_rationale_46",
+      "views_gmail_rationale_79",
+      "views_gmail_rationale_99",
+      "views_init_rationale_1"
+    ],
+    "4": [
+      "api_client_apiclient",
+      "api_client_uploadfile",
+      "core_services_ai_workflow_py",
+      "core_tests_test_views_py",
+      "frontend_next_hooks_use_chat_ts",
+      "frontend_next_lib_api_cases_ts",
+      "frontend_next_lib_api_chat_ts",
+      "frontend_next_lib_api_client_ts",
+      "frontend_next_lib_api_dashboard_ts",
+      "frontend_next_lib_api_documents_ts",
+      "frontend_next_lib_api_emails_ts",
+      "frontend_next_lib_api_gmail_ts",
+      "frontend_next_lib_api_hearings_ts",
+      "hooks_use_chat_useconversation",
+      "hooks_use_chat_useconversations",
+      "hooks_use_chat_usedeleteconversation",
+      "hooks_use_chat_usesendchat",
+      "services_ai_workflow_airesponse",
+      "services_ai_workflow_get_or_create_conversation",
+      "services_ai_workflow_load_conversation_history",
+      "services_ai_workflow_process_query",
+      "services_ai_workflow_rationale_1",
+      "services_ai_workflow_rationale_32",
+      "services_ai_workflow_save_assistant_message",
+      "services_ai_workflow_save_user_message",
+      "tests_test_views_rationale_1",
+      "tests_test_views_rationale_109",
+      "tests_test_views_rationale_148",
+      "tests_test_views_rationale_18",
+      "tests_test_views_rationale_68",
+      "tests_test_views_test_chat_returns_response",
+      "tests_test_views_testcaseapi",
+      "tests_test_views_testcaseapi_setup",
+      "tests_test_views_testcaseapi_test_create_case",
+      "tests_test_views_testcaseapi_test_delete_case",
+      "tests_test_views_testcaseapi_test_list_cases",
+      "tests_test_views_testcaseapi_test_retrieve_case",
+      "tests_test_views_testcaseapi_test_update_case",
+      "tests_test_views_testchatapi",
+      "tests_test_views_testchatapi_setup",
+      "tests_test_views_testchatapi_test_chat_rejects_empty_query",
+      "tests_test_views_testchatapi_test_chat_rejects_nonexistent_case",
+      "tests_test_views_testconversationapi",
+      "tests_test_views_testconversationapi_setup",
+      "tests_test_views_testconversationapi_test_delete_conversation",
+      "tests_test_views_testconversationapi_test_filter_conversations_by_case",
+      "tests_test_views_testconversationapi_test_list_conversations",
+      "tests_test_views_testconversationapi_test_retrieve_conversation_with_messages",
+      "tests_test_views_testdocumentapi",
+      "tests_test_views_testdocumentapi_setup",
+      "tests_test_views_testdocumentapi_test_delete_document",
+      "tests_test_views_testdocumentapi_test_filter_documents_by_case",
+      "tests_test_views_testdocumentapi_test_list_documents",
+      "tests_test_views_testdocumentapi_test_retrieve_document"
+    ],
+    "5": [
+      "core_services_ai_service_factory_py",
+      "core_services_embedding_service_py",
+      "core_services_llm_client_py",
+      "core_services_vector_search_service_py",
+      "services_ai_service_factory_get_embedding_service",
+      "services_ai_service_factory_get_llm_client",
+      "services_ai_service_factory_rationale_1",
+      "services_ai_service_factory_rationale_34",
+      "services_ai_service_factory_rationale_59",
+      "services_ai_workflow_aiworkflowservice",
+      "services_ai_workflow_aiworkflowservice_get_embedding_service",
+      "services_ai_workflow_aiworkflowservice_get_graph",
+      "services_ai_workflow_aiworkflowservice_get_llm",
+      "services_ai_workflow_aiworkflowservice_get_search_service",
+      "services_ai_workflow_aiworkflowservice_init",
+      "services_ai_workflow_rationale_44",
+      "services_document_processor_documentprocessor_get_embedding_service",
+      "services_embedding_service_embeddingservice",
+      "services_embedding_service_embeddingservice_embed_text",
+      "services_embedding_service_embeddingservice_embed_texts",
+      "services_embedding_service_embeddingservice_init",
+      "services_embedding_service_rationale_1",
+      "services_embedding_service_rationale_18",
+      "services_embedding_service_rationale_38",
+      "services_embedding_service_rationale_63",
+      "services_gmail_service_gmailservice_suggest_case_for_email",
+      "services_gmail_service_rationale_267",
+      "services_llm_client_llmclient",
+      "services_llm_client_llmclient_generate",
+      "services_llm_client_llmclient_generate_with_json",
+      "services_llm_client_llmclient_init",
+      "services_llm_client_rationale_1",
+      "services_llm_client_rationale_19",
+      "services_llm_client_rationale_44",
+      "services_llm_client_rationale_84",
+      "services_vector_search_service_rationale_1",
+      "services_vector_search_service_rationale_21",
+      "services_vector_search_service_rationale_46",
+      "services_vector_search_service_rationale_62",
+      "services_vector_search_service_vectorsearchresult",
+      "services_vector_search_service_vectorsearchresult_init",
+      "services_vector_search_service_vectorsearchresult_to_dict",
+      "services_vector_search_service_vectorsearchservice",
+      "services_vector_search_service_vectorsearchservice_init",
+      "services_vector_search_service_vectorsearchservice_search"
+    ],
+    "6": [
+      "case_intel_test_ollama_integration_rationale_1",
+      "case_intel_test_ollama_integration_rationale_135",
+      "case_intel_test_ollama_integration_rationale_168",
+      "case_intel_test_ollama_integration_rationale_216",
+      "case_intel_test_ollama_integration_rationale_253",
+      "case_intel_test_ollama_integration_rationale_45",
+      "case_intel_test_ollama_integration_rationale_62",
+      "case_intel_test_ollama_integration_rationale_95",
+      "case_intel_test_ollama_integration_run_all_tests",
+      "case_intel_test_ollama_integration_test_batch_embeddings",
+      "case_intel_test_ollama_integration_test_embedding_generation",
+      "case_intel_test_ollama_integration_test_factory_pattern",
+      "case_intel_test_ollama_integration_test_json_generation",
+      "case_intel_test_ollama_integration_test_llm_generation",
+      "case_intel_test_ollama_integration_test_ollama_connection",
+      "core_services_ollama_embedding_service_py",
+      "core_services_ollama_llm_client_py",
+      "services_ollama_embedding_service_ollamaembeddingservice",
+      "services_ollama_embedding_service_ollamaembeddingservice_call_with_retry",
+      "services_ollama_embedding_service_ollamaembeddingservice_embed_text",
+      "services_ollama_embedding_service_ollamaembeddingservice_embed_texts",
+      "services_ollama_embedding_service_ollamaembeddingservice_init",
+      "services_ollama_embedding_service_rationale_1",
+      "services_ollama_embedding_service_rationale_100",
+      "services_ollama_embedding_service_rationale_21",
+      "services_ollama_embedding_service_rationale_45",
+      "services_ollama_embedding_service_rationale_67",
+      "services_ollama_llm_client_ollamallmclient",
+      "services_ollama_llm_client_ollamallmclient_call_with_retry",
+      "services_ollama_llm_client_ollamallmclient_generate",
+      "services_ollama_llm_client_ollamallmclient_generate_with_json",
+      "services_ollama_llm_client_ollamallmclient_init",
+      "services_ollama_llm_client_ollamallmclient_verify_connection",
+      "services_ollama_llm_client_rationale_1",
+      "services_ollama_llm_client_rationale_133",
+      "services_ollama_llm_client_rationale_19",
+      "services_ollama_llm_client_rationale_42",
+      "services_ollama_llm_client_rationale_54",
+      "services_ollama_llm_client_rationale_81",
+      "test_ollama_integration_py"
+    ],
+    "7": [
+      "api_client_apierror",
+      "api_client_apierror_constructor",
+      "app_layout_rootlayout",
+      "documents_document_filters_documentfilters",
+      "documents_edit_document_dialog_editdocumentdialog",
+      "documents_page_handledelete",
+      "documents_page_handleedit",
+      "documents_page_handleprocess",
+      "documents_upload_document_dialog_handledragleave",
+      "documents_upload_document_dialog_handledragover",
+      "documents_upload_document_dialog_handledrop",
+      "documents_upload_document_dialog_handleescape",
+      "documents_upload_document_dialog_handlefilechange",
+      "documents_upload_document_dialog_handlefileselect",
+      "documents_upload_document_dialog_handlesubmit",
+      "documents_upload_document_dialog_openfilepicker",
+      "documents_upload_document_dialog_removefile",
+      "documents_upload_document_dialog_validatefile",
+      "frontend_next_app_dashboard_documents_page_tsx",
+      "frontend_next_app_layout_tsx",
+      "frontend_next_components_documents_document_filters_tsx",
+      "frontend_next_components_documents_edit_document_dialog_tsx",
+      "frontend_next_components_documents_upload_document_dialog_tsx",
+      "frontend_next_components_ui_toaster_tsx",
+      "frontend_next_hooks_use_documents_ts",
+      "frontend_next_providers_query_provider_tsx",
+      "hooks_use_cases_usecases",
+      "hooks_use_documents_usedeletedocument",
+      "hooks_use_documents_usedocument",
+      "hooks_use_documents_usedocuments",
+      "hooks_use_documents_useprocessdocument",
+      "hooks_use_documents_useupdatedocument",
+      "hooks_use_documents_useuploaddocument",
+      "lib_utils_formatfilesize",
+      "providers_query_provider_queryprovider"
+    ],
+    "8": [
+      "core_serializers_case_py",
+      "core_serializers_chat_py",
+      "core_serializers_conversation_py",
+      "core_serializers_hearing_py",
+      "core_serializers_init_py",
+      "serializers_case_caseserializer",
+      "serializers_case_caseserializer_get_document_count",
+      "serializers_case_caseserializer_get_hearing_count",
+      "serializers_case_meta",
+      "serializers_case_rationale_1",
+      "serializers_chat_chatrequestserializer",
+      "serializers_chat_chatresponseserializer",
+      "serializers_chat_citationserializer",
+      "serializers_chat_messageserializer",
+      "serializers_chat_meta",
+      "serializers_chat_rationale_1",
+      "serializers_chat_rationale_11",
+      "serializers_chat_rationale_51",
+      "serializers_conversation_conversationdetailserializer",
+      "serializers_conversation_conversationlistserializer",
+      "serializers_conversation_meta",
+      "serializers_conversation_rationale_1",
+      "serializers_hearing_hearingserializer",
+      "serializers_hearing_meta",
+      "serializers_hearing_rationale_1",
+      "serializers_init_rationale_1",
+      "views_chat_chatview_post"
+    ],
+    "9": [
+      "core_admin_activitylogadmin",
+      "core_admin_caseadmin",
+      "core_admin_casetagadmin",
+      "core_admin_casetagmapadmin",
+      "core_admin_citationadmin",
+      "core_admin_conversationadmin",
+      "core_admin_documentadmin",
+      "core_admin_documentchunkadmin",
+      "core_admin_documenttagadmin",
+      "core_admin_documenttagmapadmin",
+      "core_admin_documentversionadmin",
+      "core_admin_emailadmin",
+      "core_admin_emailattachmentadmin",
+      "core_admin_folderadmin",
+      "core_admin_gmailcredentialadmin",
+      "core_admin_hearingadmin",
+      "core_admin_messageadmin",
+      "core_admin_py",
+      "core_admin_rationale_1",
+      "core_admin_short_content",
+      "core_admin_short_description",
+      "core_admin_taskadmin"
+    ],
+    "10": [
+      "core_services_graph_builder_py",
+      "core_tests_test_graph_builder_py",
+      "graph_builder_build_legal_ai_graph",
+      "graph_builder_check_results",
+      "graph_builder_rationale_1",
+      "graph_builder_rationale_38",
+      "graph_builder_rationale_45",
+      "graph_builder_rationale_61",
+      "graph_builder_should_clarify",
+      "tests_test_graph_builder_rationale_1",
+      "tests_test_graph_builder_rationale_20",
+      "tests_test_graph_builder_testconditionaledges",
+      "tests_test_graph_builder_testconditionaledges_test_check_results_low_confidence",
+      "tests_test_graph_builder_testconditionaledges_test_check_results_no_results",
+      "tests_test_graph_builder_testconditionaledges_test_check_results_rank",
+      "tests_test_graph_builder_testconditionaledges_test_should_clarify_returns_analyze",
+      "tests_test_graph_builder_testconditionaledges_test_should_clarify_returns_clarify",
+      "tests_test_graph_builder_testgraphcompilation_test_graph_compiles_successfully"
+    ],
+    "11": [
+      "core_models_document_chunk_py",
+      "core_services_document_processor_py",
+      "models_document_chunk_documentchunk",
+      "models_document_chunk_documentchunk_str",
+      "models_document_chunk_meta",
+      "services_document_processor_documentprocessor_chunk_text",
+      "services_document_processor_extract_docx",
+      "services_document_processor_extract_pdf",
+      "services_document_processor_extract_text_from_file",
+      "services_document_processor_extract_txt",
+      "services_document_processor_find_sentence_boundary",
+      "services_document_processor_process_document",
+      "services_document_processor_rationale_1",
+      "services_document_processor_rationale_128"
+    ],
+    "12": [
+      "emails_page_handlelinkemail",
+      "emails_page_handlesync",
+      "emails_sync_config_syncconfigcard",
+      "frontend_next_app_dashboard_emails_page_tsx",
+      "frontend_next_hooks_use_emails_ts",
+      "frontend_next_hooks_use_gmail_ts",
+      "hooks_use_emails_useemails",
+      "hooks_use_emails_uselinkemail",
+      "hooks_use_gmail_usegmailstatus",
+      "hooks_use_gmail_usesyncemails"
+    ],
+    "13": [
+      "core_serializers_folder_py",
+      "core_views_folder_py",
+      "serializers_folder_folderserializer",
+      "serializers_folder_meta",
+      "serializers_folder_rationale_1",
+      "views_folder_folderlistview",
+      "views_folder_rationale_1",
+      "views_folder_rationale_12"
+    ],
+    "14": [
+      "components_error_boundary_componentdidcatch",
+      "components_error_boundary_constructor",
+      "components_error_boundary_getderivedstatefromerror",
+      "dashboard_layout_dashboardlayout",
+      "frontend_next_app_dashboard_layout_tsx",
+      "frontend_next_components_error_boundary_tsx",
+      "frontend_next_components_layout_header_tsx",
+      "layout_header_header"
+    ],
+    "15": [
+      "core_services_graph_state_py",
+      "graph_state_chunkdata",
+      "graph_state_citationdata",
+      "graph_state_rationale_1",
+      "graph_state_rationale_11",
+      "graph_state_rationale_23",
+      "typeddict"
+    ],
+    "16": [
+      "core_views_hearing_py",
+      "views_hearing_hearingdetailview",
+      "views_hearing_hearinglistcreateview",
+      "views_hearing_hearinglistcreateview_get_queryset",
+      "views_hearing_rationale_1",
+      "views_hearing_rationale_13",
+      "views_hearing_rationale_50"
+    ],
+    "17": [
+      "core_views_conversation_py",
+      "views_conversation_conversationdetailview",
+      "views_conversation_conversationlistview",
+      "views_conversation_conversationlistview_get_queryset",
+      "views_conversation_rationale_1",
+      "views_conversation_rationale_13",
+      "views_conversation_rationale_30"
+    ],
+    "18": [
+      "case_intel_project_celery_debug_task",
+      "case_intel_project_celery_py",
+      "case_intel_project_celery_rationale_1",
+      "case_intel_project_celery_rationale_23",
+      "case_intel_project_init_py",
+      "case_intel_project_init_rationale_1"
+    ],
+    "19": [
+      "core_models_gmail_credential_py",
+      "models_gmail_credential_gmailcredential",
+      "models_gmail_credential_gmailcredential_str",
+      "models_gmail_credential_meta",
+      "models_gmail_credential_rationale_1",
+      "models_gmail_credential_rationale_9"
+    ],
+    "20": [
+      "core_models_case_tag_py",
+      "models_case_tag_casetag",
+      "models_case_tag_casetag_str",
+      "models_case_tag_casetagmap",
+      "models_case_tag_casetagmap_str",
+      "models_case_tag_meta"
+    ],
+    "21": [
+      "core_models_document_tag_py",
+      "models_document_tag_documenttag",
+      "models_document_tag_documenttag_str",
+      "models_document_tag_documenttagmap",
+      "models_document_tag_documenttagmap_str",
+      "models_document_tag_meta"
+    ],
+    "22": [
+      "core_models_hearing_py",
+      "core_models_init_py",
+      "models_hearing_hearing",
+      "models_hearing_hearing_str",
+      "models_hearing_meta"
+    ],
+    "23": [
+      "core_models_document_version_py",
+      "models_document_version_documentversion",
+      "models_document_version_documentversion_str",
+      "models_document_version_meta"
+    ],
+    "24": [
+      "core_models_case_py",
+      "models_case_case",
+      "models_case_case_str",
+      "models_case_meta"
+    ],
+    "25": [
+      "core_models_folder_py",
+      "models_folder_folder",
+      "models_folder_folder_str",
+      "models_folder_meta"
+    ],
+    "26": [
+      "core_models_citation_py",
+      "models_citation_citation",
+      "models_citation_citation_str",
+      "models_citation_meta"
+    ],
+    "27": [
+      "core_models_document_py",
+      "models_document_document",
+      "models_document_document_str",
+      "models_document_meta"
+    ],
+    "28": [
+      "core_models_message_py",
+      "models_message_message",
+      "models_message_message_str",
+      "models_message_meta"
+    ],
+    "29": [
+      "core_models_email_attachment_py",
+      "models_email_attachment_emailattachment",
+      "models_email_attachment_emailattachment_str",
+      "models_email_attachment_meta"
+    ],
+    "30": [
+      "core_models_email_py",
+      "models_email_email",
+      "models_email_email_str",
+      "models_email_meta"
+    ],
+    "31": [
+      "core_models_activity_log_py",
+      "models_activity_log_activitylog",
+      "models_activity_log_activitylog_str",
+      "models_activity_log_meta"
+    ],
+    "32": [
+      "core_models_conversation_py",
+      "models_conversation_conversation",
+      "models_conversation_conversation_str",
+      "models_conversation_meta"
+    ],
+    "33": [
+      "core_models_task_py",
+      "models_task_meta",
+      "models_task_task",
+      "models_task_task_str"
+    ],
+    "34": [
+      "case_intel_manage_main",
+      "case_intel_manage_rationale_8",
+      "manage_py"
+    ],
+    "35": [
+      "appconfig",
+      "core_apps_coreconfig",
+      "core_apps_py"
+    ],
+    "36": [
+      "case_intel_project_asgi_py",
+      "case_intel_project_asgi_rationale_1"
+    ],
+    "37": [
+      "case_intel_project_settings_py",
+      "case_intel_project_settings_rationale_1"
+    ],
+    "38": [
+      "case_intel_project_urls_py",
+      "case_intel_project_urls_rationale_1"
+    ],
+    "39": [
+      "case_intel_project_wsgi_py",
+      "case_intel_project_wsgi_rationale_1"
+    ],
+    "40": [
+      "core_urls_py",
+      "core_urls_rationale_1"
+    ],
+    "41": [
+      "core_migrations_0000_vector_extension_py",
+      "migrations_0000_vector_extension_migration"
+    ],
+    "42": [
+      "core_migrations_0001_initial_py",
+      "migrations_0001_initial_migration"
+    ],
+    "43": [
+      "core_migrations_0002_alter_activitylog_id_alter_case_id_alter_casetag_id_and_more_py",
+      "migrations_0002_alter_activitylog_id_alter_case_id_alter_casetag_id_and_more_migration"
+    ],
+    "44": [
+      "core_migrations_0003_gmailcredential_hearing_py",
+      "migrations_0003_gmailcredential_hearing_migration"
+    ],
+    "45": [
+      "core_migrations_0004_alter_activitylog_id_alter_case_id_alter_casetag_id_and_more_py",
+      "migrations_0004_alter_activitylog_id_alter_case_id_alter_casetag_id_and_more_migration"
+    ],
+    "46": [
+      "core_services_graph_config_py",
+      "graph_config_rationale_1"
+    ],
+    "47": [
+      "core_init_py"
+    ],
+    "48": [
+      "core_migrations_init_py"
+    ],
+    "49": [
+      "services_ai_workflow_rationale_108"
+    ],
+    "50": [
+      "services_ai_workflow_rationale_125"
+    ],
+    "51": [
+      "services_ai_workflow_rationale_138"
+    ],
+    "52": [
+      "services_ai_workflow_rationale_173"
+    ],
+    "53": [
+      "services_ai_workflow_rationale_201"
+    ],
+    "54": [
+      "services_document_processor_rationale_61"
+    ],
+    "55": [
+      "services_document_processor_rationale_168"
+    ],
+    "56": [
+      "services_document_processor_rationale_193"
+    ],
+    "57": [
+      "core_services_init_py"
+    ],
+    "58": [
+      "core_services_graph_init_py"
+    ],
+    "59": [
+      "tests_test_document_processor_rationale_85"
+    ],
+    "60": [
+      "tests_test_document_processor_rationale_111"
+    ],
+    "61": [
+      "tests_test_document_processor_rationale_122"
+    ],
+    "62": [
+      "core_tests_init_py"
+    ],
+    "63": [
+      "frontend_next_next_env_d_ts"
+    ],
+    "64": [
+      "frontend_next_next_config_mjs"
+    ],
+    "65": [
+      "frontend_next_postcss_config_mjs"
+    ],
+    "66": [
+      "frontend_next_tailwind_config_ts"
+    ],
+    "67": [
+      "frontend_next_types_case_ts"
+    ],
+    "68": [
+      "frontend_next_types_chat_ts"
+    ],
+    "69": [
+      "frontend_next_types_dashboard_ts"
+    ],
+    "70": [
+      "frontend_next_types_document_ts"
+    ],
+    "71": [
+      "frontend_next_types_email_ts"
+    ],
+    "72": [
+      "frontend_next_types_hearing_ts"
+    ],
+    "73": [
+      "scripts_init_py"
+    ]
+  },
+  "cohesion": {
+    "0": 0.05,
+    "1": 0.07,
+    "2": 0.05,
+    "3": 0.05,
+    "4": 0.05,
+    "5": 0.05,
+    "6": 0.07,
+    "7": 0.09,
+    "8": 0.09,
+    "9": 0.09,
+    "10": 0.14,
+    "11": 0.2,
+    "12": 0.29,
+    "13": 0.25,
+    "14": 0.29,
+    "15": 0.33,
+    "16": 0.29,
+    "17": 0.29,
+    "18": 0.33,
+    "19": 0.33,
+    "20": 0.33,
+    "21": 0.33,
+    "22": 0.4,
+    "23": 0.5,
+    "24": 0.5,
+    "25": 0.5,
+    "26": 0.5,
+    "27": 0.5,
+    "28": 0.5,
+    "29": 0.5,
+    "30": 0.5,
+    "31": 0.5,
+    "32": 0.5,
+    "33": 0.5,
+    "34": 0.67,
+    "35": 0.67,
+    "36": 1.0,
+    "37": 1.0,
+    "38": 1.0,
+    "39": 1.0,
+    "40": 1.0,
+    "41": 1.0,
+    "42": 1.0,
+    "43": 1.0,
+    "44": 1.0,
+    "45": 1.0,
+    "46": 1.0,
+    "47": 1.0,
+    "48": 1.0,
+    "49": 1.0,
+    "50": 1.0,
+    "51": 1.0,
+    "52": 1.0,
+    "53": 1.0,
+    "54": 1.0,
+    "55": 1.0,
+    "56": 1.0,
+    "57": 1.0,
+    "58": 1.0,
+    "59": 1.0,
+    "60": 1.0,
+    "61": 1.0,
+    "62": 1.0,
+    "63": 1.0,
+    "64": 1.0,
+    "65": 1.0,
+    "66": 1.0,
+    "67": 1.0,
+    "68": 1.0,
+    "69": 1.0,
+    "70": 1.0,
+    "71": 1.0,
+    "72": 1.0,
+    "73": 1.0
+  },
+  "gods": [
+    {
+      "id": "services_document_processor_documentprocessor",
+      "label": "DocumentProcessor",
+      "degree": 21
+    },
+    {
+      "id": "services_gmail_service_gmailservice",
+      "label": "GmailService",
+      "degree": 19
+    },
+    {
+      "id": "tests_test_graph_nodes_make_state",
+      "label": "_make_state()",
+      "degree": 17
+    },
+    {
+      "id": "graph_state_agentstate",
+      "label": "AgentState",
+      "degree": 15
+    },
+    {
+      "id": "lib_utils_cn",
+      "label": "cn()",
+      "degree": 13
+    },
+    {
+      "id": "api_client_apiclient",
+      "label": "apiClient()",
+      "degree": 12
+    },
+    {
+      "id": "services_ollama_llm_client_ollamallmclient",
+      "label": "OllamaLLMClient",
+      "degree": 11
+    },
+    {
+      "id": "tests_test_document_processor_testtextchunking",
+      "label": "TestTextChunking",
+      "degree": 11
+    },
+    {
+      "id": "ui_card_card",
+      "label": "Card()",
+      "degree": 11
+    },
+    {
+      "id": "ui_card_cardcontent",
+      "label": "CardContent()",
+      "degree": 11
+    }
+  ],
+  "surprises": [
+    {
+      "source": "test_factory_pattern()",
+      "target": "get_llm_client()",
+      "source_files": [
+        "test_ollama_integration.py",
+        "core/services/ai_service_factory.py"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "test_factory_pattern()",
+      "target": "get_embedding_service()",
+      "source_files": [
+        "test_ollama_integration.py",
+        "core/services/ai_service_factory.py"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "migrate_all_documents()",
+      "target": "get_embedding_service()",
+      "source_files": [
+        "scripts/migrate_to_ollama.py",
+        "core/services/ai_service_factory.py"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "test_ollama_connection()",
+      "target": "OllamaLLMClient",
+      "source_files": [
+        "test_ollama_integration.py",
+        "core/services/ollama_llm_client.py"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories"
+    },
+    {
+      "source": "test_embedding_generation()",
+      "target": "OllamaEmbeddingService",
+      "source_files": [
+        "test_ollama_integration.py",
+        "core/services/ollama_embedding_service.py"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories"
+    }
+  ],
+  "questions": [
+    {
+      "type": "bridge_node",
+      "question": "Why does `DocumentProcessor` connect `Community 2` to `Community 11`, `Community 5`?",
+      "why": "High betweenness centrality (0.201) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `AIResponse` connect `Community 4` to `Community 0`, `Community 5`?",
+      "why": "High betweenness centrality (0.183) - this node is a cross-community bridge."
+    },
+    {
+      "type": "verify_inferred",
+      "question": "Are the 16 inferred relationships involving `DocumentProcessor` (e.g. with `TestTextChunking` and `TestDocumentProcessing`) actually correct?",
+      "why": "`DocumentProcessor` has 16 INFERRED edges - model-reasoned connections that need verification."
+    },
+    {
+      "type": "verify_inferred",
+      "question": "Are the 9 inferred relationships involving `GmailService` (e.g. with `GmailAuthView` and `GmailCallbackView`) actually correct?",
+      "why": "`GmailService` has 9 INFERRED edges - model-reasoned connections that need verification."
+    },
+    {
+      "type": "verify_inferred",
+      "question": "Are the 12 inferred relationships involving `AgentState` (e.g. with `AIResponse` and `AIWorkflowService`) actually correct?",
+      "why": "`AgentState` has 12 INFERRED edges - model-reasoned connections that need verification."
+    },
+    {
+      "type": "isolated_nodes",
+      "question": "What connects `Run administrative tasks.`, `Integration tests for Ollama LLM and embedding services.  This standalone scri`, `Test connection to Ollama server.` to the rest of the system?",
+      "why": "207 weakly-connected nodes found - possible documentation gaps or missing edges."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Community 0` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.05 - nodes in this community are weakly interconnected."
+    }
+  ]
+}

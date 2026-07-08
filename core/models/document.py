@@ -39,6 +39,19 @@ class Document(models.Model):
     )
     extracted_text = models.TextField(blank=True, null=True)
     chunk_count = models.IntegerField(blank=True, null=True)
+
+    # --- Deduplication: SHA-256 hash of the raw file bytes ---
+    # If two uploads have the same hash, we skip re-embedding and
+    # copy chunk references from the existing document instead.
+    # Set db_index=True so the lookup is O(log n), not a full scan.
+    content_hash = models.CharField(
+        max_length=64,
+        blank=True,
+        null=True,
+        db_index=True,
+        help_text="SHA-256 hex digest of the uploaded file. Used to skip duplicate processing.",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

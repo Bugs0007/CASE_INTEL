@@ -50,7 +50,7 @@ class MessageSerializer(serializers.ModelSerializer):
 class ChatResponseSerializer(serializers.Serializer):
     """Serializes AI workflow responses."""
 
-    answer = serializers.CharField()
+    answer = serializers.CharField(allow_blank=True, required=False)
     confidence = serializers.FloatField()
     query_type = serializers.CharField()
     requires_clarification = serializers.BooleanField()

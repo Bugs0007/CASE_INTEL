@@ -35,10 +35,11 @@ class DocumentListView(generics.ListAPIView):
         return qs
 
 
-class DocumentDetailView(generics.RetrieveDestroyAPIView):
-    """Retrieve or delete a document.
+class DocumentDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Retrieve, update, or delete a document.
 
     GET    /api/documents/<id>/
+    PATCH  /api/documents/<id>/
     DELETE /api/documents/<id>/
     """
 

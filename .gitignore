@@ -34,3 +34,7 @@ chroma_db/
 
 # Uploads
 uploads/
+
+#graphify
+graphify-out/
+

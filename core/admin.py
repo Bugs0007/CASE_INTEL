@@ -19,6 +19,8 @@ from core.models import (
     Email,
     EmailAttachment,
     Folder,
+    GmailCredential,
+    Hearing,
     Message,
     Task,
 )
@@ -132,6 +134,15 @@ class TaskAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at",)
 
 
+@admin.register(Hearing)
+class HearingAdmin(admin.ModelAdmin):
+    list_display = ("case", "hearing_type", "hearing_date", "location", "judge", "status", "created_at")
+    list_filter = ("status", "hearing_type", "case")
+    search_fields = ("location", "judge", "notes")
+    readonly_fields = ("created_at", "updated_at")
+    date_hierarchy = "hearing_date"
+
+
 @admin.register(ActivityLog)
 class ActivityLogAdmin(admin.ModelAdmin):
     list_display = ("activity_type", "case", "short_description", "created_at")
@@ -142,3 +153,11 @@ class ActivityLogAdmin(admin.ModelAdmin):
     def short_description(self, obj: ActivityLog) -> str:
         desc = obj.description or ""
         return desc[:80] + "..." if len(desc) > 80 else desc
+
+
+@admin.register(GmailCredential)
+class GmailCredentialAdmin(admin.ModelAdmin):
+    list_display = ("email_address", "is_active", "created_at", "updated_at")
+    list_filter = ("is_active",)
+    search_fields = ("email_address",)
+    readonly_fields = ("created_at", "updated_at")
