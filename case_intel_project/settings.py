@@ -160,8 +160,20 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",  # Next.js default port
     "http://localhost:8080",  # Alternative frontend port
     "http://127.0.0.1:8080",  # Alternative frontend port
+    "https://case-intel.vercel.app",  # Production Vercel deployment
 ]
-CORS_ALLOW_CREDENTIALS = True
+
+# Vercel preview deployments get a fresh URL per build, e.g.
+# https://case-intel-<hash>-bhagath-personal-projects.vercel.app
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://case-intel-[a-zA-Z0-9-]+-bhagath-personal-projects\.vercel\.app$",
+]
+
+# Auth is via a manually-attached "Authorization: Token ..." header, not
+# cookies, so the browser never needs to send credentials cross-origin
+# for this app. Keep this False (the stricter setting) unless a future
+# feature actually relies on cross-site cookies.
+CORS_ALLOW_CREDENTIALS = False
 
 # Additional CORS headers for better API integration
 CORS_ALLOW_HEADERS = [
