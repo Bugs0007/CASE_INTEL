@@ -6,6 +6,7 @@ import logging
 from datetime import datetime, timedelta
 
 from rest_framework import status
+from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -46,7 +47,12 @@ class GmailCallbackView(APIView):
     """Handle Gmail OAuth callback.
 
     GET /api/gmail/callback/?code=...
+
+    Left public: this is hit directly by Google's OAuth redirect (a
+    top-level browser navigation), which carries no Authorization header.
     """
+
+    permission_classes = [AllowAny]
 
     def get(self, request: Request) -> Response:
         code = request.query_params.get("code")

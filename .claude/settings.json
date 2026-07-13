@@ -1,0 +1,39 @@
+{
+  "respectGitignore": true,
+  "permissions": {
+    "allow": [
+      "Read",
+      "Grep",
+      "Glob",
+      "Bash(git status)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git branch*)",
+      "Bash(git show*)",
+      "Bash(python manage.py check*)",
+      "Bash(python manage.py migrate*)",
+      "Bash(python manage.py makemigrations*)",
+      "Bash(python manage.py runserver*)",
+      "Bash(python manage.py showmigrations*)",
+      "Bash(python manage.py test*)",
+      "Bash(python manage.py shell*)",
+      "Bash(pytest*)",
+      "Bash(npm run dev*)",
+      "Bash(npm run build*)",
+      "Bash(npm run lint*)",
+      "Bash(npm install*)"
+    ],
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean*)",
+      "Bash(git branch -D*)",
+      "Read(**/node_modules/**)",
+      "Read(**/.next/**)",
+      "Read(.venv/**)",
+      "Read(staticfiles/**)",
+      "Read(media/**)",
+      "Read(graphify-out/**)"
+    ]
+  }
+}

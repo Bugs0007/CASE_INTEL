@@ -28,11 +28,15 @@ from core.views import (
     GmailSyncView,
     HearingDetailView,
     HearingListCreateView,
+    LoginView,
 )
 
 app_name = "core"
 
 urlpatterns = [
+    # Auth
+    path("auth/login/", LoginView.as_view(), name="auth-login"),
+
     # Dashboard
     path("dashboard/", DashboardView.as_view(), name="dashboard"),
 
