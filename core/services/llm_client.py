@@ -26,13 +26,14 @@ class LLMClient:
         self,
         api_key: Optional[str] = None,
         model: Optional[str] = None,
+        base_url: Optional[str] = None,
     ) -> None:
         resolved_key = api_key or settings.OPENAI_API_KEY
         if not resolved_key:
             raise ValueError(
                 "OPENAI_API_KEY must be set in environment or passed explicitly."
             )
-        self._client = OpenAI(api_key=resolved_key)
+        self._client = OpenAI(api_key=resolved_key, base_url=base_url)
         self.model = model or settings.OPENAI_MODEL
 
     def generate(

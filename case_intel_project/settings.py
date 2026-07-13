@@ -193,10 +193,22 @@ CORS_ALLOW_HEADERS = [
 # AI Provider Configuration
 # ============================================================================
 
-# Toggle between OpenAI and Ollama (set to "true" for local Ollama)
+# Embedding provider toggle (Ollama nomic-embed-text is the only supported
+# option right now — OpenAI embeddings remain available as a fallback path,
+# but Gemini/other embedding providers are deliberately not implemented).
 USE_OLLAMA = config("USE_OLLAMA", default=False, cast=bool)
 
-# OpenAI Configuration (used when USE_OLLAMA=false)
+# LLM (chat generation) provider toggle — independent of USE_OLLAMA/embeddings.
+# When true, get_llm_client() routes to Groq's OpenAI-compatible endpoint
+# instead of Ollama or OpenAI, regardless of the embedding provider in use.
+USE_GROQ = config("USE_GROQ", default=False, cast=bool)
+
+# Groq Configuration (used when USE_GROQ=true)
+GROQ_API_KEY = config("GROQ_API_KEY", default="")
+GROQ_MODEL = config("GROQ_MODEL", default="llama-3.3-70b-versatile")
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+
+# OpenAI Configuration (used when USE_OLLAMA=false and USE_GROQ=false)
 OPENAI_API_KEY = config("OPENAI_API_KEY", default="")
 OPENAI_MODEL = config("OPENAI_MODEL", default="gpt-4o")
 OPENAI_EMBEDDING_MODEL = config("OPENAI_EMBEDDING_MODEL", default="text-embedding-3-small")
