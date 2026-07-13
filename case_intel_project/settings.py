@@ -13,7 +13,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 import os
 from pathlib import Path
 
-from decouple import config
+from decouple import Csv, config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -23,7 +23,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-9t=v+507ci9+%fmj75n+j4zg7(q1hkp^#_m!-42d!3o@lxjpw0"
+SECRET_KEY = config(
+    "SECRET_KEY",
+    default="django-insecure-9t=v+507ci9+%fmj75n+j4zg7(q1hkp^#_m!-42d!3o@lxjpw0",
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
@@ -42,6 +45,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     'django.contrib.postgres',
     "rest_framework",
+    "rest_framework.authtoken",
     "corsheaders",
     "django_extensions",
     "django_celery_beat",
@@ -142,6 +146,12 @@ REST_FRAMEWORK = {
         "rest_framework.parsers.JSONParser",
     ],
     "EXCEPTION_HANDLER": "rest_framework.views.exception_handler",
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
 }
 
 # CORS Configuration
