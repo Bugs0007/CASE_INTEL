@@ -11,6 +11,8 @@ ENV/
 
 # Environment variables
 .env
+.env.local
+.env.*.local
 
 # Django
 *.log
@@ -24,6 +26,9 @@ staticfiles/
 .idea/
 *.swp
 *.swo
+
+# Claude Code local overrides
+.claude/settings.local.json
 
 # OS
 .DS_Store

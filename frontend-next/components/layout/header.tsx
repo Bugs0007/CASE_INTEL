@@ -1,10 +1,19 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { SearchInput } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Calendar, Upload } from "lucide-react";
+import { Calendar, LogOut, Upload } from "lucide-react";
+import { clearToken } from "@/lib/auth";
 
 export function Header() {
+  const router = useRouter();
+
+  function handleLogout() {
+    clearToken();
+    router.push("/login");
+  }
+
   return (
     <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6">
       {/* Global Search */}
@@ -25,6 +34,11 @@ export function Header() {
         <Button variant="primary" size="sm">
           <Upload className="h-4 w-4" />
           Quick Upload
+        </Button>
+
+        <Button variant="ghost" size="sm" onClick={handleLogout}>
+          <LogOut className="h-4 w-4" />
+          Log out
         </Button>
       </div>
     </header>
