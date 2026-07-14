@@ -22,16 +22,13 @@ restarting the service with a half-applied deploy):
    match of `main`, not `git pull`, so there is no possibility of local drift on
    the server.
 2. Activate the venv, `pip install -r requirements.txt`.
-3. `python manage.py migrate --noinput`
-4. `python manage.py collectstatic --noinput`
-5. `sudo systemctl restart case-intel` — the systemd unit (gunicorn behind Nginx)
+3. `python -m spacy download en_core_web_sm` — runs on every deploy, right after
+   dependency install, so the model is always present regardless of whether the
+   venv was fresh or already had it.
+4. `python manage.py migrate --noinput`
+5. `python manage.py collectstatic --noinput`
+6. `sudo systemctl restart case-intel` — the systemd unit (gunicorn behind Nginx)
    that was created manually on the server and is **not** in this repo.
-
-**The current workflow does NOT run `python -m spacy download en_core_web_sm`.**
-Since `pip install -r requirements.txt` does not fetch spaCy language models,
-every deploy that reinstalls dependencies into a clean environment (or otherwise
-loses the previously-downloaded model) needs this step added to `deploy.yml`, or
-run manually on the server — it is not automatic today.
 
 **Known gaps to verify before trusting this workflow on a real deploy:**
 - The `PROJECT_DIR` and `VENV_DIR` values at the top of `deploy.yml`'s script are
@@ -42,4 +39,3 @@ run manually on the server — it is not automatic today.
 - `git reset --hard` will discard any uncommitted changes that exist directly on
   the server — if anyone has ever hotfixed EC2 by hand outside of git, that work
   is destroyed on the next deploy.
-- The workflow does not run `python -m spacy download en_core_web_sm` (see above).
