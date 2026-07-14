@@ -45,6 +45,7 @@ python manage.py makemigrations
 python manage.py migrate
 python manage.py createsuperuser
 python manage.py check              # sanity-check settings before anything else
+python -m spacy download en_core_web_sm   # required once after every fresh pip install — see Gotchas
 
 # Frontend (from frontend-next/)
 npm run dev
@@ -63,3 +64,4 @@ There is currently **no automated test suite** in this repo (no `test*.py` files
 - `.env` is gitignored and has never been committed — keep it that way. Never put real secrets directly into `settings.py` defaults.
 - **`USE_GROQ` only affects chat generation, never embeddings.** Embeddings always go through Ollama's `nomic-embed-text` regardless of `USE_GROQ` — this is intentional (Groq doesn't serve `nomic-embed-text`, and no other embedding provider has been wired in). Even in a `USE_GROQ=true` deployment, Ollama must still be installed and running for embeddings to work at all.
 - **No production `GROQ_API_KEY` exists yet.** The key used to verify this integration was a local-testing-only key. Before `USE_GROQ=true` can go live, generate a dedicated production key in the Groq console (console.groq.com/keys) and add it to prod `.env` — do not reuse the dev/test key for production. Also see the Ollama-on-EC2 gap noted for the same deploy (Ollama isn't installed on the EC2 instance yet, and embeddings need it regardless of `USE_GROQ`).
+- **`spacy` in `requirements.txt` does NOT include its language model.** `core/services/document_processor.py`'s `_get_nlp()` loads `en_core_web_sm` for sentence splitting, but spaCy models aren't distributed as regular pip packages — `pip install -r requirements.txt` alone will not fetch it. Run `python -m spacy download en_core_web_sm` once after every fresh install (local, CI, or EC2). If skipped, this doesn't hard-crash — `_get_nlp()` catches the `OSError` and silently falls back to a blank spaCy sentencizer (worse sentence boundaries, no linguistic features), so the gap can go unnoticed for a while. `.claude/commands/deploy-checks.md` documents this as a required post-`pip install` step.
