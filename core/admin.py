@@ -19,6 +19,7 @@ from core.models import (
     Email,
     EmailAttachment,
     Folder,
+    CourtFetchLog,
     GmailCredential,
     Hearing,
     Message,
@@ -28,10 +29,13 @@ from core.models import (
 
 @admin.register(Case)
 class CaseAdmin(admin.ModelAdmin):
-    list_display = ("case_number", "title", "client_name", "case_type", "status", "priority", "created_at")
-    list_filter = ("status", "case_type", "priority")
-    search_fields = ("case_number", "title", "client_name", "opposing_party")
-    readonly_fields = ("created_at",)
+    list_display = (
+        "case_number", "title", "client_name", "case_type", "status", "priority",
+        "tracking_enabled", "fetch_status", "cnr_number", "created_at",
+    )
+    list_filter = ("status", "case_type", "priority", "tracking_enabled", "fetch_status")
+    search_fields = ("case_number", "title", "client_name", "opposing_party", "cnr_number")
+    readonly_fields = ("created_at", "last_fetched_at")
 
 
 @admin.register(CaseTag)
@@ -136,11 +140,19 @@ class TaskAdmin(admin.ModelAdmin):
 
 @admin.register(Hearing)
 class HearingAdmin(admin.ModelAdmin):
-    list_display = ("case", "hearing_type", "hearing_date", "location", "judge", "status", "created_at")
-    list_filter = ("status", "hearing_type", "case")
-    search_fields = ("location", "judge", "notes")
+    list_display = ("case", "hearing_type", "hearing_date", "source", "location", "judge", "status", "created_at")
+    list_filter = ("status", "hearing_type", "source", "case")
+    search_fields = ("location", "judge", "notes", "purpose")
     readonly_fields = ("created_at", "updated_at")
     date_hierarchy = "hearing_date"
+
+
+@admin.register(CourtFetchLog)
+class CourtFetchLogAdmin(admin.ModelAdmin):
+    list_display = ("case", "timestamp", "success", "duration_ms")
+    list_filter = ("success", "case")
+    readonly_fields = ("timestamp",)
+    date_hierarchy = "timestamp"
 
 
 @admin.register(ActivityLog)

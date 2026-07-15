@@ -14,6 +14,7 @@ from .citation import Citation
 from .activity_log import ActivityLog
 from .task import Task
 from .hearing import Hearing
+from .court_fetch_log import CourtFetchLog
 
 __all__ = [
     "Case",
@@ -34,4 +35,5 @@ __all__ = [
     "ActivityLog",
     "Task",
     "Hearing",
+    "CourtFetchLog",
 ]
