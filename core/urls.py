@@ -9,11 +9,14 @@ from django.urls import path
 from core.views import (
     CaseDetailView,
     CaseListCreateView,
+    CaseTrackingRefreshView,
+    CaseTrackingSetupView,
     ChatView,
     ConversationDetailView,
     ConversationExportView,
     ConversationListView,
     ConversationMessagesView,
+    CourtStructureView,
     DashboardView,
     DocumentDetailView,
     DocumentListView,
@@ -29,6 +32,7 @@ from core.views import (
     HearingDetailView,
     HearingListCreateView,
     LoginView,
+    UpcomingHearingsView,
 )
 
 app_name = "core"
@@ -39,6 +43,11 @@ urlpatterns = [
 
     # Dashboard
     path("dashboard/", DashboardView.as_view(), name="dashboard"),
+    path(
+        "dashboard/upcoming-hearings/",
+        UpcomingHearingsView.as_view(),
+        name="dashboard-upcoming-hearings",
+    ),
 
     # Chat
     path("chat/", ChatView.as_view(), name="chat"),
@@ -64,6 +73,19 @@ urlpatterns = [
     # Cases
     path("cases/", CaseListCreateView.as_view(), name="case-list"),
     path("cases/<int:pk>/", CaseDetailView.as_view(), name="case-detail"),
+    path(
+        "cases/<int:pk>/tracking/",
+        CaseTrackingSetupView.as_view(),
+        name="case-tracking-setup",
+    ),
+    path(
+        "cases/<int:pk>/tracking/refresh/",
+        CaseTrackingRefreshView.as_view(),
+        name="case-tracking-refresh",
+    ),
+
+    # Court structure (eCourts hierarchy discovery for the tracking form)
+    path("court-structure/", CourtStructureView.as_view(), name="court-structure"),
 
     # Hearings
     path("hearings/", HearingListCreateView.as_view(), name="hearing-list"),
