@@ -31,8 +31,11 @@ class CourtDataProvider(ABC):
         """Look up a case and its hearing history.
 
         Args:
-            tracking_config: Court hierarchy + case_type/case_number/year.
-                Shape depends on tracking_config["court_type"]:
+            tracking_config: Either the CNR-first shape
+                {"court_type": ..., "cnr": "<16-char CNR>"} (preferred --
+                see fetch_case_by_cnr, no hierarchy needed), or the cascade
+                fallback shape: court hierarchy + case_type/case_number/
+                year. Shape depends on tracking_config["court_type"]:
                   "district": state_code, dist_code, court_complex_code,
                       est_code, case_type, case_number, year
                   "high_court": hc_court_code, state_code, bench_code,
@@ -40,6 +43,21 @@ class CourtDataProvider(ABC):
 
         Raises:
             CaseNotFoundError: No matching case for these identifiers.
+            CourtPortalError: The portal failed after retries.
+            CaptchaSolveError: CAPTCHA solving failed after retries.
+        """
+
+    @abstractmethod
+    def fetch_case_by_cnr(self, cnr: str, court_type: str) -> CourtCaseData:
+        """Look up a case directly by its 16-character CNR number.
+
+        Unlike fetch_case, this needs no court hierarchy -- a CNR alone
+        identifies the case on either portal. court_type only selects
+        which portal to query ("district" vs "high_court"); it is not
+        used to scope the search once there.
+
+        Raises:
+            CaseNotFoundError: No case exists for this CNR on this portal.
             CourtPortalError: The portal failed after retries.
             CaptchaSolveError: CAPTCHA solving failed after retries.
         """

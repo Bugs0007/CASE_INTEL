@@ -8,6 +8,8 @@ import {
   RefreshCw,
   AlertTriangle,
   CalendarClock,
+  Trash2,
+  Search,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,8 +19,14 @@ import { Badge } from "@/components/ui/badge";
 import { showToast } from "@/components/ui/toaster";
 import { APIError } from "@/lib/api/client";
 import { formatDate, formatRelativeTime } from "@/lib/utils";
-import { useCourtStructure, useRefreshTracking, useSetupTracking } from "@/hooks/use-case-tracking";
-import type { Case, CourtType, Hearing, TrackingConfig } from "@/types";
+import {
+  useConfirmTracking,
+  useCourtStructure,
+  usePreviewTracking,
+  useRefreshTracking,
+  useUntrackTracking,
+} from "@/hooks/use-case-tracking";
+import type { Case, CourtType, Hearing, TrackingConfig, TrackingPreview } from "@/types";
 
 const DISTRICT_PORTAL_URL = "https://services.ecourts.gov.in/ecourtindia_v6/";
 const HC_PORTAL_URL = "https://hcservices.ecourts.gov.in/hcservices/";
@@ -40,6 +48,10 @@ export function CourtTrackingCard({ caseItem, hearings }: CourtTrackingCardProps
 // ---------------------------------------------------------------------------
 
 function TrackingSetupForm({ caseId }: { caseId: number }) {
+  const [mode, setMode] = useState<"cnr" | "cascade">("cnr");
+  const [cnr, setCnr] = useState("");
+  const [cnrCourtType, setCnrCourtType] = useState<CourtType>("district");
+
   const [courtType, setCourtType] = useState<CourtType>("district");
   const [stateCode, setStateCode] = useState("");
   const [distCode, setDistCode] = useState("");
@@ -50,8 +62,10 @@ function TrackingSetupForm({ caseId }: { caseId: number }) {
   const [caseNumber, setCaseNumber] = useState("");
   const [year, setYear] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<TrackingPreview | null>(null);
 
-  const setupTracking = useSetupTracking(caseId);
+  const previewTracking = usePreviewTracking(caseId);
+  const confirmTracking = useConfirmTracking(caseId);
 
   // Cascading discovery calls -- each only fires once its prerequisite is set.
   const states = useCourtStructure(courtType === "district" ? { court_type: "district" } : null);
@@ -87,11 +101,13 @@ function TrackingSetupForm({ caseId }: { caseId: number }) {
         : null,
   );
 
-  const canSubmit =
+  const cnrValid = cnr.trim().length === 16 && /^[a-zA-Z0-9]+$/.test(cnr.trim());
+  const canSubmitCascade =
     caseTypeCode &&
     caseNumber &&
     year &&
     (courtType === "district" ? complexOption?.complex_code : hcCourtCode && benchCode);
+  const canSubmit = mode === "cnr" ? cnrValid : canSubmitCascade;
 
   function resetDownstream(level: "courtType" | "state" | "district" | "hcCourt") {
     if (level === "courtType") {
@@ -117,35 +133,37 @@ function TrackingSetupForm({ caseId }: { caseId: number }) {
     setCaseTypeCode("");
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handlePreviewSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
     if (!canSubmit) return;
 
     const config: TrackingConfig =
-      courtType === "district"
-        ? {
-            court_type: "district",
-            state_code: stateCode,
-            dist_code: distCode,
-            court_complex_code: complexOption!.complex_code!,
-            est_code: complexOption!.est_code || "",
-            case_type: caseTypeCode,
-            case_number: caseNumber,
-            year,
-          }
-        : {
-            court_type: "high_court",
-            hc_court_code: hcCourtCode,
-            bench_code: benchCode,
-            case_type: caseTypeCode,
-            case_number: caseNumber,
-            year,
-          };
+      mode === "cnr"
+        ? { court_type: cnrCourtType, cnr: cnr.trim().toUpperCase() }
+        : courtType === "district"
+          ? {
+              court_type: "district",
+              state_code: stateCode,
+              dist_code: distCode,
+              court_complex_code: complexOption!.complex_code!,
+              est_code: complexOption!.est_code || "",
+              case_type: caseTypeCode,
+              case_number: caseNumber,
+              year,
+            }
+          : {
+              court_type: "high_court",
+              hc_court_code: hcCourtCode,
+              bench_code: benchCode,
+              case_type: caseTypeCode,
+              case_number: caseNumber,
+              year,
+            };
 
     try {
-      await setupTracking.mutateAsync(config);
-      showToast.success("Tracking enabled", "Case fetched successfully from eCourts.");
+      const result = await previewTracking.mutateAsync(config);
+      setPreview(result);
     } catch (error) {
       if (error instanceof APIError && error.data && typeof error.data === "object") {
         const detail = (error.data as { detail?: string }).detail;
@@ -156,12 +174,48 @@ function TrackingSetupForm({ caseId }: { caseId: number }) {
     }
   }
 
+  async function handleConfirm() {
+    if (!preview) return;
+    try {
+      await confirmTracking.mutateAsync(preview.preview_token);
+      showToast.success("Tracking enabled", "Case confirmed and tracking started.");
+    } catch (error) {
+      // Most likely a 410 (preview expired) -- send the user back to the
+      // form rather than leaving them stuck on a dead preview panel.
+      setPreview(null);
+      if (error instanceof APIError && error.data && typeof error.data === "object") {
+        const detail = (error.data as { detail?: string }).detail;
+        setFormError(detail || "This preview expired. Please search again.");
+      } else {
+        setFormError("Could not save this case. Please search again.");
+      }
+    }
+  }
+
+  function handleTryAgain() {
+    setPreview(null);
+    // Inputs are intentionally left as-is -- Try Again returns to the
+    // form with prior inputs retained, not a blank form.
+  }
+
   const renderOptions = (options: Record<string, unknown> | undefined) =>
     Object.entries(options || {}).map(([code, value]) => (
       <option key={code} value={code}>
         {typeof value === "string" ? value : (value as { label: string }).label}
       </option>
     ));
+
+  if (preview) {
+    return (
+      <TrackingPreviewPanel
+        preview={preview}
+        onConfirm={handleConfirm}
+        onTryAgain={handleTryAgain}
+        isConfirming={confirmTracking.isPending}
+        error={formError}
+      />
+    );
+  }
 
   return (
     <Card>
@@ -173,11 +227,64 @@ function TrackingSetupForm({ caseId }: { caseId: number }) {
       </CardHeader>
       <CardContent>
         <p className="text-sm text-gray-600 mb-4">
-          Set up live tracking to fetch hearing dates and case status from eCourts. You don't need
-          the CNR to start -- it's captured automatically once the case is found.
+          {mode === "cnr"
+            ? "Enter the case's CNR number to fetch it directly -- no need to know the court hierarchy or case number."
+            : "Search by court, case type, number, and year. The CNR is captured automatically once the case is found."}
         </p>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="mb-4 flex gap-2 text-sm">
+          <button
+            type="button"
+            onClick={() => {
+              setMode("cnr");
+              setFormError(null);
+            }}
+            className={`rounded-full px-3 py-1 font-medium transition-colors ${
+              mode === "cnr" ? "bg-primary text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
+          >
+            Have a CNR
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMode("cascade");
+              setFormError(null);
+            }}
+            className={`rounded-full px-3 py-1 font-medium transition-colors ${
+              mode === "cascade" ? "bg-primary text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
+          >
+            Search by case number
+          </button>
+        </div>
+
+        <form onSubmit={handlePreviewSubmit} className="space-y-4">
+          {mode === "cnr" ? (
+            <>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Court</label>
+                <Select value={cnrCourtType} onChange={(e) => setCnrCourtType(e.target.value as CourtType)}>
+                  <option value="district">District Court</option>
+                  <option value="high_court">High Court</option>
+                </Select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">CNR Number</label>
+                <Input
+                  value={cnr}
+                  onChange={(e) => setCnr(e.target.value.toUpperCase())}
+                  placeholder="e.g. MHAU019999992015"
+                  maxLength={16}
+                  className="font-mono"
+                />
+                {cnr && !cnrValid && (
+                  <p className="mt-1 text-xs text-gray-500">CNR must be exactly 16 letters/digits.</p>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Court</label>
             <Select
@@ -300,6 +407,8 @@ function TrackingSetupForm({ caseId }: { caseId: number }) {
               <Input value={year} onChange={(e) => setYear(e.target.value)} placeholder="e.g. 2024" />
             </div>
           </div>
+            </>
+          )}
 
           {formError && (
             <div className="flex items-start gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-700">
@@ -308,17 +417,106 @@ function TrackingSetupForm({ caseId }: { caseId: number }) {
             </div>
           )}
 
-          <Button type="submit" disabled={!canSubmit || setupTracking.isPending} className="w-full">
-            {setupTracking.isPending ? (
+          <Button type="submit" disabled={!canSubmit || previewTracking.isPending} className="w-full">
+            {previewTracking.isPending ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Fetching from eCourts...
               </>
             ) : (
-              "Start Tracking"
+              <>
+                <Search className="h-4 w-4" />
+                Preview Case
+              </>
             )}
           </Button>
         </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Preview / confirm step -- shows the fetched case before anything is
+// persisted, so a mismatched case_type/case_number/CNR lookup can be caught
+// by a human before it silently overwrites the case's tracking data.
+// ---------------------------------------------------------------------------
+
+function TrackingPreviewPanel({
+  preview,
+  onConfirm,
+  onTryAgain,
+  isConfirming,
+  error,
+}: {
+  preview: TrackingPreview;
+  onConfirm: () => void;
+  onTryAgain: () => void;
+  isConfirming: boolean;
+  error: string | null;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Gavel className="h-5 w-5 text-gray-500" />
+          Is this your case?
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="mb-4 flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-100 p-3 text-xs text-amber-800">
+          <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+          <span>
+            This is fetched from eCourts and has NOT been saved yet. Check the parties below match
+            before confirming.
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <Field label="Case Title">
+            <span className="text-sm font-medium text-gray-900">{preview.case_title || "—"}</span>
+          </Field>
+          <Field label="CNR">
+            <span className="font-mono text-sm">{preview.cnr || "—"}</span>
+          </Field>
+          <Field label="Petitioner">
+            <span className="text-sm text-gray-900">{preview.petitioner || "—"}</span>
+          </Field>
+          <Field label="Respondent">
+            <span className="text-sm text-gray-900">{preview.respondent || "—"}</span>
+          </Field>
+          <Field label="Court">
+            <span className="text-sm text-gray-900">{preview.court_name || "—"}</span>
+          </Field>
+          <Field label="Next Hearing">
+            <span className="text-sm text-gray-900">
+              {preview.next_hearing_date ? formatDate(preview.next_hearing_date) : "None scheduled"}
+            </span>
+          </Field>
+        </div>
+
+        {error && (
+          <div className="mb-4 flex items-start gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+            <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <div className="flex gap-3">
+          <Button variant="secondary" onClick={onTryAgain} disabled={isConfirming} className="flex-1">
+            Try Again
+          </Button>
+          <Button onClick={onConfirm} disabled={isConfirming} className="flex-1">
+            {isConfirming ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Confirming...
+              </>
+            ) : (
+              "Confirm, this is correct"
+            )}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
@@ -332,6 +530,7 @@ const RATE_LIMIT_MS = 60 * 60 * 1000;
 
 function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hearing[] }) {
   const refreshTracking = useRefreshTracking(caseItem.id);
+  const untrackTracking = useUntrackTracking(caseItem.id);
   const [rateLimitedUntil, setRateLimitedUntil] = useState<string | null>(null);
 
   const ecourtsHearings = useMemo(
@@ -369,6 +568,22 @@ function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hea
     }
   }
 
+  async function handleUntrack() {
+    const confirmed = window.confirm(
+      "Remove court tracking for this case? This clears the CNR, tracking configuration, and " +
+        "all eCourts-sourced hearing dates (manually-entered hearings are kept). You can set up " +
+        "tracking again immediately afterward with the correct case. This cannot be undone.",
+    );
+    if (!confirmed) return;
+
+    try {
+      await untrackTracking.mutateAsync();
+      showToast.success("Tracking removed", "You can set up tracking again with the correct case.");
+    } catch (error) {
+      showToast.error("Could not remove tracking", "Please try again.");
+    }
+  }
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -376,19 +591,36 @@ function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hea
           <Gavel className="h-5 w-5 text-gray-500" />
           Court Tracking
         </CardTitle>
-        <div title={withinRateLimitWindow ? "You can refresh again about an hour after the last check." : undefined}>
+        <div className="flex items-center gap-2">
+          <div title={withinRateLimitWindow ? "You can refresh again about an hour after the last check." : undefined}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={refreshTracking.isPending || !!withinRateLimitWindow}
+            >
+              {refreshTracking.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              {refreshTracking.isPending ? "Refreshing..." : "Refresh"}
+            </Button>
+          </div>
           <Button
-            variant="secondary"
+            variant="ghost"
             size="sm"
-            onClick={handleRefresh}
-            disabled={refreshTracking.isPending || !!withinRateLimitWindow}
+            onClick={handleUntrack}
+            disabled={untrackTracking.isPending}
+            title="Untrack this case / fix a wrong case match"
+            className="text-red-600 hover:bg-red-50 hover:text-red-700"
           >
-            {refreshTracking.isPending ? (
+            {untrackTracking.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <RefreshCw className="h-4 w-4" />
+              <Trash2 className="h-4 w-4" />
             )}
-            {refreshTracking.isPending ? "Refreshing..." : "Refresh"}
+            Untrack
           </Button>
         </div>
       </CardHeader>

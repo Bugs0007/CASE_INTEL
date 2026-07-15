@@ -9,8 +9,10 @@ from django.urls import path
 from core.views import (
     CaseDetailView,
     CaseListCreateView,
+    CaseTrackingConfirmView,
+    CaseTrackingPreviewView,
     CaseTrackingRefreshView,
-    CaseTrackingSetupView,
+    CaseTrackingView,
     ChatView,
     ConversationDetailView,
     ConversationExportView,
@@ -75,8 +77,18 @@ urlpatterns = [
     path("cases/<int:pk>/", CaseDetailView.as_view(), name="case-detail"),
     path(
         "cases/<int:pk>/tracking/",
-        CaseTrackingSetupView.as_view(),
-        name="case-tracking-setup",
+        CaseTrackingView.as_view(),
+        name="case-tracking",
+    ),
+    path(
+        "cases/<int:pk>/tracking/preview/",
+        CaseTrackingPreviewView.as_view(),
+        name="case-tracking-preview",
+    ),
+    path(
+        "cases/<int:pk>/tracking/confirm/",
+        CaseTrackingConfirmView.as_view(),
+        name="case-tracking-confirm",
     ),
     path(
         "cases/<int:pk>/tracking/refresh/",

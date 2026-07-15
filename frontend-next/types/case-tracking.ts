@@ -14,6 +14,11 @@ export interface CourtStructureResponse {
   options: Record<string, string | CourtStructureOption>;
 }
 
+export interface TrackingConfigCnr {
+  court_type: "district" | "high_court";
+  cnr: string;
+}
+
 export interface TrackingConfigDistrict {
   court_type: "district";
   state_code: string;
@@ -34,7 +39,7 @@ export interface TrackingConfigHighCourt {
   year: string;
 }
 
-export type TrackingConfig = TrackingConfigDistrict | TrackingConfigHighCourt;
+export type TrackingConfig = TrackingConfigCnr | TrackingConfigDistrict | TrackingConfigHighCourt;
 
 export interface CourtDataSnapshot {
   cnr: string;
@@ -60,4 +65,21 @@ export interface TrackingResponse {
 export interface TrackingErrorResponse {
   detail: string;
   code: string;
+}
+
+export interface TrackingPreview {
+  preview_token: string;
+  case_title: string | null;
+  cnr: string;
+  petitioner: string;
+  respondent: string;
+  court_name: string;
+  case_status: string;
+  case_stage: string;
+  case_type: string | null;
+  case_number: string | null;
+  year: string | null;
+  next_hearing_date: string | null;
+  first_hearing_date: string | null;
+  hearing_count: number;
 }

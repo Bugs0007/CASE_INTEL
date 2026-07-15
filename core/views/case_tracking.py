@@ -19,9 +19,14 @@ from core.services.court_data import CaptchaSolveError, CaseNotFoundError, Court
 from core.services.court_data.ecourts_provider import parse_complex_code
 from core.services.court_tracking import (
     MissingTrackingConfigError,
+    PreviewExpiredError,
+    PreviewThrottledError,
     TrackingNotEnabledError,
+    confirm_case_tracking,
     latest_snapshot,
+    preview_case_tracking,
     refresh_case_tracking,
+    untrack_case,
 )
 
 
@@ -42,6 +47,32 @@ def _error_response(exc: Exception) -> Response:
     if isinstance(exc, CourtDataError):
         return Response({"detail": str(exc), "code": "court_data_error"}, status=status.HTTP_400_BAD_REQUEST)
     raise exc
+
+
+def _validate_tracking_config(tracking_config: dict) -> str | None:
+    """Returns an error message if tracking_config is invalid for either
+    the CNR-first shape ({court_type, cnr}) or the cascade fallback shape
+    (court hierarchy + case_type/case_number/year), else None."""
+    court_type = tracking_config.get("court_type")
+    if court_type not in ("district", "high_court"):
+        return "tracking_config.court_type must be 'district' or 'high_court'."
+
+    cnr = tracking_config.get("cnr")
+    if cnr:
+        if not isinstance(cnr, str) or len(cnr) != 16 or not cnr.isalnum():
+            return "cnr must be a 16-character alphanumeric CNR number."
+        return None
+
+    required = ["case_type", "case_number", "year"]
+    required += (
+        ["state_code", "dist_code", "court_complex_code"]
+        if court_type == "district"
+        else ["hc_court_code"]
+    )
+    missing = [f for f in required if not tracking_config.get(f)]
+    if missing:
+        return f"Missing required field(s): {', '.join(missing)}."
+    return None
 
 
 def _snapshot_response(case: Case, data=None) -> dict:
@@ -157,14 +188,39 @@ class CourtStructureView(APIView):
         return Response({"level": "case_type", "options": options})
 
 
-class CaseTrackingSetupView(APIView):
-    """Save tracking_config, enable tracking, and run the first fetch.
+class CaseTrackingView(APIView):
+    """Untrack a case: DELETE /api/cases/<id>/tracking/.
 
-    POST /api/cases/<id>/tracking/
-    Body: the tracking_config shape CourtDataProvider.fetch_case() expects,
-    e.g. {"court_type": "district", "state_code": "29", "dist_code": "2",
-    "court_complex_code": "1290019", "est_code": "2", "case_type": "2^2",
-    "case_number": "300", "year": "2024"}
+    Clears cnr_number/tracking_config/tracking_enabled/fetch_status AND
+    last_fetched_at (so a wrong case's fetch doesn't rate-limit re-tracking
+    the right one -- see untrack_case() docstring), deletes source='ecourts'
+    Hearing rows (manual hearings untouched), and logs an ActivityLog entry.
+    This is the recovery path when setup was confirmed against the wrong
+    case: untrack, then preview/confirm again with corrected inputs.
+    """
+
+    def delete(self, request, pk):
+        try:
+            case = Case.objects.get(pk=pk)
+        except Case.DoesNotExist:
+            return Response({"detail": "Case not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        untrack_case(case)
+        case.refresh_from_db()
+        return Response(CaseSerializer(case).data, status=status.HTTP_200_OK)
+
+
+class CaseTrackingPreviewView(APIView):
+    """Fetch live court data WITHOUT persisting it -- the human-confirmation
+    step. POST /api/cases/<id>/tracking/preview/
+
+    Body: either the CNR-first shape {"court_type": "district"|"high_court",
+    "cnr": "<16-char CNR>"}, or the cascade fallback shape (court hierarchy
+    + case_type/case_number/year -- same shape the old one-step setup
+    endpoint took). Returns the fetched case identity (title, parties, CNR,
+    court name, status) and a preview_token to pass to .../confirm/.
+    Nothing is written to the case; exempt from the per-case 1h rate limit
+    but subject to a per-user preview throttle.
     """
 
     def post(self, request, pk):
@@ -173,40 +229,45 @@ class CaseTrackingSetupView(APIView):
         except Case.DoesNotExist:
             return Response({"detail": "Case not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        tracking_config = request.data
-        court_type = tracking_config.get("court_type")
-        if court_type not in ("district", "high_court"):
-            return Response(
-                {"detail": "tracking_config.court_type must be 'district' or 'high_court'."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        required = ["case_type", "case_number", "year"]
-        required += (
-            ["state_code", "dist_code", "court_complex_code"]
-            if court_type == "district"
-            else ["hc_court_code"]
-        )
-        missing = [f for f in required if not tracking_config.get(f)]
-        if missing:
-            return Response(
-                {"detail": f"Missing required field(s): {', '.join(missing)}."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        case.court_type = court_type
-        case.tracking_config = dict(tracking_config)
-        case.tracking_enabled = True
-        case.save(update_fields=["court_type", "tracking_config", "tracking_enabled"])
+        tracking_config = dict(request.data)
+        error = _validate_tracking_config(tracking_config)
+        if error:
+            return Response({"detail": error}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            result = refresh_case_tracking(case, force=True)
+            preview = preview_case_tracking(case, tracking_config, user_id=request.user.id)
+        except PreviewThrottledError as exc:
+            return Response({"detail": str(exc), "code": "preview_throttled"}, status=status.HTTP_429_TOO_MANY_REQUESTS)
         except CourtDataError as exc:
-            # Setup failed the first lookup -- leave tracking_enabled=True
-            # (the config was valid enough to attempt) but report the
-            # actionable reason so the user can fix case number/year and
-            # retry via the refresh endpoint.
-            case.refresh_from_db()
             return _error_response(exc)
+
+        return Response(preview, status=status.HTTP_200_OK)
+
+
+class CaseTrackingConfirmView(APIView):
+    """Persist a previously-previewed fetch. POST /api/cases/<id>/tracking/confirm/
+
+    Body: {"preview_token": "..."}. Loads ONLY the server-cached payload
+    from the matching preview call -- never trusts client-supplied case
+    data -- and sets cnr_number/tracking_config/tracking_enabled, creates
+    Hearing rows, and logs a CourtFetchLog, exactly like the old one-step
+    setup used to, but now only after a human has seen the preview.
+    """
+
+    def post(self, request, pk):
+        try:
+            case = Case.objects.get(pk=pk)
+        except Case.DoesNotExist:
+            return Response({"detail": "Case not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        preview_token = request.data.get("preview_token")
+        if not preview_token:
+            return Response({"detail": "preview_token is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            result = confirm_case_tracking(case, preview_token, user_id=request.user.id)
+        except PreviewExpiredError as exc:
+            return Response({"detail": str(exc), "code": "preview_expired"}, status=status.HTTP_410_GONE)
 
         case.refresh_from_db()
         return Response(_snapshot_response(case, result["data"]), status=status.HTTP_201_CREATED)

@@ -33,11 +33,31 @@ export function useCourtStructure(
   });
 }
 
-export function useSetupTracking(caseId: number) {
+/** Fetches live court data without persisting it. Doesn't invalidate any
+ * queries -- nothing changed on the server yet. */
+export function usePreviewTracking(caseId: number) {
+  return useMutation({
+    mutationFn: (config: TrackingConfig) => caseTrackingApi.preview(caseId, config),
+  });
+}
+
+export function useConfirmTracking(caseId: number) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (config: TrackingConfig) => caseTrackingApi.setup(caseId, config),
+    mutationFn: (previewToken: string) => caseTrackingApi.confirm(caseId, previewToken),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: caseKeys.detail(caseId) });
+      queryClient.invalidateQueries({ queryKey: hearingKeys.lists() });
+    },
+  });
+}
+
+export function useUntrackTracking(caseId: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => caseTrackingApi.untrack(caseId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: caseKeys.detail(caseId) });
       queryClient.invalidateQueries({ queryKey: hearingKeys.lists() });

@@ -8,9 +8,11 @@ rate limiting/tracking_enabled checks can't be bypassed.
 from __future__ import annotations
 
 import logging
+import secrets
 import time
 from datetime import datetime, timedelta
 
+from django.core.cache import cache
 from django.utils import timezone
 
 from core.models import ActivityLog, Case, CourtFetchLog, Hearing
@@ -20,6 +22,12 @@ logger = logging.getLogger(__name__)
 
 MIN_REFETCH_INTERVAL = timedelta(hours=1)
 
+PREVIEW_CACHE_TTL = timedelta(minutes=10)
+PREVIEW_CACHE_PREFIX = "court_tracking:preview"
+PREVIEW_THROTTLE_PREFIX = "court_tracking:preview_throttle"
+PREVIEW_THROTTLE_MAX = 10
+PREVIEW_THROTTLE_WINDOW = timedelta(minutes=10)
+
 
 class TrackingNotEnabledError(Exception):
     """Raised when refresh_case_tracking() is called for a case with
@@ -28,6 +36,15 @@ class TrackingNotEnabledError(Exception):
 
 class MissingTrackingConfigError(Exception):
     """Raised when tracking_enabled=True but tracking_config is empty."""
+
+
+class PreviewThrottledError(Exception):
+    """Raised when a user exceeds the preview rate limit."""
+
+
+class PreviewExpiredError(Exception):
+    """Raised when a preview_token is unknown, expired, or doesn't belong
+    to the requesting user/case."""
 
 
 def refresh_case_tracking(case: Case, *, force: bool = False) -> dict:
@@ -121,6 +138,184 @@ def refresh_case_tracking(case: Case, *, force: bool = False) -> dict:
         "data": data,
         "new_hearing_dates": new_hearing_dates,
     }
+
+
+def _preview_cache_key(token: str) -> str:
+    return f"{PREVIEW_CACHE_PREFIX}:{token}"
+
+
+def _check_preview_throttle(user_id: int) -> None:
+    """Max PREVIEW_THROTTLE_MAX previews per user per PREVIEW_THROTTLE_WINDOW.
+
+    Preview is exempt from the per-case 1h rate limit (nothing is
+    persisted), so without this a preview loop would be an unlimited free
+    live-fetch endpoint. This is intentionally simple (get-then-set, not
+    atomic) -- matching this module's existing MIN_REFETCH_INTERVAL check,
+    which doesn't lock either. A little raciness on the count boundary is
+    an acceptable trade for not adding new infrastructure.
+    """
+    key = f"{PREVIEW_THROTTLE_PREFIX}:{user_id}"
+    count = cache.get(key)
+    if count is None:
+        cache.set(key, 1, int(PREVIEW_THROTTLE_WINDOW.total_seconds()))
+        return
+    if count >= PREVIEW_THROTTLE_MAX:
+        raise PreviewThrottledError(
+            f"Too many preview attempts ({PREVIEW_THROTTLE_MAX} per "
+            f"{int(PREVIEW_THROTTLE_WINDOW.total_seconds() // 60)} minutes). Please wait and try again."
+        )
+    cache.incr(key)
+
+
+def preview_case_tracking(case: Case, tracking_config: dict, *, user_id: int) -> dict:
+    """Fetch live court data WITHOUT persisting anything to the case.
+
+    This is the fix for tracking silently saving a mismatched case: setup
+    used to fetch-and-persist in one step, so a wrong case_type/case_number
+    combination that happened to resolve to a DIFFERENT real case saved
+    that wrong case's data with no human check. Preview separates "fetch"
+    from "save" -- the caller must show the result to a human and call
+    confirm_case_tracking() with the returned preview_token to persist it.
+
+    tracking_config accepts either shape CourtDataProvider.fetch_case()
+    understands: the cascade shape (state/dist/complex/case_type/
+    case_number/year, or the HC equivalent), or the CNR-first shape
+    ({"court_type": ..., "cnr": "..."}) -- EcourtsProvider.fetch_case()
+    dispatches between them, so this function doesn't need to know which.
+
+    Raises PreviewThrottledError if the per-user throttle is exceeded.
+    Raises CourtDataError (or a subclass) if the fetch itself fails --
+    nothing is cached or persisted in that case.
+    """
+    _check_preview_throttle(user_id)
+
+    provider = get_provider()
+    data = provider.fetch_case(tracking_config)
+
+    token = secrets.token_urlsafe(24)
+    cache.set(
+        _preview_cache_key(token),
+        {
+            "case_id": case.id,
+            "user_id": user_id,
+            "tracking_config": dict(tracking_config),
+            "data": data,
+        },
+        int(PREVIEW_CACHE_TTL.total_seconds()),
+    )
+
+    case_title = " vs ".join(p for p in (data.petitioner, data.respondent) if p) or None
+
+    return {
+        "preview_token": token,
+        "case_title": case_title,
+        "cnr": data.cnr,
+        "petitioner": data.petitioner,
+        "respondent": data.respondent,
+        "court_name": data.court_name,
+        "case_status": data.case_status,
+        "case_stage": data.case_stage,
+        "case_type": tracking_config.get("case_type"),
+        "case_number": tracking_config.get("case_number"),
+        "year": tracking_config.get("year"),
+        "next_hearing_date": data.next_hearing_date.isoformat() if data.next_hearing_date else None,
+        "first_hearing_date": data.first_hearing_date.isoformat() if data.first_hearing_date else None,
+        "hearing_count": len(data.hearing_history),
+    }
+
+
+def confirm_case_tracking(case: Case, preview_token: str, *, user_id: int) -> dict:
+    """Persist a previously-previewed fetch.
+
+    Never trusts client-supplied case data -- loads ONLY the server-cached
+    payload keyed by preview_token (and checks it actually belongs to this
+    case and this user) rather than anything in the request body, so a
+    confirm call can't be used to smuggle in different data than what was
+    actually previewed and shown to the user.
+
+    Raises PreviewExpiredError if the token is unknown, expired, or
+    doesn't match this case/user -- the caller should tell the user to
+    preview again rather than silently retrying.
+    """
+    cached = cache.get(_preview_cache_key(preview_token))
+    if cached is None:
+        raise PreviewExpiredError("This preview has expired. Please search again.")
+    if cached["case_id"] != case.id or cached["user_id"] != user_id:
+        raise PreviewExpiredError("This preview does not match the requested case. Please search again.")
+
+    data: CourtCaseData = cached["data"]
+    tracking_config: dict = cached["tracking_config"]
+
+    case.court_type = tracking_config.get("court_type")
+    case.tracking_config = tracking_config
+    case.tracking_enabled = True
+    case.save(update_fields=["court_type", "tracking_config", "tracking_enabled"])
+
+    _apply_case_data(case, data)
+    new_hearing_dates = _upsert_hearings(case, data)
+    log_payload = _build_snapshot(data, new_hearing_dates)
+
+    CourtFetchLog.objects.create(
+        case=case,
+        success=True,
+        error_message=None,
+        fields_changed=log_payload,
+        duration_ms=None,
+    )
+
+    case.last_fetched_at = timezone.now()
+    case.fetch_status = "success"
+    case.save(update_fields=["last_fetched_at", "fetch_status"])
+
+    if new_hearing_dates:
+        dates_str = ", ".join(d.isoformat() for d in new_hearing_dates)
+        ActivityLog.objects.create(
+            case=case,
+            activity_type="court_hearing_update",
+            description=f"eCourts: new hearing date(s) found for {case.case_number}: {dates_str}",
+        )
+
+    # One-time use -- a stale token can't be replayed to re-persist the
+    # same (or since-changed) cached payload after this.
+    cache.delete(_preview_cache_key(preview_token))
+
+    return {"case": case, "data": data, "new_hearing_dates": new_hearing_dates}
+
+
+def untrack_case(case: Case) -> None:
+    """Clear all court-tracking state for a case: the setup-mismatch
+    recovery path (Part 3).
+
+    Clears last_fetched_at along with everything else -- leaving it set
+    would let the wrong case's fetch continue rate-limiting a correct
+    re-track attempt for up to an hour, which is exactly the recovery
+    flow this function exists for. Only Hearing rows with source='ecourts'
+    are deleted; manually-entered hearings are untouched.
+    """
+    Hearing.objects.filter(case=case, source="ecourts").delete()
+
+    case.cnr_number = None
+    case.court_type = None
+    case.tracking_config = None
+    case.tracking_enabled = False
+    case.fetch_status = "never_fetched"
+    case.last_fetched_at = None
+    case.save(
+        update_fields=[
+            "cnr_number",
+            "court_type",
+            "tracking_config",
+            "tracking_enabled",
+            "fetch_status",
+            "last_fetched_at",
+        ]
+    )
+
+    ActivityLog.objects.create(
+        case=case,
+        activity_type="court_tracking_removed",
+        description=f"Court tracking removed for {case.case_number}",
+    )
 
 
 def _apply_case_data(case: Case, data: CourtCaseData) -> None:

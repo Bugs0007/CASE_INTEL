@@ -31,6 +31,37 @@ being ported here as first-party code:
   with Error="ERROR_VAL" -- observed live to sometimes be a
   mis-recognized CAPTCHA failure -- propagates uncaught. The outer retry
   loops in this module catch that too.
+
+CNR search (fetch_case_by_cnr, added after the above -- not covered by
+either original spike, which only exercised bharat-courts' own case-
+number/party-name methods, never the portals' own CNR search pages):
+
+- Neither portal's CNR search is implemented anywhere in bharat-courts
+  (grepped the installed package; zero hits for cnr_status or a CNR
+  search action_code). Both were found by fetching the live pages
+  directly and reading their embedded JS (no browser devtools available).
+- District Courts: the CNR form lives on the portal's home page
+  (?p=home/index, not ?p=cnr_status/index -- that path renders an empty
+  shell), submitting via searchByCNR.js to POST cnr_status/searchByCNR
+  with just {cino, fcaptcha_code}. No court hierarchy / set_data call
+  needed -- confirmed live, a bare CNR + solved CAPTCHA is sufficient.
+- HC Services: the CNR form's funViewCinoHistory() (inline in main.php)
+  POSTs to the same index_qry.php used by showRecords, with
+  action_code=fetchStateDistCourtNew & caseStatusSearchType=CNRNumber.
+  Also confirmed live to need no High Court / bench pre-selection.
+- Both responses are strictly BETTER than the cascade path's: a single
+  call returns case details, current status, parties, AND the full
+  hearing-history table together (District's casetype_list / HC's raw
+  HTML both already contain a "history_table"-classed table) -- no
+  second viewHistory/case-history call needed at all.
+- Neither portal's JSON/text envelope reliably flags "not found" the way
+  the module docstring's ERROR_VAL handling does. District's status key
+  was observed to stay 1 even for a CNR proven not to exist -- the only
+  reliable signal is the literal "This Case Code does not exists" text
+  in casetype_list. HC's not-found signal is "THERE IS AN SQL ERROR" in
+  the response body; a rejected CAPTCHA there instead shows "ERROR_VAL"
+  (the same portal-side error variable name already handled for
+  showRecords -- confirmed by reading main.php's searchForError var).
 """
 
 from __future__ import annotations
@@ -112,10 +143,37 @@ _DETAIL_LABELS = {
     "case stage": "case_stage",
 }
 
+_PARTY_NUMBERING_RE = re.compile(r"^\d+\)\s*")
+
+
+def _extract_first_party(soup: BeautifulSoup, class_name: str) -> str:
+    """Both portals render party lists under a ``Petitioner_Advocate_table``/
+    ``Respondent_Advocate_table``-classed element (District: ``<ul>``, HC
+    Services: ``<span>``) with one or more "N) Name" entries separated by
+    ``<br>``, interleaved with "Advocate- ..." lines. Returns just the
+    first party's name -- enough for a human to recognize the case, not a
+    full structured list (CourtCaseData has a single string field here,
+    matching how the case-number/party-search flow already populates it)."""
+    el = soup.find(class_=class_name)
+    if el is None:
+        return ""
+    for line in el.get_text("\n").split("\n"):
+        line = _clean(line)
+        if not line or line.lower().startswith("advocate"):
+            continue
+        return _PARTY_NUMBERING_RE.sub("", line).strip()
+    return ""
+
 
 def parse_case_history_html(html: str) -> CourtCaseData | None:
-    """Parse an eCourts case-history response into a partial CourtCaseData
-    (cnr is filled in by the caller, which already knows it).
+    """Parse an eCourts case-history response into a partial CourtCaseData.
+
+    ``cnr`` is left blank here -- callers always already know it (either
+    from the search step's result, or because CNR was the search input
+    itself) and set it directly; the CNR text embedded in this HTML is
+    inconsistently formatted (HC Services renders it with hyphens, e.g.
+    "HBHC01-000377-2010", unlike the hyphen-free CNR used everywhere else
+    including this same response's onclick handlers).
 
     Returns None if the response is empty or an error page -- callers
     treat that as "history unavailable" without failing the whole fetch,
@@ -149,6 +207,18 @@ def parse_case_history_html(html: str) -> CourtCaseData | None:
                 elif not getattr(data, field_name):
                     setattr(data, field_name, value)
                 break
+
+    data.petitioner = _extract_first_party(soup, "Petitioner_Advocate_table")
+    data.respondent = _extract_first_party(soup, "Respondent_Advocate_table")
+
+    # District Courts' CNR-search response has a court-name heading; HC
+    # Services' doesn't expose an equivalent single element here, so
+    # court_name stays whatever the caller already set (or blank).
+    ch_heading = soup.find(id="chHeading")
+    if ch_heading is not None:
+        heading_text = _clean(ch_heading.get_text())
+        if heading_text:
+            data.court_name = heading_text
 
     # Hearing-history table: match by CSS class, not a header-keyword
     # heuristic (which previously matched the wrong table -- see module
@@ -249,10 +319,28 @@ class EcourtsProvider(CourtDataProvider):
 
     def fetch_case(self, tracking_config: dict) -> CourtCaseData:
         court_type = tracking_config.get("court_type")
+        if court_type not in ("district", "high_court"):
+            raise ValueError(f"Unknown court_type: {court_type!r}")
+
+        # CNR-first dispatch: a tracking_config carrying "cnr" (the setup
+        # form's primary path, see fetch_case_by_cnr) needs no court
+        # hierarchy / case_type/case_number/year at all. Handling this here
+        # rather than only in fetch_case_by_cnr means refresh_case_tracking
+        # -- which only ever calls fetch_case(case.tracking_config) --
+        # re-fetches CNR-based cases correctly with no changes of its own.
+        cnr = tracking_config.get("cnr")
+        if cnr:
+            return self.fetch_case_by_cnr(cnr, court_type)
+
         if court_type == "district":
             return asyncio.run(self._fetch_district(tracking_config))
+        return asyncio.run(self._fetch_hc(tracking_config))
+
+    def fetch_case_by_cnr(self, cnr: str, court_type: str) -> CourtCaseData:
+        if court_type == "district":
+            return asyncio.run(self._fetch_district_by_cnr(cnr))
         if court_type == "high_court":
-            return asyncio.run(self._fetch_hc(tracking_config))
+            return asyncio.run(self._fetch_hc_by_cnr(cnr))
         raise ValueError(f"Unknown court_type: {court_type!r}")
 
     # ------------------------------------------------------------------
@@ -368,6 +456,77 @@ class EcourtsProvider(CourtDataProvider):
         logger.error("District Courts history fetch failed after retries: %s", last_exc)
         return None
 
+    async def _fetch_district_by_cnr(self, cnr: str) -> CourtCaseData:
+        """CNR search on the District Courts portal (Part 1 investigation).
+
+        A single POST to cnr_status/searchByCNR (found in the portal's own
+        searchByCNR.js, undocumented by bharat-courts) returns case
+        details, current status, AND the full hearing-history table in one
+        response -- no court hierarchy selection and no separate
+        home/viewHistory call needed, unlike fetch_case's cascade path.
+
+        The endpoint doesn't reliably signal "not found" via the JSON
+        envelope's status field (observed to stay 1 even for a
+        provably-nonexistent CNR in testing) -- the only reliable
+        not-found signal is the literal "This Case Code does not exists"
+        message in casetype_list, checked for below.
+        """
+        async with DistrictCourtClient() as client:
+            last_exc: Exception | None = None
+            for attempt in range(1, MAX_RETRIES + 1):
+                await client._init_session()
+                captcha = await client._solve_captcha()
+                if not captcha:
+                    last_exc = CaptchaSolveError("OCR failed to read the CAPTCHA image.")
+                    if attempt < MAX_RETRIES:
+                        await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
+                    continue
+                try:
+                    result = await client._post_ajax(
+                        "cnr_status/searchByCNR",
+                        {"cino": cnr, "fcaptcha_code": captcha},
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    last_exc = exc
+                    logger.warning(
+                        "District Courts CNR search attempt %d/%d failed: %s", attempt, MAX_RETRIES, exc
+                    )
+                    if attempt < MAX_RETRIES:
+                        await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
+                    continue
+
+                html = result.get("casetype_list", "")
+                if "does not exist" in html.lower():
+                    raise CaseNotFoundError(f"No case found for CNR {cnr!r} on the District Courts portal.")
+                if result.get("status") == 0:
+                    # Portal rejected the CAPTCHA and cleared the form.
+                    last_exc = CaptchaSolveError("District Courts portal rejected the CAPTCHA.")
+                    if attempt < MAX_RETRIES:
+                        await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
+                    continue
+                if "history_table" not in html:
+                    # Unrecognized response shape -- neither the known
+                    # not-found message nor a real result. Don't guess;
+                    # surface it as a portal error with the raw content.
+                    last_exc = CourtPortalError(
+                        f"Unrecognized response from District Courts CNR search: {html[:300]!r}"
+                    )
+                    if attempt < MAX_RETRIES:
+                        await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
+                    continue
+
+                data = parse_case_history_html(html)
+                if data is None:
+                    raise CaseNotFoundError(f"No case found for CNR {cnr!r} on the District Courts portal.")
+                data.cnr = cnr
+                return data
+
+            if isinstance(last_exc, CaptchaSolveError):
+                raise last_exc
+            raise CourtPortalError(
+                f"District Courts CNR search failed after {MAX_RETRIES} attempts: {last_exc}"
+            ) from last_exc
+
     # ------------------------------------------------------------------
     # HC Services
     # ------------------------------------------------------------------
@@ -455,6 +614,84 @@ class EcourtsProvider(CourtDataProvider):
                     await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
         logger.error("HC Services history fetch failed after retries: %s", last_exc)
         return None
+
+    async def _fetch_hc_by_cnr(self, cnr: str) -> CourtCaseData:
+        """CNR search on the HC Services portal (Part 1 investigation).
+
+        POSTs directly to index_qry.php with action_code=fetchStateDistCourtNew
+        & caseStatusSearchType=CNRNumber (found in the portal's own inline
+        funViewCinoHistory() JS on main.php, undocumented by bharat-courts).
+        Confirmed live: works with NO High Court / bench pre-selection --
+        the CNR alone is enough, and the server-rendered page returned
+        already contains the full hearing history (class="history_table"),
+        same single-call shape as the District Courts CNR search.
+
+        Response is a raw HTML page, not the JSON envelope showRecords()
+        uses, so error detection is substring-based against two confirmed
+        live signals: "THERE IS AN SQL ERROR" for a genuinely nonexistent
+        CNR, and "ERROR_VAL" (the portal's own JS error variable name,
+        matching the ERROR_VAL ServerError this module already handles
+        for showRecords) for a rejected CAPTCHA / generic server error.
+        """
+        async with HCServicesClient() as client:
+            last_exc: Exception | None = None
+            for attempt in range(1, MAX_RETRIES + 1):
+                await client._init_session()
+                captcha = await client._solve_captcha()
+                if not captcha:
+                    last_exc = CaptchaSolveError("OCR failed to read the CAPTCHA image.")
+                    if attempt < MAX_RETRIES:
+                        await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
+                    continue
+
+                form = {
+                    "cino": cnr,
+                    "appFlag": "web",
+                    "action_code": "fetchStateDistCourtNew",
+                    "caseStatusSearchType": "CNRNumber",
+                    "captcha": captcha,
+                }
+                try:
+                    resp = await client._http.post(
+                        hc_endpoints.INDEX_QRY_URL,
+                        data=form,
+                        headers={"Referer": hc_endpoints.MAIN_PAGE_URL},
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    last_exc = exc
+                    logger.warning(
+                        "HC Services CNR search attempt %d/%d failed: %s", attempt, MAX_RETRIES, exc
+                    )
+                    if attempt < MAX_RETRIES:
+                        await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
+                    continue
+
+                text = resp.text
+                if "history_table" in text:
+                    data = parse_case_history_html(text)
+                    if data is None:
+                        raise CaseNotFoundError(f"No case found for CNR {cnr!r} on the HC Services portal.")
+                    data.cnr = cnr
+                    return data
+                if "there is an sql error" in text.lower():
+                    raise CaseNotFoundError(f"No case found for CNR {cnr!r} on the HC Services portal.")
+                if "ERROR_VAL" in text or "invalid captcha" in text.lower():
+                    last_exc = CaptchaSolveError("HC Services portal rejected the CAPTCHA.")
+                    if attempt < MAX_RETRIES:
+                        await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
+                    continue
+                # Unrecognized response shape -- don't guess; surface it.
+                last_exc = CourtPortalError(
+                    f"Unrecognized response from HC Services CNR search: {text[:300]!r}"
+                )
+                if attempt < MAX_RETRIES:
+                    await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
+
+            if isinstance(last_exc, CaptchaSolveError):
+                raise last_exc
+            raise CourtPortalError(
+                f"HC Services CNR search failed after {MAX_RETRIES} attempts: {last_exc}"
+            ) from last_exc
 
     # ------------------------------------------------------------------
     # Court hierarchy discovery (cached -- changes ~never)
