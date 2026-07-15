@@ -39,3 +39,17 @@ export interface DashboardData {
   recent_activity: RecentActivity[];
   active_cases_summary: ActiveCaseSummary[];
 }
+
+export interface UpcomingHearing {
+  id: number;
+  case_id: number;
+  case_title: string;
+  case_number: string;
+  hearing_date: string;
+  hearing_type: string;
+  judge: string | null;
+  purpose: string | null;
+  source: "manual" | "ecourts";
+  status: string;
+  days_until: number;
+}

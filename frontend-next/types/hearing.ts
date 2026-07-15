@@ -13,6 +13,8 @@ export type HearingStatus =
   | "cancelled"
   | "postponed";
 
+export type HearingSource = "manual" | "ecourts";
+
 export interface Hearing {
   id: number;
   case: number;
@@ -26,6 +28,9 @@ export interface Hearing {
   status_display: string;
   notes: string | null;
   outcome: string | null;
+  source: HearingSource;
+  business_date: string | null;
+  purpose: string | null;
   created_at: string;
   updated_at: string;
 }

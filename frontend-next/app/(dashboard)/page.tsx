@@ -4,13 +4,15 @@ import { useState } from "react";
 import { StatCards } from "@/components/dashboard/stat-cards";
 import { RecentActivity } from "@/components/dashboard/recent-activity";
 import { ActiveCases } from "@/components/dashboard/active-cases";
+import { UpcomingHearings } from "@/components/dashboard/upcoming-hearings";
 import { QuickActions } from "@/components/dashboard/quick-actions";
 import { CreateCaseDialog } from "@/components/cases/create-case-dialog";
 import { UploadDocumentDialog } from "@/components/documents/upload-document-dialog";
-import { useDashboard } from "@/hooks/use-dashboard";
+import { useDashboard, useUpcomingHearings } from "@/hooks/use-dashboard";
 
 export default function DashboardPage() {
   const { data: dashboardData, isLoading, error } = useDashboard();
+  const { data: upcomingHearings = [] } = useUpcomingHearings();
   const [isCreateCaseOpen, setIsCreateCaseOpen] = useState(false);
   const [isUploadDocOpen, setIsUploadDocOpen] = useState(false);
 
@@ -75,6 +77,11 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <RecentActivity activities={dashboardData?.recent_activity || []} />
         <ActiveCases cases={dashboardData?.active_cases_summary || []} />
+      </div>
+
+      {/* Upcoming Hearings */}
+      <div className="mb-8">
+        <UpcomingHearings hearings={upcomingHearings} />
       </div>
 
       {/* Quick Actions */}

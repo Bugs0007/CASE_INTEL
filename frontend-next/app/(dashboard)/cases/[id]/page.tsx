@@ -7,6 +7,7 @@ import { useDocuments } from "@/hooks/use-documents";
 import { useHearings } from "@/hooks/use-hearings";
 import { CaseDetailHeader } from "@/components/cases/case-detail-header";
 import { CaseOverview } from "@/components/cases/case-overview";
+import { CourtTrackingCard } from "@/components/cases/court-tracking-card";
 import { HearingsList } from "@/components/hearings/hearings-list";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { UploadDocumentDialog } from "@/components/documents/upload-document-dialog";
@@ -95,6 +96,9 @@ export default function CaseDetailPage() {
           <div className="max-w-7xl mx-auto p-6 space-y-6">
             {/* Case Overview */}
             <CaseOverview case={caseItem} />
+
+            {/* Court Tracking */}
+            <CourtTrackingCard caseItem={caseItem} hearings={hearings} />
 
             {/* Recent Documents */}
             <Card>
