@@ -3,12 +3,17 @@ REM ============================================================================
 REM Case Intel - Development Server Startup Script (Windows)
 REM ============================================================================
 REM This script starts all required services for local development
-REM 
+REM
 REM Prerequisites:
-REM   1. Redis installed (redis-server)
-REM   2. PostgreSQL running with case_intel database
-REM   3. Python virtual environment activated
-REM   4. Ollama installed (if USE_OLLAMA=true)
+REM   1. PostgreSQL running with case_intel database
+REM   2. Python virtual environment activated
+REM   3. Ollama installed (if USE_OLLAMA=true)
+REM
+REM NOTE: Redis and Celery are NOT started here. Verified 2026-07-16 that
+REM Celery has zero real task dispatch anywhere in this codebase (no
+REM .delay(/.apply_async(/@shared_task calls), and the default cache backend
+REM is now LocMemCache (see case_intel_project/settings.py) -- neither is
+REM needed to run this app. See REDIS_SETUP.md for the same finding.
 REM ============================================================================
 
 echo.
@@ -17,57 +22,12 @@ echo   Case Intel - Starting Services
 echo ========================================
 echo.
 
-REM Check if Redis is installed
-echo [1/5] Checking Redis installation...
-where redis-server >nul 2>&1
-if %errorlevel% neq 0 (
-    echo.
-    echo ========================================
-    echo   Redis Not Found!
-    echo ========================================
-    echo.
-    echo Redis is required for background tasks.
-    echo.
-    echo To install Redis (ONE TIME ONLY^):
-    echo   1. Right-click PowerShell
-    echo   2. Select "Run as Administrator"  
-    echo   3. Run: .\setup_redis.ps1
-    echo.
-    echo OR download manually from:
-    echo   https://github.com/tporadowski/redis/releases
-    echo.
-    pause
-    exit /b 1
-)
-echo [OK] Redis is installed
-
-REM Check if Redis is running
-echo [2/5] Checking if Redis is running...
-redis-cli ping >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [INFO] Redis is not running. Starting Redis...
-    start "Redis Server" cmd /k "redis-server --port 6379"
-    timeout /t 3 /nobreak >nul
-    
-    REM Verify Redis started
-    redis-cli ping >nul 2>&1
-    if %errorlevel% neq 0 (
-        echo [ERROR] Redis failed to start!
-        echo Please start Redis manually: redis-server
-        pause
-        exit /b 1
-    )
-    echo [OK] Redis started
-) else (
-    echo [OK] Redis is running
-)
-
 REM Check if PostgreSQL is accessible
-echo [3/5] Checking PostgreSQL...
+echo [1/3] Checking PostgreSQL...
 echo [OK] Skipping PostgreSQL check - assuming it's running
 
 REM Activate virtual environment
-echo [4/5] Activating virtual environment...
+echo [2/3] Activating virtual environment...
 if exist .venv\Scripts\activate.bat (
     call .venv\Scripts\activate.bat
     echo [OK] Virtual environment activated
@@ -79,10 +39,10 @@ if exist .venv\Scripts\activate.bat (
 )
 
 REM Check if dependencies are installed
-echo [5/5] Checking Python dependencies...
-python -c "import celery" >nul 2>&1
+echo [3/3] Checking Python dependencies...
+python -c "import django" >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [ERROR] Celery not installed!
+    echo [ERROR] Dependencies not installed!
     echo Please install dependencies: pip install -r requirements.txt
     pause
     exit /b 1
@@ -95,10 +55,9 @@ echo ========================================
 echo   Starting services...
 echo ========================================
 echo.
-echo You will see 3 new terminal windows:
+echo You will see 2 new terminal windows:
 echo   1. Django Backend (port 8000^)
-echo   2. Celery Worker (background tasks^)
-echo   3. Next.js Frontend (port 3000^)
+echo   2. Next.js Frontend (port 3000^)
 echo.
 echo Close this window to stop all services
 echo ========================================
@@ -106,10 +65,6 @@ echo.
 
 REM Start Django in new window
 start "Django Backend" cmd /k "call .venv\Scripts\activate.bat && python manage.py runserver 8000"
-timeout /t 2 /nobreak >nul
-
-REM Start Celery in new window
-start "Celery Worker" cmd /k "call .venv\Scripts\activate.bat && celery -A case_intel_project worker --loglevel=info --pool=solo"
 timeout /t 2 /nobreak >nul
 
 REM Start Next.js Frontend in new window
