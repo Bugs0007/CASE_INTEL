@@ -12,19 +12,16 @@ import secrets
 import time
 from datetime import datetime, timedelta
 
-from django.core.cache import cache
 from django.utils import timezone
 
-from core.models import ActivityLog, Case, CourtFetchLog, Hearing
+from core.models import ActivityLog, Case, CourtFetchLog, CourtTrackingPreview, Hearing
 from core.services.court_data import CourtCaseData, CourtDataError, get_provider
 
 logger = logging.getLogger(__name__)
 
 MIN_REFETCH_INTERVAL = timedelta(hours=1)
 
-PREVIEW_CACHE_TTL = timedelta(minutes=10)
-PREVIEW_CACHE_PREFIX = "court_tracking:preview"
-PREVIEW_THROTTLE_PREFIX = "court_tracking:preview_throttle"
+PREVIEW_TOKEN_TTL = timedelta(minutes=10)
 PREVIEW_THROTTLE_MAX = 10
 PREVIEW_THROTTLE_WINDOW = timedelta(minutes=10)
 
@@ -140,8 +137,18 @@ def refresh_case_tracking(case: Case, *, force: bool = False) -> dict:
     }
 
 
-def _preview_cache_key(token: str) -> str:
-    return f"{PREVIEW_CACHE_PREFIX}:{token}"
+def _cleanup_expired_previews() -> None:
+    """Delete preview rows that expired without ever being confirmed.
+
+    Confirmed rows are deleted immediately in confirm_case_tracking(), so
+    this only ever catches abandoned ones. No Celery/cron needed -- this
+    table sees setup-flow volume only (a handful of rows per user per
+    session), so a cheap indexed DELETE on every preview call is enough to
+    keep it from growing unbounded. Safe to call from any worker process;
+    unlike the old LocMemCache TTL, expiry here is a real column every
+    worker can see and delete against.
+    """
+    CourtTrackingPreview.objects.filter(expires_at__lte=timezone.now()).delete()
 
 
 def _check_preview_throttle(user_id: int) -> None:
@@ -149,22 +156,29 @@ def _check_preview_throttle(user_id: int) -> None:
 
     Preview is exempt from the per-case 1h rate limit (nothing is
     persisted), so without this a preview loop would be an unlimited free
-    live-fetch endpoint. This is intentionally simple (get-then-set, not
-    atomic) -- matching this module's existing MIN_REFETCH_INTERVAL check,
-    which doesn't lock either. A little raciness on the count boundary is
-    an acceptable trade for not adding new infrastructure.
+    live-fetch endpoint. Counts CourtTrackingPreview rows created in the
+    trailing window rather than an incrementing cache counter -- a real
+    table row every worker process can see and count identically, unlike
+    the old per-process LocMemCache counter (which under-enforced the
+    limit by up to Nx on an N-worker deployment, since each worker kept its
+    own separate count).
+
+    Note: confirm_case_tracking() deletes a row as soon as it's confirmed,
+    so a preview that's confirmed quickly stops counting toward this
+    window immediately -- this module has always favored a simple,
+    slightly-racy check over exact enforcement (see the original
+    MIN_REFETCH_INTERVAL check, which doesn't lock either), and that trade
+    still holds here.
     """
-    key = f"{PREVIEW_THROTTLE_PREFIX}:{user_id}"
-    count = cache.get(key)
-    if count is None:
-        cache.set(key, 1, int(PREVIEW_THROTTLE_WINDOW.total_seconds()))
-        return
+    window_start = timezone.now() - PREVIEW_THROTTLE_WINDOW
+    count = CourtTrackingPreview.objects.filter(
+        user_id=user_id, created_at__gte=window_start
+    ).count()
     if count >= PREVIEW_THROTTLE_MAX:
         raise PreviewThrottledError(
             f"Too many preview attempts ({PREVIEW_THROTTLE_MAX} per "
             f"{int(PREVIEW_THROTTLE_WINDOW.total_seconds() // 60)} minutes). Please wait and try again."
         )
-    cache.incr(key)
 
 
 def preview_case_tracking(case: Case, tracking_config: dict, *, user_id: int) -> dict:
@@ -183,25 +197,31 @@ def preview_case_tracking(case: Case, tracking_config: dict, *, user_id: int) ->
     ({"court_type": ..., "cnr": "..."}) -- EcourtsProvider.fetch_case()
     dispatches between them, so this function doesn't need to know which.
 
+    The preview token is stored in CourtTrackingPreview (Postgres), not
+    Django's cache -- it has to be visible to whichever gunicorn worker
+    handles the later confirm_case_tracking() call, and LocMemCache is
+    per-process.
+
     Raises PreviewThrottledError if the per-user throttle is exceeded.
     Raises CourtDataError (or a subclass) if the fetch itself fails --
-    nothing is cached or persisted in that case.
+    nothing is persisted in that case.
     """
+    _cleanup_expired_previews()
     _check_preview_throttle(user_id)
 
     provider = get_provider()
     data = provider.fetch_case(tracking_config)
 
     token = secrets.token_urlsafe(24)
-    cache.set(
-        _preview_cache_key(token),
-        {
-            "case_id": case.id,
-            "user_id": user_id,
+    CourtTrackingPreview.objects.create(
+        token=token,
+        case=case,
+        user_id=user_id,
+        payload={
             "tracking_config": dict(tracking_config),
-            "data": data,
+            "data": data.to_dict(),
         },
-        int(PREVIEW_CACHE_TTL.total_seconds()),
+        expires_at=timezone.now() + PREVIEW_TOKEN_TTL,
     )
 
     case_title = " vs ".join(p for p in (data.petitioner, data.respondent) if p) or None
@@ -227,24 +247,33 @@ def preview_case_tracking(case: Case, tracking_config: dict, *, user_id: int) ->
 def confirm_case_tracking(case: Case, preview_token: str, *, user_id: int) -> dict:
     """Persist a previously-previewed fetch.
 
-    Never trusts client-supplied case data -- loads ONLY the server-cached
+    Never trusts client-supplied case data -- loads ONLY the server-side
     payload keyed by preview_token (and checks it actually belongs to this
     case and this user) rather than anything in the request body, so a
     confirm call can't be used to smuggle in different data than what was
-    actually previewed and shown to the user.
+    actually previewed and shown to the user. The payload comes from
+    CourtTrackingPreview (Postgres), not Django's cache -- readable from
+    whichever gunicorn worker handles this request, regardless of which
+    worker handled the earlier preview call.
 
     Raises PreviewExpiredError if the token is unknown, expired, or
     doesn't match this case/user -- the caller should tell the user to
     preview again rather than silently retrying.
     """
-    cached = cache.get(_preview_cache_key(preview_token))
-    if cached is None:
+    try:
+        preview = CourtTrackingPreview.objects.get(token=preview_token)
+    except CourtTrackingPreview.DoesNotExist:
         raise PreviewExpiredError("This preview has expired. Please search again.")
-    if cached["case_id"] != case.id or cached["user_id"] != user_id:
+
+    if preview.expires_at <= timezone.now():
+        preview.delete()
+        raise PreviewExpiredError("This preview has expired. Please search again.")
+
+    if preview.case_id != case.id or preview.user_id != user_id:
         raise PreviewExpiredError("This preview does not match the requested case. Please search again.")
 
-    data: CourtCaseData = cached["data"]
-    tracking_config: dict = cached["tracking_config"]
+    data: CourtCaseData = CourtCaseData.from_dict(preview.payload["data"])
+    tracking_config: dict = preview.payload["tracking_config"]
 
     case.court_type = tracking_config.get("court_type")
     case.tracking_config = tracking_config
@@ -276,8 +305,8 @@ def confirm_case_tracking(case: Case, preview_token: str, *, user_id: int) -> di
         )
 
     # One-time use -- a stale token can't be replayed to re-persist the
-    # same (or since-changed) cached payload after this.
-    cache.delete(_preview_cache_key(preview_token))
+    # same (or since-changed) payload after this.
+    preview.delete()
 
     return {"case": case, "data": data, "new_hearing_dates": new_hearing_dates}
 

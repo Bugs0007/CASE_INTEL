@@ -20,6 +20,7 @@ from core.models import (
     EmailAttachment,
     Folder,
     CourtFetchLog,
+    CourtTrackingPreview,
     GmailCredential,
     Hearing,
     Message,
@@ -153,6 +154,14 @@ class CourtFetchLogAdmin(admin.ModelAdmin):
     list_filter = ("success", "case")
     readonly_fields = ("timestamp",)
     date_hierarchy = "timestamp"
+
+
+@admin.register(CourtTrackingPreview)
+class CourtTrackingPreviewAdmin(admin.ModelAdmin):
+    list_display = ("token", "case", "user", "created_at", "expires_at")
+    list_filter = ("case",)
+    readonly_fields = ("created_at",)
+    date_hierarchy = "created_at"
 
 
 @admin.register(ActivityLog)

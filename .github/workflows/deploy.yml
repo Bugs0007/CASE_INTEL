@@ -1,3 +1,12 @@
+# Handles ONGOING code updates only -- not first-time server setup.
+#
+# This workflow assumes deploy/provision.sh has already been run once against
+# the target EC2 instance (system packages, swap, venv, Ollama + embedding
+# model, spaCy model, the gunicorn systemd unit it restarts below, the Nginx
+# site, and the narrow sudoers rule that lets EC2_USERNAME run
+# `sudo systemctl restart case-intel` without a password). If any of those
+# are missing on a fresh box, run provision.sh first -- see PROVISIONING.md
+# for the full path from a fresh AWS account to a live deploy.
 name: Deploy to EC2
 
 on:
@@ -18,6 +27,8 @@ jobs:
           script: |
             set -e
 
+            # PROJECT_DIR/VENV_DIR must match what provision.sh set up
+            # (PROJECT_DIR defaults there to ~<DEPLOY_USER>/CASE_INTEL).
             PROJECT_DIR=~/CASE_INTEL
             VENV_DIR=.venv
 
