@@ -3,10 +3,11 @@ Dashboard view — aggregated statistics for the Case Intel platform.
 """
 
 from django.db.models import Count
+from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.models import ActivityLog, Case, Document, Email
+from core.models import ActivityLog, Case, Document, Email, Hearing
 
 
 class DashboardView(APIView):
@@ -107,4 +108,39 @@ class DashboardView(APIView):
                     for c in active_cases_qs
                 ],
             }
+        )
+
+
+class UpcomingHearingsView(APIView):
+    """All upcoming hearings across every case, for dashboard alerts.
+
+    GET /api/dashboard/upcoming-hearings/
+    """
+
+    def get(self, request):
+        today = timezone.localdate()
+        hearings = (
+            Hearing.objects.select_related("case")
+            .filter(hearing_date__date__gte=today)
+            .exclude(status__in=["cancelled", "completed"])
+            .order_by("hearing_date")
+        )
+
+        return Response(
+            [
+                {
+                    "id": h.id,
+                    "case_id": h.case_id,
+                    "case_title": h.case.title,
+                    "case_number": h.case.case_number,
+                    "hearing_date": h.hearing_date,
+                    "hearing_type": h.hearing_type,
+                    "judge": h.judge,
+                    "purpose": h.purpose,
+                    "source": h.source,
+                    "status": h.status,
+                    "days_until": (h.hearing_date.date() - today).days,
+                }
+                for h in hearings
+            ]
         )

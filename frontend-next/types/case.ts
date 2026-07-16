@@ -10,6 +10,9 @@ export type CaseType =
   | "tax"
   | "other";
 
+export type CourtType = "district" | "high_court";
+export type FetchStatus = "never_fetched" | "success" | "failed";
+
 export interface Case {
   id: number;
   case_number: string;
@@ -26,6 +29,12 @@ export interface Case {
   hearing_count: number;
   thread_count: number;
   conversation_count: number;
+  cnr_number: string | null;
+  court_type: CourtType | null;
+  tracking_config: Record<string, string> | null;
+  tracking_enabled: boolean;
+  fetch_status: FetchStatus;
+  last_fetched_at: string | null;
 }
 
 export interface CaseCreateInput {

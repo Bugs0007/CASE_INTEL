@@ -29,6 +29,9 @@ class HearingSerializer(serializers.ModelSerializer):
             "status_display",
             "notes",
             "outcome",
+            "source",
+            "business_date",
+            "purpose",
             "created_at",
             "updated_at",
         ]

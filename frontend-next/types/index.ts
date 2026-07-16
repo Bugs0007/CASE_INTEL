@@ -4,3 +4,4 @@ export * from "./hearing";
 export * from "./chat";
 export * from "./email";
 export * from "./dashboard";
+export * from "./case-tracking";

@@ -4,7 +4,6 @@ import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { DocumentFilters } from "@/components/documents/document-filters";
 import { DocumentTable } from "@/components/documents/document-table";
-import { UploadDocumentDialog } from "@/components/documents/upload-document-dialog";
 import { EditDocumentDialog } from "@/components/documents/edit-document-dialog";
 import { showToast } from "@/components/ui/toaster";
 import {
@@ -12,6 +11,7 @@ import {
   useProcessDocument,
   useDeleteDocument,
 } from "@/hooks/use-documents";
+import { useDialogs } from "@/providers/dialog-provider";
 import { Upload } from "lucide-react";
 import type { Document, DocumentType, ProcessingStatus } from "@/types";
 
@@ -22,8 +22,8 @@ export default function DocumentsPage() {
   const [selectedStatus, setSelectedStatus] = useState<ProcessingStatus | null>(
     null,
   );
-  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [editingDocument, setEditingDocument] = useState<Document | null>(null);
+  const { openUploadDocument } = useDialogs();
 
   const { data: documents = [], isLoading } = useDocuments();
   const processDocument = useProcessDocument();
@@ -104,7 +104,7 @@ export default function DocumentsPage() {
             Manage and analyze all case documents
           </p>
         </div>
-        <Button variant="primary" onClick={() => setIsUploadDialogOpen(true)}>
+        <Button variant="primary" onClick={openUploadDocument}>
           <Upload className="h-4 w-4" />
           Upload Document
         </Button>
@@ -142,12 +142,6 @@ export default function DocumentsPage() {
           {selectedStatus && ` with status "${selectedStatus}"`}
         </div>
       )}
-
-      {/* Upload Document Dialog */}
-      <UploadDocumentDialog
-        isOpen={isUploadDialogOpen}
-        onClose={() => setIsUploadDialogOpen(false)}
-      />
 
       {/* Edit Document Dialog */}
       <EditDocumentDialog

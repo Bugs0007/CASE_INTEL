@@ -8,6 +8,13 @@ continue to work.
 
 from .auth import LoginView
 from .case import CaseDetailView, CaseListCreateView
+from .case_tracking import (
+    CaseTrackingConfirmView,
+    CaseTrackingPreviewView,
+    CaseTrackingRefreshView,
+    CaseTrackingView,
+    CourtStructureView,
+)
 from .chat import ChatView
 from .conversation import (
     ConversationDetailView,
@@ -15,7 +22,7 @@ from .conversation import (
     ConversationListView,
     ConversationMessagesView,
 )
-from .dashboard import DashboardView
+from .dashboard import DashboardView, UpcomingHearingsView
 from .document import (
     DocumentDetailView,
     DocumentListView,
@@ -36,11 +43,16 @@ from .hearing import HearingDetailView, HearingListCreateView
 __all__ = [
     "CaseDetailView",
     "CaseListCreateView",
+    "CaseTrackingConfirmView",
+    "CaseTrackingPreviewView",
+    "CaseTrackingRefreshView",
+    "CaseTrackingView",
     "ChatView",
     "ConversationDetailView",
     "ConversationExportView",
     "ConversationListView",
     "ConversationMessagesView",
+    "CourtStructureView",
     "DashboardView",
     "DocumentDetailView",
     "DocumentListView",
@@ -56,4 +68,5 @@ __all__ = [
     "HearingDetailView",
     "HearingListCreateView",
     "LoginView",
+    "UpcomingHearingsView",
 ]

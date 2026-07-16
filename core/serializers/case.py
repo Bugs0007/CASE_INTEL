@@ -31,8 +31,14 @@ class CaseSerializer(serializers.ModelSerializer):
             "hearing_count",
             "thread_count",
             "conversation_count",
+            "cnr_number",
+            "court_type",
+            "tracking_config",
+            "tracking_enabled",
+            "fetch_status",
+            "last_fetched_at",
         ]
-        read_only_fields = ["id", "created_at"]
+        read_only_fields = ["id", "created_at", "cnr_number", "fetch_status", "last_fetched_at"]
 
     def get_document_count(self, obj: Case) -> int:
         return obj.documents.count()
