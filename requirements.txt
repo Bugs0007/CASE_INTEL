@@ -47,10 +47,29 @@ sentence-transformers==3.4.1
 # accuracy bharat-courts' own maintainers report for the [ocr] extra.
 # numpy and pillow below satisfy ddddocr's other requirements and are
 # already pinned above for other AI/ML dependencies.
+#
+# opencv-python-headless, NOT opencv-python: ddddocr's own metadata already
+# conditions this correctly (opencv-python on win32/darwin,
+# opencv-python-headless on linux -- see its own requires_dist), but an
+# unconditional top-level pin here overrides that per-platform choice for
+# everyone, including our Linux (EC2) deploys. opencv-python needs
+# libGL.so.1/X11 (a GUI-capable build) which a headless Ubuntu server
+# doesn't have; import cv2 then raises ImportError, which
+# bharat_courts/captcha/ocr.py's `try: import ddddocr / except ImportError`
+# silently swallows -- producing exactly "No automatic CAPTCHA solver
+# available ... Falling back to manual (stdin) solver", and then EOFError
+# once that manual solver tries to read a CAPTCHA off stdin inside a
+# gunicorn worker (no terminal attached). opencv-python-headless exposes
+# the identical cv2 API ddddocr actually uses (image decode +
+# classification, no GUI calls anywhere in this repo) with none of the
+# GUI/X11 dependencies, on every platform. Verified locally: uninstalling
+# ddddocr reproduces the exact fallback warning + EOFError; reinstalling
+# with opencv-python-headless (not opencv-python) keeps the OCR solver
+# active and functional.
 bharat-courts==0.3.0
 ddddocr==1.6.1
 onnxruntime==1.27.0
-opencv-python==5.0.0.93
+opencv-python-headless==5.0.0.93
 
 # ============================================================================
 # DOCUMENT PROCESSING
