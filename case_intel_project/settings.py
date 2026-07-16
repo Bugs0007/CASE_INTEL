@@ -255,33 +255,46 @@ GMAIL_REDIRECT_URI = config(
 )
 
 # ============================================================================
-# Celery Configuration
+# Celery Configuration -- DISABLED (dead infrastructure, not just unused)
 # ============================================================================
-CELERY_BROKER_URL = config("CELERY_BROKER_URL", default="redis://localhost:6379/0")
-CELERY_RESULT_BACKEND = config("CELERY_RESULT_BACKEND", default="redis://localhost:6379/0")
-CELERY_ACCEPT_CONTENT = ['json']
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_SERIALIZER = 'json'
-CELERY_TIMEZONE = TIME_ZONE
-CELERY_TASK_TRACK_STARTED = True
-CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes max per task
-CELERY_TASK_SOFT_TIME_LIMIT = 25 * 60  # Soft limit at 25 minutes
+# Verified 2026-07-16: zero .delay(/.apply_async(/@shared_task calls or
+# tasks.py files anywhere in core/, no CELERY_BEAT_SCHEDULE. case_intel_project/
+# celery.py defines the app + a debug_task and nothing else ever dispatches
+# through it. ARCHITECTURE.md independently confirms document processing is
+# synchronous. django_celery_beat/django_celery_results stay in INSTALLED_APPS
+# (harmless -- just DB-backed models/admin, no live connection) but the
+# broker/backend settings that would point Celery at Redis are intentionally
+# not defined here. If Celery is ever actually wired up to a task, restore
+# CELERY_BROKER_URL / CELERY_RESULT_BACKEND (and provision a Redis instance --
+# see PROVISIONING.md) at that point, not before.
 
 # ============================================================================
-# Cache Configuration (Redis)
+# Cache Configuration
 # ============================================================================
 CACHES = {
     'default': {
-        # Django's own native redis backend (added in Django 4.0), NOT the
-        # third-party django-redis package -- it takes no OPTIONS.CLIENT_CLASS
-        # key. That key is leftover django-redis config syntax; passing it
-        # here reaches redis-py's own connection constructor as an
-        # unexpected kwarg and raises TypeError on first real cache use
-        # (nothing touched Django's cache framework before court tracking's
-        # hierarchy-discovery caching, so this was previously dormant).
-        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        'LOCATION': config("REDIS_URL", default="redis://127.0.0.1:6379/1"),
-        'KEY_PREFIX': 'case_intel',
+        # LocMemCache -- Redis was never needed for anything except this
+        # cache (Celery is unused, see above). Only two real consumers, both
+        # via the plain get/set/incr cache API, nothing Redis-specific:
+        #   - core/services/court_data/ecourts_provider.py: court hierarchy
+        #     lookups (states/districts/complexes/benches), "changes ~never"
+        #     per that file's own comment -- fine to be per-process.
+        #   - core/services/court_tracking.py: preview-token cache + preview
+        #     rate-limit throttle.
+        #
+        # CAVEAT -- LocMemCache is per-process, not shared across processes.
+        # Fine for `manage.py runserver` (one process) and fine for the
+        # hierarchy cache under gunicorn with multiple workers (each worker
+        # just rebuilds its own copy, no correctness impact). NOT fine for
+        # the preview-token flow if gunicorn ever runs with >1 worker: a
+        # preview_case_tracking() call and the confirm_case_tracking() call
+        # that follows it can land on different worker processes, and the
+        # token won't be visible across them -- confirm would incorrectly
+        # raise PreviewExpiredError even though the token hasn't actually
+        # expired. Redis (or another shared backend) is required again if
+        # this ever runs behind more than one worker process.
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'case-intel-cache',
         'TIMEOUT': 300,  # Default 5 minutes
     }
 }

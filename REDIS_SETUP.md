@@ -1,9 +1,19 @@
 # Redis Setup for Case Intel
 
-Redis is required for:
+> **NOT CURRENTLY REQUIRED (2026-07-16).** Verified that Celery has zero real
+> task dispatch anywhere in this codebase (no `.delay(`/`.apply_async(`/
+> `@shared_task` calls, no `tasks.py`, no beat schedule) -- it was installed
+> and configured but never actually wired to a real background job. The
+> Django cache backend is now `LocMemCache` (see
+> `case_intel_project/settings.py`), not Redis. You do not need to install or
+> run Redis to develop or deploy this app. This file is kept for reference in
+> case Celery is ever actually wired up to a real task in the future, at
+> which point the setup below still applies.
 
-1. **Celery task queue** - Background job processing (court case fetching)
-2. **Django caching** - Caching fetched court data
+Redis was previously used for:
+
+1. **Celery task queue** - Background job processing (court case fetching) -- never actually dispatched, see notice above
+2. **Django caching** - Caching fetched court data -- now LocMemCache instead
 
 ## Quick Setup
 
