@@ -67,7 +67,10 @@ log() { echo -e "\n==> $*"; }
 # build toolchain (psycopg2/pgvector/ddddocr/onnxruntime compile native
 # extensions), Nginx as the reverse proxy, the Postgres client (the DB itself
 # is RDS, not local -- see PROVISIONING.md), and certbot for the eventual TLS
-# cert.
+# cert. libgomp1 is onnxruntime's own common missing-.so on a minimal Ubuntu
+# image (used by ddddocr's CAPTCHA-solving model) -- requirements.txt already
+# uses opencv-python-headless specifically so this box never needs
+# libGL.so.1/X11 for that same OCR path.
 log "Installing system packages"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
@@ -81,7 +84,8 @@ apt-get install -y \
     libpq-dev \
     certbot \
     python3-certbot-nginx \
-    curl
+    curl \
+    libgomp1
 
 # ============================================================================
 # 2. Swap file (1GB, matching this session's setup)
