@@ -2,19 +2,27 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDateTime, cn } from "@/lib/utils";
-import { Calendar, MapPin, User, Plus, Edit, Trash2 } from "lucide-react";
+import { Calendar, MapPin, User, Plus, Edit, Trash2, Loader2 } from "lucide-react";
 import type { Hearing } from "@/types";
 
 interface HearingsListProps {
   caseId: number;
   hearings: Hearing[];
   isLoading?: boolean;
+  onAddHearing?: () => void;
+  onEditHearing?: (hearing: Hearing) => void;
+  onDeleteHearing?: (id: number) => void;
+  deletingId?: number;
 }
 
 export function HearingsList({
   caseId,
   hearings,
   isLoading,
+  onAddHearing,
+  onEditHearing,
+  onDeleteHearing,
+  deletingId,
 }: HearingsListProps) {
   const now = new Date();
   const upcomingHearings = hearings.filter(
@@ -45,7 +53,7 @@ export function HearingsList({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Hearings & Deadlines</CardTitle>
-        <Button variant="secondary" size="sm">
+        <Button variant="secondary" size="sm" onClick={onAddHearing}>
           <Plus className="h-4 w-4" />
           Add Hearing
         </Button>
@@ -59,7 +67,14 @@ export function HearingsList({
             </h4>
             <div className="space-y-3">
               {upcomingHearings.map((hearing) => (
-                <HearingItem key={hearing.id} hearing={hearing} isUpcoming />
+                <HearingItem
+                  key={hearing.id}
+                  hearing={hearing}
+                  isUpcoming
+                  onEdit={onEditHearing}
+                  onDelete={onDeleteHearing}
+                  isDeleting={deletingId === hearing.id}
+                />
               ))}
             </div>
           </div>
@@ -73,7 +88,13 @@ export function HearingsList({
             </h4>
             <div className="space-y-3">
               {pastHearings.map((hearing) => (
-                <HearingItem key={hearing.id} hearing={hearing} />
+                <HearingItem
+                  key={hearing.id}
+                  hearing={hearing}
+                  onEdit={onEditHearing}
+                  onDelete={onDeleteHearing}
+                  isDeleting={deletingId === hearing.id}
+                />
               ))}
             </div>
           </div>
@@ -84,7 +105,7 @@ export function HearingsList({
           <div className="text-center py-8">
             <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-3" />
             <p className="text-gray-500 text-sm">No hearings scheduled</p>
-            <Button variant="secondary" size="sm" className="mt-3">
+            <Button variant="secondary" size="sm" className="mt-3" onClick={onAddHearing}>
               <Plus className="h-4 w-4" />
               Schedule First Hearing
             </Button>
@@ -98,9 +119,12 @@ export function HearingsList({
 interface HearingItemProps {
   hearing: Hearing;
   isUpcoming?: boolean;
+  onEdit?: (hearing: Hearing) => void;
+  onDelete?: (id: number) => void;
+  isDeleting?: boolean;
 }
 
-function HearingItem({ hearing, isUpcoming }: HearingItemProps) {
+function HearingItem({ hearing, isUpcoming, onEdit, onDelete, isDeleting }: HearingItemProps) {
   return (
     <div
       className={cn(
@@ -118,6 +142,11 @@ function HearingItem({ hearing, isUpcoming }: HearingItemProps) {
             <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
               {hearing.hearing_type_display}
             </span>
+            {hearing.source === "manual" && (
+              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                Manual
+              </span>
+            )}
           </div>
 
           {/* Details */}
@@ -152,19 +181,35 @@ function HearingItem({ hearing, isUpcoming }: HearingItemProps) {
           )}
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center gap-1 ml-4">
-          <Button variant="ghost" size="sm" className="p-2">
-            <Edit className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="p-2 text-red-600 hover:text-red-700"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
+        {/* Actions -- eCourts-sourced hearings are edited via Court Tracking
+            refresh, not manually, so only manual hearings get edit/delete. */}
+        {hearing.source === "manual" && (
+          <div className="flex items-center gap-1 ml-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="p-2"
+              onClick={() => onEdit?.(hearing)}
+              title="Edit hearing"
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="p-2 text-red-600 hover:text-red-700"
+              onClick={() => onDelete?.(hearing.id)}
+              disabled={isDeleting}
+              title="Delete hearing"
+            >
+              {isDeleting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

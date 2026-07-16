@@ -1,20 +1,37 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { Suspense, useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { CaseFilters } from "@/components/cases/case-filters";
 import { CaseGrid } from "@/components/cases/case-grid";
-import { CreateCaseDialog } from "@/components/cases/create-case-dialog";
-import { useCases } from "@/hooks/use-cases";
+import { AiAssistantHintBanner } from "@/components/cases/ai-assistant-hint-banner";
+import { showToast } from "@/components/ui/toaster";
+import { useCases, useDeleteCase } from "@/hooks/use-cases";
+import { useDialogs } from "@/providers/dialog-provider";
 import { Plus } from "lucide-react";
 import type { CaseStatus } from "@/types";
 
 export default function CasesPage() {
   const [activeStatus, setActiveStatus] = useState<CaseStatus | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const { openCreateCase } = useDialogs();
 
   const { data: cases = [], isLoading, error } = useCases(activeStatus);
+  const deleteCase = useDeleteCase();
+
+  const handleDeleteCase = async (id: number) => {
+    if (!confirm("Are you sure you want to delete this case? This cannot be undone.")) {
+      return;
+    }
+
+    try {
+      await deleteCase.mutateAsync(id);
+      showToast.success("Case deleted", "The case has been removed.");
+    } catch (error) {
+      console.error("Failed to delete case:", error);
+      showToast.error("Delete failed", "Could not delete the case.");
+    }
+  };
 
   // Filter cases by search query
   const filteredCases = useMemo(() => {
@@ -47,6 +64,10 @@ export default function CasesPage() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
+      <Suspense fallback={null}>
+        <AiAssistantHintBanner />
+      </Suspense>
+
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -55,7 +76,7 @@ export default function CasesPage() {
             Manage and track all your legal cases
           </p>
         </div>
-        <Button variant="primary" onClick={() => setIsCreateDialogOpen(true)}>
+        <Button variant="primary" onClick={openCreateCase}>
           <Plus className="h-4 w-4" />
           New Case
         </Button>
@@ -71,7 +92,12 @@ export default function CasesPage() {
       </div>
 
       {/* Cases Grid */}
-      <CaseGrid cases={filteredCases} isLoading={isLoading} />
+      <CaseGrid
+        cases={filteredCases}
+        isLoading={isLoading}
+        onDelete={handleDeleteCase}
+        deletingId={deleteCase.variables}
+      />
 
       {/* Results Count */}
       {!isLoading && (
@@ -81,12 +107,6 @@ export default function CasesPage() {
           {searchQuery && ` matching "${searchQuery}"`}
         </div>
       )}
-
-      {/* Create Case Dialog */}
-      <CreateCaseDialog
-        isOpen={isCreateDialogOpen}
-        onClose={() => setIsCreateDialogOpen(false)}
-      />
     </div>
   );
 }

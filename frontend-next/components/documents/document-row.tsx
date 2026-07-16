@@ -99,7 +99,8 @@ export function DocumentRow({
       {/* Actions */}
       <td className="py-4 px-6">
         <div className="flex items-center gap-2">
-          {document.processing_status === "pending" && (
+          {(document.processing_status === "pending" ||
+            document.processing_status === "failed") && (
             <Button
               variant="secondary"
               size="sm"
@@ -111,7 +112,11 @@ export function DocumentRow({
               ) : (
                 <Play className="h-4 w-4" />
               )}
-              {isProcessing ? "Processing..." : "Process"}
+              {isProcessing
+                ? "Processing..."
+                : document.processing_status === "failed"
+                  ? "Retry"
+                  : "Process"}
             </Button>
           )}
           <Button

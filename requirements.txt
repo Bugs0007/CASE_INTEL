@@ -30,6 +30,29 @@ openai==1.109.1
 sentence-transformers==3.4.1
 
 # ============================================================================
+# COURT DATA (eCourts case tracking)
+# ============================================================================
+# Pinned to the version verified against real services.ecourts.gov.in /
+# hcservices.ecourts.gov.in responses in the case-tracking validation
+# spikes.
+#
+# NOTE: installed WITHOUT the [ocr] extra deliberately. That extra pins
+# ddddocr<1.6,>=1.5.5, which has no wheel for Python 3.13 (this project's
+# actual runtime -- the validation spikes used an isolated Python 3.11
+# venv where [ocr] installed cleanly, masking this). ddddocr==1.6.1 (the
+# lowest version with a 3.13 wheel) is pinned explicitly below instead,
+# bypassing bharat-courts' conservative upper bound. Verified live against
+# real services.ecourts.gov.in CAPTCHAs on this exact version combination:
+# 3/5 successful solves in a real test run, consistent with the ~75%
+# accuracy bharat-courts' own maintainers report for the [ocr] extra.
+# numpy and pillow below satisfy ddddocr's other requirements and are
+# already pinned above for other AI/ML dependencies.
+bharat-courts==0.3.0
+ddddocr==1.6.1
+onnxruntime==1.27.0
+opencv-python==5.0.0.93
+
+# ============================================================================
 # DOCUMENT PROCESSING
 # ============================================================================
 PyPDF2==3.0.1

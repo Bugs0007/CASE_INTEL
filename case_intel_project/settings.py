@@ -272,11 +272,15 @@ CELERY_TASK_SOFT_TIME_LIMIT = 25 * 60  # Soft limit at 25 minutes
 # ============================================================================
 CACHES = {
     'default': {
+        # Django's own native redis backend (added in Django 4.0), NOT the
+        # third-party django-redis package -- it takes no OPTIONS.CLIENT_CLASS
+        # key. That key is leftover django-redis config syntax; passing it
+        # here reaches redis-py's own connection constructor as an
+        # unexpected kwarg and raises TypeError on first real cache use
+        # (nothing touched Django's cache framework before court tracking's
+        # hierarchy-discovery caching, so this was previously dormant).
         'BACKEND': 'django.core.cache.backends.redis.RedisCache',
         'LOCATION': config("REDIS_URL", default="redis://127.0.0.1:6379/1"),
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django.core.cache.backends.redis.RedisClient',
-        },
         'KEY_PREFIX': 'case_intel',
         'TIMEOUT': 300,  # Default 5 minutes
     }

@@ -27,6 +27,17 @@ class Case(models.Model):
         ("critical", "Critical"),
     ]
 
+    COURT_TYPE_CHOICES = [
+        ("district", "District Court"),
+        ("high_court", "High Court"),
+    ]
+
+    FETCH_STATUS_CHOICES = [
+        ("never_fetched", "Never Fetched"),
+        ("success", "Success"),
+        ("failed", "Failed"),
+    ]
+
     case_number = models.CharField(max_length=100, unique=True)
     title = models.CharField(max_length=500)
     client_name = models.CharField(max_length=255)
@@ -37,6 +48,28 @@ class Case(models.Model):
     filing_date = models.DateField(blank=True, null=True)
     notes = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    # --- Court tracking (eCourts) ---
+    cnr_number = models.CharField(max_length=16, blank=True, null=True, db_index=True)
+    court_type = models.CharField(
+        max_length=20, choices=COURT_TYPE_CHOICES, blank=True, null=True
+    )
+    tracking_config = models.JSONField(
+        blank=True,
+        null=True,
+        help_text=(
+            "Court hierarchy + case_type/case_number/year used to look this "
+            "case up on eCourts. Shape depends on court_type: district needs "
+            "state_code/dist_code/court_complex_code/est_code; high_court "
+            "needs hc_court_code/state_code/bench_code. Both need "
+            "case_type/case_number/year."
+        ),
+    )
+    last_fetched_at = models.DateTimeField(blank=True, null=True)
+    fetch_status = models.CharField(
+        max_length=20, choices=FETCH_STATUS_CHOICES, default="never_fetched"
+    )
+    tracking_enabled = models.BooleanField(default=False)
 
     class Meta:
         db_table = "cases"

@@ -5,9 +5,11 @@ import { SearchInput } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Calendar, LogOut, Upload } from "lucide-react";
 import { clearToken } from "@/lib/auth";
+import { useDialogs } from "@/providers/dialog-provider";
 
 export function Header() {
   const router = useRouter();
+  const { openUploadDocument } = useDialogs();
 
   function handleLogout() {
     clearToken();
@@ -31,7 +33,7 @@ export function Header() {
           Calendar
         </Button>
 
-        <Button variant="primary" size="sm">
+        <Button variant="primary" size="sm" onClick={openUploadDocument}>
           <Upload className="h-4 w-4" />
           Quick Upload
         </Button>

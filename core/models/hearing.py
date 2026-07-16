@@ -20,6 +20,11 @@ class Hearing(models.Model):
         ("postponed", "Postponed"),
     ]
 
+    SOURCE_CHOICES = [
+        ("manual", "Manual"),
+        ("ecourts", "eCourts"),
+    ]
+
     case = models.ForeignKey(
         "core.Case", on_delete=models.CASCADE, related_name="hearings"
     )
@@ -33,9 +38,29 @@ class Hearing(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # --- Court tracking (eCourts) ---
+    source = models.CharField(max_length=20, choices=SOURCE_CHOICES, default="manual")
+    business_date = models.DateField(
+        blank=True,
+        null=True,
+        help_text="eCourts 'business on date' -- the date the case was last acted on, distinct from hearing_date.",
+    )
+    purpose = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="eCourts 'purpose of hearing' (e.g. 'CALL WITH IAS', 'FOR DISMISSAL').",
+    )
+
     class Meta:
         db_table = "hearings"
         ordering = ["hearing_date"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["case", "hearing_date", "source"],
+                name="unique_hearing_per_case_date_source",
+            )
+        ]
 
     def __str__(self):
         return f"{self.get_hearing_type_display()} - {self.hearing_date.strftime('%Y-%m-%d')}"

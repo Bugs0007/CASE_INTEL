@@ -4,9 +4,11 @@ import type { Case } from "@/types";
 interface CaseGridProps {
   cases: Case[];
   isLoading?: boolean;
+  onDelete?: (id: number) => void;
+  deletingId?: number;
 }
 
-export function CaseGrid({ cases, isLoading }: CaseGridProps) {
+export function CaseGrid({ cases, isLoading, onDelete, deletingId }: CaseGridProps) {
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -34,7 +36,12 @@ export function CaseGrid({ cases, isLoading }: CaseGridProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {cases.map((caseItem) => (
-        <CaseCard key={caseItem.id} case={caseItem} />
+        <CaseCard
+          key={caseItem.id}
+          case={caseItem}
+          onDelete={onDelete}
+          isDeleting={deletingId === caseItem.id}
+        />
       ))}
     </div>
   );

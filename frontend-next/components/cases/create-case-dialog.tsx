@@ -109,8 +109,16 @@ export function CreateCaseDialog({
 
     if (!validateForm()) return;
 
+    // DRF's DateField rejects "" (it wants the key omitted or null, not an
+    // empty string) -- filing_date is optional, so strip it entirely when
+    // left blank rather than sending "".
+    const payload: CaseCreateInput = { ...formData };
+    if (!payload.filing_date) {
+      delete payload.filing_date;
+    }
+
     try {
-      await createCase.mutateAsync(formData);
+      await createCase.mutateAsync(payload);
       showToast.success(
         "Case created successfully",
         `Case ${formData.case_number} has been created.`,

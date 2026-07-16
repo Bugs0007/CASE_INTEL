@@ -50,7 +50,11 @@ export function QuickActions({
       description: "Get AI-powered insights",
       icon: MessageSquare,
       color: "bg-orange-500 hover:bg-orange-600",
-      onClick: () => router.push("/cases"),
+      // Chat is scoped per-case (ChatPanel requires a caseId) -- there's no
+      // global chat view, so this sends the user to pick a case first. The
+      // ?from=ai param lets the Cases page show a one-line hint explaining
+      // why they landed here instead of it looking like a broken link.
+      onClick: () => router.push("/cases?from=ai"),
     },
   ];
 
