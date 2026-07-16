@@ -27,6 +27,17 @@ export function formatDateTime(dateString: string | null | undefined): string {
   }
 }
 
+/** Converts an ISO datetime string to the "yyyy-MM-ddTHH:mm" shape an
+ * `<input type="datetime-local">` expects. */
+export function toDatetimeLocal(dateString: string | null | undefined): string {
+  if (!dateString) return "";
+  try {
+    return format(parseISO(dateString), "yyyy-MM-dd'T'HH:mm");
+  } catch {
+    return "";
+  }
+}
+
 export function formatRelativeTime(
   dateString: string | null | undefined,
 ): string {

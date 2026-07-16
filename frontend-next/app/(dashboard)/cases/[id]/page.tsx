@@ -4,11 +4,12 @@ import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useCase } from "@/hooks/use-cases";
 import { useDocuments } from "@/hooks/use-documents";
-import { useHearings } from "@/hooks/use-hearings";
+import { useDeleteHearing, useHearings } from "@/hooks/use-hearings";
 import { CaseDetailHeader } from "@/components/cases/case-detail-header";
 import { CaseOverview } from "@/components/cases/case-overview";
 import { CourtTrackingCard } from "@/components/cases/court-tracking-card";
 import { HearingsList } from "@/components/hearings/hearings-list";
+import { HearingDialog } from "@/components/hearings/hearing-dialog";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { UploadDocumentDialog } from "@/components/documents/upload-document-dialog";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -17,12 +18,15 @@ import { FileText, Upload, Trash2, Play, Loader2 } from "lucide-react";
 import { formatDate, getFileIcon } from "@/lib/utils";
 import { showToast } from "@/components/ui/toaster";
 import { useProcessDocument, useDeleteDocument } from "@/hooks/use-documents";
+import type { Hearing } from "@/types";
 
 export default function CaseDetailPage() {
   const params = useParams();
   const caseId = Number(params.id);
   const [showChat, setShowChat] = useState(false);
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  const [isHearingDialogOpen, setIsHearingDialogOpen] = useState(false);
+  const [editingHearing, setEditingHearing] = useState<Hearing | null>(null);
 
   const { data: caseItem, isLoading: caseLoading } = useCase(caseId);
   const { data: documents = [], isLoading: docsLoading } = useDocuments({
@@ -34,6 +38,7 @@ export default function CaseDetailPage() {
 
   const processDocument = useProcessDocument();
   const deleteDocument = useDeleteDocument();
+  const deleteHearing = useDeleteHearing();
 
   if (caseLoading) {
     return (
@@ -77,6 +82,28 @@ export default function CaseDetailPage() {
     } catch (error) {
       console.error("Failed to delete document:", error);
       showToast.error("Delete failed", "Could not delete the document.");
+    }
+  };
+
+  const handleAddHearing = () => {
+    setEditingHearing(null);
+    setIsHearingDialogOpen(true);
+  };
+
+  const handleEditHearing = (hearing: Hearing) => {
+    setEditingHearing(hearing);
+    setIsHearingDialogOpen(true);
+  };
+
+  const handleDeleteHearing = async (hearingId: number) => {
+    if (!confirm("Are you sure you want to delete this hearing?")) return;
+
+    try {
+      await deleteHearing.mutateAsync(hearingId);
+      showToast.success("Hearing deleted", "The hearing has been removed.");
+    } catch (error) {
+      console.error("Failed to delete hearing:", error);
+      showToast.error("Delete failed", "Could not delete the hearing.");
     }
   };
 
@@ -146,7 +173,8 @@ export default function CaseDetailPage() {
                             </div>
                           </div>
                           <div className="flex items-center gap-2 ml-4">
-                            {doc.processing_status === "pending" && (
+                            {(doc.processing_status === "pending" ||
+                              doc.processing_status === "failed") && (
                               <Button
                                 variant="secondary"
                                 size="sm"
@@ -158,7 +186,11 @@ export default function CaseDetailPage() {
                                 ) : (
                                   <Play className="h-4 w-4" />
                                 )}
-                                {processDocument.isPending && processDocument.variables === doc.id ? "Processing..." : "Process"}
+                                {processDocument.isPending && processDocument.variables === doc.id
+                                  ? "Processing..."
+                                  : doc.processing_status === "failed"
+                                    ? "Retry"
+                                    : "Process"}
                               </Button>
                             )}
                             <span
@@ -200,6 +232,10 @@ export default function CaseDetailPage() {
               caseId={caseId}
               hearings={hearings}
               isLoading={hearingsLoading}
+              onAddHearing={handleAddHearing}
+              onEditHearing={handleEditHearing}
+              onDeleteHearing={handleDeleteHearing}
+              deletingId={deleteHearing.variables}
             />
           </div>
         </div>
@@ -217,6 +253,14 @@ export default function CaseDetailPage() {
         isOpen={isUploadDialogOpen}
         onClose={() => setIsUploadDialogOpen(false)}
         defaultCaseId={caseId}
+      />
+
+      {/* Add/Edit Hearing Dialog */}
+      <HearingDialog
+        isOpen={isHearingDialogOpen}
+        onClose={() => setIsHearingDialogOpen(false)}
+        caseId={caseId}
+        hearing={editingHearing}
       />
     </div>
   );

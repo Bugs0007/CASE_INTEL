@@ -1,20 +1,17 @@
 "use client";
 
-import { useState } from "react";
 import { StatCards } from "@/components/dashboard/stat-cards";
 import { RecentActivity } from "@/components/dashboard/recent-activity";
 import { ActiveCases } from "@/components/dashboard/active-cases";
 import { UpcomingHearings } from "@/components/dashboard/upcoming-hearings";
 import { QuickActions } from "@/components/dashboard/quick-actions";
-import { CreateCaseDialog } from "@/components/cases/create-case-dialog";
-import { UploadDocumentDialog } from "@/components/documents/upload-document-dialog";
 import { useDashboard, useUpcomingHearings } from "@/hooks/use-dashboard";
+import { useDialogs } from "@/providers/dialog-provider";
 
 export default function DashboardPage() {
   const { data: dashboardData, isLoading, error } = useDashboard();
   const { data: upcomingHearings = [] } = useUpcomingHearings();
-  const [isCreateCaseOpen, setIsCreateCaseOpen] = useState(false);
-  const [isUploadDocOpen, setIsUploadDocOpen] = useState(false);
+  const { openCreateCase, openUploadDocument } = useDialogs();
 
   if (isLoading) {
     return (
@@ -86,18 +83,8 @@ export default function DashboardPage() {
 
       {/* Quick Actions */}
       <QuickActions
-        onCreateCase={() => setIsCreateCaseOpen(true)}
-        onUploadDocument={() => setIsUploadDocOpen(true)}
-      />
-
-      {/* Dialogs */}
-      <CreateCaseDialog
-        isOpen={isCreateCaseOpen}
-        onClose={() => setIsCreateCaseOpen(false)}
-      />
-      <UploadDocumentDialog
-        isOpen={isUploadDocOpen}
-        onClose={() => setIsUploadDocOpen(false)}
+        onCreateCase={openCreateCase}
+        onUploadDocument={openUploadDocument}
       />
     </div>
   );

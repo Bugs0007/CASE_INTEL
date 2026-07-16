@@ -11,6 +11,7 @@ import {
   Plus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useDialogs } from '@/providers/dialog-provider';
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { openCreateCase } = useDialogs();
 
   return (
     <div className="fixed left-0 top-0 h-screen w-64 bg-sidebar text-white flex flex-col border-r border-sidebar-active">
@@ -37,9 +39,7 @@ export function Sidebar() {
           variant="primary"
           size="md"
           className="w-full"
-          onClick={() => {
-            // TODO: Open create case dialog
-          }}
+          onClick={openCreateCase}
         >
           <Plus className="h-4 w-4" />
           New Case
