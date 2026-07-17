@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatRelativeTime } from "@/lib/utils";
+import { formatRelativeTime, staggerDelay } from "@/lib/utils";
 import type { RecentActivity as RecentActivityType } from "@/types";
 
 interface RecentActivityProps {
@@ -35,8 +35,12 @@ export function RecentActivity({ activities }: RecentActivityProps) {
           <p className="text-gray-500 text-sm py-4">No recent activity</p>
         ) : (
           <div className="space-y-4">
-            {activities.map((activity) => (
-              <div key={activity.id} className="flex items-start gap-4">
+            {activities.map((activity, i) => (
+              <div
+                key={activity.id}
+                style={staggerDelay(i)}
+                className="flex items-start gap-4 animate-fade-up motion-reduce:animate-none"
+              >
                 <div className="flex-shrink-0 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-sm">
                   {getActivityIcon(activity.activity_type)}
                 </div>
@@ -51,7 +55,7 @@ export function RecentActivity({ activities }: RecentActivityProps) {
                         <span>•</span>
                         <Link
                           href={`/cases/${activity.case_id}`}
-                          className="text-blue-600 hover:text-blue-800"
+                          className="text-primary hover:text-primary-hover font-medium"
                         >
                           View Case
                         </Link>

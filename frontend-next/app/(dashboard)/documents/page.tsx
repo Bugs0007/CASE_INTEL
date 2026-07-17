@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Button } from "@/components/ui/button";
 import { DocumentFilters } from "@/components/documents/document-filters";
 import { DocumentTable } from "@/components/documents/document-table";
+import { DocumentsSkeleton } from "@/components/documents/documents-skeleton";
 import { EditDocumentDialog } from "@/components/documents/edit-document-dialog";
 import { showToast } from "@/components/ui/toaster";
 import {
@@ -94,24 +94,31 @@ export default function DocumentsPage() {
     setEditingDocument(document);
   };
 
+  if (isLoading) {
+    return <DocumentsSkeleton />;
+  }
+
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="px-7 pt-7 pb-[60px] max-w-[1240px] mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-[22px] flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Documents</h1>
-          <p className="text-gray-600 mt-1">
-            Manage and analyze all case documents
+          <h1 className="text-page-title text-gray-900 mb-1.5">Documents</h1>
+          <p className="text-sm text-gray-600">
+            {filteredDocuments.length} documents across all cases
           </p>
         </div>
-        <Button variant="primary" onClick={openUploadDocument}>
+        <button
+          onClick={openUploadDocument}
+          className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border-none bg-primary text-white text-sm font-semibold hover:bg-primary-hover transition-colors"
+        >
           <Upload className="h-4 w-4" />
           Upload Document
-        </Button>
+        </button>
       </div>
 
       {/* Filters */}
-      <div className="mb-6">
+      <div className="mb-5">
         <DocumentFilters
           onSearchChange={setSearchQuery}
           onCaseChange={setSelectedCase}

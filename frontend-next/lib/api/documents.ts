@@ -1,9 +1,17 @@
 import { apiClient, uploadFile } from "./client";
-import type { Document, DocumentUploadInput, DocumentUpdateInput } from "@/types";
+import type {
+  Document,
+  DocumentUploadInput,
+  DocumentUpdateInput,
+  ProcessingStatus,
+} from "@/types";
 
 export const documentsApi = {
-  list: (filters?: { case_id?: number; document_type?: string }) =>
-    apiClient<Document[]>("/documents/", { params: filters }),
+  list: (filters?: {
+    case_id?: number;
+    document_type?: string;
+    processing_status?: ProcessingStatus;
+  }) => apiClient<Document[]>("/documents/", { params: filters }),
 
   get: (id: number) => apiClient<Document>(`/documents/${id}/`),
 

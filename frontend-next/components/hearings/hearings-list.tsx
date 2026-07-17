@@ -1,7 +1,7 @@
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { formatDateTime, cn } from "@/lib/utils";
+import { formatDateTime, staggerDelay } from "@/lib/utils";
 import { Calendar, MapPin, User, Plus, Edit, Trash2, Loader2 } from "lucide-react";
 import type { Hearing } from "@/types";
 
@@ -66,10 +66,11 @@ export function HearingsList({
               Upcoming
             </h4>
             <div className="space-y-3">
-              {upcomingHearings.map((hearing) => (
+              {upcomingHearings.map((hearing, i) => (
                 <HearingItem
                   key={hearing.id}
                   hearing={hearing}
+                  index={i}
                   isUpcoming
                   onEdit={onEditHearing}
                   onDelete={onDeleteHearing}
@@ -87,10 +88,11 @@ export function HearingsList({
               Past
             </h4>
             <div className="space-y-3">
-              {pastHearings.map((hearing) => (
+              {pastHearings.map((hearing, i) => (
                 <HearingItem
                   key={hearing.id}
                   hearing={hearing}
+                  index={i}
                   onEdit={onEditHearing}
                   onDelete={onDeleteHearing}
                   isDeleting={deletingId === hearing.id}
@@ -122,15 +124,15 @@ interface HearingItemProps {
   onEdit?: (hearing: Hearing) => void;
   onDelete?: (id: number) => void;
   isDeleting?: boolean;
+  /** Position within its (upcoming/past) list, for a stagger-in delay. */
+  index?: number;
 }
 
-function HearingItem({ hearing, isUpcoming, onEdit, onDelete, isDeleting }: HearingItemProps) {
+function HearingItem({ hearing, isUpcoming, onEdit, onDelete, isDeleting, index = 0 }: HearingItemProps) {
   return (
     <div
-      className={cn(
-        "p-4 border border-gray-100 rounded-lg",
-        isUpcoming && "bg-green-50 border-green-200",
-      )}
+      style={staggerDelay(index)}
+      className="p-3.5 border border-gray-100 rounded-lg transition-colors hover:bg-gray-50 animate-fade-up motion-reduce:animate-none"
     >
       <div className="flex items-start justify-between">
         <div className="flex-1">
@@ -139,14 +141,12 @@ function HearingItem({ hearing, isUpcoming, onEdit, onDelete, isDeleting }: Hear
             <div className="text-sm font-medium text-gray-900">
               {formatDateTime(hearing.hearing_date)}
             </div>
-            <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
+            <span className="text-[11px] font-semibold bg-[#f3ecfb] text-[#6b3aa0] h-5 px-2 inline-flex items-center rounded-full">
               {hearing.hearing_type_display}
             </span>
-            {hearing.source === "manual" && (
-              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                Manual
-              </span>
-            )}
+            <span className="text-[11px] font-semibold bg-gray-100 text-[#4b5468] h-5 px-2 inline-flex items-center rounded-full">
+              {hearing.source === "manual" ? "Manual" : "eCourts"}
+            </span>
           </div>
 
           {/* Details */}
@@ -197,7 +197,7 @@ function HearingItem({ hearing, isUpcoming, onEdit, onDelete, isDeleting }: Hear
             <Button
               variant="ghost"
               size="sm"
-              className="p-2 text-red-600 hover:text-red-700"
+              className="p-2 text-destructive hover:text-destructive-hover"
               onClick={() => onDelete?.(hearing.id)}
               disabled={isDeleting}
               title="Delete hearing"

@@ -4,6 +4,7 @@ Dashboard view — aggregated statistics for the Case Intel platform.
 
 from django.db.models import Count
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -115,6 +116,10 @@ class UpcomingHearingsView(APIView):
     """All upcoming hearings across every case, for dashboard alerts.
 
     GET /api/dashboard/upcoming-hearings/
+    GET /api/dashboard/upcoming-hearings/?since=2026-07-15T09:00:00Z
+        Restricts to hearings whose eCourts tracking last touched them
+        (updated_at) after `since` — used to flag hearing dates that
+        changed since the caller's last visit.
     """
 
     def get(self, request):
@@ -125,6 +130,12 @@ class UpcomingHearingsView(APIView):
             .exclude(status__in=["cancelled", "completed"])
             .order_by("hearing_date")
         )
+
+        since = request.query_params.get("since")
+        if since:
+            since_dt = parse_datetime(since)
+            if since_dt is not None:
+                hearings = hearings.filter(source="ecourts", updated_at__gt=since_dt)
 
         return Response(
             [
@@ -140,6 +151,7 @@ class UpcomingHearingsView(APIView):
                     "source": h.source,
                     "status": h.status,
                     "days_until": (h.hearing_date.date() - today).days,
+                    "updated_at": h.updated_at,
                 }
                 for h in hearings
             ]
