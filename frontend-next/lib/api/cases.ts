@@ -7,8 +7,8 @@ import type {
 } from "@/types";
 
 export const casesApi = {
-  list: (status?: CaseStatus) =>
-    apiClient<Case[]>("/cases/", { params: { status } }),
+  list: (status?: CaseStatus, since?: string) =>
+    apiClient<Case[]>("/cases/", { params: { status, since } }),
 
   get: (id: number) => apiClient<Case>(`/cases/${id}/`),
 

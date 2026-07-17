@@ -19,10 +19,11 @@ logger = logging.getLogger(__name__)
 
 
 class DocumentListView(generics.ListAPIView):
-    """List documents, optionally filtered by case_id.
+    """List documents, optionally filtered by case_id and/or processing_status.
 
     GET /api/documents/
     GET /api/documents/?case_id=1
+    GET /api/documents/?processing_status=failed
     """
 
     serializer_class = DocumentSerializer
@@ -32,6 +33,9 @@ class DocumentListView(generics.ListAPIView):
         case_id = self.request.query_params.get("case_id")
         if case_id is not None:
             qs = qs.filter(case_id=case_id)
+        processing_status = self.request.query_params.get("processing_status")
+        if processing_status is not None:
+            qs = qs.filter(processing_status=processing_status)
         return qs
 
 

@@ -411,7 +411,7 @@ function TrackingSetupForm({ caseId }: { caseId: number }) {
           )}
 
           {formError && (
-            <div className="flex items-start gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+            <div className="flex items-start gap-2 rounded-lg bg-[#fdecec] p-3 text-sm text-[#b32e26]">
               <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
               <span>{formError}</span>
             </div>
@@ -464,7 +464,7 @@ function TrackingPreviewPanel({
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="mb-4 flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-100 p-3 text-xs text-amber-800">
+        <div className="mb-4 flex items-start gap-2 rounded-lg bg-[#fdf3e0] border border-[#f5e3c2] p-3 text-xs text-[#92610f]">
           <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
           <span>
             This is fetched from eCourts and has NOT been saved yet. Check the parties below match
@@ -496,7 +496,7 @@ function TrackingPreviewPanel({
         </div>
 
         {error && (
-          <div className="mb-4 flex items-start gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+          <div className="mb-4 flex items-start gap-2 rounded-lg bg-[#fdecec] p-3 text-sm text-[#b32e26]">
             <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
             <span>{error}</span>
           </div>
@@ -532,6 +532,7 @@ function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hea
   const refreshTracking = useRefreshTracking(caseItem.id);
   const untrackTracking = useUntrackTracking(caseItem.id);
   const [rateLimitedUntil, setRateLimitedUntil] = useState<string | null>(null);
+  const [hearingHistoryOpen, setHearingHistoryOpen] = useState(true);
 
   const ecourtsHearings = useMemo(
     () => hearings.filter((h) => h.source === "ecourts").sort((a, b) => a.hearing_date.localeCompare(b.hearing_date)),
@@ -613,7 +614,7 @@ function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hea
             onClick={handleUntrack}
             disabled={untrackTracking.isPending}
             title="Untrack this case / fix a wrong case match"
-            className="text-red-600 hover:bg-red-50 hover:text-red-700"
+            className="text-destructive hover:bg-[#fdecec] hover:text-destructive-hover"
           >
             {untrackTracking.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -625,7 +626,7 @@ function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hea
         </div>
       </CardHeader>
       <CardContent>
-        <div className="mb-4 rounded-lg bg-blue-50 border border-blue-100 p-3 text-xs text-blue-800">
+        <div className="mb-4 rounded-lg bg-[#ebf3fb] border border-[#d6e7f7] p-3 text-xs text-[#2f6fb0]">
           Data sourced from eCourts ({caseItem.court_type === "high_court" ? "hcservices" : "services"}
           .ecourts.gov.in). May be delayed or incomplete -- always verify against official court
           records.{" "}
@@ -675,27 +676,39 @@ function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hea
 
         {ecourtsHearings.length > 0 && (
           <div>
-            <h4 className="text-sm font-semibold text-gray-700 mb-2">Hearing History</h4>
-            <div className="overflow-x-auto rounded-lg border border-gray-100">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-left text-xs text-gray-500">
-                  <tr>
-                    <th className="px-3 py-2 font-medium">Date</th>
-                    <th className="px-3 py-2 font-medium">Purpose</th>
-                    <th className="px-3 py-2 font-medium">Judge</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {[...ecourtsHearings].reverse().map((h) => (
-                    <tr key={h.id} className={h.hearing_date.slice(0, 10) >= today ? "bg-blue-50/50" : ""}>
-                      <td className="px-3 py-2 whitespace-nowrap">{formatDate(h.hearing_date)}</td>
-                      <td className="px-3 py-2 text-gray-600">{h.purpose || "—"}</td>
-                      <td className="px-3 py-2 text-gray-600">{h.judge || "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="flex items-center justify-between mb-2.5">
+              <h4 className="text-[13px] font-semibold text-gray-700">
+                Hearing History ({ecourtsHearings.length})
+              </h4>
+              <button
+                onClick={() => setHearingHistoryOpen((v) => !v)}
+                className="h-7 px-2.5 rounded-md border border-gray-200 bg-white text-gray-700 text-xs font-semibold hover:bg-gray-50"
+              >
+                {hearingHistoryOpen ? "Collapse" : "Expand"}
+              </button>
             </div>
+            {hearingHistoryOpen && (
+              <div className="overflow-x-auto rounded-lg border border-gray-100">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 text-left text-xs text-gray-500">
+                    <tr>
+                      <th className="px-3 py-2 font-medium">Date</th>
+                      <th className="px-3 py-2 font-medium">Purpose</th>
+                      <th className="px-3 py-2 font-medium">Judge</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {[...ecourtsHearings].reverse().map((h) => (
+                      <tr key={h.id} className={h.hearing_date.slice(0, 10) >= today ? "bg-[#ebf3fb]/50" : ""}>
+                        <td className="px-3 py-2 whitespace-nowrap">{formatDate(h.hearing_date)}</td>
+                        <td className="px-3 py-2 text-gray-600">{h.purpose || "—"}</td>
+                        <td className="px-3 py-2 text-gray-600">{h.judge || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </CardContent>

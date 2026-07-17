@@ -6,6 +6,12 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/** Inline style for a stagger-in fade at list index `i` -- delay is capped
+ * so long lists don't leave the last rows waiting seconds to appear. */
+export function staggerDelay(i: number, stepMs = 35, maxSteps = 10) {
+  return { animationDelay: `${Math.min(i, maxSteps) * stepMs}ms` };
+}
+
 export function formatDate(
   dateString: string | null | undefined,
   formatStr: string = "MMM d, yyyy",

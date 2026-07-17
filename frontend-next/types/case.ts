@@ -35,6 +35,8 @@ export interface Case {
   tracking_enabled: boolean;
   fetch_status: FetchStatus;
   last_fetched_at: string | null;
+  needs_attention: boolean;
+  next_hearing_date: string | null;
 }
 
 export interface CaseCreateInput {

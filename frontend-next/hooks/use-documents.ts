@@ -4,23 +4,24 @@ import type {
   Document,
   DocumentUploadInput,
   DocumentUpdateInput,
+  ProcessingStatus,
 } from "@/types";
+
+type DocumentFilters = {
+  case_id?: number;
+  document_type?: string;
+  processing_status?: ProcessingStatus;
+};
 
 export const documentKeys = {
   all: ["documents"] as const,
   lists: () => [...documentKeys.all, "list"] as const,
-  list: (filters: { case_id?: number; document_type?: string }) =>
-    [...documentKeys.lists(), filters] as const,
+  list: (filters: DocumentFilters) => [...documentKeys.lists(), filters] as const,
   details: () => [...documentKeys.all, "detail"] as const,
   detail: (id: number) => [...documentKeys.details(), id] as const,
 };
 
-export function useDocuments(
-  filters: {
-    case_id?: number;
-    document_type?: string;
-  } = {},
-) {
+export function useDocuments(filters: DocumentFilters = {}) {
   return useQuery({
     queryKey: documentKeys.list(filters),
     queryFn: () => documentsApi.list(filters),

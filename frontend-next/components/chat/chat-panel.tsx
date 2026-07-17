@@ -320,7 +320,7 @@ export function ChatPanel({ caseId, className, onClose }: ChatPanelProps) {
                     className={cn(
                       "w-full rounded-xl border px-3 py-3 text-left transition-colors",
                       isActive
-                        ? "border-blue-200 bg-blue-50"
+                        ? "border-primary-light bg-[#eef1fb]"
                         : "border-transparent bg-white hover:border-gray-200 hover:bg-gray-100",
                     )}
                   >
@@ -348,7 +348,7 @@ export function ChatPanel({ caseId, className, onClose }: ChatPanelProps) {
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <MessageSquare className="h-5 w-5 text-blue-600" />
+                <MessageSquare className="h-5 w-5 text-primary" />
                 <h2 className="font-semibold text-gray-900">AI Assistant</h2>
               </div>
               <p className="mt-1 text-sm text-gray-500">
@@ -515,7 +515,7 @@ function MessageItem({ message }: MessageItemProps) {
         className={cn(
           "max-w-[90%] rounded-2xl p-4 text-sm shadow-sm",
           isUser
-            ? "bg-blue-600 text-white"
+            ? "bg-primary text-white"
             : "border border-gray-200 bg-white text-gray-900",
         )}
       >
@@ -537,7 +537,7 @@ function MessageItem({ message }: MessageItemProps) {
         <div
           className={cn(
             "mt-3 text-xs",
-            isUser ? "text-blue-100" : "text-gray-500",
+            isUser ? "text-white/70" : "text-gray-500",
           )}
         >
           {formatRelativeTime(message.created_at)}
@@ -559,29 +559,17 @@ function CitationBadge({ citation }: { citation: Citation }) {
 function TypingIndicator({ elapsedSeconds }: { elapsedSeconds: number }) {
   return (
     <div className="flex justify-start">
-      <div className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
-        <div className="flex items-center gap-2">
-          <div className="flex space-x-1">
-            <div className="h-2 w-2 animate-bounce rounded-full bg-blue-500" />
-            <div
-              className="h-2 w-2 animate-bounce rounded-full bg-blue-500"
-              style={{ animationDelay: "0.1s" }}
-            />
-            <div
-              className="h-2 w-2 animate-bounce rounded-full bg-blue-500"
-              style={{ animationDelay: "0.2s" }}
-            />
-          </div>
-          <div>
-            <div className="text-sm font-medium text-gray-900">
-              AI is working on your answer
-            </div>
-            <div className="text-xs text-gray-500">
-              {elapsedSeconds > 0
-                ? `${elapsedSeconds}s elapsed. Responses can take a little while.`
-                : "Responses can take a little while depending on model load."}
-            </div>
-          </div>
+      <div className="w-full max-w-[88%] rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="mb-2 text-sm font-semibold text-gray-900">
+          Generating response&hellip;
+        </div>
+        <div className="h-1 overflow-hidden rounded-full bg-gray-100">
+          <div className="h-full w-2/5 animate-chat-indeterminate rounded-full bg-primary" />
+        </div>
+        <div className="mt-2 text-xs text-gray-500">
+          {elapsedSeconds > 0
+            ? `${elapsedSeconds}s elapsed. Responses can take a little while.`
+            : "Responses can take a little while depending on model load."}
         </div>
       </div>
     </div>

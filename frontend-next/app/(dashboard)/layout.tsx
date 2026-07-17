@@ -12,12 +12,12 @@ export default function DashboardLayout({
   return (
     <AuthGuard>
       <DialogProvider>
-        <div className="flex h-screen bg-gray-50">
+        <div className="flex h-screen bg-page">
           {/* Sidebar */}
           <Sidebar />
 
           {/* Main Content */}
-          <div className="flex-1 flex flex-col ml-64">
+          <div className="flex-1 flex flex-col ml-60">
             <Header />
             <main className="flex-1 overflow-y-auto">
               <ErrorBoundary>{children}</ErrorBoundary>

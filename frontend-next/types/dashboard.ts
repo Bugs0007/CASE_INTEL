@@ -52,4 +52,5 @@ export interface UpcomingHearing {
   source: "manual" | "ecourts";
   status: string;
   days_until: number;
+  updated_at: string;
 }

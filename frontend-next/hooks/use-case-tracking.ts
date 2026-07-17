@@ -30,6 +30,7 @@ export function useCourtStructure(
     queryFn: () => caseTrackingApi.courtStructure(params!),
     enabled: params !== null,
     staleTime: 24 * 60 * 60 * 1000, // 24h client-side; backend caches 30d
+    gcTime: 24 * 60 * 60 * 1000, // keep it cached across screens for the same window it's fresh
   });
 }
 

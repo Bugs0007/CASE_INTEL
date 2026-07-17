@@ -1,5 +1,4 @@
-import { useState, useMemo } from "react";
-import { SearchInput } from "@/components/ui/input";
+import { Search } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { useCases } from "@/hooks/use-cases";
 import type { DocumentType, ProcessingStatus } from "@/types";
@@ -35,13 +34,18 @@ export function DocumentFilters({
   const { data: cases = [] } = useCases();
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div className="bg-white border border-gray-100 rounded-xl p-4">
+      <div className="grid grid-cols-1 md:grid-cols-[1.4fr_1fr_1fr_1fr] gap-3">
         {/* Search */}
-        <SearchInput
-          placeholder="Search documents..."
-          onChange={(e) => onSearchChange(e.target.value)}
-        />
+        <div className="flex items-center gap-2.5 h-10 rounded-lg border border-gray-200 px-3">
+          <Search className="h-4 w-4 text-gray-400 flex-shrink-0" strokeWidth={1.8} />
+          <input
+            type="text"
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder="Search documents…"
+            className="flex-1 min-w-0 bg-transparent text-sm text-gray-800 placeholder:text-gray-400 outline-none"
+          />
+        </div>
 
         {/* Case Filter */}
         <Select
