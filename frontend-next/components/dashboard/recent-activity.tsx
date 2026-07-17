@@ -51,7 +51,7 @@ export function RecentActivity({ activities }: RecentActivityProps) {
                         <span>•</span>
                         <Link
                           href={`/cases/${activity.case_id}`}
-                          className="text-blue-600 hover:text-blue-800"
+                          className="text-primary hover:text-primary-hover font-medium"
                         >
                           View Case
                         </Link>

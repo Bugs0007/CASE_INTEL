@@ -1,9 +1,23 @@
 import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
 
+// Exact semantic badge colors from Design System.dc.html's "Semantic" swatch
+// (status & priority badges only, never buttons).
+const VARIANT_CLASSES = {
+  default: "bg-gray-100 text-[#4b5468]", // Neutral
+  success: "bg-[#e9f7f1] text-[#146349]",
+  warning: "bg-[#fdf3e0] text-[#92610f]",
+  attention: "bg-[#fdf0e4] text-[#9a4a12]",
+  critical: "bg-[#f3ecfb] text-[#6b3aa0]",
+  info: "bg-[#ebf3fb] text-[#2f6fb0]",
+  danger: "bg-[#fdecec] text-[#b32e26]", // Error
+} as const;
+
+type BadgeVariant = keyof typeof VARIANT_CLASSES;
+
 interface BadgeProps {
   children: ReactNode;
-  variant?: "default" | "success" | "warning" | "danger" | "info" | "purple";
+  variant?: BadgeVariant;
   size?: "sm" | "md";
   className?: string;
 }
@@ -17,18 +31,11 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center font-medium rounded-full",
+        "inline-flex items-center font-semibold rounded-full",
+        VARIANT_CLASSES[variant],
         {
-          "bg-gray-100 text-gray-800": variant === "default",
-          "bg-green-100 text-green-800": variant === "success",
-          "bg-yellow-100 text-yellow-800": variant === "warning",
-          "bg-red-100 text-red-800": variant === "danger",
-          "bg-blue-100 text-blue-800": variant === "info",
-          "bg-purple-100 text-purple-800": variant === "purple",
-        },
-        {
-          "px-2 py-0.5 text-xs": size === "sm",
-          "px-2.5 py-1 text-sm": size === "md",
+          "h-[22px] px-2.5 text-xs": size === "sm",
+          "h-6 px-3 text-sm": size === "md",
         },
         className,
       )}
@@ -39,10 +46,7 @@ export function Badge({
 }
 
 export function StatusBadge({ status }: { status: string }) {
-  const variants: Record<
-    string,
-    "success" | "warning" | "default" | "danger" | "info"
-  > = {
+  const variants: Record<string, BadgeVariant> = {
     open: "success",
     active: "success",
     pending: "warning",
@@ -64,13 +68,12 @@ export function StatusBadge({ status }: { status: string }) {
 }
 
 export function PriorityBadge({ priority }: { priority: string }) {
-  const variants: Record<string, "success" | "warning" | "danger" | "purple"> =
-    {
-      low: "success",
-      medium: "warning",
-      high: "danger",
-      critical: "purple",
-    };
+  const variants: Record<string, BadgeVariant> = {
+    low: "success",
+    medium: "warning",
+    high: "attention",
+    critical: "critical",
+  };
 
   return (
     <Badge variant={variants[priority] || "default"}>

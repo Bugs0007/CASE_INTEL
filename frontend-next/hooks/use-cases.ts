@@ -10,16 +10,16 @@ import type {
 export const caseKeys = {
   all: ["cases"] as const,
   lists: () => [...caseKeys.all, "list"] as const,
-  list: (filters: { status?: CaseStatus | "all" }) =>
+  list: (filters: { status?: CaseStatus | "all"; since?: string }) =>
     [...caseKeys.lists(), filters] as const,
   details: () => [...caseKeys.all, "detail"] as const,
   detail: (id: number) => [...caseKeys.details(), id] as const,
 };
 
-export function useCases(status?: CaseStatus | "all") {
+export function useCases(status?: CaseStatus | "all", since?: string) {
   return useQuery({
-    queryKey: caseKeys.list({ status }),
-    queryFn: () => casesApi.list(status === "all" ? undefined : status),
+    queryKey: caseKeys.list({ status, since }),
+    queryFn: () => casesApi.list(status === "all" ? undefined : status, since),
     staleTime: 60 * 1000, // 1 minute
   });
 }

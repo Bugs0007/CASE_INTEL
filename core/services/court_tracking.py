@@ -361,7 +361,13 @@ def _upsert_hearings(case: Case, data: CourtCaseData) -> list:
     """Upsert Hearing rows for source='ecourts', deduped on
     (case, hearing_date, source) per the unique constraint. Returns the
     list of hearing dates that are genuinely new (didn't exist before
-    this call) -- the signal an ActivityLog entry gets written for."""
+    this call) -- the signal an ActivityLog entry gets written for.
+
+    `location` is stamped from data.court_name (case-level -- the
+    provider's hearing-history table has no per-row court/location
+    column, only hearing_date/business_date/purpose/judge/
+    cause_list_type, see HearingRecord) on every hearing for this case,
+    same as judge/purpose below."""
     new_dates = []
     today = timezone.localdate()
 
@@ -382,6 +388,7 @@ def _upsert_hearings(case: Case, data: CourtCaseData) -> list:
             source="ecourts",
             defaults={
                 "hearing_type": "other",
+                "location": data.court_name or "",
                 "judge": record.judge or "",
                 "business_date": record.business_date,
                 "purpose": record.purpose or "",

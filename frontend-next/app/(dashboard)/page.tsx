@@ -1,32 +1,64 @@
 "use client";
 
-import { StatCards } from "@/components/dashboard/stat-cards";
+import { useEffect, useMemo, useState } from "react";
 import { RecentActivity } from "@/components/dashboard/recent-activity";
-import { ActiveCases } from "@/components/dashboard/active-cases";
-import { UpcomingHearings } from "@/components/dashboard/upcoming-hearings";
-import { QuickActions } from "@/components/dashboard/quick-actions";
+import { NeedsAttention } from "@/components/dashboard/needs-attention";
+import { HearingDensityStrip } from "@/components/dashboard/hearing-density-strip";
+import { CasesByUrgency } from "@/components/dashboard/cases-by-urgency";
 import { useDashboard, useUpcomingHearings } from "@/hooks/use-dashboard";
-import { useDialogs } from "@/providers/dialog-provider";
+import { useDocuments } from "@/hooks/use-documents";
+import { useCases } from "@/hooks/use-cases";
+import { getLastDashboardVisit, setLastDashboardVisit } from "@/lib/last-visit";
 
 export default function DashboardPage() {
   const { data: dashboardData, isLoading, error } = useDashboard();
+
+  // Capture the previous visit's timestamp before overwriting it, so
+  // "changed since last login" queries have something to compare against.
+  const [since, setSince] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    const previous = getLastDashboardVisit();
+    setSince(previous ?? undefined);
+    setLastDashboardVisit(new Date().toISOString());
+  }, []);
+
   const { data: upcomingHearings = [] } = useUpcomingHearings();
-  const { openCreateCase, openUploadDocument } = useDialogs();
+  const { data: ecourtsUpdates = [] } = useUpcomingHearings(since);
+  const { data: failedDocuments = [] } = useDocuments({
+    processing_status: "failed",
+  });
+  const { data: cases = [] } = useCases("all", since);
+
+  const hearingsSoon = useMemo(
+    () => upcomingHearings.filter((h) => h.days_until <= 1),
+    [upcomingHearings],
+  );
+  const hearingSoonCaseIds = useMemo(
+    () => new Set(upcomingHearings.filter((h) => h.days_until <= 7).map((h) => h.case_id)),
+    [upcomingHearings],
+  );
+  const ecourtsUpdateCaseIds = useMemo(
+    () => new Set(ecourtsUpdates.map((h) => h.case_id)),
+    [ecourtsUpdates],
+  );
+  const failedDocCaseIds = useMemo(
+    () =>
+      new Set(
+        failedDocuments
+          .filter((d): d is typeof d & { case_id: number } => d.case_id != null)
+          .map((d) => d.case_id),
+      ),
+    [failedDocuments],
+  );
 
   if (isLoading) {
     return (
-      <div className="p-6">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/3 mb-6"></div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-32 bg-gray-200 rounded-xl"></div>
-            ))}
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="h-96 bg-gray-200 rounded-xl"></div>
-            <div className="h-96 bg-gray-200 rounded-xl"></div>
-          </div>
+      <div className="px-7 pt-7 pb-[60px] max-w-[1240px] mx-auto">
+        <div className="animate-pulse space-y-5">
+          <div className="h-32 bg-gray-200 rounded-xl"></div>
+          <div className="h-48 bg-gray-200 rounded-xl"></div>
+          <div className="h-64 bg-gray-200 rounded-xl"></div>
+          <div className="h-64 bg-gray-200 rounded-xl"></div>
         </div>
       </div>
     );
@@ -34,9 +66,9 @@ export default function DashboardPage() {
 
   if (error) {
     return (
-      <div className="p-6">
+      <div className="px-7 pt-7">
         <div className="text-center py-12">
-          <div className="text-red-500 text-lg font-medium mb-2">
+          <div className="text-[#b32e26] text-lg font-medium mb-2">
             Failed to load dashboard
           </div>
           <div className="text-gray-500 text-sm">
@@ -47,45 +79,28 @@ export default function DashboardPage() {
     );
   }
 
-  const currentHour = new Date().getHours();
-  const greeting =
-    currentHour < 12
-      ? "Good Morning"
-      : currentHour < 17
-        ? "Good Afternoon"
-        : "Good Evening";
-
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Welcome Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          {greeting}, Advocate! 👋
-        </h1>
-        <p className="text-gray-600">
-          Here's what's happening with your cases today.
-        </p>
-      </div>
-
-      {/* Stats Cards */}
-      {dashboardData && <StatCards stats={dashboardData.stats} />}
-
-      {/* Two Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <RecentActivity activities={dashboardData?.recent_activity || []} />
-        <ActiveCases cases={dashboardData?.active_cases_summary || []} />
-      </div>
-
-      {/* Upcoming Hearings */}
-      <div className="mb-8">
-        <UpcomingHearings hearings={upcomingHearings} />
-      </div>
-
-      {/* Quick Actions */}
-      <QuickActions
-        onCreateCase={openCreateCase}
-        onUploadDocument={openUploadDocument}
+    <div className="px-7 pt-7 pb-[60px] max-w-[1240px] mx-auto">
+      {/* Needs Your Attention */}
+      <NeedsAttention
+        hearingsSoon={hearingsSoon}
+        ecourtsUpdates={ecourtsUpdates}
+        failedDocuments={failedDocuments}
       />
+
+      {/* Next 14 Days density strip */}
+      <HearingDensityStrip hearings={upcomingHearings} />
+
+      {/* Cases grouped by urgency */}
+      <CasesByUrgency
+        cases={cases}
+        hearingSoonCaseIds={hearingSoonCaseIds}
+        ecourtsUpdateCaseIds={ecourtsUpdateCaseIds}
+        failedDocCaseIds={failedDocCaseIds}
+      />
+
+      {/* Recent Activity */}
+      <RecentActivity activities={dashboardData?.recent_activity || []} />
     </div>
   );
 }

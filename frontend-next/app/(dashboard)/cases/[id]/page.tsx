@@ -112,15 +112,15 @@ export default function CaseDetailPage() {
       {/* Header */}
       <CaseDetailHeader case={caseItem} onStartChat={() => setShowChat(true)} />
 
-      {/* Main Content */}
-      <div className="relative flex flex-1 overflow-hidden">
+      {/* Main Content — a real flex row, not an overlay: the chat panel is a
+          persistent sibling column with its own height from this flex
+          container, so it never depends on position:fixed/sticky (and the
+          containing-block bugs that come with those) to stay put while the
+          left column scrolls. */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Left/Main Section */}
-        <div
-          className={`flex-1 overflow-y-auto transition-all duration-300 ${
-            showChat ? "lg:pr-[680px] xl:pr-[720px]" : ""
-          }`}
-        >
-          <div className="max-w-7xl mx-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto min-w-0">
+          <div className="max-w-[900px] mx-auto px-7 pt-6 pb-[60px] space-y-5">
             {/* Case Overview */}
             <CaseOverview case={caseItem} />
 
@@ -194,12 +194,14 @@ export default function CaseDetailPage() {
                               </Button>
                             )}
                             <span
-                              className={`text-xs px-2 py-1 rounded-md ${
+                              className={`text-xs px-2.5 h-[22px] inline-flex items-center rounded-full font-semibold ${
                                 doc.processing_status === "completed"
-                                  ? "bg-green-100 text-green-800"
+                                  ? "bg-[#e9f7f1] text-[#146349]"
                                   : doc.processing_status === "processing"
-                                    ? "bg-blue-100 text-blue-800"
-                                    : "bg-gray-100 text-gray-600"
+                                    ? "bg-[#ebf3fb] text-[#2f6fb0]"
+                                    : doc.processing_status === "failed"
+                                      ? "bg-[#fdecec] text-[#b32e26]"
+                                      : "bg-gray-100 text-[#4b5468]"
                               }`}
                             >
                               {doc.processing_status}
@@ -211,7 +213,7 @@ export default function CaseDetailPage() {
                               onClick={() => handleDeleteDocument(doc.id)}
                               disabled={deleteDocument.isPending}
                             >
-                              <Trash2 className="h-4 w-4 text-red-500" />
+                              <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           </div>
                         </div>
@@ -240,9 +242,9 @@ export default function CaseDetailPage() {
           </div>
         </div>
 
-        {/* Right Chat Panel */}
+        {/* Right Chat Panel — a persistent flex sibling, never an overlay */}
         {showChat && (
-          <div className="absolute inset-y-0 right-0 z-20 w-full max-w-[720px]">
+          <div className="w-full max-w-[720px] flex-shrink-0 min-h-0">
             <ChatPanel caseId={caseId} onClose={() => setShowChat(false)} />
           </div>
         )}

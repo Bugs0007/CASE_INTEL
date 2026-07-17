@@ -27,7 +27,7 @@ export function CaseOverview({ case: caseItem }: CaseOverviewProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {overviewFields.map((field) => (
             <div key={field.label} className="space-y-1">
-              <dt className="text-sm font-medium text-gray-500">
+              <dt className="text-xs text-gray-400 mb-1">
                 {field.label}
               </dt>
               <dd className="text-sm text-gray-900 font-medium">

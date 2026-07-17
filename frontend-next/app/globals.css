@@ -8,7 +8,7 @@
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
-    --primary: 4 82% 56%;
+    --primary: 233 45% 35%;
     --primary-foreground: 0 0% 100%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
@@ -20,7 +20,7 @@
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 4 82% 56%;
+    --ring: 233 45% 35%;
     --radius: 0.5rem;
   }
 }
@@ -31,7 +31,7 @@
   }
 
   body {
-    @apply bg-gray-50 text-gray-900;
+    @apply bg-page text-gray-800;
     font-feature-settings:
       "rlig" 1,
       "calt" 1;
