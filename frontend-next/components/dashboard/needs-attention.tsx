@@ -3,7 +3,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { CalendarClock, RefreshCw, FileWarning } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { formatDate, formatRelativeTime } from "@/lib/utils";
+import { formatDate, formatRelativeTime, staggerDelay } from "@/lib/utils";
 import type { UpcomingHearing, Document } from "@/types";
 
 interface NeedsAttentionProps {
@@ -119,12 +119,13 @@ export function NeedsAttention({
           </p>
         ) : (
           <div className="space-y-1">
-            {items.map((item) => {
+            {items.map((item, i) => {
               const Icon = item.icon;
               return (
                 <div
                   key={item.key}
-                  className="flex items-center gap-4 py-3 px-1 rounded-lg"
+                  style={staggerDelay(i)}
+                  className="flex items-center gap-4 py-3 px-1 rounded-lg animate-fade-up motion-reduce:animate-none"
                 >
                   <div
                     className={`w-9 h-9 rounded-lg ${item.iconBg} flex items-center justify-center flex-shrink-0`}

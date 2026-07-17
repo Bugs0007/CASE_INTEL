@@ -38,10 +38,11 @@ export function CaseGrid({ cases, isLoading, onDelete, deletingId, urgencyReason
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {cases.map((caseItem) => (
+      {cases.map((caseItem, i) => (
         <CaseCard
           key={caseItem.id}
           case={caseItem}
+          index={i}
           onDelete={onDelete}
           isDeleting={deletingId === caseItem.id}
           urgencyReason={urgencyReasons?.get(caseItem.id)}

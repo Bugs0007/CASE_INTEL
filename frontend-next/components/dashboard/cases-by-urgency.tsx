@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { reasonForCase, sortByUrgencyPriority } from "@/lib/case-urgency";
+import { staggerDelay } from "@/lib/utils";
 import type { Case } from "@/types";
 
 interface CasesByUrgencyProps {
@@ -39,7 +40,7 @@ export function CasesByUrgency({
           </p>
         ) : (
           <div className="space-y-2">
-            {needsAttention.map((c) => {
+            {needsAttention.map((c, i) => {
               const reason = reasonForCase(
                 c.id,
                 hearingSoonCaseIds,
@@ -49,7 +50,8 @@ export function CasesByUrgency({
               return (
                 <div
                   key={c.id}
-                  className="flex items-center justify-between gap-3 p-3 border border-gray-100 rounded-lg flex-wrap"
+                  style={staggerDelay(i)}
+                  className="flex items-center justify-between gap-3 p-3 border border-gray-100 rounded-lg flex-wrap animate-fade-up motion-reduce:animate-none"
                 >
                   <div className="min-w-0 flex items-center gap-3 flex-wrap">
                     <span

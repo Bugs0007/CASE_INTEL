@@ -28,6 +28,7 @@ export function useHearings(
   return useQuery({
     queryKey: hearingKeys.list(filters),
     queryFn: () => hearingsApi.list(filters),
+    staleTime: 60 * 1000, // 1 minute -- hearings change often enough to keep this short
   });
 }
 

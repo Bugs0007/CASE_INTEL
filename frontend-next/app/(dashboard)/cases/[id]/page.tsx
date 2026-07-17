@@ -7,6 +7,7 @@ import { useDocuments } from "@/hooks/use-documents";
 import { useDeleteHearing, useHearings } from "@/hooks/use-hearings";
 import { CaseDetailHeader } from "@/components/cases/case-detail-header";
 import { CaseOverview } from "@/components/cases/case-overview";
+import { CaseDetailSkeleton } from "@/components/cases/case-detail-skeleton";
 import { CourtTrackingCard } from "@/components/cases/court-tracking-card";
 import { HearingsList } from "@/components/hearings/hearings-list";
 import { HearingDialog } from "@/components/hearings/hearing-dialog";
@@ -41,11 +42,7 @@ export default function CaseDetailPage() {
   const deleteHearing = useDeleteHearing();
 
   if (caseLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-lg text-gray-500">Loading case details...</div>
-      </div>
-    );
+    return <CaseDetailSkeleton />;
   }
 
   if (!caseItem) {

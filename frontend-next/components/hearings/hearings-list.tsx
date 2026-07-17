@@ -1,7 +1,7 @@
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime, staggerDelay } from "@/lib/utils";
 import { Calendar, MapPin, User, Plus, Edit, Trash2, Loader2 } from "lucide-react";
 import type { Hearing } from "@/types";
 
@@ -66,10 +66,11 @@ export function HearingsList({
               Upcoming
             </h4>
             <div className="space-y-3">
-              {upcomingHearings.map((hearing) => (
+              {upcomingHearings.map((hearing, i) => (
                 <HearingItem
                   key={hearing.id}
                   hearing={hearing}
+                  index={i}
                   isUpcoming
                   onEdit={onEditHearing}
                   onDelete={onDeleteHearing}
@@ -87,10 +88,11 @@ export function HearingsList({
               Past
             </h4>
             <div className="space-y-3">
-              {pastHearings.map((hearing) => (
+              {pastHearings.map((hearing, i) => (
                 <HearingItem
                   key={hearing.id}
                   hearing={hearing}
+                  index={i}
                   onEdit={onEditHearing}
                   onDelete={onDeleteHearing}
                   isDeleting={deletingId === hearing.id}
@@ -122,11 +124,16 @@ interface HearingItemProps {
   onEdit?: (hearing: Hearing) => void;
   onDelete?: (id: number) => void;
   isDeleting?: boolean;
+  /** Position within its (upcoming/past) list, for a stagger-in delay. */
+  index?: number;
 }
 
-function HearingItem({ hearing, isUpcoming, onEdit, onDelete, isDeleting }: HearingItemProps) {
+function HearingItem({ hearing, isUpcoming, onEdit, onDelete, isDeleting, index = 0 }: HearingItemProps) {
   return (
-    <div className="p-3.5 border border-gray-100 rounded-lg">
+    <div
+      style={staggerDelay(index)}
+      className="p-3.5 border border-gray-100 rounded-lg transition-colors hover:bg-gray-50 animate-fade-up motion-reduce:animate-none"
+    >
       <div className="flex items-start justify-between">
         <div className="flex-1">
           {/* Date and Type */}

@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { DocumentFilters } from "@/components/documents/document-filters";
 import { DocumentTable } from "@/components/documents/document-table";
+import { DocumentsSkeleton } from "@/components/documents/documents-skeleton";
 import { EditDocumentDialog } from "@/components/documents/edit-document-dialog";
 import { showToast } from "@/components/ui/toaster";
 import {
@@ -92,6 +93,10 @@ export default function DocumentsPage() {
   const handleEdit = (document: Document) => {
     setEditingDocument(document);
   };
+
+  if (isLoading) {
+    return <DocumentsSkeleton />;
+  }
 
   return (
     <div className="px-7 pt-7 pb-[60px] max-w-[1240px] mx-auto">

@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, PriorityBadge } from "@/components/ui/badge";
 import { MoreVertical, Trash2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, staggerDelay } from "@/lib/utils";
 import type { UrgencyReason } from "@/lib/case-urgency";
 import type { Case } from "@/types";
 
@@ -18,9 +18,11 @@ interface CaseCardProps {
    * Dashboard's Cases-by-urgency section. Omit for cases that don't need
    * attention. */
   urgencyReason?: UrgencyReason;
+  /** Position in the grid, for a stagger-in delay on first mount. */
+  index?: number;
 }
 
-export function CaseCard({ case: caseItem, onDelete, isDeleting, urgencyReason }: CaseCardProps) {
+export function CaseCard({ case: caseItem, onDelete, isDeleting, urgencyReason, index = 0 }: CaseCardProps) {
   const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -40,8 +42,9 @@ export function CaseCard({ case: caseItem, onDelete, isDeleting, urgencyReason }
   return (
     <Card
       onClick={() => router.push(`/cases/${caseItem.id}`)}
+      style={staggerDelay(index)}
       className={cn(
-        "p-[18px] cursor-pointer hover:shadow-md transition-shadow",
+        "p-[18px] cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 animate-fade-up motion-reduce:animate-none motion-reduce:hover:translate-y-0",
         urgencyReason && "border-[#f0d9bb]",
       )}
     >

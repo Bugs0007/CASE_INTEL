@@ -5,6 +5,7 @@ import { RecentActivity } from "@/components/dashboard/recent-activity";
 import { NeedsAttention } from "@/components/dashboard/needs-attention";
 import { HearingDensityStrip } from "@/components/dashboard/hearing-density-strip";
 import { CasesByUrgency } from "@/components/dashboard/cases-by-urgency";
+import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
 import { useDashboard, useUpcomingHearings } from "@/hooks/use-dashboard";
 import { useDocuments } from "@/hooks/use-documents";
 import { useCases } from "@/hooks/use-cases";
@@ -52,16 +53,7 @@ export default function DashboardPage() {
   );
 
   if (isLoading) {
-    return (
-      <div className="px-7 pt-7 pb-[60px] max-w-[1240px] mx-auto">
-        <div className="animate-pulse space-y-5">
-          <div className="h-32 bg-gray-200 rounded-xl"></div>
-          <div className="h-48 bg-gray-200 rounded-xl"></div>
-          <div className="h-64 bg-gray-200 rounded-xl"></div>
-          <div className="h-64 bg-gray-200 rounded-xl"></div>
-        </div>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   if (error) {

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   LayoutDashboard,
   Briefcase,
@@ -12,6 +13,10 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDialogs } from "@/providers/dialog-provider";
+import { hearingKeys } from "@/hooks/use-hearings";
+import { hearingsApi } from "@/lib/api/hearings";
+import { caseKeys } from "@/hooks/use-cases";
+import { casesApi } from "@/lib/api/cases";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -24,6 +29,21 @@ const NAV_ITEMS = [
 export function Sidebar() {
   const pathname = usePathname();
   const { openCreateCase } = useDialogs();
+  const queryClient = useQueryClient();
+
+  // Warms the Calendar's data on hover, since it's the heaviest nav
+  // destination -- by the time the click lands, the query cache is often
+  // already populated so the page mounts with data instead of a spinner.
+  function prefetchCalendar() {
+    queryClient.prefetchQuery({
+      queryKey: hearingKeys.list({}),
+      queryFn: () => hearingsApi.list({}),
+    });
+    queryClient.prefetchQuery({
+      queryKey: caseKeys.list({ status: "all", since: undefined }),
+      queryFn: () => casesApi.list(undefined, undefined),
+    });
+  }
 
   return (
     <div className="fixed left-0 top-0 h-screen w-60 bg-white border-r border-gray-100 flex flex-col z-10">
@@ -54,8 +74,9 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onMouseEnter={item.href === "/calendar" ? prefetchCalendar : undefined}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm",
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
                 isActive
                   ? "bg-[#eef1fb] text-primary-hover font-semibold"
                   : "text-gray-600 font-medium hover:bg-gray-50",

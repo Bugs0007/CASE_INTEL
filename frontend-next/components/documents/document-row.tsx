@@ -35,7 +35,7 @@ export function DocumentRow({
     document.processing_status === "pending" || document.processing_status === "failed";
 
   return (
-    <div className="bg-white border border-gray-100 rounded-[10px] px-[18px] py-4 flex items-center gap-4 flex-wrap">
+    <div className="bg-white border border-gray-100 rounded-[10px] px-[18px] py-4 flex items-center gap-4 flex-wrap transition-colors hover:bg-gray-50/60">
       <div className="w-10 h-10 rounded-lg bg-[#eef1fb] flex items-center justify-center flex-shrink-0 text-lg">
         {fileIcon}
       </div>

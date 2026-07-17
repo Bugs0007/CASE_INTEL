@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { Plus } from "lucide-react";
 import { CaseFilters } from "@/components/cases/case-filters";
 import { CaseGrid } from "@/components/cases/case-grid";
+import { CasesSkeleton } from "@/components/cases/cases-skeleton";
 import { showToast } from "@/components/ui/toaster";
 import { useCases, useDeleteCase } from "@/hooks/use-cases";
 import { useUpcomingHearings } from "@/hooks/use-dashboard";
@@ -93,6 +94,10 @@ export default function CasesPage() {
     }
     return map;
   }, [needsAttentionCases, hearingSoonCaseIds, ecourtsUpdateCaseIds, failedDocCaseIds]);
+
+  if (isLoading) {
+    return <CasesSkeleton />;
+  }
 
   if (error) {
     return (

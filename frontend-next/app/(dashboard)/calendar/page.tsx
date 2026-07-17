@@ -5,6 +5,7 @@ import { useHearings } from "@/hooks/use-hearings";
 import { useCases } from "@/hooks/use-cases";
 import { CalendarMonth } from "@/components/calendar/calendar-month";
 import { CalendarByCourt } from "@/components/calendar/calendar-by-court";
+import { CalendarSkeleton } from "@/components/calendar/calendar-skeleton";
 import { cn } from "@/lib/utils";
 
 type View = "calendar" | "court";
@@ -32,14 +33,7 @@ export default function CalendarPage() {
   const isLoading = hearingsLoading || casesLoading;
 
   if (isLoading) {
-    return (
-      <div className="px-7 pt-7 pb-[60px] max-w-[1240px] mx-auto">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-          <div className="h-96 bg-gray-200 rounded-xl"></div>
-        </div>
-      </div>
-    );
+    return <CalendarSkeleton />;
   }
 
   if (hearingsError) {
