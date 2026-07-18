@@ -140,7 +140,7 @@ export default function CaseDetailPage() {
             the viewport's width. min-w only enforced at lg+: below that,
             this is the sole column and always full-width. */}
         <div className="flex-1 overflow-y-auto min-w-0 lg:min-w-[400px]">
-          <div className="@container max-w-[900px] mx-auto px-4 sm:px-7 pt-6 pb-[60px] space-y-5">
+          <div className="@container max-w-[900px] mx-auto px-4 sm:px-7 pt-6 pb-[var(--mobile-nav-height)] lg:pb-[60px] space-y-5">
             {/* Case Overview */}
             <CaseOverview case={caseItem} />
 

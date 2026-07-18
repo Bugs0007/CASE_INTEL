@@ -382,11 +382,17 @@ export function ChatPanel({ caseId, className, onClose }: ChatPanelProps) {
                     : "Select a conversation or start a new one"}
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
+              {/* Explicit w-11 (not just the Button component's default
+                  padding): an icon-only button sized purely by icon+padding
+                  lands a couple px under the 44px touch-target floor, right
+                  next to New Chat's much bigger hit area -- easy to mis-tap
+                  on a real touchscreen, which silently opens a draft chat
+                  instead and makes History look like it does nothing. */}
               <Button
                 variant="secondary"
                 size="sm"
-                className="lg:hidden"
+                className="lg:hidden w-11 flex-shrink-0"
                 onClick={() => setMobileHistoryView(true)}
                 aria-label="View conversation history"
               >
@@ -428,8 +434,27 @@ export function ChatPanel({ caseId, className, onClose }: ChatPanelProps) {
                   Export
                 </Button>
               </div>
+              {/* Mobile-only stand-in for the Select+Export group above
+                  (hidden below sm) -- without this, conversations were
+                  simply impossible to export from a phone at all. Exports
+                  directly as the default format (txt); the format picker
+                  stays a tablet/desktop affordance where there's room. */}
+              <Button
+                variant="secondary"
+                size="sm"
+                className="sm:hidden w-11 flex-shrink-0"
+                onClick={() => void handleExport()}
+                disabled={!activeConversationId || isExporting}
+                aria-label="Export conversation"
+              >
+                {isExporting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+              </Button>
               {onClose && (
-                <Button variant="ghost" size="sm" onClick={onClose}>
+                <Button variant="ghost" size="sm" className="w-11 flex-shrink-0" onClick={onClose} aria-label="Close">
                   <X className="h-4 w-4" />
                 </Button>
               )}

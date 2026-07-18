@@ -25,7 +25,7 @@ export default function DashboardLayout({
               of staying contained to its own overflow-x-auto scrollbar. */}
           <div className="flex-1 flex flex-col lg:ml-60 min-w-0">
             <Header />
-            <main className="flex-1 min-h-0 min-w-0 overflow-y-auto pb-16 lg:pb-0">
+            <main className="flex-1 min-h-0 min-w-0 overflow-y-auto pb-[var(--mobile-nav-height)] lg:pb-0">
               <ErrorBoundary>{children}</ErrorBoundary>
             </main>
           </div>

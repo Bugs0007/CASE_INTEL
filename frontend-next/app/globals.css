@@ -4,6 +4,12 @@
 
 @layer base {
   :root {
+    /* MobileNav's real total height: a comfortable 4rem of tap-target plus
+       whatever the device reserves for a home-indicator/gesture bar. Shared
+       between MobileNav (its own height) and every scrollable content area
+       that sits above it (bottom clearance) so the two can never drift out
+       of sync -- env() falls back to 0px on devices/browsers without it. */
+    --mobile-nav-height: calc(4rem + env(safe-area-inset-bottom, 0px));
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;

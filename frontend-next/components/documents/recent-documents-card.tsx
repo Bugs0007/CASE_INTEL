@@ -130,7 +130,7 @@ function DocumentRow({
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-2 ml-4">
+      <div className="flex items-center gap-2 ml-4 flex-wrap justify-end">
         {(doc.processing_status === "pending" || doc.processing_status === "failed") && (
           <Button
             variant="secondary"
@@ -151,7 +151,7 @@ function DocumentRow({
           </Button>
         )}
         <span
-          className={`text-xs px-2.5 h-[22px] inline-flex items-center rounded-full font-semibold ${
+          className={`text-xs px-2.5 h-[22px] inline-flex items-center flex-shrink-0 whitespace-nowrap rounded-full font-semibold ${
             doc.processing_status === "completed"
               ? "bg-[#e9f7f1] text-[#146349]"
               : doc.processing_status === "processing"

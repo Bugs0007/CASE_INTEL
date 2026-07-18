@@ -22,8 +22,7 @@ export function MobileNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-30 flex h-16 items-stretch border-t border-gray-100 bg-white lg:hidden"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      className="fixed bottom-0 left-0 right-0 z-30 flex h-[var(--mobile-nav-height)] items-stretch border-t border-gray-100 bg-white pb-[env(safe-area-inset-bottom,0px)] lg:hidden"
     >
       {NAV_ITEMS.map((item) => {
         const Icon = item.icon;
