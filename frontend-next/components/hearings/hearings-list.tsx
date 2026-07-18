@@ -200,15 +200,18 @@ function HearingItem({ hearing, isUpcoming, onEdit, onDelete, isDeleting, index 
     >
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          {/* Date and Type */}
-          <div className="flex items-center gap-2 mb-2">
-            <div className="text-sm font-medium text-gray-900">
+          {/* Date and Type -- flex-wrap so a long hearing type (e.g.
+              "Status Conference") wraps the badge to its own line instead of
+              squeezing it and the date until the badge's own text wraps and
+              breaks its pill shape. */}
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <div className="text-sm font-medium text-gray-900 flex-shrink-0">
               {formatDateTime(hearing.hearing_date)}
             </div>
-            <span className="text-[11px] font-semibold bg-[#f3ecfb] text-[#6b3aa0] h-5 px-2 inline-flex items-center rounded-full">
+            <span className="text-[11px] font-semibold bg-[#f3ecfb] text-[#6b3aa0] h-5 px-2 inline-flex items-center flex-shrink-0 whitespace-nowrap rounded-full">
               {hearing.hearing_type_display}
             </span>
-            <span className="text-[11px] font-semibold bg-gray-100 text-[#4b5468] h-5 px-2 inline-flex items-center rounded-full">
+            <span className="text-[11px] font-semibold bg-gray-100 text-[#4b5468] h-5 px-2 inline-flex items-center flex-shrink-0 whitespace-nowrap rounded-full">
               {hearing.source === "manual" ? "Manual" : "eCourts"}
             </span>
           </div>

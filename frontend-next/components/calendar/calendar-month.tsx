@@ -164,7 +164,7 @@ export function CalendarMonth({ hearings, caseMeta }: CalendarMonthProps) {
                     </span>
                     <span
                       className={cn(
-                        "inline-flex items-center h-[18px] px-1.5 rounded-full text-[10.5px] font-bold",
+                        "inline-flex items-center h-[18px] px-1.5 rounded-full text-[10.5px] font-bold flex-shrink-0 whitespace-nowrap",
                         h.source === "ecourts"
                           ? "bg-[#ebf3fb] text-[#2f6fb0]"
                           : "bg-gray-100 text-gray-600",
