@@ -25,7 +25,12 @@ export default function DashboardLayout({
               of staying contained to its own overflow-x-auto scrollbar. */}
           <div className="flex-1 flex flex-col lg:ml-60 min-w-0">
             <Header />
-            <main className="flex-1 min-h-0 min-w-0 overflow-y-auto pb-[var(--mobile-nav-height)] lg:pb-0">
+            {/* <main> itself no longer scrolls -- it's just a flex host so
+                that template.tsx's wrapper div (flex-1 min-h-0) gets a
+                genuinely definite resolved height and becomes the actual
+                scrolling element instead. See template.tsx for why this
+                split is necessary. */}
+            <main className="flex-1 min-h-0 min-w-0 flex flex-col">
               <ErrorBoundary>{children}</ErrorBoundary>
             </main>
           </div>

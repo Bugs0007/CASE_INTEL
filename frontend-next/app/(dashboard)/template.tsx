@@ -6,13 +6,24 @@ import type { ReactNode } from "react";
 // which persists across sibling routes), so this replays the fade-in
 // automatically each time the route changes -- no per-page wiring needed.
 export default function DashboardTemplate({ children }: { children: ReactNode }) {
-  // min-h-full (not h-full): a fixed h-full clips at exactly main's visible
-  // height, so on pages taller than the viewport (e.g. Calendar's day-detail
-  // panel with 2+ hearings) the real content silently overflows past this
-  // wrapper's own box with default overflow:visible. That desyncs <main>'s
-  // scrollHeight from where content actually ends, so its pb-16 bottom-nav
-  // clearance (see layout.tsx) lands short -- the last item stays hidden
-  // behind MobileNav even scrolled all the way down. min-h-full lets this
-  // wrapper grow to fit its content instead of being clipped to it.
-  return <div className="min-h-full animate-fade-up motion-reduce:animate-none">{children}</div>;
+  // flex-1 min-h-0 overflow-y-auto (the same recipe Case Detail's own inner
+  // column already uses) makes THIS div the scrolling element, not <main>.
+  // That split matters: flex-basis:0% (flex-1) + min-height:0 together give
+  // this div a genuinely definite resolved height regardless of its
+  // content -- required for Case Detail's own h-full root to correctly
+  // fill "the rest of main" and do its own internal scrolling (a page
+  // taller than the viewport otherwise falls back to being sized by its
+  // *content* here, cascading "auto" all the way down through every nested
+  // percentage-height descendant, which is what broke Case Detail's "only
+  // the middle column scrolls" layout into "the whole page scrolls"
+  // instead of the chat sliding in over an internally-scrolled page).
+  // Because this div both clips (min-h-0) AND scrolls (overflow-y-auto)
+  // its own content, pages taller than the viewport (Calendar's
+  // day-detail list) still get a real scrollbar and correct bottom-nav
+  // clearance -- just from this element instead of from <main>.
+  return (
+    <div className="flex-1 min-h-0 min-w-0 overflow-y-auto pb-[var(--mobile-nav-height)] lg:pb-0 animate-fade-up motion-reduce:animate-none">
+      {children}
+    </div>
+  );
 }
