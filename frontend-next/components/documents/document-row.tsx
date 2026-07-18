@@ -20,7 +20,7 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 const ACTION_BTN =
-  "inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-gray-200 bg-white text-gray-700 text-xs font-semibold hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors";
+  "inline-flex items-center gap-1.5 h-11 md:h-8 px-3 rounded-md border border-gray-200 bg-white text-gray-700 text-xs font-semibold hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors";
 
 export function DocumentRow({
   document,
@@ -99,7 +99,7 @@ export function DocumentRow({
           Download
         </button>
         <button
-          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-[#fbdada] bg-white text-destructive text-xs font-semibold hover:bg-[#fdecec] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="inline-flex items-center gap-1.5 h-11 md:h-8 px-3 rounded-md border border-[#fbdada] bg-white text-destructive text-xs font-semibold hover:bg-[#fdecec] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           onClick={() => onDelete(document.id)}
           disabled={isDeleting}
           title="Delete"

@@ -399,7 +399,7 @@ function TrackingSetupForm({ caseId }: { caseId: number }) {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 @sm:grid-cols-2 gap-4">
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Case Number</label>
               <Input value={caseNumber} onChange={(e) => setCaseNumber(e.target.value)} placeholder="e.g. 300" />
@@ -474,7 +474,7 @@ function TrackingPreviewPanel({
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        <div className="grid grid-cols-1 @sm:grid-cols-2 gap-4 mb-4">
           <Field label="Case Title">
             <span className="text-sm font-medium text-gray-900">{preview.case_title || "—"}</span>
           </Field>
@@ -589,7 +589,7 @@ function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hea
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
         <CardTitle className="flex items-center gap-2">
           <Gavel className="h-5 w-5 text-gray-500" />
           Court Tracking
@@ -642,7 +642,7 @@ function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hea
           </a>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+        <div className="grid grid-cols-1 @md:grid-cols-2 @3xl:grid-cols-3 gap-4 mb-4">
           <Field label="CNR">
             <span className="font-mono text-sm">{caseItem.cnr_number || "—"}</span>
           </Field>

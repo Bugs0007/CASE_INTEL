@@ -99,10 +99,10 @@ export default function DocumentsPage() {
   }
 
   return (
-    <div className="px-7 pt-7 pb-[60px] max-w-[1240px] mx-auto">
+    <div className="px-4 sm:px-7 pt-5 sm:pt-7 pb-[60px] max-w-[1240px] mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-[22px] flex-wrap gap-3">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-[22px] gap-3">
+        <div className="min-w-0">
           <h1 className="text-page-title text-gray-900 mb-1.5">Documents</h1>
           <p className="text-sm text-gray-600">
             {filteredDocuments.length} documents across all cases
@@ -110,7 +110,7 @@ export default function DocumentsPage() {
         </div>
         <button
           onClick={openUploadDocument}
-          className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border-none bg-primary text-white text-sm font-semibold hover:bg-primary-hover transition-colors"
+          className="inline-flex items-center justify-center gap-2 h-11 sm:h-10 px-4 rounded-lg border-none bg-primary text-white text-sm font-semibold hover:bg-primary-hover transition-colors"
         >
           <Upload className="h-4 w-4" />
           Upload Document

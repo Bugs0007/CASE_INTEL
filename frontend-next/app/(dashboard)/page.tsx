@@ -58,7 +58,7 @@ export default function DashboardPage() {
 
   if (error) {
     return (
-      <div className="px-7 pt-7">
+      <div className="px-4 sm:px-7 pt-5 sm:pt-7">
         <div className="text-center py-12">
           <div className="text-[#b32e26] text-lg font-medium mb-2">
             Failed to load dashboard
@@ -72,7 +72,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="px-7 pt-7 pb-[60px] max-w-[1240px] mx-auto">
+    <div className="px-4 sm:px-7 pt-5 sm:pt-7 pb-[60px] max-w-[1240px] mx-auto">
       {/* Needs Your Attention */}
       <NeedsAttention
         hearingsSoon={hearingsSoon}

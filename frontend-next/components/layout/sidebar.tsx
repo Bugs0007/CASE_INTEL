@@ -55,7 +55,7 @@ export function Sidebar() {
   }
 
   return (
-    <div className="fixed left-0 top-0 h-screen w-60 bg-white border-r border-gray-100 flex flex-col z-10">
+    <div className="hidden lg:flex fixed left-0 top-0 h-screen w-60 bg-white border-r border-gray-100 flex-col z-10">
       {/* Logo */}
       <div className="px-5 py-[22px] border-b border-gray-100">
         <Link href="/" className="text-[19px] font-bold text-primary-active">

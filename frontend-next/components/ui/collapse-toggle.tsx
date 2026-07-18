@@ -20,7 +20,7 @@ export function CollapseToggle({
     <button
       type="button"
       onClick={onToggle}
-      className={`h-7 px-2.5 rounded-md border border-gray-200 bg-white text-gray-700 text-xs font-semibold hover:bg-gray-50 ${className}`}
+      className={`h-11 px-3 md:h-7 md:px-2.5 rounded-md border border-gray-200 bg-white text-gray-700 text-xs font-semibold hover:bg-gray-50 ${className}`}
     >
       {isOpen ? openLabel : closedLabel}
     </button>

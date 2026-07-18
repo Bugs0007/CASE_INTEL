@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Bot,
+  ChevronLeft,
   Download,
   History,
   Loader2,
@@ -68,6 +69,10 @@ export function ChatPanel({ caseId, className, onClose }: ChatPanelProps) {
     null,
   );
   const [isDraftChat, setIsDraftChat] = useState(false);
+  // Mobile-only: History and the chat thread swap as full-width views inside
+  // the same overlay instead of trying to show both side by side. Irrelevant
+  // above `lg`, where History is its own persistent column (see aside below).
+  const [mobileHistoryView, setMobileHistoryView] = useState(false);
   const [conversationError, setConversationError] = useState<string | null>(null);
   const [messagesError, setMessagesError] = useState<string | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
@@ -152,6 +157,7 @@ export function ChatPanel({ caseId, className, onClose }: ChatPanelProps) {
     setSendError(null);
     setMessages([]);
     setLastFailedRequest(null);
+    setMobileHistoryView(false);
     await loadConversationMessages(conversationId);
   };
 
@@ -163,6 +169,7 @@ export function ChatPanel({ caseId, className, onClose }: ChatPanelProps) {
     setMessagesError(null);
     setSendError(null);
     setLastFailedRequest(null);
+    setMobileHistoryView(false);
   };
 
   const sendMessage = async (
@@ -281,10 +288,25 @@ export function ChatPanel({ caseId, className, onClose }: ChatPanelProps) {
         className,
       )}
     >
-      <aside className="hidden w-[250px] shrink-0 border-r border-gray-200 bg-gray-50 lg:flex lg:flex-col">
+      <aside
+        className={cn(
+          "w-full shrink-0 flex-col border-r border-gray-200 bg-gray-50 lg:w-[250px]",
+          "hidden",
+          mobileHistoryView && "max-lg:flex",
+          "min-[1300px]:flex",
+        )}
+      >
         <div className="border-b border-gray-200 px-4 py-4">
           <div className="mb-3 flex items-center gap-2">
-            <History className="h-4 w-4 text-gray-500" />
+            <button
+              type="button"
+              onClick={() => setMobileHistoryView(false)}
+              aria-label="Back to chat"
+              className="-ml-1 flex h-11 w-11 items-center justify-center text-gray-500 lg:hidden"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <History className="hidden h-4 w-4 text-gray-500 lg:block" />
             <h3 className="text-sm font-semibold text-gray-900">History</h3>
           </div>
           <Button
@@ -344,7 +366,7 @@ export function ChatPanel({ caseId, className, onClose }: ChatPanelProps) {
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className={cn("flex min-w-0 flex-1 flex-col", mobileHistoryView && "max-lg:hidden")}>
         <div className="border-b border-gray-200 bg-white px-4 py-4">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="min-w-0">
@@ -361,6 +383,15 @@ export function ChatPanel({ caseId, className, onClose }: ChatPanelProps) {
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                className="lg:hidden"
+                onClick={() => setMobileHistoryView(true)}
+                aria-label="View conversation history"
+              >
+                <History className="h-4 w-4" />
+              </Button>
               <Button
                 variant="secondary"
                 size="sm"
