@@ -1,17 +1,17 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, PriorityBadge } from "@/components/ui/badge";
-import { Share2, MessageSquare, Calendar, ChevronLeft } from "lucide-react";
+import { Bot, Calendar, ChevronLeft } from "lucide-react";
 import type { Case } from "@/types";
 
 interface CaseDetailHeaderProps {
   case: Case;
-  onStartChat?: () => void;
+  onToggleChat?: () => void;
 }
 
 export function CaseDetailHeader({
   case: caseItem,
-  onStartChat,
+  onToggleChat,
 }: CaseDetailHeaderProps) {
   return (
     <div className="bg-white border-b border-gray-100 px-7 py-5 flex-shrink-0">
@@ -33,13 +33,9 @@ export function CaseDetailHeader({
           </span>
         </div>
         <div className="flex items-center gap-2.5">
-          <Button variant="secondary" size="sm">
-            <Share2 className="h-4 w-4" />
-            Share
-          </Button>
-          <Button variant="primary" size="sm" onClick={onStartChat}>
-            <MessageSquare className="h-4 w-4" />
-            Ask AI Assistant
+          <Button variant="primary" size="sm" onClick={onToggleChat}>
+            <Bot className="h-4 w-4" />
+            Case Bot
           </Button>
         </div>
       </div>

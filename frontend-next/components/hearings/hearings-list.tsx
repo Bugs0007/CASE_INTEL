@@ -1,9 +1,16 @@
+"use client";
+
+import { useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CollapseToggle } from "@/components/ui/collapse-toggle";
+import { Collapsible } from "@/components/ui/collapsible";
 import { formatDateTime, staggerDelay } from "@/lib/utils";
 import { Calendar, MapPin, User, Plus, Edit, Trash2, Loader2 } from "lucide-react";
 import type { Hearing } from "@/types";
+
+const DEFAULT_VISIBLE_COUNT = 5;
 
 interface HearingsListProps {
   caseId: number;
@@ -24,13 +31,25 @@ export function HearingsList({
   onDeleteHearing,
   deletingId,
 }: HearingsListProps) {
+  const [sectionOpen, setSectionOpen] = useState(true);
+  const [upcomingShowAll, setUpcomingShowAll] = useState(false);
+  // Past hearings grow unbounded over a long case and are rarely what the
+  // user opened the page to see, so this subsection defaults collapsed.
+  const [pastOpen, setPastOpen] = useState(false);
+  const [pastShowAll, setPastShowAll] = useState(false);
+
   const now = new Date();
+  // Hearing model default ordering is ascending by hearing_date, so this is
+  // already soonest-first -- exactly what "Upcoming" wants.
   const upcomingHearings = hearings.filter(
     (h) => new Date(h.hearing_date) >= now && h.status === "scheduled",
   );
-  const pastHearings = hearings.filter(
-    (h) => new Date(h.hearing_date) < now || h.status !== "scheduled",
-  );
+  // Reversed to most-recent-first for "Past", since that's the useful
+  // default view on a long-running case.
+  const pastHearings = hearings
+    .filter((h) => new Date(h.hearing_date) < now || h.status !== "scheduled")
+    .slice()
+    .reverse();
 
   if (isLoading) {
     return (
@@ -49,71 +68,116 @@ export function HearingsList({
     );
   }
 
+  const visibleUpcoming = upcomingShowAll
+    ? upcomingHearings
+    : upcomingHearings.slice(0, DEFAULT_VISIBLE_COUNT);
+  const visiblePast = pastShowAll ? pastHearings : pastHearings.slice(0, DEFAULT_VISIBLE_COUNT);
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Hearings & Deadlines</CardTitle>
-        <Button variant="secondary" size="sm" onClick={onAddHearing}>
-          <Plus className="h-4 w-4" />
-          Add Hearing
-        </Button>
+        <CardTitle>
+          Hearings & Deadlines{hearings.length > 0 ? ` (${hearings.length})` : ""}
+        </CardTitle>
+        <div className="flex items-center gap-2">
+          <CollapseToggle isOpen={sectionOpen} onToggle={() => setSectionOpen((v) => !v)} />
+          <Button variant="secondary" size="sm" onClick={onAddHearing}>
+            <Plus className="h-4 w-4" />
+            Add Hearing
+          </Button>
+        </div>
       </CardHeader>
-      <CardContent>
-        {/* Upcoming Hearings */}
-        {upcomingHearings.length > 0 && (
-          <div className="mb-6">
-            <h4 className="text-sm font-medium text-gray-700 mb-3 uppercase tracking-wide">
-              Upcoming
-            </h4>
-            <div className="space-y-3">
-              {upcomingHearings.map((hearing, i) => (
-                <HearingItem
-                  key={hearing.id}
-                  hearing={hearing}
-                  index={i}
-                  isUpcoming
-                  onEdit={onEditHearing}
-                  onDelete={onDeleteHearing}
-                  isDeleting={deletingId === hearing.id}
-                />
-              ))}
+      <Collapsible isOpen={sectionOpen}>
+        <CardContent>
+          {/* Upcoming Hearings */}
+          {upcomingHearings.length > 0 && (
+            <div className="mb-6">
+              <h4 className="text-sm font-medium text-gray-700 mb-3 uppercase tracking-wide">
+                Upcoming ({upcomingHearings.length})
+              </h4>
+              <div
+                className={
+                  upcomingShowAll ? "max-h-[480px] overflow-y-auto pr-1 space-y-3" : "space-y-3"
+                }
+              >
+                {visibleUpcoming.map((hearing, i) => (
+                  <HearingItem
+                    key={hearing.id}
+                    hearing={hearing}
+                    index={i}
+                    isUpcoming
+                    onEdit={onEditHearing}
+                    onDelete={onDeleteHearing}
+                    isDeleting={deletingId === hearing.id}
+                  />
+                ))}
+              </div>
+              {upcomingHearings.length > DEFAULT_VISIBLE_COUNT && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full mt-2"
+                  onClick={() => setUpcomingShowAll((v) => !v)}
+                >
+                  {upcomingShowAll ? "Show less" : `Show all (${upcomingHearings.length})`}
+                </Button>
+              )}
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Past Hearings */}
-        {pastHearings.length > 0 && (
-          <div>
-            <h4 className="text-sm font-medium text-gray-700 mb-3 uppercase tracking-wide">
-              Past
-            </h4>
-            <div className="space-y-3">
-              {pastHearings.map((hearing, i) => (
-                <HearingItem
-                  key={hearing.id}
-                  hearing={hearing}
-                  index={i}
-                  onEdit={onEditHearing}
-                  onDelete={onDeleteHearing}
-                  isDeleting={deletingId === hearing.id}
-                />
-              ))}
+          {/* Past Hearings -- collapsed by default */}
+          {pastHearings.length > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-medium text-gray-700 uppercase tracking-wide">
+                  Past ({pastHearings.length})
+                </h4>
+                <CollapseToggle isOpen={pastOpen} onToggle={() => setPastOpen((v) => !v)} />
+              </div>
+              <Collapsible isOpen={pastOpen}>
+                <div
+                  className={
+                    pastShowAll ? "max-h-[480px] overflow-y-auto pr-1 space-y-3" : "space-y-3"
+                  }
+                >
+                  {visiblePast.map((hearing, i) => (
+                    <HearingItem
+                      key={hearing.id}
+                      hearing={hearing}
+                      index={i}
+                      onEdit={onEditHearing}
+                      onDelete={onDeleteHearing}
+                      isDeleting={deletingId === hearing.id}
+                    />
+                  ))}
+                </div>
+                {pastHearings.length > DEFAULT_VISIBLE_COUNT && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full mt-2"
+                    onClick={() => setPastShowAll((v) => !v)}
+                  >
+                    {pastShowAll ? "Show less" : `Show all (${pastHearings.length})`}
+                  </Button>
+                )}
+              </Collapsible>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Empty State */}
-        {hearings.length === 0 && (
-          <div className="text-center py-8">
-            <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-            <p className="text-gray-500 text-sm">No hearings scheduled</p>
-            <Button variant="secondary" size="sm" className="mt-3" onClick={onAddHearing}>
-              <Plus className="h-4 w-4" />
-              Schedule First Hearing
-            </Button>
-          </div>
-        )}
-      </CardContent>
+          {/* Empty State */}
+          {hearings.length === 0 && (
+            <div className="text-center py-8">
+              <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-500 text-sm">No hearings scheduled</p>
+              <Button variant="secondary" size="sm" className="mt-3" onClick={onAddHearing}>
+                <Plus className="h-4 w-4" />
+                Schedule First Hearing
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Collapsible>
     </Card>
   );
 }

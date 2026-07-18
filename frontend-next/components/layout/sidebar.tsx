@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
@@ -17,6 +18,7 @@ import { hearingKeys } from "@/hooks/use-hearings";
 import { hearingsApi } from "@/lib/api/hearings";
 import { caseKeys } from "@/hooks/use-cases";
 import { casesApi } from "@/lib/api/cases";
+import { getUsername } from "@/lib/auth";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -30,6 +32,13 @@ export function Sidebar() {
   const pathname = usePathname();
   const { openCreateCase } = useDialogs();
   const queryClient = useQueryClient();
+  const [username, setUsername] = useState<string | null>(null);
+
+  // Read on mount only -- localStorage isn't available during SSR, and the
+  // token/username are only ever set client-side at login anyway.
+  useEffect(() => {
+    setUsername(getUsername());
+  }, []);
 
   // Warms the Calendar's data on hover, since it's the heaviest nav
   // destination -- by the time the click lands, the query cache is often
@@ -95,8 +104,9 @@ export function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="px-5 py-4 border-t border-gray-100 text-meta text-gray-500">
-        Signed in as <span className="text-gray-800 font-semibold">Advocate</span>
+      <div className="px-5 py-4 border-t border-gray-100 text-meta text-gray-500 truncate">
+        Signed in as{" "}
+        <span className="text-gray-800 font-semibold">{username || "Advocate"}</span>
       </div>
     </div>
   );
