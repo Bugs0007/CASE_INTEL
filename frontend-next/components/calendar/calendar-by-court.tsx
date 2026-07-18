@@ -40,10 +40,15 @@ export function CalendarByCourt({ hearings, caseMeta }: CalendarByCourtProps) {
     <div className="flex flex-col gap-4">
       {groups.map((g) => (
         <div key={g.court} className="bg-white border border-gray-100 rounded-xl shadow-sm">
-          <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2.5">
-            <Landmark className="h-4 w-4 text-gray-500 flex-shrink-0" />
-            <div className="text-[15px] font-bold text-gray-900">{g.court}</div>
-            <span className="inline-flex items-center h-5 px-2 rounded-full bg-gray-100 text-gray-600 text-[11px] font-bold">
+          {/* items-start (not center): a long court name wraps to 2+ lines
+              here, and center-aligning against that taller block floats the
+              icon/badge in the vertical middle instead of the top -- badge
+              also needs flex-shrink-0 + whitespace-nowrap so IT doesn't get
+              squeezed into wrapping its own short text mid-word. */}
+          <div className="px-5 py-3.5 border-b border-gray-100 flex items-start gap-2.5">
+            <Landmark className="h-4 w-4 text-gray-500 flex-shrink-0 mt-0.5" />
+            <div className="text-[15px] font-bold text-gray-900 min-w-0 flex-1">{g.court}</div>
+            <span className="inline-flex items-center h-5 px-2 rounded-full bg-gray-100 text-gray-600 text-[11px] font-bold flex-shrink-0 whitespace-nowrap">
               {g.hearings.length} hearing{g.hearings.length === 1 ? "" : "s"}
             </span>
           </div>
@@ -66,7 +71,7 @@ export function CalendarByCourt({ hearings, caseMeta }: CalendarByCourtProps) {
                         </span>
                         <span
                           className={cn(
-                            "inline-flex items-center h-[18px] px-1.5 rounded-full text-[10.5px] font-bold",
+                            "inline-flex items-center h-[18px] px-1.5 rounded-full text-[10.5px] font-bold flex-shrink-0 whitespace-nowrap",
                             h.source === "ecourts"
                               ? "bg-[#ebf3fb] text-[#2f6fb0]"
                               : "bg-gray-100 text-gray-600",

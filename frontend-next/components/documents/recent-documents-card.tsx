@@ -40,7 +40,7 @@ export function RecentDocumentsCard({
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
         <CardTitle>Case Documents{documents.length > 0 ? ` (${documents.length})` : ""}</CardTitle>
         <div className="flex items-center gap-2">
           <CollapseToggle isOpen={sectionOpen} onToggle={() => setSectionOpen((v) => !v)} />
@@ -130,7 +130,7 @@ function DocumentRow({
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-2 ml-4">
+      <div className="flex items-center gap-2 ml-4 flex-wrap justify-end">
         {(doc.processing_status === "pending" || doc.processing_status === "failed") && (
           <Button
             variant="secondary"
@@ -151,7 +151,7 @@ function DocumentRow({
           </Button>
         )}
         <span
-          className={`text-xs px-2.5 h-[22px] inline-flex items-center rounded-full font-semibold ${
+          className={`text-xs px-2.5 h-[22px] inline-flex items-center flex-shrink-0 whitespace-nowrap rounded-full font-semibold ${
             doc.processing_status === "completed"
               ? "bg-[#e9f7f1] text-[#146349]"
               : doc.processing_status === "processing"
@@ -166,7 +166,7 @@ function DocumentRow({
         <Button
           variant="ghost"
           size="sm"
-          className="p-1 h-8 w-8"
+          className="p-1 h-11 w-11 md:h-8 md:w-8"
           onClick={() => onDelete(doc.id)}
           disabled={isDeletePending}
         >

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useParams } from "next/navigation";
 import { useCase } from "@/hooks/use-cases";
 import { useDocuments } from "@/hooks/use-documents";
@@ -25,6 +26,24 @@ export default function CaseDetailPage() {
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [isHearingDialogOpen, setIsHearingDialogOpen] = useState(false);
   const [editingHearing, setEditingHearing] = useState<Hearing | null>(null);
+
+  // Below `lg`, Case Bot is a true full-screen overlay portaled to
+  // document.body -- position:fixed alone isn't enough because
+  // (dashboard)/template.tsx's page-transition wrapper uses `transform`,
+  // which per spec makes it the containing block for fixed descendants,
+  // silently shrinking "fixed inset-0" down to that wrapper's box (leaving
+  // the Header and bottom MobileNav visibly poking out above/below it,
+  // still tappable, instead of a real modal takeover). A portal escapes
+  // that ancestor entirely. At `lg`+, Case Bot stays the persistent flex
+  // sibling column it's always been.
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    setIsDesktop(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
 
   const { data: caseItem, isLoading: caseLoading } = useCase(caseId);
   const { data: documents = [], isLoading: docsLoading } = useDocuments({
@@ -110,11 +129,18 @@ export default function CaseDetailPage() {
           persistent sibling column with its own height from this flex
           container, so it never depends on position:fixed/sticky (and the
           containing-block bugs that come with those) to stay put while the
-          left column scrolls. */}
+          left column scrolls. Below `lg`, there's no room for a 3-column
+          layout at all, so Case Bot instead renders as a fixed full-screen
+          overlay (see its wrapper below) and this row is effectively just
+          the single main column. */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        {/* Left/Main Section */}
-        <div className="flex-1 overflow-y-auto min-w-0">
-          <div className="max-w-[900px] mx-auto px-7 pt-6 pb-[60px] space-y-5">
+        {/* Left/Main Section — @container so CaseOverview/CourtTrackingCard
+            can key their internal grids off the ACTUAL space this column
+            has (which shrinks a lot once Case Bot + History are open), not
+            the viewport's width. min-w only enforced at lg+: below that,
+            this is the sole column and always full-width. */}
+        <div className="flex-1 overflow-y-auto min-w-0 lg:min-w-[400px]">
+          <div className="@container max-w-[900px] mx-auto px-4 sm:px-7 pt-6 pb-[var(--mobile-nav-height)] lg:pb-[60px] space-y-5">
             {/* Case Overview */}
             <CaseOverview case={caseItem} />
 
@@ -146,12 +172,31 @@ export default function CaseDetailPage() {
           </div>
         </div>
 
-        {/* Right Chat Panel — a persistent flex sibling, never an overlay */}
-        {showChat && (
-          <div className="w-full max-w-[720px] flex-shrink-0 min-h-0 animate-slide-in-right motion-reduce:animate-none">
-            <ChatPanel caseId={caseId} onClose={() => setShowChat(false)} />
+        {/* Right Chat Panel — a persistent flex sibling at lg+ (flexes
+            between a 380px floor and a 720px cap, sharing space fairly with
+            the main column instead of rigidly claiming 720px and squeezing
+            main content to nothing). Below `lg` there's no space to share at
+            all, so it becomes a fixed full-screen overlay instead.
+
+            The min-width jumps from 380 to 630 (380 + History's 250) at the
+            same min-[1300px] breakpoint where ChatPanel's History rail
+            switches itself on -- otherwise the outer flex split has no idea
+            History is about to eat 250px from *inside* this column, and
+            starves the actual chat thread down to a sliver. */}
+        {showChat && isDesktop && (
+          <div className="flex-1 min-w-[380px] max-w-[720px] min-[1300px]:min-w-[630px] min-h-0 animate-slide-in-right motion-reduce:animate-none">
+            <ChatPanel caseId={caseId} onClose={() => setShowChat(false)} className="h-full" />
           </div>
         )}
+        {showChat &&
+          !isDesktop &&
+          typeof document !== "undefined" &&
+          createPortal(
+            <div className="fixed inset-0 z-40 bg-white animate-slide-in-right motion-reduce:animate-none">
+              <ChatPanel caseId={caseId} onClose={() => setShowChat(false)} className="h-full" />
+            </div>,
+            document.body,
+          )}
       </div>
 
       {/* Upload Document Dialog */}

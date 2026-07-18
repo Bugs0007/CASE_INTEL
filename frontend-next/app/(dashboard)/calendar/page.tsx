@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useHearings } from "@/hooks/use-hearings";
 import { useCases } from "@/hooks/use-cases";
 import { CalendarMonth } from "@/components/calendar/calendar-month";
@@ -12,6 +12,15 @@ type View = "calendar" | "court";
 
 export default function CalendarPage() {
   const [view, setView] = useState<View>("calendar");
+  // The 7-day-wide month grid is the hardest element to squeeze into a phone
+  // screen, so mobile defaults to the already-mobile-friendly By Court list
+  // instead. Done post-mount (not in the initial state) to avoid an SSR/
+  // client hydration mismatch, since the server has no viewport to check.
+  useEffect(() => {
+    if (window.innerWidth < 768) {
+      setView("court");
+    }
+  }, []);
   const { data: hearings = [], isLoading: hearingsLoading, error: hearingsError } = useHearings();
   const { data: cases = [], isLoading: casesLoading } = useCases("all");
 
@@ -38,7 +47,7 @@ export default function CalendarPage() {
 
   if (hearingsError) {
     return (
-      <div className="px-7 pt-7 pb-[60px] max-w-[1240px] mx-auto">
+      <div className="px-4 sm:px-7 pt-5 sm:pt-7 pb-[60px] max-w-[1240px] mx-auto">
         <div className="text-center py-12">
           <div className="text-[#b32e26] text-lg font-medium mb-2">
             Failed to load calendar
@@ -52,7 +61,7 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3.5">
         <div>
           <h1 className="text-page-title text-gray-900 mb-1.5">Calendar</h1>

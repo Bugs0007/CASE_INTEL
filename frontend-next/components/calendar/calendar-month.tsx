@@ -12,6 +12,7 @@ import {
   startOfMonth,
   subMonths,
 } from "date-fns";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { Hearing } from "@/types";
@@ -59,31 +60,46 @@ export function CalendarMonth({ hearings, caseMeta }: CalendarMonthProps) {
   return (
     <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-5 items-start">
       <div className="bg-white border border-gray-100 rounded-xl shadow-sm">
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-          <div className="text-base font-bold text-gray-900">
+        <div className="px-3 sm:px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="text-[15px] sm:text-base font-bold text-gray-900">
             {format(cursor, "MMMM yyyy")}
           </div>
           <div className="flex gap-1.5">
-            <Button variant="secondary" size="sm" onClick={() => setCursor((c) => subMonths(c, 1))}>
-              Previous
+            <Button
+              variant="secondary"
+              size="sm"
+              className="px-2.5 sm:px-3"
+              onClick={() => setCursor((c) => subMonths(c, 1))}
+              aria-label="Previous month"
+            >
+              <ChevronLeft className="h-4 w-4 sm:hidden" />
+              <span className="hidden sm:inline">Previous</span>
             </Button>
-            <Button variant="secondary" size="sm" onClick={() => setCursor((c) => addMonths(c, 1))}>
-              Next
+            <Button
+              variant="secondary"
+              size="sm"
+              className="px-2.5 sm:px-3"
+              onClick={() => setCursor((c) => addMonths(c, 1))}
+              aria-label="Next month"
+            >
+              <ChevronRight className="h-4 w-4 sm:hidden" />
+              <span className="hidden sm:inline">Next</span>
             </Button>
           </div>
         </div>
-        <div className="p-5">
-          <div className="grid grid-cols-7 gap-1.5 mb-2">
+        <div className="p-2.5 sm:p-5">
+          <div className="grid grid-cols-7 gap-1 sm:gap-1.5 mb-2">
             {WEEKDAY_LABELS.map((w) => (
               <div
                 key={w}
                 className="text-center text-[11px] font-bold uppercase tracking-wide text-gray-400 pb-1"
               >
-                {w}
+                <span className="sm:hidden">{w[0]}</span>
+                <span className="hidden sm:inline">{w}</span>
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-7 gap-1.5">
+          <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
             {cells.map((cell, i) => {
               if (!cell.date) return <div key={`blank-${i}`} />;
               const dayKey = format(cell.date, "yyyy-MM-dd");
@@ -94,13 +110,13 @@ export function CalendarMonth({ hearings, caseMeta }: CalendarMonthProps) {
                   key={dayKey}
                   onClick={() => setSelectedDate(cell.date as Date)}
                   className={cn(
-                    "text-center rounded-lg py-2 px-1 min-h-[58px] border transition-colors",
+                    "text-center rounded-lg py-2 px-0.5 min-h-[44px] sm:min-h-[58px] border transition-colors",
                     selected ? "border-[#323b83] bg-[#eef1fb]" : "border-transparent hover:bg-gray-50",
                   )}
                 >
                   <div
                     className={cn(
-                      "text-[13px] mb-1.5",
+                      "text-[12px] sm:text-[13px] mb-1 sm:mb-1.5",
                       selected ? "font-bold text-primary" : "text-gray-700",
                     )}
                   >
@@ -116,7 +132,7 @@ export function CalendarMonth({ hearings, caseMeta }: CalendarMonthProps) {
                           background: dayHearings.length >= 2 ? "#323b83" : "#8d9bdb",
                         }}
                       />
-                      <div className="text-[10px] text-gray-500 mt-1">
+                      <div className="text-[10px] text-gray-500 mt-1 hidden sm:block">
                         {dayHearings.length}
                       </div>
                     </>
@@ -148,7 +164,7 @@ export function CalendarMonth({ hearings, caseMeta }: CalendarMonthProps) {
                     </span>
                     <span
                       className={cn(
-                        "inline-flex items-center h-[18px] px-1.5 rounded-full text-[10.5px] font-bold",
+                        "inline-flex items-center h-[18px] px-1.5 rounded-full text-[10.5px] font-bold flex-shrink-0 whitespace-nowrap",
                         h.source === "ecourts"
                           ? "bg-[#ebf3fb] text-[#2f6fb0]"
                           : "bg-gray-100 text-gray-600",

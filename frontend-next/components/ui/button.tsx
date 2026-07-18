@@ -28,8 +28,11 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
               variant === "ghost",
           },
           {
-            "h-8 px-3 text-sm": size === "sm",
-            "h-10 px-4 text-sm": size === "md",
+            // 44px-tall on mobile for a real touch target, reverting to the
+            // compact desktop size at md+ (768px) where precise pointers are
+            // the norm -- zero visual change above that breakpoint.
+            "h-11 px-3 text-sm md:h-8": size === "sm",
+            "h-11 px-4 text-sm md:h-10": size === "md",
             "h-12 px-6 text-base": size === "lg",
           },
           className,

@@ -14,7 +14,7 @@ export function CaseDetailHeader({
   onToggleChat,
 }: CaseDetailHeaderProps) {
   return (
-    <div className="bg-white border-b border-gray-100 px-7 py-5 flex-shrink-0">
+    <div className="bg-white border-b border-gray-100 px-4 sm:px-7 py-4 sm:py-5 flex-shrink-0">
       <Link
         href="/cases"
         className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-gray-600 mb-3.5 hover:text-gray-800"

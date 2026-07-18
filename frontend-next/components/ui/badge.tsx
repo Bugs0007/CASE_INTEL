@@ -31,7 +31,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center font-semibold rounded-full",
+        "inline-flex items-center flex-shrink-0 whitespace-nowrap font-semibold rounded-full",
         VARIANT_CLASSES[variant],
         {
           "h-[22px] px-2.5 text-xs": size === "sm",

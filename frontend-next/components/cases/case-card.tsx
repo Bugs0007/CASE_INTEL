@@ -53,7 +53,7 @@ export function CaseCard({ case: caseItem, onDelete, isDeleting, urgencyReason, 
         <div className="flex items-center gap-2 flex-wrap">
           {urgencyReason && (
             <span
-              className={`inline-flex items-center h-5 px-2 rounded-full text-[11px] font-semibold ${urgencyReason.className}`}
+              className={`inline-flex items-center h-5 px-2 rounded-full text-[11px] font-semibold flex-shrink-0 whitespace-nowrap ${urgencyReason.className}`}
             >
               {urgencyReason.label}
             </span>
@@ -65,7 +65,7 @@ export function CaseCard({ case: caseItem, onDelete, isDeleting, urgencyReason, 
           <Button
             variant="ghost"
             size="sm"
-            className="p-1 h-8 w-8"
+            className="p-1 h-11 w-11 md:h-8 md:w-8"
             onClick={(e) => {
               e.stopPropagation();
               setIsMenuOpen((open) => !open);
