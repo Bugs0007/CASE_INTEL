@@ -75,7 +75,7 @@ export function HearingsList({
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
         <CardTitle>
           Hearings & Deadlines{hearings.length > 0 ? ` (${hearings.length})` : ""}
         </CardTitle>
@@ -252,7 +252,7 @@ function HearingItem({ hearing, isUpcoming, onEdit, onDelete, isDeleting, index 
             <Button
               variant="ghost"
               size="sm"
-              className="p-2"
+              className="p-2 w-11 md:w-8"
               onClick={() => onEdit?.(hearing)}
               title="Edit hearing"
             >
@@ -261,7 +261,7 @@ function HearingItem({ hearing, isUpcoming, onEdit, onDelete, isDeleting, index 
             <Button
               variant="ghost"
               size="sm"
-              className="p-2 text-destructive hover:text-destructive-hover"
+              className="p-2 w-11 md:w-8 text-destructive hover:text-destructive-hover"
               onClick={() => onDelete?.(hearing.id)}
               disabled={isDeleting}
               title="Delete hearing"

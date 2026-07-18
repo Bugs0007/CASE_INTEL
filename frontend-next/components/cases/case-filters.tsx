@@ -52,7 +52,7 @@ export function CaseFilters({
   return (
     <div className="flex items-center justify-between gap-4 flex-wrap">
       {/* Search */}
-      <div className="flex items-center gap-2.5 w-80 h-10 rounded-lg border border-gray-200 bg-white px-3">
+      <div className="flex items-center gap-2.5 w-full sm:w-80 h-11 sm:h-10 rounded-lg border border-gray-200 bg-white px-3">
         <Search className="h-4 w-4 text-gray-400 flex-shrink-0" strokeWidth={1.8} />
         <input
           type="text"
@@ -63,8 +63,10 @@ export function CaseFilters({
         />
       </div>
 
-      {/* Status Tabs -- segmented control with a sliding active-tab pill */}
-      <div className="relative flex gap-1 bg-gray-100 rounded-lg p-1">
+      {/* Status Tabs -- segmented control with a sliding active-tab pill.
+          Scrolls horizontally, contained to this control, instead of
+          overflowing the page when all 5 tabs don't fit a narrow screen. */}
+      <div className="relative flex gap-1 bg-gray-100 rounded-lg p-1 min-w-0 max-w-full overflow-x-auto">
         {indicatorStyle && (
           <div
             aria-hidden="true"
@@ -80,7 +82,7 @@ export function CaseFilters({
             }}
             onClick={() => onStatusChange(tab.key)}
             className={cn(
-              "relative z-10 h-8 px-3.5 rounded-md text-[13px] font-semibold transition-colors",
+              "relative z-10 h-11 sm:h-8 px-3.5 rounded-md text-[13px] font-semibold transition-colors flex-shrink-0 flex items-center",
               activeStatus === tab.key ? "text-gray-800" : "text-gray-500",
             )}
           >

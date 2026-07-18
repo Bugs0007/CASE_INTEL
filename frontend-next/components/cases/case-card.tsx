@@ -65,7 +65,7 @@ export function CaseCard({ case: caseItem, onDelete, isDeleting, urgencyReason, 
           <Button
             variant="ghost"
             size="sm"
-            className="p-1 h-8 w-8"
+            className="p-1 h-11 w-11 md:h-8 md:w-8"
             onClick={(e) => {
               e.stopPropagation();
               setIsMenuOpen((open) => !open);

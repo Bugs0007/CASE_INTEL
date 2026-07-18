@@ -40,7 +40,7 @@ export function RecentDocumentsCard({
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
         <CardTitle>Case Documents{documents.length > 0 ? ` (${documents.length})` : ""}</CardTitle>
         <div className="flex items-center gap-2">
           <CollapseToggle isOpen={sectionOpen} onToggle={() => setSectionOpen((v) => !v)} />
@@ -166,7 +166,7 @@ function DocumentRow({
         <Button
           variant="ghost"
           size="sm"
-          className="p-1 h-8 w-8"
+          className="p-1 h-11 w-11 md:h-8 md:w-8"
           onClick={() => onDelete(doc.id)}
           disabled={isDeletePending}
         >
