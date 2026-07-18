@@ -13,10 +13,7 @@ import { HearingsList } from "@/components/hearings/hearings-list";
 import { HearingDialog } from "@/components/hearings/hearing-dialog";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { UploadDocumentDialog } from "@/components/documents/upload-document-dialog";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { FileText, Upload, Trash2, Play, Loader2 } from "lucide-react";
-import { formatDate, getFileIcon } from "@/lib/utils";
+import { RecentDocumentsCard } from "@/components/documents/recent-documents-card";
 import { showToast } from "@/components/ui/toaster";
 import { useProcessDocument, useDeleteDocument } from "@/hooks/use-documents";
 import type { Hearing } from "@/types";
@@ -47,7 +44,7 @@ export default function CaseDetailPage() {
 
   if (!caseItem) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex items-center justify-center h-full">
         <div>
           <div className="text-xl font-semibold text-gray-900 mb-2">
             Case not found
@@ -105,9 +102,9 @@ export default function CaseDetailPage() {
   };
 
   return (
-    <div className="h-screen overflow-hidden flex flex-col">
+    <div className="h-full overflow-hidden flex flex-col">
       {/* Header */}
-      <CaseDetailHeader case={caseItem} onStartChat={() => setShowChat(true)} />
+      <CaseDetailHeader case={caseItem} onToggleChat={() => setShowChat((v) => !v)} />
 
       {/* Main Content — a real flex row, not an overlay: the chat panel is a
           persistent sibling column with its own height from this flex
@@ -124,107 +121,17 @@ export default function CaseDetailPage() {
             {/* Court Tracking */}
             <CourtTrackingCard caseItem={caseItem} hearings={hearings} />
 
-            {/* Recent Documents */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Recent Documents</CardTitle>
-                <Button variant="primary" size="sm" onClick={() => setIsUploadDialogOpen(true)}>
-                  <Upload className="h-4 w-4" />
-                  Upload Document
-                </Button>
-              </CardHeader>
-              <CardContent>
-                {docsLoading ? (
-                  <div className="text-center py-8 text-gray-500">
-                    Loading documents...
-                  </div>
-                ) : documents.length === 0 ? (
-                  <div className="text-center py-8">
-                    <FileText className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                    <div className="text-gray-500">No documents yet</div>
-                    <div className="text-sm text-gray-400">
-                      Upload a document to get started
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {documents.slice(0, 5).map((doc) => {
-                      const fileIcon = getFileIcon(doc.file_type);
-                      return (
-                        <div
-                          key={doc.id}
-                          className="flex items-center justify-between p-3 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                          <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <span className="text-xl flex-shrink-0">
-                              {fileIcon}
-                            </span>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-gray-900 truncate">
-                                {doc.filename}
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                {doc.document_type} •{" "}
-                                {formatDate(doc.created_at, "MMM d, yyyy")}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 ml-4">
-                            {(doc.processing_status === "pending" ||
-                              doc.processing_status === "failed") && (
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                onClick={() => handleProcessDocument(doc.id)}
-                                disabled={processDocument.isPending}
-                              >
-                                {processDocument.isPending && processDocument.variables === doc.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Play className="h-4 w-4" />
-                                )}
-                                {processDocument.isPending && processDocument.variables === doc.id
-                                  ? "Processing..."
-                                  : doc.processing_status === "failed"
-                                    ? "Retry"
-                                    : "Process"}
-                              </Button>
-                            )}
-                            <span
-                              className={`text-xs px-2.5 h-[22px] inline-flex items-center rounded-full font-semibold ${
-                                doc.processing_status === "completed"
-                                  ? "bg-[#e9f7f1] text-[#146349]"
-                                  : doc.processing_status === "processing"
-                                    ? "bg-[#ebf3fb] text-[#2f6fb0]"
-                                    : doc.processing_status === "failed"
-                                      ? "bg-[#fdecec] text-[#b32e26]"
-                                      : "bg-gray-100 text-[#4b5468]"
-                              }`}
-                            >
-                              {doc.processing_status}
-                            </span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="p-1 h-8 w-8"
-                              onClick={() => handleDeleteDocument(doc.id)}
-                              disabled={deleteDocument.isPending}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {documents.length > 5 && (
-                      <Button variant="ghost" size="sm" className="w-full mt-2">
-                        View all {documents.length} documents
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            {/* Case Documents */}
+            <RecentDocumentsCard
+              documents={documents}
+              isLoading={docsLoading}
+              onUploadClick={() => setIsUploadDialogOpen(true)}
+              onProcess={handleProcessDocument}
+              onDelete={handleDeleteDocument}
+              isProcessPending={processDocument.isPending}
+              processingDocId={processDocument.variables}
+              isDeletePending={deleteDocument.isPending}
+            />
 
             {/* Hearings */}
             <HearingsList
@@ -241,7 +148,7 @@ export default function CaseDetailPage() {
 
         {/* Right Chat Panel — a persistent flex sibling, never an overlay */}
         {showChat && (
-          <div className="w-full max-w-[720px] flex-shrink-0 min-h-0">
+          <div className="w-full max-w-[720px] flex-shrink-0 min-h-0 animate-slide-in-right motion-reduce:animate-none">
             <ChatPanel caseId={caseId} onClose={() => setShowChat(false)} />
           </div>
         )}

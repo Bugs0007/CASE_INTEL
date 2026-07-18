@@ -16,6 +16,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { CollapseToggle } from "@/components/ui/collapse-toggle";
+import { Collapsible } from "@/components/ui/collapsible";
 import { showToast } from "@/components/ui/toaster";
 import { APIError } from "@/lib/api/client";
 import { formatDate, formatRelativeTime } from "@/lib/utils";
@@ -532,7 +534,7 @@ function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hea
   const refreshTracking = useRefreshTracking(caseItem.id);
   const untrackTracking = useUntrackTracking(caseItem.id);
   const [rateLimitedUntil, setRateLimitedUntil] = useState<string | null>(null);
-  const [hearingHistoryOpen, setHearingHistoryOpen] = useState(true);
+  const [hearingHistoryOpen, setHearingHistoryOpen] = useState(false);
 
   const ecourtsHearings = useMemo(
     () => hearings.filter((h) => h.source === "ecourts").sort((a, b) => a.hearing_date.localeCompare(b.hearing_date)),
@@ -680,14 +682,12 @@ function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hea
               <h4 className="text-[13px] font-semibold text-gray-700">
                 Hearing History ({ecourtsHearings.length})
               </h4>
-              <button
-                onClick={() => setHearingHistoryOpen((v) => !v)}
-                className="h-7 px-2.5 rounded-md border border-gray-200 bg-white text-gray-700 text-xs font-semibold hover:bg-gray-50"
-              >
-                {hearingHistoryOpen ? "Collapse" : "Expand"}
-              </button>
+              <CollapseToggle
+                isOpen={hearingHistoryOpen}
+                onToggle={() => setHearingHistoryOpen((v) => !v)}
+              />
             </div>
-            {hearingHistoryOpen && (
+            <Collapsible isOpen={hearingHistoryOpen}>
               <div className="overflow-x-auto rounded-lg border border-gray-100">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 text-left text-xs text-gray-500">
@@ -708,7 +708,7 @@ function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hea
                   </tbody>
                 </table>
               </div>
-            )}
+            </Collapsible>
           </div>
         )}
       </CardContent>

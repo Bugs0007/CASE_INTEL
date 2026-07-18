@@ -3,7 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export function CaseDetailSkeleton() {
   return (
-    <div className="h-screen overflow-hidden flex flex-col">
+    <div className="h-full overflow-hidden flex flex-col">
       {/* Header */}
       <div className="bg-white border-b border-gray-100 px-7 py-5 flex-shrink-0">
         <Skeleton className="h-4 w-28 mb-3.5" />
@@ -50,7 +50,7 @@ export function CaseDetailSkeleton() {
             </CardContent>
           </Card>
 
-          {/* Recent Documents */}
+          {/* Case Documents */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <Skeleton className="h-5 w-40" />

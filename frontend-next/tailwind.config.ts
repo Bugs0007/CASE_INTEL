@@ -87,11 +87,16 @@ const config: Config = {
           "0%": { opacity: "0" },
           "100%": { opacity: "1" },
         },
+        "slide-in-right": {
+          "0%": { transform: "translateX(100%)", opacity: "0" },
+          "100%": { transform: "translateX(0)", opacity: "1" },
+        },
       },
       animation: {
         "chat-indeterminate": "chat-indeterminate 1.2s ease-in-out infinite",
         "fade-up": "fade-up 0.25s ease-out both",
         "fade-in": "fade-in 0.2s ease-out both",
+        "slide-in-right": "slide-in-right 0.3s ease-out both",
       },
     },
   },
