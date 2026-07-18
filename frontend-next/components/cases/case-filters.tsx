@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { CaseStatus } from "@/types";
@@ -25,6 +25,24 @@ export function CaseFilters({
   activeStatus,
 }: CaseFiltersProps) {
   const [searchValue, setSearchValue] = useState("");
+  const tabRefs = useRef<Partial<Record<string, HTMLButtonElement>>>({});
+  const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number } | null>(
+    null,
+  );
+
+  // Slides the active-tab pill to the newly active button -- re-measured on
+  // resize too, since the tabs' widths are text-driven, not fixed.
+  useLayoutEffect(() => {
+    function updateIndicator() {
+      const activeEl = tabRefs.current[activeStatus];
+      if (activeEl) {
+        setIndicatorStyle({ left: activeEl.offsetLeft, width: activeEl.offsetWidth });
+      }
+    }
+    updateIndicator();
+    window.addEventListener("resize", updateIndicator);
+    return () => window.removeEventListener("resize", updateIndicator);
+  }, [activeStatus]);
 
   const handleSearchChange = (value: string) => {
     setSearchValue(value);
@@ -45,17 +63,25 @@ export function CaseFilters({
         />
       </div>
 
-      {/* Status Tabs -- segmented control */}
-      <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+      {/* Status Tabs -- segmented control with a sliding active-tab pill */}
+      <div className="relative flex gap-1 bg-gray-100 rounded-lg p-1">
+        {indicatorStyle && (
+          <div
+            aria-hidden="true"
+            className="absolute top-1 bottom-1 rounded-md bg-white shadow-[0_1px_2px_rgba(20,23,31,0.08)] transition-all duration-300 ease-out motion-reduce:transition-none"
+            style={{ left: indicatorStyle.left, width: indicatorStyle.width }}
+          />
+        )}
         {STATUS_TABS.map((tab) => (
           <button
             key={tab.key}
+            ref={(el) => {
+              tabRefs.current[tab.key] = el ?? undefined;
+            }}
             onClick={() => onStatusChange(tab.key)}
             className={cn(
-              "h-8 px-3.5 rounded-md text-[13px] font-semibold transition-colors",
-              activeStatus === tab.key
-                ? "bg-white text-gray-800 shadow-[0_1px_2px_rgba(20,23,31,0.08)]"
-                : "bg-transparent text-gray-500",
+              "relative z-10 h-8 px-3.5 rounded-md text-[13px] font-semibold transition-colors",
+              activeStatus === tab.key ? "text-gray-800" : "text-gray-500",
             )}
           >
             {tab.label}

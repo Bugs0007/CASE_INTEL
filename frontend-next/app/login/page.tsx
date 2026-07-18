@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { setToken } from "@/lib/auth";
+import { setToken, setUsername as storeUsername } from "@/lib/auth";
 import { API_BASE_URL } from "@/lib/api/client";
 
 export default function LoginPage() {
@@ -31,6 +31,7 @@ export default function LoginPage() {
 
       const data = await response.json();
       setToken(data.token);
+      storeUsername(data.username);
       router.push("/");
     } catch {
       setError("Could not reach the server. Please try again.");
