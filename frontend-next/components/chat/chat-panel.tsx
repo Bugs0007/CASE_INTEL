@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  Bot,
   Download,
   History,
   Loader2,
@@ -348,8 +349,8 @@ export function ChatPanel({ caseId, className, onClose }: ChatPanelProps) {
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <MessageSquare className="h-5 w-5 text-primary" />
-                <h2 className="font-semibold text-gray-900">AI Assistant</h2>
+                <Bot className="h-5 w-5 text-primary" />
+                <h2 className="font-semibold text-gray-900">Case Bot</h2>
               </div>
               <p className="mt-1 text-sm text-gray-500">
                 {isDraftChat

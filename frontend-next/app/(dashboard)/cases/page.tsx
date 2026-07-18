@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { Plus } from "lucide-react";
 import { CaseFilters } from "@/components/cases/case-filters";
 import { CaseGrid } from "@/components/cases/case-grid";
@@ -28,6 +28,16 @@ export default function CasesPage() {
   }, []);
 
   const { data: cases = [], isLoading, error } = useCases(activeStatus, since);
+
+  // Switching the status filter queries a fresh, uncached react-query key,
+  // so `isLoading` goes true again on every never-before-visited tab. Only
+  // the very first load should swap in the full-page skeleton -- after
+  // that, keep the filter bar (and its sliding tab indicator) mounted and
+  // let CaseGrid's own isLoading skeleton cover the results area instead.
+  const hasLoadedOnce = useRef(false);
+  useEffect(() => {
+    if (!isLoading) hasLoadedOnce.current = true;
+  }, [isLoading]);
   const { data: upcomingHearings = [] } = useUpcomingHearings();
   const { data: ecourtsUpdates = [] } = useUpcomingHearings(since);
   const { data: failedDocuments = [] } = useDocuments({ processing_status: "failed" });
@@ -95,7 +105,7 @@ export default function CasesPage() {
     return map;
   }, [needsAttentionCases, hearingSoonCaseIds, ecourtsUpdateCaseIds, failedDocCaseIds]);
 
-  if (isLoading) {
+  if (isLoading && !hasLoadedOnce.current) {
     return <CasesSkeleton />;
   }
 

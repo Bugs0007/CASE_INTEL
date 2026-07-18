@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { Search, Calendar, LogOut, Upload } from "lucide-react";
-import { clearToken } from "@/lib/auth";
+import { clearToken, clearUsername } from "@/lib/auth";
 import { useDialogs } from "@/providers/dialog-provider";
 
 export function Header() {
@@ -11,6 +11,7 @@ export function Header() {
 
   function handleLogout() {
     clearToken();
+    clearUsername();
     router.push("/login");
   }
 
