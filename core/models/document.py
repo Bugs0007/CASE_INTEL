@@ -44,6 +44,9 @@ class Document(models.Model):
     )
     extracted_text = models.TextField(blank=True, null=True)
     chunk_count = models.IntegerField(blank=True, null=True)
+    # True when the processing worker detected a scanned PDF (negligible
+    # extractable text) and ran it through ocrmypdf before chunking.
+    ocr_applied = models.BooleanField(default=False)
 
     # --- Deduplication: SHA-256 hash of the raw file bytes ---
     # If two uploads have the same hash, we skip re-embedding and

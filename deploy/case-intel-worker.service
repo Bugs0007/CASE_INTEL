@@ -1,0 +1,27 @@
+# Case Intel document-processing worker (manage.py process_jobs).
+#
+# Reference copy with the default paths (DEPLOY_USER=ubuntu,
+# PROJECT_DIR=/home/ubuntu/CASE_INTEL). deploy/provision.sh generates and
+# installs the real unit with its configured values, the same way it does
+# for the case-intel gunicorn unit -- edit provision.sh, not just this
+# file, when changing the unit.
+#
+# The worker claims queued ProcessingJob rows from Postgres
+# (select_for_update skip_locked -- no Redis/Celery, deliberately) and runs
+# extract -> OCR-if-scanned -> chunk -> embed. Exactly ONE instance should
+# run: the queue is safe for multiple workers, but the 1GB t3.micro is not.
+
+[Unit]
+Description=Case Intel document-processing worker
+After=network.target
+
+[Service]
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/CASE_INTEL
+ExecStart=/home/ubuntu/CASE_INTEL/.venv/bin/python manage.py process_jobs
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

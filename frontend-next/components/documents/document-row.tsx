@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { Download, Trash2, Play, Loader2, Pencil } from "lucide-react";
 import { formatDate, getFileIcon } from "@/lib/utils";
+import {
+  DocumentStatusBadge,
+  isDocumentActive,
+} from "./document-status-badge";
 import type { Document } from "@/types";
 
 interface DocumentRowProps {
@@ -11,13 +15,6 @@ interface DocumentRowProps {
   isProcessing?: boolean;
   isDeleting?: boolean;
 }
-
-const STATUS_STYLES: Record<string, string> = {
-  completed: "bg-[#e9f7f1] text-[#146349]",
-  processing: "bg-[#ebf3fb] text-[#2f6fb0]",
-  pending: "bg-gray-100 text-[#4b5468]",
-  failed: "bg-[#fdecec] text-[#b32e26]",
-};
 
 const ACTION_BTN =
   "inline-flex items-center gap-1.5 h-11 md:h-8 px-3 rounded-md border border-gray-200 bg-white text-gray-700 text-xs font-semibold hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors";
@@ -31,8 +28,11 @@ export function DocumentRow({
   isDeleting,
 }: DocumentRowProps) {
   const fileIcon = getFileIcon(document.file_type);
+  // No Process/Retry button while a background job is queued or running.
   const canProcess =
-    document.processing_status === "pending" || document.processing_status === "failed";
+    !isDocumentActive(document) &&
+    (document.processing_status === "pending" ||
+      document.processing_status === "failed");
 
   return (
     <div className="bg-white border border-gray-100 rounded-[10px] px-[18px] py-4 flex items-center gap-4 flex-wrap transition-colors hover:bg-gray-50/60">
@@ -73,11 +73,7 @@ export function DocumentRow({
         )}
       </div>
 
-      <span
-        className={`text-xs font-semibold h-[22px] px-2.5 inline-flex items-center rounded-full flex-shrink-0 ${STATUS_STYLES[document.processing_status] || STATUS_STYLES.pending}`}
-      >
-        {document.processing_status}
-      </span>
+      <DocumentStatusBadge document={document} />
 
       <div className="flex items-center gap-1.5 flex-shrink-0">
         {canProcess && (

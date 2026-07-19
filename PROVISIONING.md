@@ -52,13 +52,20 @@ cp deploy/provision.env.example deploy/provision.env
 sudo ./deploy/provision.sh
 ```
 
-This installs system packages, sets up a 1GB swap file, clones the repo,
-creates the venv and installs `requirements.txt`, installs Ollama and pulls
-`nomic-embed-text`, downloads the spaCy `en_core_web_sm` model, writes and
-enables the `case-intel` gunicorn systemd unit (`--preload --workers 2
---timeout 120`, matching production), writes and enables the Nginx site for
-your domain, and writes a narrow sudoers rule letting the deploy user run
-only `sudo systemctl restart case-intel` without a password (not the broad
+This installs system packages (including `tesseract-ocr` and `ghostscript`,
+which `ocrmypdf` needs for scanned-document OCR -- pip alone is not enough),
+sets up a 1GB swap file, clones the repo, creates the venv and installs
+`requirements.txt`, installs Ollama and pulls `nomic-embed-text`, downloads
+the spaCy `en_core_web_sm` model, writes and enables the `case-intel`
+gunicorn systemd unit (`--preload --workers 2 --timeout 120`, matching
+production), writes and enables the `case-intel-worker` unit (the
+`manage.py process_jobs` background document-processing worker -- see
+`deploy/case-intel-worker.service` for the reference copy; document uploads
+only enqueue a job, so without this service running nothing ever gets
+chunked/embedded), writes and enables the Nginx site for your domain, and
+writes a narrow sudoers rule letting the deploy user run only
+`sudo systemctl restart case-intel` and
+`sudo systemctl restart case-intel-worker` without a password (not the broad
 `NOPASSWD: ALL` that's on the current production box today -- see the
 CACHES/Celery changes in this same session for context on tightening things
 that were more permissive than needed).
@@ -95,7 +102,9 @@ source .venv/bin/activate
 python manage.py migrate
 python manage.py collectstatic --noinput
 sudo systemctl start case-intel
-sudo systemctl status case-intel   # confirm it's actually running
+sudo systemctl start case-intel-worker
+sudo systemctl status case-intel          # confirm it's actually running
+sudo systemctl status case-intel-worker   # ditto -- uploads stay "queued" forever without it
 ```
 
 If `/static/` or `/media/` 404 through Nginx, check that the Nginx worker

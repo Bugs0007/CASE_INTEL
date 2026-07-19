@@ -70,7 +70,10 @@ log() { echo -e "\n==> $*"; }
 # cert. libgomp1 is onnxruntime's own common missing-.so on a minimal Ubuntu
 # image (used by ddddocr's CAPTCHA-solving model) -- requirements.txt already
 # uses opencv-python-headless specifically so this box never needs
-# libGL.so.1/X11 for that same OCR path.
+# libGL.so.1/X11 for that same OCR path. tesseract-ocr + ghostscript are
+# ocrmypdf's system dependencies (scanned-document OCR inside the
+# case-intel-worker service) -- ocrmypdf itself comes from requirements.txt
+# but is useless without these two binaries.
 log "Installing system packages"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
@@ -85,7 +88,9 @@ apt-get install -y \
     certbot \
     python3-certbot-nginx \
     curl \
-    libgomp1
+    libgomp1 \
+    tesseract-ocr \
+    ghostscript
 
 # ============================================================================
 # 2. Swap file (1GB, matching this session's setup)
@@ -190,6 +195,35 @@ systemctl enable "$SERVICE_NAME"
 echo "Unit written and enabled. Not starting it yet -- it needs $PROJECT_DIR/.env filled in first (see PROVISIONING.md)."
 
 # ============================================================================
+# 7b. Document-processing worker systemd unit
+# ============================================================================
+# Runs `manage.py process_jobs` -- the DB-backed background worker that
+# document uploads enqueue into (chunking, OCR of scanned PDFs, embedding).
+# Same values as deploy/case-intel-worker.service (the checked-in reference
+# copy), templated here like the gunicorn unit above. Exactly one instance.
+log "Writing worker systemd unit (${SERVICE_NAME}-worker)"
+cat > "/etc/systemd/system/${SERVICE_NAME}-worker.service" <<EOF
+[Unit]
+Description=Case Intel document-processing worker
+After=network.target
+
+[Service]
+User=$DEPLOY_USER
+Group=$DEPLOY_USER
+WorkingDirectory=$PROJECT_DIR
+ExecStart=$PROJECT_DIR/.venv/bin/python manage.py process_jobs
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable "${SERVICE_NAME}-worker"
+echo "Worker unit written and enabled. Start it together with $SERVICE_NAME once .env exists."
+
+# ============================================================================
 # 8. Nginx site config
 # ============================================================================
 log "Writing Nginx site config for $DOMAIN"
@@ -233,7 +267,7 @@ systemctl reload nginx || systemctl restart nginx
 log "Configuring narrow sudoers rule for $DEPLOY_USER"
 SYSTEMCTL_PATH="$(command -v systemctl)"
 SUDOERS_FILE="/etc/sudoers.d/${SERVICE_NAME}-restart"
-SUDOERS_LINE="$DEPLOY_USER ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH restart $SERVICE_NAME"
+SUDOERS_LINE="$DEPLOY_USER ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH restart $SERVICE_NAME, $SYSTEMCTL_PATH restart ${SERVICE_NAME}-worker"
 TMP_SUDOERS="$(mktemp)"
 echo "$SUDOERS_LINE" > "$TMP_SUDOERS"
 if visudo -c -f "$TMP_SUDOERS" >/dev/null 2>&1; then
@@ -268,5 +302,6 @@ Next steps (see PROVISIONING.md for the full checklist):
   3. python manage.py migrate
   4. python manage.py collectstatic --noinput
   5. sudo systemctl start ${SERVICE_NAME}
-  6. Once DNS for $DOMAIN resolves to this box: sudo certbot --nginx -d $DOMAIN
+  6. sudo systemctl start ${SERVICE_NAME}-worker   # background document processing
+  7. Once DNS for $DOMAIN resolves to this box: sudo certbot --nginx -d $DOMAIN
 EOF
