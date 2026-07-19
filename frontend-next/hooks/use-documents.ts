@@ -1,11 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { documentsApi } from "@/lib/api/documents";
+import { isDocumentActive } from "@/components/documents/document-status-badge";
 import type {
   Document,
   DocumentUploadInput,
   DocumentUpdateInput,
   ProcessingStatus,
 } from "@/types";
+
+// While any listed document has background work queued/running, poll so
+// the row's "Processing… X/Y" progress stays live.
+const ACTIVE_POLL_MS = 2500;
 
 type DocumentFilters = {
   case_id?: number;
@@ -26,6 +31,8 @@ export function useDocuments(filters: DocumentFilters = {}) {
     queryKey: documentKeys.list(filters),
     queryFn: () => documentsApi.list(filters),
     staleTime: 60 * 1000,
+    refetchInterval: (query) =>
+      query.state.data?.some(isDocumentActive) ? ACTIVE_POLL_MS : false,
   });
 }
 
@@ -35,6 +42,10 @@ export function useDocument(id: number, enabled: boolean = true) {
     queryFn: () => documentsApi.get(id),
     enabled: !!id && enabled,
     staleTime: 60 * 1000,
+    refetchInterval: (query) =>
+      query.state.data && isDocumentActive(query.state.data)
+        ? ACTIVE_POLL_MS
+        : false,
   });
 }
 

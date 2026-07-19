@@ -3,6 +3,10 @@ export type ProcessingStatus =
   | "processing"
   | "completed"
   | "failed";
+
+// Status of the latest background ProcessingJob for a document (null when
+// the document has never been queued, e.g. legacy rows).
+export type JobStatus = "queued" | "running" | "succeeded" | "failed";
 export type DocumentType =
   | "contract"
   | "pleading"
@@ -25,6 +29,11 @@ export interface Document {
   document_date: string | null;
   processing_status: ProcessingStatus;
   chunk_count: number | null;
+  ocr_applied: boolean;
+  job_status: JobStatus | null;
+  job_progress_current: number | null;
+  job_progress_total: number | null;
+  job_error: string | null;
   folder?: number | null;
   folder_name?: string | null;
   ai_summary?: string | null;

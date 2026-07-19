@@ -16,6 +16,7 @@ from .task import Task
 from .hearing import Hearing
 from .court_fetch_log import CourtFetchLog
 from .court_tracking_preview import CourtTrackingPreview
+from .processing_job import ProcessingJob
 
 __all__ = [
     "Case",
@@ -38,4 +39,5 @@ __all__ = [
     "Hearing",
     "CourtFetchLog",
     "CourtTrackingPreview",
+    "ProcessingJob",
 ]

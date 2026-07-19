@@ -7,6 +7,10 @@ import { CollapseToggle } from "@/components/ui/collapse-toggle";
 import { Collapsible } from "@/components/ui/collapsible";
 import { FileText, Upload, Trash2, Play, Loader2 } from "lucide-react";
 import { formatDate, getFileIcon } from "@/lib/utils";
+import {
+  DocumentStatusBadge,
+  isDocumentActive,
+} from "./document-status-badge";
 import type { Document } from "@/types";
 
 const DEFAULT_VISIBLE_COUNT = 5;
@@ -131,7 +135,8 @@ function DocumentRow({
         </div>
       </div>
       <div className="flex items-center gap-2 ml-4 flex-wrap justify-end">
-        {(doc.processing_status === "pending" || doc.processing_status === "failed") && (
+        {!isDocumentActive(doc) &&
+          (doc.processing_status === "pending" || doc.processing_status === "failed") && (
           <Button
             variant="secondary"
             size="sm"
@@ -150,19 +155,7 @@ function DocumentRow({
                 : "Process"}
           </Button>
         )}
-        <span
-          className={`text-xs px-2.5 h-[22px] inline-flex items-center flex-shrink-0 whitespace-nowrap rounded-full font-semibold ${
-            doc.processing_status === "completed"
-              ? "bg-[#e9f7f1] text-[#146349]"
-              : doc.processing_status === "processing"
-                ? "bg-[#ebf3fb] text-[#2f6fb0]"
-                : doc.processing_status === "failed"
-                  ? "bg-[#fdecec] text-[#b32e26]"
-                  : "bg-gray-100 text-[#4b5468]"
-          }`}
-        >
-          {doc.processing_status}
-        </span>
+        <DocumentStatusBadge document={doc} />
         <Button
           variant="ghost"
           size="sm"

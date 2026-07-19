@@ -45,3 +45,8 @@ jobs:
             python manage.py collectstatic --noinput
 
             sudo systemctl restart case-intel
+            # The document-processing worker runs the same codebase -- it
+            # must pick up new code too, or it keeps processing with the
+            # old pipeline until the next reboot. provision.sh's sudoers
+            # rule covers both restarts.
+            sudo systemctl restart case-intel-worker
