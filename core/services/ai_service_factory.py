@@ -6,9 +6,11 @@ instances based on configuration.
 
 LLM (chat generation) provider is independently selectable via USE_GROQ /
 USE_OLLAMA: Groq, Ollama, or OpenAI. Embedding provider is selected via
-USE_OLLAMA only: Ollama (nomic-embed-text) or OpenAI — these two toggles
-are deliberately decoupled so, e.g., Groq can be used for generation
-while embeddings continue to run locally through Ollama.
+USE_GEMINI_EMBEDDINGS / USE_OLLAMA: Gemini, Ollama (nomic-embed-text), or
+OpenAI. USE_GEMINI_EMBEDDINGS and USE_GROQ are deliberately decoupled from
+each other -- one only ever affects embeddings, the other only ever
+affects generation -- so e.g. Groq can be used for generation while
+Gemini (or Ollama) handles embeddings, or vice versa.
 
 Usage:
     from core.services.ai_service_factory import get_llm_client, get_embedding_service
@@ -27,12 +29,13 @@ if TYPE_CHECKING:
     from core.services.ollama_llm_client import OllamaLLMClient
     from core.services.embedding_service import EmbeddingService
     from core.services.ollama_embedding_service import OllamaEmbeddingService
+    from core.services.gemini_embedding_service import GeminiEmbeddingService
 
 logger = logging.getLogger(__name__)
 
 # Type aliases for cleaner type hints
 LLMClientType = Union["LLMClient", "OllamaLLMClient"]
-EmbeddingServiceType = Union["EmbeddingService", "OllamaEmbeddingService"]
+EmbeddingServiceType = Union["EmbeddingService", "OllamaEmbeddingService", "GeminiEmbeddingService"]
 
 
 def get_llm_client() -> LLMClientType:
@@ -78,17 +81,33 @@ def get_llm_client() -> LLMClientType:
 def get_embedding_service() -> EmbeddingServiceType:
     """Factory function to create an embedding service.
 
+    Provider selection is independent of the LLM (chat generation) provider:
+    USE_GEMINI_EMBEDDINGS is checked first, then USE_OLLAMA, then OpenAI as
+    the final fallback -- mirroring get_llm_client()'s priority chain, but
+    on the embedding axis. USE_GEMINI_EMBEDDINGS never affects
+    get_llm_client(), same as USE_GROQ never affects this function.
+
     Returns:
-        EmbeddingService or OllamaEmbeddingService based on settings.USE_OLLAMA.
+        GeminiEmbeddingService, OllamaEmbeddingService, or EmbeddingService
+        (OpenAI) based on settings.USE_GEMINI_EMBEDDINGS / settings.USE_OLLAMA.
 
     Raises:
         ImportError: If required dependencies are missing.
         ConnectionError: If Ollama server is unreachable (when USE_OLLAMA=True).
-        ValueError: If OpenAI API key is missing (when USE_OLLAMA=False).
+        ValueError: If the required API key is missing for the selected provider.
     """
+    use_gemini_embeddings = getattr(settings, "USE_GEMINI_EMBEDDINGS", False)
     use_ollama = getattr(settings, "USE_OLLAMA", False)
 
-    if use_ollama:
+    if use_gemini_embeddings:
+        from core.services.gemini_embedding_service import GeminiEmbeddingService
+
+        logger.info(
+            "Creating Gemini embedding service (model=%s)",
+            settings.GEMINI_EMBEDDING_MODEL,
+        )
+        return GeminiEmbeddingService()
+    elif use_ollama:
         from core.services.ollama_embedding_service import OllamaEmbeddingService
 
         logger.info(

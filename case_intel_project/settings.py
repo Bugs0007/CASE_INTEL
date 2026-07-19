@@ -193,10 +193,15 @@ CORS_ALLOW_HEADERS = [
 # AI Provider Configuration
 # ============================================================================
 
-# Embedding provider toggle (Ollama nomic-embed-text is the only supported
-# option right now — OpenAI embeddings remain available as a fallback path,
-# but Gemini/other embedding providers are deliberately not implemented).
+# Embedding provider toggle. USE_GEMINI_EMBEDDINGS is checked first (see
+# get_embedding_service() in ai_service_factory.py), then USE_OLLAMA
+# (nomic-embed-text), then OpenAI as the final fallback.
 USE_OLLAMA = config("USE_OLLAMA", default=False, cast=bool)
+
+# Embedding provider toggle — independent of USE_GROQ/generation. When true,
+# get_embedding_service() routes to Gemini's embed_content API regardless of
+# which LLM provider is used for chat generation.
+USE_GEMINI_EMBEDDINGS = config("USE_GEMINI_EMBEDDINGS", default=False, cast=bool)
 
 # LLM (chat generation) provider toggle — independent of USE_OLLAMA/embeddings.
 # When true, get_llm_client() routes to Groq's OpenAI-compatible endpoint
@@ -207,6 +212,10 @@ USE_GROQ = config("USE_GROQ", default=False, cast=bool)
 GROQ_API_KEY = config("GROQ_API_KEY", default="")
 GROQ_MODEL = config("GROQ_MODEL", default="llama-3.3-70b-versatile")
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+
+# Gemini Configuration (used when USE_GEMINI_EMBEDDINGS=true)
+GEMINI_API_KEY = config("GEMINI_API_KEY", default="")
+GEMINI_EMBEDDING_MODEL = config("GEMINI_EMBEDDING_MODEL", default="gemini-embedding-001")
 
 # OpenAI Configuration (used when USE_OLLAMA=false and USE_GROQ=false)
 OPENAI_API_KEY = config("OPENAI_API_KEY", default="")
@@ -236,7 +245,14 @@ _EMBEDDING_DIMENSIONS_MAP = {
     "all-minilm": 384,
 }
 
-if USE_OLLAMA:
+if USE_GEMINI_EMBEDDINGS:
+    # Gemini's output_dimensionality is passed explicitly on every call (see
+    # GeminiEmbeddingService) using this value -- hardcoded to 768 rather
+    # than derived from GEMINI_EMBEDDING_MODEL's native dimension (3072 for
+    # gemini-embedding-001), since it must match DocumentChunk.embedding's
+    # fixed VectorField(dimensions=768) column, not the model's default.
+    EMBEDDING_DIMENSIONS = 768
+elif USE_OLLAMA:
     EMBEDDING_DIMENSIONS = _EMBEDDING_DIMENSIONS_MAP.get(OLLAMA_EMBEDDING_MODEL, 768)
 else:
     EMBEDDING_DIMENSIONS = _EMBEDDING_DIMENSIONS_MAP.get(OPENAI_EMBEDDING_MODEL, 1536)
