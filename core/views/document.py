@@ -3,9 +3,8 @@ Document views — list, retrieve, upload, and process documents.
 """
 
 import logging
-import os
 
-from django.conf import settings as django_settings
+from django.core.files.storage import default_storage
 from rest_framework import generics, status
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.request import Request
@@ -82,28 +81,16 @@ class DocumentUploadView(APIView):
         filename = uploaded_file.name
         file_type = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
 
-        # Save file to media directory
-        upload_dir = os.path.join(django_settings.BASE_DIR, "media", "documents")
-        os.makedirs(upload_dir, exist_ok=True)
-
-        file_path = os.path.join(upload_dir, filename)
-
-        # Avoid overwriting existing files
-        base, ext = os.path.splitext(filename)
-        counter = 1
-        while os.path.exists(file_path):
-            file_path = os.path.join(upload_dir, f"{base}_{counter}{ext}")
-            counter += 1
-
-        with open(file_path, "wb") as dest:
-            for chunk in uploaded_file.chunks():
-                dest.write(chunk)
+        # Save via the configured storage backend (local disk or S3 -- see
+        # STORAGES in settings.py). default_storage.save() already avoids
+        # overwriting an existing name, on both backends.
+        saved_name = default_storage.save(f"documents/{filename}", uploaded_file)
 
         # Create document record
         document = Document.objects.create(
             case_id=case_id,
             filename=filename,
-            file_path=file_path,
+            file_path=saved_name,
             file_type=file_type,
             file_size=uploaded_file.size,
             document_type=document_type,
@@ -153,3 +140,37 @@ class DocumentProcessView(APIView):
             )
 
         return Response(DocumentSerializer(document).data, status=status.HTTP_200_OK)
+
+
+class DocumentDownloadView(APIView):
+    """Return a URL for downloading/viewing a document's file.
+
+    GET /api/documents/<id>/download/
+
+    Local disk (USE_S3=false): a relative /media/... URL served by Django.
+    S3 (USE_S3=true): a short-lived presigned URL -- the bucket blocks all
+    public access, so this is the only way to reach the file. Either way,
+    reaching this endpoint itself still requires the normal token auth;
+    the URL it returns is time-limited on S3, so treat it as sensitive but
+    disposable.
+    """
+
+    def get(self, request: Request, pk: int) -> Response:
+        try:
+            document = Document.objects.get(id=pk)
+        except Document.DoesNotExist:
+            return Response(
+                {"detail": "Document not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        try:
+            url = default_storage.url(document.file_path)
+        except Exception as exc:
+            logger.exception("Could not generate download URL for document %d", pk)
+            return Response(
+                {"detail": f"File is unavailable: {exc}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        return Response({"url": url, "filename": document.filename})

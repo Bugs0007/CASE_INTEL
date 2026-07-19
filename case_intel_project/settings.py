@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     "django_extensions",
     "django_celery_beat",
     "django_celery_results",
+    "storages",
     "core",
 ]
 
@@ -260,6 +261,49 @@ else:
 # Media files (uploaded documents)
 MEDIA_ROOT = BASE_DIR / "media"
 MEDIA_URL = "/media/"
+
+# ============================================================================
+# File Storage — local disk by default, S3 (via django-storages) when
+# USE_S3=true. Document.file_path always holds a storage-relative key (e.g.
+# "documents/foo.pdf"), never an absolute filesystem path, so switching
+# USE_S3 repoints every read/write at a different backend without touching
+# application code — see core/views/document.py and
+# core/services/document_processor.py, which both go through
+# django.core.files.storage.default_storage instead of raw open()/os.path.
+USE_S3 = config("USE_S3", default=False, cast=bool)
+
+if USE_S3:
+    AWS_STORAGE_BUCKET_NAME = config("AWS_STORAGE_BUCKET_NAME")
+    AWS_S3_REGION_NAME = config("AWS_S3_REGION_NAME", default="ap-south-1")
+    AWS_ACCESS_KEY_ID = config("AWS_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY = config("AWS_SECRET_ACCESS_KEY")
+
+    # The bucket blocks all public access (bucket-owner-enforced, no ACLs) --
+    # every file is reached only through a short-lived presigned URL.
+    AWS_DEFAULT_ACL = None
+    AWS_QUERYSTRING_AUTH = True
+    AWS_QUERYSTRING_EXPIRE = config("AWS_S3_URL_EXPIRE_SECONDS", default=3600, cast=int)
+    # ap-south-1 (and other newer regions) require SigV4 explicitly.
+    AWS_S3_SIGNATURE_VERSION = "s3v4"
+    AWS_S3_FILE_OVERWRITE = False
+
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.s3.S3Storage",
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
+else:
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
 
 # ============================================================================
 # Gmail OAuth Configuration
