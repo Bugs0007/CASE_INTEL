@@ -39,8 +39,14 @@ class GeminiEmbeddingService:
           settings.EMBEDDING_DIMENSIONS via output_dimensionality)
     """
 
-    DEFAULT_RETRY_ATTEMPTS = 3
+    DEFAULT_RETRY_ATTEMPTS = 5
     DEFAULT_RETRY_DELAY = 0.5  # seconds
+    # Gemini's free tier meters embed_content per *content string* per
+    # minute (100/min), so a single 100-text batch can exhaust the whole
+    # window -- a sub-second exponential backoff never survives that. For
+    # 429 RESOURCE_EXHAUSTED specifically, wait long enough for the
+    # per-minute window to roll over instead.
+    RATE_LIMIT_RETRY_DELAY = 30.0  # seconds
 
     def __init__(
         self,
@@ -77,7 +83,10 @@ class GeminiEmbeddingService:
                     str(e),
                 )
                 if attempt < self.DEFAULT_RETRY_ATTEMPTS - 1:
-                    time.sleep(delay)
+                    wait = delay
+                    if getattr(e, "code", None) == 429:
+                        wait = max(wait, self.RATE_LIMIT_RETRY_DELAY)
+                    time.sleep(wait)
                     delay *= 2  # Exponential backoff
 
         raise last_error

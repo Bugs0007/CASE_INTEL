@@ -78,6 +78,11 @@ PyPDF2==3.0.1
 python-docx==1.2.0
 lxml==6.0.2
 spacy==3.8.14
+# OCR for scanned PDFs (core/services/ocr_service.py, runs inside the
+# process_jobs worker). NOT pip-only: needs tesseract-ocr and ghostscript
+# installed as system packages (see deploy/provision.sh / PROVISIONING.md).
+# pikepdf comes with it and is also used directly for page-batch slicing.
+ocrmypdf==17.8.1
 
 # ============================================================================
 # FILE STORAGE (AWS S3 via django-storages -- used when USE_S3=true)

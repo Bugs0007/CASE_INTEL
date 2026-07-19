@@ -17,7 +17,7 @@ import logging
 import re
 
 from django.core.files.storage import default_storage
-from django.db import connection, transaction
+from django.db import connection
 
 from core.models import Document, DocumentChunk
 from core.services.ai_service_factory import get_embedding_service
@@ -29,7 +29,23 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 DEFAULT_CHUNK_SIZE = 500          # characters — tighter for legal clauses
 DEFAULT_CHUNK_OVERLAP = 100       # characters
-MAX_CHUNKS_PER_DOCUMENT = 500
+# Raised from 500 now that processing runs in the background worker with
+# batched embedding — at 500 the old synchronous path silently indexed only
+# the first ~100 pages of large documents.
+MAX_CHUNKS_PER_DOCUMENT = 5000
+
+# Chunks embedded + inserted per batch by process_document. Keeps peak
+# memory bounded on the 1GB production box and gives the worker a natural
+# point to report progress. 100 matches Gemini's per-request input cap.
+EMBED_BATCH_SIZE = 100
+
+# Max characters fed to spaCy in one nlp() call. A spaCy Doc costs roughly
+# 100x its text in RAM (a 400-page document peaked the worker at ~440MB
+# before this cap), and spaCy hard-errors past nlp.max_length (1M chars)
+# anyway. Sentence-splitting segment by segment bounds that memory to
+# ~10-20MB regardless of document size; the only cost is that a sentence
+# straddling a segment boundary may be split in two.
+NLP_SEGMENT_CHARS = 100_000
 
 
 class DocumentProcessor:
@@ -68,7 +84,21 @@ class DocumentProcessor:
         try:
             import spacy
             try:
-                self._nlp = spacy.load("en_core_web_sm", disable=["ner", "tagger", "parser"])
+                # exclude (not disable!) every component and keep only the
+                # model's tokenizer + a rule-based sentencizer. With the
+                # parser disabled (as it always was here), sentence
+                # boundaries already came from the sentencizer -- but
+                # `disable=` still LOADS all component weights (~215MB
+                # resident) and tok2vec/lemmatizer kept running per call.
+                # `exclude=` skips loading them entirely (~25MB), which
+                # matters on the 1GB production box.
+                self._nlp = spacy.load(
+                    "en_core_web_sm",
+                    exclude=[
+                        "tok2vec", "tagger", "parser", "ner",
+                        "lemmatizer", "attribute_ruler",
+                    ],
+                )
                 if "sentencizer" not in self._nlp.pipe_names:
                     self._nlp.add_pipe("sentencizer")
             except OSError:
@@ -141,6 +171,15 @@ class DocumentProcessor:
         return "\n".join(text_parts)
 
     @staticmethod
+    def _pdf_page_count(file_path: str) -> int:
+        try:
+            import PyPDF2
+        except ImportError:
+            raise ImportError("pip install PyPDF2")
+        with default_storage.open(file_path, "rb") as f:
+            return len(PyPDF2.PdfReader(f).pages)
+
+    @staticmethod
     def _extract_docx(file_path: str) -> str:
         try:
             import docx
@@ -200,12 +239,36 @@ class DocumentProcessor:
     def _split_into_sentences(self, text: str) -> list[str]:
         """Return a list of sentences using spaCy or regex fallback."""
         nlp = self._get_nlp()
-        if nlp is not None:
-            doc = nlp(text)
-            return [sent.text.strip() for sent in doc.sents if sent.text.strip()]
+        if nlp is None:
+            parts = re.split(r'(?<=[.?!])\s+(?=[A-Z])', text)
+            return [p.strip() for p in parts if p.strip()]
 
-        parts = re.split(r'(?<=[.?!])\s+(?=[A-Z])', text)
-        return [p.strip() for p in parts if p.strip()]
+        sentences: list[str] = []
+        for segment in self._segment_for_nlp(text):
+            doc = nlp(segment)
+            sentences.extend(
+                sent.text.strip() for sent in doc.sents if sent.text.strip()
+            )
+        return sentences
+
+    @staticmethod
+    def _segment_for_nlp(text: str) -> list[str]:
+        """Split text into <=NLP_SEGMENT_CHARS pieces at whitespace, so
+        each spaCy call stays small (see NLP_SEGMENT_CHARS)."""
+        if len(text) <= NLP_SEGMENT_CHARS:
+            return [text]
+        segments = []
+        start = 0
+        while start < len(text):
+            end = min(start + NLP_SEGMENT_CHARS, len(text))
+            if end < len(text):
+                # Back up to the last space so words stay intact.
+                space = text.rfind(" ", start, end)
+                if space > start:
+                    end = space
+            segments.append(text[start:end])
+            start = end
+        return segments
 
     def _hard_split(self, text: str) -> list[str]:
         """Hard-split an oversized sentence at word boundaries."""
@@ -270,10 +333,23 @@ class DocumentProcessor:
     # Main processing pipeline
     # ------------------------------------------------------------------
 
-    @transaction.atomic
-    def process_document(self, document_id: int) -> Document:
-        """Run the full processing pipeline for a document."""
-        document = Document.objects.select_for_update().get(id=document_id)
+    def process_document(self, document_id: int, progress_callback=None) -> Document:
+        """Run the full processing pipeline for a document.
+
+        Args:
+            document_id: The Document row to process.
+            progress_callback: Optional ``callback(current, total)`` invoked
+                after each embedded chunk-batch is persisted. Used by the
+                ``process_jobs`` worker to report incremental progress.
+
+        NOT wrapped in one big transaction on purpose: the slow work
+        (OCR, embedding API calls) must not hold a transaction open, and
+        progress written by the callback must be visible to other
+        connections while the job is still running. Chunks are embedded
+        and inserted in EMBED_BATCH_SIZE batches so peak memory stays
+        bounded regardless of document size.
+        """
+        document = Document.objects.get(id=document_id)
         document.processing_status = "processing"
         document.save(update_fields=["processing_status"])
 
@@ -305,57 +381,96 @@ class DocumentProcessor:
                     file_hash[:12],
                     existing.chunk_count,
                 )
-                extracted_text = self.extract_text_from_file(
-                    document.file_path, document.file_type or ""
-                )
-                document.extracted_text = extracted_text
+                # Identical bytes -- reuse the original's extraction (and
+                # its OCR result, if the original was a scanned PDF)
+                # instead of re-extracting.
+                document.extracted_text = existing.extracted_text
+                document.ocr_applied = existing.ocr_applied
 
                 n_cloned = self._clone_chunks_from(existing, document)
                 document.processing_status = "completed"
                 document.chunk_count = n_cloned
-                document.save(update_fields=["extracted_text", "processing_status", "chunk_count"])
+                document.save(update_fields=[
+                    "extracted_text", "ocr_applied", "processing_status", "chunk_count",
+                ])
+                if progress_callback:
+                    progress_callback(n_cloned, n_cloned)
                 return document
 
             extracted_text = self.extract_text_from_file(
                 document.file_path, document.file_type or ""
             )
+
+            # --- OCR fallback for scanned PDFs (worker context only:
+            # views enqueue a ProcessingJob rather than calling this
+            # inline, so this slow path never runs in a request cycle).
+            ocr_applied = False
+            if (document.file_type or "").lower().lstrip(".") == "pdf":
+                from core.services.ocr_service import extract_text_with_ocr, needs_ocr
+
+                page_count = self._pdf_page_count(document.file_path)
+                if needs_ocr(extracted_text, page_count):
+                    logger.info(
+                        "Document %d yields negligible text (%d chars over %d "
+                        "pages) -- running ocrmypdf.",
+                        document_id, len(extracted_text.strip()), page_count,
+                    )
+                    extracted_text = extract_text_with_ocr(document.file_path)
+                    ocr_applied = True
+
             document.extracted_text = extracted_text
+            document.ocr_applied = ocr_applied
 
             if not extracted_text.strip():
                 logger.warning("No text extracted from document %d", document_id)
                 document.processing_status = "completed"
                 document.chunk_count = 0
-                document.save(update_fields=["extracted_text", "processing_status", "chunk_count"])
+                document.save(update_fields=[
+                    "extracted_text", "ocr_applied", "processing_status", "chunk_count",
+                ])
                 return document
 
             chunks = self.chunk_text(extracted_text)
+            total = len(chunks)
+            if progress_callback:
+                progress_callback(0, total)
 
             embedding_service = self._get_embedding_service()
-            embeddings = embedding_service.embed_texts(chunks)
 
             DocumentChunk.objects.filter(document=document).delete()
 
-            chunk_objects = [
-                DocumentChunk(
-                    document=document,
-                    chunk_index=i,
-                    chunk_text=chunk_text,
-                    embedding=embedding,
-                )
-                for i, (chunk_text, embedding) in enumerate(zip(chunks, embeddings))
-            ]
-            DocumentChunk.objects.bulk_create(chunk_objects)
+            # Embed + insert in batches: bounded memory, and each batch is
+            # a natural progress checkpoint for the worker.
+            n_created = 0
+            for start in range(0, total, EMBED_BATCH_SIZE):
+                batch = chunks[start : start + EMBED_BATCH_SIZE]
+                embeddings = embedding_service.embed_texts(batch)
+                DocumentChunk.objects.bulk_create([
+                    DocumentChunk(
+                        document=document,
+                        chunk_index=start + i,
+                        chunk_text=chunk_text,
+                        embedding=embedding,
+                    )
+                    for i, (chunk_text, embedding) in enumerate(zip(batch, embeddings))
+                ])
+                n_created += len(batch)
+                if progress_callback:
+                    progress_callback(n_created, total)
 
             self._populate_search_vectors(document_id)
 
             document.processing_status = "completed"
-            document.chunk_count = len(chunk_objects)
-            document.save(update_fields=["extracted_text", "processing_status", "chunk_count"])
+            document.chunk_count = n_created
+            document.save(update_fields=[
+                "extracted_text", "ocr_applied", "processing_status", "chunk_count",
+            ])
 
             logger.info(
-                "Document %d processed: %d chunks created",
+                "Document %d processed: %d chunks created%s",
                 document_id,
-                len(chunk_objects),
+                n_created,
+                " (OCR applied)" if ocr_applied else "",
             )
 
         except Exception:

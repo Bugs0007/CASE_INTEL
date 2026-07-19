@@ -11,8 +11,21 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.models import Case, Document
+from django.db.models import Prefetch
+
+from core.models import Case, Document, ProcessingJob
 from core.serializers import DocumentSerializer, DocumentUploadSerializer
+
+
+def _with_latest_jobs(qs):
+    """Prefetch processing jobs newest-first so DocumentSerializer can
+    expose the latest job's status/progress without N+1 queries."""
+    return qs.prefetch_related(
+        Prefetch(
+            "processing_jobs",
+            queryset=ProcessingJob.objects.order_by("-created_at"),
+        )
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +41,7 @@ class DocumentListView(generics.ListAPIView):
     serializer_class = DocumentSerializer
 
     def get_queryset(self):
-        qs = Document.objects.select_related("case")
+        qs = _with_latest_jobs(Document.objects.select_related("case"))
         case_id = self.request.query_params.get("case_id")
         if case_id is not None:
             qs = qs.filter(case_id=case_id)
@@ -47,7 +60,7 @@ class DocumentDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
 
     serializer_class = DocumentSerializer
-    queryset = Document.objects.select_related("case")
+    queryset = _with_latest_jobs(Document.objects.select_related("case"))
 
 
 class DocumentUploadView(APIView):
@@ -97,7 +110,12 @@ class DocumentUploadView(APIView):
             processing_status="pending",
         )
 
-        logger.info("Document uploaded: id=%d, filename=%s", document.id, filename)
+        # Enqueue background processing immediately -- the worker
+        # (manage.py process_jobs) picks it up; nothing heavy happens in
+        # this request.
+        ProcessingJob.enqueue(document)
+
+        logger.info("Document uploaded and queued: id=%d, filename=%s", document.id, filename)
 
         return Response(
             DocumentSerializer(document).data,
@@ -106,7 +124,12 @@ class DocumentUploadView(APIView):
 
 
 class DocumentProcessView(APIView):
-    """Trigger processing for a document (extract text, chunk, embed).
+    """Enqueue processing for a document (extract text, OCR if scanned,
+    chunk, embed) and return immediately.
+
+    The actual work happens in the `manage.py process_jobs` background
+    worker -- this endpoint never blocks on extraction/embedding. Also the
+    retry path: POSTing for a failed document simply enqueues a fresh job.
 
     POST /api/documents/<id>/process/
     """
@@ -120,26 +143,21 @@ class DocumentProcessView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        if document.processing_status == "processing":
+        job, created = ProcessingJob.enqueue(document)
+        if not created:
             return Response(
-                {"detail": "Document is already being processed."},
+                {"detail": f"Document is already {job.status} (job {job.id})."},
                 status=status.HTTP_409_CONFLICT,
             )
 
-        from core.services.document_processor import DocumentProcessor
+        logger.info("Document %d queued for processing (job %d)", pk, job.id)
 
-        processor = DocumentProcessor()
-
-        try:
-            document = processor.process_document(document.id)
-        except Exception as exc:
-            logger.exception("Document processing failed: %d", pk)
-            return Response(
-                {"detail": f"Processing failed: {exc}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-        return Response(DocumentSerializer(document).data, status=status.HTTP_200_OK)
+        document = (
+            _with_latest_jobs(Document.objects.select_related("case")).get(id=pk)
+        )
+        return Response(
+            DocumentSerializer(document).data, status=status.HTTP_202_ACCEPTED
+        )
 
 
 class DocumentDownloadView(APIView):

@@ -24,6 +24,7 @@ from core.models import (
     GmailCredential,
     Hearing,
     Message,
+    ProcessingJob,
     Task,
 )
 
@@ -82,6 +83,16 @@ class DocumentTagAdmin(admin.ModelAdmin):
 class DocumentTagMapAdmin(admin.ModelAdmin):
     list_display = ("document", "tag")
     list_filter = ("tag",)
+
+
+@admin.register(ProcessingJob)
+class ProcessingJobAdmin(admin.ModelAdmin):
+    list_display = (
+        "id", "document", "status", "progress_current", "progress_total",
+        "attempts", "created_at", "started_at", "finished_at",
+    )
+    list_filter = ("status",)
+    readonly_fields = ("created_at", "updated_at", "started_at", "finished_at")
 
 
 @admin.register(DocumentChunk)
