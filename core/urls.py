@@ -21,6 +21,7 @@ from core.views import (
     CourtStructureView,
     DashboardView,
     DocumentDetailView,
+    DocumentDownloadView,
     DocumentListView,
     DocumentProcessView,
     DocumentUploadView,
@@ -111,6 +112,11 @@ urlpatterns = [
         "documents/<int:pk>/process/",
         DocumentProcessView.as_view(),
         name="document-process",
+    ),
+    path(
+        "documents/<int:pk>/download/",
+        DocumentDownloadView.as_view(),
+        name="document-download",
     ),
 
     # Folders
