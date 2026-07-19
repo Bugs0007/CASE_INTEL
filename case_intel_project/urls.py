@@ -15,6 +15,8 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 
+from django.conf import settings
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 
@@ -22,3 +24,8 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include("core.urls")),
 ]
+
+# Local disk media (USE_S3=false) needs Django to serve /media/... itself in
+# dev; static() is a no-op unless DEBUG=True, so this never applies in prod.
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

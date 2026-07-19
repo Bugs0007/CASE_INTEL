@@ -27,6 +27,11 @@ class Document(models.Model):
         "core.Folder", on_delete=models.SET_NULL, blank=True, null=True, related_name="documents"
     )
     filename = models.CharField(max_length=255)
+    # Storage-relative key (e.g. "documents/foo.pdf"), resolved through
+    # django.core.files.storage.default_storage -- NOT an absolute
+    # filesystem path. This is what lets USE_S3 swap local disk for S3
+    # without a schema change: the same key resolves under MEDIA_ROOT
+    # locally or as an S3 object key in the bucket.
     file_path = models.CharField(max_length=500)
     file_type = models.CharField(max_length=10, blank=True, null=True)
     file_size = models.BigIntegerField(blank=True, null=True)

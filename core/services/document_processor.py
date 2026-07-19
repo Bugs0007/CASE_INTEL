@@ -16,6 +16,7 @@ import hashlib
 import logging
 import re
 
+from django.core.files.storage import default_storage
 from django.db import connection, transaction
 
 from core.models import Document, DocumentChunk
@@ -94,7 +95,7 @@ class DocumentProcessor:
     def compute_file_hash(file_path: str) -> str:
         """Return the SHA-256 hex digest of a file's raw bytes."""
         h = hashlib.sha256()
-        with open(file_path, "rb") as f:
+        with default_storage.open(file_path, "rb") as f:
             for block in iter(lambda: f.read(65536), b""):
                 h.update(block)
         return h.hexdigest()
@@ -118,8 +119,11 @@ class DocumentProcessor:
 
     @staticmethod
     def _extract_txt(file_path: str) -> str:
-        with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-            return f.read()
+        # Always read as bytes and decode manually -- text-mode "r" isn't
+        # reliably honored across storage backends (S3Storage streams bytes
+        # regardless of the mode string passed to .open()).
+        with default_storage.open(file_path, "rb") as f:
+            return f.read().decode("utf-8", errors="replace")
 
     @staticmethod
     def _extract_pdf(file_path: str) -> str:
@@ -128,7 +132,7 @@ class DocumentProcessor:
         except ImportError:
             raise ImportError("pip install PyPDF2")
         text_parts = []
-        with open(file_path, "rb") as f:
+        with default_storage.open(file_path, "rb") as f:
             reader = PyPDF2.PdfReader(f)
             for page in reader.pages:
                 page_text = page.extract_text()
@@ -142,7 +146,8 @@ class DocumentProcessor:
             import docx
         except ImportError:
             raise ImportError("pip install python-docx")
-        doc = docx.Document(file_path)
+        with default_storage.open(file_path, "rb") as f:
+            doc = docx.Document(f)
         return "\n".join(para.text for para in doc.paragraphs if para.text.strip())
 
     # ------------------------------------------------------------------

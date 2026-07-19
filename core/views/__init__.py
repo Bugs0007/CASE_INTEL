@@ -25,6 +25,7 @@ from .conversation import (
 from .dashboard import DashboardView, UpcomingHearingsView
 from .document import (
     DocumentDetailView,
+    DocumentDownloadView,
     DocumentListView,
     DocumentProcessView,
     DocumentUploadView,
@@ -55,6 +56,7 @@ __all__ = [
     "CourtStructureView",
     "DashboardView",
     "DocumentDetailView",
+    "DocumentDownloadView",
     "DocumentListView",
     "DocumentProcessView",
     "DocumentUploadView",
