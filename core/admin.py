@@ -20,6 +20,7 @@ from core.models import (
     EmailAttachment,
     Folder,
     CourtFetchLog,
+    CourtOrder,
     CourtTrackingPreview,
     GmailCredential,
     Hearing,
@@ -88,11 +89,18 @@ class DocumentTagMapAdmin(admin.ModelAdmin):
 @admin.register(ProcessingJob)
 class ProcessingJobAdmin(admin.ModelAdmin):
     list_display = (
-        "id", "document", "status", "progress_current", "progress_total",
-        "attempts", "created_at", "started_at", "finished_at",
+        "id", "job_type", "document", "case", "status", "progress_current",
+        "progress_total", "attempts", "created_at", "started_at", "finished_at",
     )
-    list_filter = ("status",)
+    list_filter = ("status", "job_type")
     readonly_fields = ("created_at", "updated_at", "started_at", "finished_at")
+
+
+@admin.register(CourtOrder)
+class CourtOrderAdmin(admin.ModelAdmin):
+    list_display = ("case", "order_number", "order_date", "source", "document", "created_at")
+    list_filter = ("source", "case")
+    readonly_fields = ("created_at",)
 
 
 @admin.register(DocumentChunk)

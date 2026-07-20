@@ -17,6 +17,9 @@ class Document(models.Model):
         ("brief", "Brief"),
         ("motion", "Motion"),
         ("order", "Order"),
+        # Fetched automatically from the court portal by order sync (Phase
+        # B) -- the frontend renders these with a "From eCourts" badge.
+        ("court_order", "Court Order (eCourts)"),
         ("other", "Other"),
     ]
 
