@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Download, Trash2, Play, Loader2, Pencil } from "lucide-react";
+import { Eye, Trash2, Play, Loader2, Pencil } from "lucide-react";
 import { formatDate, getFileIcon } from "@/lib/utils";
 import {
   DocumentStatusBadge,
@@ -12,8 +12,10 @@ interface DocumentRowProps {
   onProcess: (id: number) => void;
   onDelete: (id: number) => void;
   onEdit: (document: Document) => void;
+  onView: (id: number) => void;
   isProcessing?: boolean;
   isDeleting?: boolean;
+  isViewing?: boolean;
 }
 
 const ACTION_BTN =
@@ -24,8 +26,10 @@ export function DocumentRow({
   onProcess,
   onDelete,
   onEdit,
+  onView,
   isProcessing,
   isDeleting,
+  isViewing,
 }: DocumentRowProps) {
   const fileIcon = getFileIcon(document.file_type);
   // No Process/Retry button while a background job is queued or running.
@@ -42,9 +46,14 @@ export function DocumentRow({
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2.5 mb-0.5 flex-wrap">
-          <span className="text-sm font-semibold text-gray-900 truncate">
+          <button
+            type="button"
+            onClick={() => onView(document.id)}
+            className="text-sm font-semibold text-gray-900 truncate hover:text-primary hover:underline text-left"
+            title="Open document"
+          >
             {document.filename}
-          </span>
+          </button>
           {document.document_type === "court_order" ? (
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 flex-shrink-0">
               From eCourts
@@ -96,9 +105,18 @@ export function DocumentRow({
           <Pencil className="h-3.5 w-3.5" />
           Edit
         </button>
-        <button className={ACTION_BTN} title="Download">
-          <Download className="h-3.5 w-3.5" />
-          Download
+        <button
+          className={ACTION_BTN}
+          onClick={() => onView(document.id)}
+          disabled={isViewing}
+          title="View"
+        >
+          {isViewing ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Eye className="h-3.5 w-3.5" />
+          )}
+          View
         </button>
         <button
           className="inline-flex items-center gap-1.5 h-11 md:h-8 px-3 rounded-md border border-[#fbdada] bg-white text-destructive text-xs font-semibold hover:bg-[#fdecec] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"

@@ -10,6 +10,7 @@ import {
   useDocuments,
   useProcessDocument,
   useDeleteDocument,
+  useViewDocument,
 } from "@/hooks/use-documents";
 import { useDialogs } from "@/providers/dialog-provider";
 import { Upload } from "lucide-react";
@@ -28,6 +29,7 @@ export default function DocumentsPage() {
   const { data: documents = [], isLoading } = useDocuments();
   const processDocument = useProcessDocument();
   const deleteDocument = useDeleteDocument();
+  const viewDocument = useViewDocument();
 
   // Filter documents
   const filteredDocuments = useMemo(() => {
@@ -94,6 +96,15 @@ export default function DocumentsPage() {
     setEditingDocument(document);
   };
 
+  const handleView = (id: number) => {
+    viewDocument.mutate(id, {
+      onError: (error) => {
+        console.error("Failed to open document:", error);
+        showToast.error("Could not open document", "Try downloading it again in a moment.");
+      },
+    });
+  };
+
   if (isLoading) {
     return <DocumentsSkeleton />;
   }
@@ -134,8 +145,10 @@ export default function DocumentsPage() {
         onProcess={handleProcess}
         onDelete={handleDelete}
         onEdit={handleEdit}
+        onView={handleView}
         processingId={processDocument.variables}
         deletingId={deleteDocument.variables}
+        viewingId={viewDocument.variables}
       />
 
       {/* Results Count */}

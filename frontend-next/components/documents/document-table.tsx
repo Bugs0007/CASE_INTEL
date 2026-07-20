@@ -7,8 +7,10 @@ interface DocumentTableProps {
   onProcess: (id: number) => void;
   onDelete: (id: number) => void;
   onEdit: (document: Document) => void;
+  onView: (id: number) => void;
   processingId?: number;
   deletingId?: number;
+  viewingId?: number;
 }
 
 export function DocumentTable({
@@ -17,8 +19,10 @@ export function DocumentTable({
   onProcess,
   onDelete,
   onEdit,
+  onView,
   processingId,
   deletingId,
+  viewingId,
 }: DocumentTableProps) {
   if (isLoading) {
     return (
@@ -55,8 +59,10 @@ export function DocumentTable({
           onProcess={onProcess}
           onDelete={onDelete}
           onEdit={onEdit}
+          onView={onView}
           isProcessing={processingId === doc.id}
           isDeleting={deletingId === doc.id}
+          isViewing={viewingId === doc.id}
         />
       ))}
     </div>

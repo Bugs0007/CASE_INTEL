@@ -67,6 +67,20 @@ export function formatFileSize(bytes: number | null | undefined): string {
   return `${size.toFixed(1)} ${units[unitIndex]}`;
 }
 
+/** The `download/` endpoint returns a storage-relative URL on local disk
+ * (e.g. "/media/documents/foo.pdf", same-origin to the Django backend --
+ * NOT the Next.js frontend) or an absolute presigned S3 URL in production
+ * (USE_S3=true). Absolute URLs are used as-is; relative ones are resolved
+ * against the API host (API_BASE_URL minus its trailing "/api"), since
+ * opening them relative to the frontend's own origin would 404. */
+export function resolveFileUrl(url: string): string {
+  if (/^https?:\/\//i.test(url)) return url;
+  const apiBase =
+    process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+  const backendOrigin = apiBase.replace(/\/api\/?$/, "");
+  return `${backendOrigin}${url.startsWith("/") ? "" : "/"}${url}`;
+}
+
 export function getFileIcon(fileType: string | null): string {
   const type = fileType?.toLowerCase() || "";
   if (type.includes("pdf")) return "📄";
