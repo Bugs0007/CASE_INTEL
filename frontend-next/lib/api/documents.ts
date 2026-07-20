@@ -38,6 +38,13 @@ export const documentsApi = {
       `/documents/${id}/status/`,
     ),
 
+  // Resolves to a viewable/downloadable URL for the file -- a same-origin
+  // /media/... path on local disk, or a short-lived presigned S3 URL in
+  // production. See resolveFileUrl() in lib/utils for turning this into
+  // something openable from the frontend's own origin.
+  getDownloadUrl: (id: number) =>
+    apiClient<{ url: string; filename: string }>(`/documents/${id}/download/`),
+
   delete: (id: number) =>
     apiClient<void>(`/documents/${id}/`, { method: "DELETE" }),
 };

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { documentsApi } from "@/lib/api/documents";
 import { isDocumentActive } from "@/components/documents/document-status-badge";
+import { resolveFileUrl } from "@/lib/utils";
 import type {
   Document,
   DocumentUploadInput,
@@ -84,6 +85,39 @@ export function useProcessDocument() {
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: documentKeys.detail(id) });
       queryClient.invalidateQueries({ queryKey: documentKeys.lists() });
+    },
+  });
+}
+
+// View/open a document's underlying file in a new tab. Opens a blank tab
+// synchronously in onMutate (still inside the click's call stack) and
+// points it at the resolved URL once the download endpoint responds --
+// assigning window.location after the fact is fine, but calling
+// window.open() itself post-await gets treated as an unsolicited popup by
+// some browsers since it's no longer directly tied to the user gesture.
+export function useViewDocument() {
+  return useMutation<
+    string,
+    unknown,
+    number,
+    { win: Window | null }
+  >({
+    mutationFn: async (id: number) => {
+      const { url } = await documentsApi.getDownloadUrl(id);
+      return resolveFileUrl(url);
+    },
+    onMutate: () => ({
+      win: typeof window !== "undefined" ? window.open("", "_blank") : null,
+    }),
+    onSuccess: (url, _id, context) => {
+      if (context?.win) {
+        context.win.location.href = url;
+      } else if (typeof window !== "undefined") {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
+    },
+    onError: (_err, _id, context) => {
+      context?.win?.close();
     },
   });
 }
