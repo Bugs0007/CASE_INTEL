@@ -16,7 +16,11 @@ import { ChatPanel } from "@/components/chat/chat-panel";
 import { UploadDocumentDialog } from "@/components/documents/upload-document-dialog";
 import { RecentDocumentsCard } from "@/components/documents/recent-documents-card";
 import { showToast } from "@/components/ui/toaster";
-import { useProcessDocument, useDeleteDocument } from "@/hooks/use-documents";
+import {
+  useProcessDocument,
+  useDeleteDocument,
+  useViewDocument,
+} from "@/hooks/use-documents";
 import type { Hearing } from "@/types";
 
 export default function CaseDetailPage() {
@@ -55,6 +59,7 @@ export default function CaseDetailPage() {
 
   const processDocument = useProcessDocument();
   const deleteDocument = useDeleteDocument();
+  const viewDocument = useViewDocument();
   const deleteHearing = useDeleteHearing();
 
   if (caseLoading) {
@@ -96,6 +101,15 @@ export default function CaseDetailPage() {
       console.error("Failed to delete document:", error);
       showToast.error("Delete failed", "Could not delete the document.");
     }
+  };
+
+  const handleViewDocument = (docId: number) => {
+    viewDocument.mutate(docId, {
+      onError: (error) => {
+        console.error("Failed to open document:", error);
+        showToast.error("Could not open document", "Try again in a moment.");
+      },
+    });
   };
 
   const handleAddHearing = () => {
@@ -154,9 +168,12 @@ export default function CaseDetailPage() {
               onUploadClick={() => setIsUploadDialogOpen(true)}
               onProcess={handleProcessDocument}
               onDelete={handleDeleteDocument}
+              onView={handleViewDocument}
               isProcessPending={processDocument.isPending}
               processingDocId={processDocument.variables}
               isDeletePending={deleteDocument.isPending}
+              isViewPending={viewDocument.isPending}
+              viewingDocId={viewDocument.variables}
             />
 
             {/* Hearings */}
