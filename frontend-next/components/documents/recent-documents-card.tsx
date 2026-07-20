@@ -128,7 +128,14 @@ function DocumentRow({
       <div className="flex items-center gap-3 flex-1 min-w-0">
         <span className="text-xl flex-shrink-0">{fileIcon}</span>
         <div className="flex-1 min-w-0">
-          <div className="font-medium text-gray-900 truncate">{doc.filename}</div>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-medium text-gray-900 truncate">{doc.filename}</span>
+            {doc.document_type === "court_order" && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 flex-shrink-0">
+                From eCourts
+              </span>
+            )}
+          </div>
           <div className="text-xs text-gray-500">
             {doc.document_type} • {formatDate(doc.created_at, "MMM d, yyyy")}
           </div>

@@ -85,7 +85,7 @@ from bharat_courts.hcservices.parser import ServerError as HCServerError
 
 from core.services.court_data.base import CourtDataProvider
 from core.services.court_data.exceptions import CaptchaSolveError, CaseNotFoundError, CourtPortalError
-from core.services.court_data.models import CourtCaseData, HearingRecord
+from core.services.court_data.models import CourtCaseData, CourtOrderRecord, HearingRecord
 
 logger = logging.getLogger(__name__)
 
@@ -273,6 +273,130 @@ def parse_case_history_html(html: str) -> CourtCaseData | None:
     return data
 
 
+# ---------------------------------------------------------------------------
+# Orders parsing (Phase B order-fetch spike, ~/bharat-env/order_fetch_spike.py)
+#
+# HC Services: the CNR-search response embeds an Orders table
+# (class="order_table"): Order Number | Order on | Judge | Order Date |
+# Order Details, where the details cell holds an <a href="cases/
+# display_pdf.php?filename=<encrypted>&..."> link. Verified live: the link
+# downloads a real PDF in the SAME session (application/pdf, 0.6s) but
+# returns an "Orders is not uploaded" error page from a fresh session --
+# the encrypted filename token is session-bound, hence the re-search in
+# download_order().
+#
+# District Courts: the same CNR-search response is expected to carry
+# displayPdf(normal_v, case_val, court_code, filename, appFlag) onclick
+# links when orders are uploaded (per the live portal's own components.js
+# displayPdf(), which POSTs home/display_pdf and GETs the returned path).
+# NOT yet observed live -- every real case checked in the spike (the
+# tracked case + 3 others at the same court) listed zero orders, so the
+# district download leg below is best-effort: built from the portal's own
+# JS, exercised only when a district case with uploaded orders appears.
+# ---------------------------------------------------------------------------
+
+_HC_ORDERS_BASE = "https://hcservices.ecourts.gov.in/hcservices/"
+_DC_ORDERS_BASE = "https://services.ecourts.gov.in/ecourtindia_v6/"
+
+_DC_DISPLAYPDF_RE = re.compile(
+    r"""displayPdf\(\s*'?([^,'\)]*)'?\s*,\s*'([^']*)'\s*,\s*'?([^,'\)]*)'?\s*,\s*'([^']*)'\s*(?:,\s*'([^']*)')?\s*\)"""
+)
+
+
+def _strip_pdf_prefix(raw: bytes) -> bytes:
+    """Both portals have been observed to prepend junk (a UTF-8 BOM on HC
+    Services) before the %PDF magic; strip anything before it."""
+    idx = raw.find(b"%PDF-")
+    return raw[idx:] if idx > 0 else raw
+
+
+def _parse_hc_orders(html: str, cnr: str) -> list[tuple[CourtOrderRecord, str]]:
+    """Parse the HC Services order_table into (record, href) pairs.
+
+    href is the session-bound relative display_pdf.php link -- only valid
+    for the session that produced `html`.
+    """
+    soup = BeautifulSoup(html, "lxml")
+    table = soup.find("table", class_="order_table")
+    if table is None:
+        return []
+
+    results: list[tuple[CourtOrderRecord, str]] = []
+    for row in table.find_all("tr"):
+        link = row.find("a", href=re.compile(r"display_pdf\.php"))
+        if link is None:
+            continue
+        cells = [_clean(c.get_text()) for c in row.find_all("td")]
+        # Columns: Order Number | Order on | Judge | Order Date | Order Details
+        order_number = cells[0] if len(cells) > 0 else ""
+        order_on = cells[1] if len(cells) > 1 else ""
+        judge = cells[2] if len(cells) > 2 else ""
+        order_date = _parse_date(cells[3]) if len(cells) > 3 else None
+        if not order_number:
+            continue
+        record = CourtOrderRecord(
+            cnr=cnr,
+            order_number=order_number,
+            order_date=order_date,
+            description=f"Order {order_number} on {order_on}".strip(),
+            judge=judge,
+        )
+        results.append((record, link.get("href", "")))
+    return results
+
+
+def _parse_district_orders(html: str, cnr: str) -> list[tuple[CourtOrderRecord, dict]]:
+    """Parse district-court order rows into (record, displayPdf-args) pairs.
+
+    Best-effort (see module comment above): matches rows containing a
+    displayPdf(...) onclick and reads order number/date from the row's
+    cells by position, mirroring the HC layout. Returns [] when no
+    displayPdf links exist -- the verified-common case.
+    """
+    if "displayPdf" not in html:
+        return []
+    soup = BeautifulSoup(html, "lxml")
+    results: list[tuple[CourtOrderRecord, dict]] = []
+    for row in soup.find_all("tr"):
+        onclick_el = row.find(attrs={"onclick": re.compile(r"displayPdf\(")})
+        if onclick_el is None:
+            link = row.find("a", href=re.compile(r"displayPdf\("))
+            onclick_el = link
+        if onclick_el is None:
+            continue
+        target = onclick_el.get("onclick") or onclick_el.get("href") or ""
+        match = _DC_DISPLAYPDF_RE.search(target)
+        if not match:
+            continue
+        normal_v, case_val, court_code, ofilename, app_flag = match.groups()
+        cells = [_clean(c.get_text()) for c in row.find_all("td")]
+        order_number = cells[0] if cells else ""
+        order_date = None
+        for cell in cells:
+            order_date = _parse_date(cell)
+            if order_date:
+                break
+        if not order_number:
+            continue
+        record = CourtOrderRecord(
+            cnr=cnr,
+            order_number=order_number,
+            order_date=order_date,
+            description=f"Order {order_number}" + (f" on {case_val}" if case_val else ""),
+        )
+        results.append((
+            record,
+            {
+                "normal_v": normal_v or "",
+                "case_val": case_val or "",
+                "court_code": court_code or "",
+                "filename": ofilename or "",
+                "appFlag": app_flag or "",
+            },
+        ))
+    return results
+
+
 _VIEWHISTORY_RE = re.compile(
     r"viewHistory\((\d+),\s*'([A-Z]{4}\d{12,})'\s*,\s*'?([^,']*)'?\s*,"
     r"\s*'([^']*)'\s*,\s*'([^']*)'\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*'([^']*)'"
@@ -342,6 +466,95 @@ class EcourtsProvider(CourtDataProvider):
         if court_type == "high_court":
             return asyncio.run(self._fetch_hc_by_cnr(cnr))
         raise ValueError(f"Unknown court_type: {court_type!r}")
+
+    # ------------------------------------------------------------------
+    # Public: orders (Phase B)
+    # ------------------------------------------------------------------
+
+    def list_orders(self, tracking_config: dict) -> list[CourtOrderRecord]:
+        cnr, court_type = self._order_identity(tracking_config)
+        if court_type == "district":
+            return asyncio.run(self._list_district_orders(cnr))
+        return asyncio.run(self._list_hc_orders(cnr))
+
+    def download_order(self, tracking_config: dict, order: CourtOrderRecord) -> bytes:
+        cnr, court_type = self._order_identity(tracking_config)
+        if court_type == "district":
+            return asyncio.run(self._download_district_order(cnr, order))
+        return asyncio.run(self._download_hc_order(cnr, order))
+
+    @staticmethod
+    def _order_identity(tracking_config: dict) -> tuple[str, str]:
+        court_type = tracking_config.get("court_type")
+        if court_type not in ("district", "high_court"):
+            raise ValueError(f"Unknown court_type: {court_type!r}")
+        cnr = tracking_config.get("cnr")
+        if not cnr:
+            raise ValueError(
+                "Order listing needs a CNR in tracking_config -- callers "
+                "should inject case.cnr_number for cascade-shaped configs."
+            )
+        return cnr, court_type
+
+    async def _list_hc_orders(self, cnr: str) -> list[CourtOrderRecord]:
+        async with HCServicesClient() as client:
+            html = await self._hc_cnr_search(client, cnr)
+            return [record for record, _href in _parse_hc_orders(html, cnr)]
+
+    async def _download_hc_order(self, cnr: str, order: CourtOrderRecord) -> bytes:
+        async with HCServicesClient() as client:
+            # Fresh search in THIS session -- the display_pdf.php link is
+            # session-bound (spike-verified), so a stored href is useless.
+            html = await self._hc_cnr_search(client, cnr)
+            for record, href in _parse_hc_orders(html, cnr):
+                if record.dedup_key != order.dedup_key:
+                    continue
+                url = _HC_ORDERS_BASE + href.lstrip("/")
+                resp = await client._http.get(
+                    url, headers={"Referer": hc_endpoints.MAIN_PAGE_URL}
+                )
+                raw = _strip_pdf_prefix(resp.content)
+                if raw[:5] != b"%PDF-":
+                    raise CourtPortalError(
+                        f"HC Services order download did not return a PDF "
+                        f"(first bytes: {resp.content[:80]!r})"
+                    )
+                return raw
+            raise CaseNotFoundError(
+                f"Order {order.dedup_key!r} no longer listed for CNR {cnr!r} on HC Services."
+            )
+
+    async def _list_district_orders(self, cnr: str) -> list[CourtOrderRecord]:
+        async with DistrictCourtClient() as client:
+            html = await self._district_cnr_search(client, cnr)
+            return [record for record, _args in _parse_district_orders(html, cnr)]
+
+    async def _download_district_order(self, cnr: str, order: CourtOrderRecord) -> bytes:
+        async with DistrictCourtClient() as client:
+            html = await self._district_cnr_search(client, cnr)
+            for record, args in _parse_district_orders(html, cnr):
+                if record.dedup_key != order.dedup_key:
+                    continue
+                # Two-step download, per the live portal's own displayPdf()
+                # JS: POST home/display_pdf -> JSON with a relative path ->
+                # GET that path in the same session.
+                resp = await client._post_ajax("home/display_pdf", args)
+                order_path = resp.get("order", "")
+                if not order_path:
+                    raise CourtPortalError(
+                        f"District Courts display_pdf returned no file path: {str(resp)[:300]!r}"
+                    )
+                r2 = await client._http.get(_DC_ORDERS_BASE + order_path.lstrip("/"))
+                raw = _strip_pdf_prefix(r2.content)
+                if raw[:5] != b"%PDF-":
+                    raise CourtPortalError(
+                        f"District Courts order download did not return a PDF "
+                        f"(first bytes: {r2.content[:80]!r})"
+                    )
+                return raw
+            raise CaseNotFoundError(
+                f"Order {order.dedup_key!r} no longer listed for CNR {cnr!r} on the District Courts portal."
+            )
 
     # ------------------------------------------------------------------
     # District Courts
@@ -472,60 +685,67 @@ class EcourtsProvider(CourtDataProvider):
         message in casetype_list, checked for below.
         """
         async with DistrictCourtClient() as client:
-            last_exc: Exception | None = None
-            for attempt in range(1, MAX_RETRIES + 1):
-                await client._init_session()
-                captcha = await client._solve_captcha()
-                if not captcha:
-                    last_exc = CaptchaSolveError("OCR failed to read the CAPTCHA image.")
-                    if attempt < MAX_RETRIES:
-                        await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
-                    continue
-                try:
-                    result = await client._post_ajax(
-                        "cnr_status/searchByCNR",
-                        {"cino": cnr, "fcaptcha_code": captcha},
-                    )
-                except Exception as exc:  # noqa: BLE001
-                    last_exc = exc
-                    logger.warning(
-                        "District Courts CNR search attempt %d/%d failed: %s", attempt, MAX_RETRIES, exc
-                    )
-                    if attempt < MAX_RETRIES:
-                        await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
-                    continue
+            html = await self._district_cnr_search(client, cnr)
+            data = parse_case_history_html(html)
+            if data is None:
+                raise CaseNotFoundError(f"No case found for CNR {cnr!r} on the District Courts portal.")
+            data.cnr = cnr
+            return data
 
-                html = result.get("casetype_list", "")
-                if "does not exist" in html.lower():
-                    raise CaseNotFoundError(f"No case found for CNR {cnr!r} on the District Courts portal.")
-                if result.get("status") == 0:
-                    # Portal rejected the CAPTCHA and cleared the form.
-                    last_exc = CaptchaSolveError("District Courts portal rejected the CAPTCHA.")
-                    if attempt < MAX_RETRIES:
-                        await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
-                    continue
-                if "history_table" not in html:
-                    # Unrecognized response shape -- neither the known
-                    # not-found message nor a real result. Don't guess;
-                    # surface it as a portal error with the raw content.
-                    last_exc = CourtPortalError(
-                        f"Unrecognized response from District Courts CNR search: {html[:300]!r}"
-                    )
-                    if attempt < MAX_RETRIES:
-                        await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
-                    continue
+    async def _district_cnr_search(self, client: DistrictCourtClient, cnr: str) -> str:
+        """Run the District Courts CNR search and return the raw
+        casetype_list HTML. Shared by _fetch_district_by_cnr and the
+        order-listing/download path (Phase B)."""
+        last_exc: Exception | None = None
+        for attempt in range(1, MAX_RETRIES + 1):
+            await client._init_session()
+            captcha = await client._solve_captcha()
+            if not captcha:
+                last_exc = CaptchaSolveError("OCR failed to read the CAPTCHA image.")
+                if attempt < MAX_RETRIES:
+                    await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
+                continue
+            try:
+                result = await client._post_ajax(
+                    "cnr_status/searchByCNR",
+                    {"cino": cnr, "fcaptcha_code": captcha},
+                )
+            except Exception as exc:  # noqa: BLE001
+                last_exc = exc
+                logger.warning(
+                    "District Courts CNR search attempt %d/%d failed: %s", attempt, MAX_RETRIES, exc
+                )
+                if attempt < MAX_RETRIES:
+                    await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
+                continue
 
-                data = parse_case_history_html(html)
-                if data is None:
-                    raise CaseNotFoundError(f"No case found for CNR {cnr!r} on the District Courts portal.")
-                data.cnr = cnr
-                return data
+            html = result.get("casetype_list", "")
+            if "does not exist" in html.lower():
+                raise CaseNotFoundError(f"No case found for CNR {cnr!r} on the District Courts portal.")
+            if result.get("status") == 0:
+                # Portal rejected the CAPTCHA and cleared the form.
+                last_exc = CaptchaSolveError("District Courts portal rejected the CAPTCHA.")
+                if attempt < MAX_RETRIES:
+                    await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
+                continue
+            if "history_table" not in html:
+                # Unrecognized response shape -- neither the known
+                # not-found message nor a real result. Don't guess;
+                # surface it as a portal error with the raw content.
+                last_exc = CourtPortalError(
+                    f"Unrecognized response from District Courts CNR search: {html[:300]!r}"
+                )
+                if attempt < MAX_RETRIES:
+                    await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
+                continue
 
-            if isinstance(last_exc, CaptchaSolveError):
-                raise last_exc
-            raise CourtPortalError(
-                f"District Courts CNR search failed after {MAX_RETRIES} attempts: {last_exc}"
-            ) from last_exc
+            return html
+
+        if isinstance(last_exc, CaptchaSolveError):
+            raise last_exc
+        raise CourtPortalError(
+            f"District Courts CNR search failed after {MAX_RETRIES} attempts: {last_exc}"
+        ) from last_exc
 
     # ------------------------------------------------------------------
     # HC Services
@@ -634,64 +854,75 @@ class EcourtsProvider(CourtDataProvider):
         for showRecords) for a rejected CAPTCHA / generic server error.
         """
         async with HCServicesClient() as client:
-            last_exc: Exception | None = None
-            for attempt in range(1, MAX_RETRIES + 1):
-                await client._init_session()
-                captcha = await client._solve_captcha()
-                if not captcha:
-                    last_exc = CaptchaSolveError("OCR failed to read the CAPTCHA image.")
-                    if attempt < MAX_RETRIES:
-                        await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
-                    continue
+            text = await self._hc_cnr_search(client, cnr)
+            data = parse_case_history_html(text)
+            if data is None:
+                raise CaseNotFoundError(f"No case found for CNR {cnr!r} on the HC Services portal.")
+            data.cnr = cnr
+            return data
 
-                form = {
-                    "cino": cnr,
-                    "appFlag": "web",
-                    "action_code": "fetchStateDistCourtNew",
-                    "caseStatusSearchType": "CNRNumber",
-                    "captcha": captcha,
-                }
-                try:
-                    resp = await client._http.post(
-                        hc_endpoints.INDEX_QRY_URL,
-                        data=form,
-                        headers={"Referer": hc_endpoints.MAIN_PAGE_URL},
-                    )
-                except Exception as exc:  # noqa: BLE001
-                    last_exc = exc
-                    logger.warning(
-                        "HC Services CNR search attempt %d/%d failed: %s", attempt, MAX_RETRIES, exc
-                    )
-                    if attempt < MAX_RETRIES:
-                        await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
-                    continue
+    async def _hc_cnr_search(self, client: HCServicesClient, cnr: str) -> str:
+        """Run the HC Services CNR search and return the raw HTML page.
 
-                text = resp.text
-                if "history_table" in text:
-                    data = parse_case_history_html(text)
-                    if data is None:
-                        raise CaseNotFoundError(f"No case found for CNR {cnr!r} on the HC Services portal.")
-                    data.cnr = cnr
-                    return data
-                if "there is an sql error" in text.lower():
-                    raise CaseNotFoundError(f"No case found for CNR {cnr!r} on the HC Services portal.")
-                if "ERROR_VAL" in text or "invalid captcha" in text.lower():
-                    last_exc = CaptchaSolveError("HC Services portal rejected the CAPTCHA.")
-                    if attempt < MAX_RETRIES:
-                        await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
-                    continue
-                # Unrecognized response shape -- don't guess; surface it.
-                last_exc = CourtPortalError(
-                    f"Unrecognized response from HC Services CNR search: {text[:300]!r}"
+        Shared by _fetch_hc_by_cnr and the order-listing/download path
+        (Phase B) -- the same single response carries the case details,
+        history_table, AND the order_table with its session-bound
+        display_pdf.php links.
+        """
+        last_exc: Exception | None = None
+        for attempt in range(1, MAX_RETRIES + 1):
+            await client._init_session()
+            captcha = await client._solve_captcha()
+            if not captcha:
+                last_exc = CaptchaSolveError("OCR failed to read the CAPTCHA image.")
+                if attempt < MAX_RETRIES:
+                    await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
+                continue
+
+            form = {
+                "cino": cnr,
+                "appFlag": "web",
+                "action_code": "fetchStateDistCourtNew",
+                "caseStatusSearchType": "CNRNumber",
+                "captcha": captcha,
+            }
+            try:
+                resp = await client._http.post(
+                    hc_endpoints.INDEX_QRY_URL,
+                    data=form,
+                    headers={"Referer": hc_endpoints.MAIN_PAGE_URL},
+                )
+            except Exception as exc:  # noqa: BLE001
+                last_exc = exc
+                logger.warning(
+                    "HC Services CNR search attempt %d/%d failed: %s", attempt, MAX_RETRIES, exc
                 )
                 if attempt < MAX_RETRIES:
                     await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
+                continue
 
-            if isinstance(last_exc, CaptchaSolveError):
-                raise last_exc
-            raise CourtPortalError(
-                f"HC Services CNR search failed after {MAX_RETRIES} attempts: {last_exc}"
-            ) from last_exc
+            text = resp.text
+            if "history_table" in text:
+                return text
+            if "there is an sql error" in text.lower():
+                raise CaseNotFoundError(f"No case found for CNR {cnr!r} on the HC Services portal.")
+            if "ERROR_VAL" in text or "invalid captcha" in text.lower():
+                last_exc = CaptchaSolveError("HC Services portal rejected the CAPTCHA.")
+                if attempt < MAX_RETRIES:
+                    await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
+                continue
+            # Unrecognized response shape -- don't guess; surface it.
+            last_exc = CourtPortalError(
+                f"Unrecognized response from HC Services CNR search: {text[:300]!r}"
+            )
+            if attempt < MAX_RETRIES:
+                await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
+
+        if isinstance(last_exc, CaptchaSolveError):
+            raise last_exc
+        raise CourtPortalError(
+            f"HC Services CNR search failed after {MAX_RETRIES} attempts: {last_exc}"
+        ) from last_exc
 
     # ------------------------------------------------------------------
     # Court hierarchy discovery (cached -- changes ~never)

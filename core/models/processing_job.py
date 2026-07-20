@@ -20,12 +20,36 @@ class ProcessingJob(models.Model):
         ("failed", "Failed"),
     ]
 
+    JOB_TYPE_CHOICES = [
+        ("document", "Document Processing"),
+        ("order_sync", "Court Order Sync"),
+    ]
+
     # Explicit pk so this model doesn't add to the pre-existing W042
     # (auto-created AutoField) warning noise from the other models.
     id = models.BigAutoField(primary_key=True)
 
+    # "document" jobs process one Document (document set, case unused).
+    # "order_sync" jobs fetch order PDFs from the court portal for one
+    # tracked Case (case set, document null) and enqueue a document job
+    # per downloaded file -- reusing this same queue/worker rather than a
+    # parallel pipeline.
+    job_type = models.CharField(
+        max_length=20, choices=JOB_TYPE_CHOICES, default="document"
+    )
     document = models.ForeignKey(
-        "core.Document", on_delete=models.CASCADE, related_name="processing_jobs"
+        "core.Document",
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+        related_name="processing_jobs",
+    )
+    case = models.ForeignKey(
+        "core.Case",
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+        related_name="processing_jobs",
     )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="queued")
     progress_current = models.IntegerField(default=0)
@@ -49,7 +73,8 @@ class ProcessingJob(models.Model):
         ]
 
     def __str__(self):
-        return f"Job {self.id} [{self.status}] doc={self.document_id}"
+        target = f"doc={self.document_id}" if self.document_id else f"case={self.case_id}"
+        return f"Job {self.id} [{self.job_type}/{self.status}] {target}"
 
     @classmethod
     def enqueue(cls, document) -> tuple["ProcessingJob", bool]:
@@ -67,3 +92,17 @@ class ProcessingJob(models.Model):
         if existing is not None:
             return existing, False
         return cls.objects.create(document=document), True
+
+    @classmethod
+    def enqueue_order_sync(cls, case) -> tuple["ProcessingJob", bool]:
+        """Enqueue a court-order sync for a tracked case, deduplicating
+        active jobs the same way enqueue() does for documents."""
+        existing = (
+            cls.objects
+            .filter(case=case, job_type="order_sync", status__in=["queued", "running"])
+            .order_by("created_at")
+            .first()
+        )
+        if existing is not None:
+            return existing, False
+        return cls.objects.create(case=case, job_type="order_sync"), True

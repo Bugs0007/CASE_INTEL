@@ -13,12 +13,13 @@ from core.services.court_data.exceptions import (
     CourtDataError,
     CourtPortalError,
 )
-from core.services.court_data.models import CourtCaseData, HearingRecord
+from core.services.court_data.models import CourtCaseData, CourtOrderRecord, HearingRecord
 
 __all__ = [
     "CourtDataProvider",
     "get_provider",
     "CourtCaseData",
+    "CourtOrderRecord",
     "HearingRecord",
     "CourtDataError",
     "CaseNotFoundError",

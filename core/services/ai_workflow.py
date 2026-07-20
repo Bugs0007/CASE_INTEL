@@ -17,8 +17,9 @@ from typing import Optional
 from django.db import transaction
 from django.utils import timezone
 
-from core.models import Citation, Conversation, DocumentChunk, Message
+from core.models import Case, Citation, Conversation, DocumentChunk, Message
 from core.services.conversation_utils import generate_conversation_title
+from core.services.court_tracking import build_ai_context
 from core.services.graph.builder import build_legal_ai_graph
 from core.services.graph.state import AgentState
 from core.services.ai_service_factory import get_llm_client, get_embedding_service
@@ -175,12 +176,27 @@ class AIWorkflowService:
             conversation.save(update_fields=["title"])
         history = self._load_conversation_history(conversation.id)
 
+        # Live eCourts context for tracked cases — always injected into the
+        # generation prompt, never something a failure here should take the
+        # whole chat request down over.
+        tracking_context = None
+        if case_id is not None:
+            try:
+                case = Case.objects.filter(id=case_id).first()
+                if case is not None:
+                    tracking_context = build_ai_context(case)
+            except Exception:
+                logger.warning(
+                    "Failed to build tracking context for case %s", case_id, exc_info=True
+                )
+
         # AgentState for the new 3-node pipeline
         initial_state: AgentState = {
             "user_query": user_query,
             "case_id": case_id,
             "conversation_id": conversation.id,
             "conversation_history": history,
+            "tracking_context": tracking_context,
             # Populated by hyde_expand
             "hyde_passage": "",
             "query_type": "",

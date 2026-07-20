@@ -42,6 +42,11 @@ class AgentState(TypedDict):
     case_id: Optional[int]
     conversation_id: Optional[int]
     conversation_history: list[dict]   # [{"role": "user"|"assistant", "content": str}]
+    # Live eCourts tracking context for tracked cases, built by
+    # court_tracking.build_ai_context(): {"block": str, "source_label": str}.
+    # Always injected into the generation prompt (never retrieved), None
+    # for untracked cases.
+    tracking_context: Optional[dict]
 
     # --- HyDE expansion (hyde_expand node) ---
     hyde_passage: str                  # hypothetical doc excerpt used for vector search
