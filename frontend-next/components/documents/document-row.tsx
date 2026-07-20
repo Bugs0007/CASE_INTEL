@@ -45,9 +45,15 @@ export function DocumentRow({
           <span className="text-sm font-semibold text-gray-900 truncate">
             {document.filename}
           </span>
-          <span className="text-[11px] text-gray-400 capitalize">
-            {document.document_type}
-          </span>
+          {document.document_type === "court_order" ? (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 flex-shrink-0">
+              From eCourts
+            </span>
+          ) : (
+            <span className="text-[11px] text-gray-400 capitalize">
+              {document.document_type}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2.5 text-xs text-gray-400 flex-wrap">
           {document.case ? (

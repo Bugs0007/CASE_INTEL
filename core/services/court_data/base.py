@@ -13,7 +13,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from functools import lru_cache
 
-from core.services.court_data.models import CourtCaseData
+from core.services.court_data.models import CourtCaseData, CourtOrderRecord
 
 
 class CourtDataProvider(ABC):
@@ -60,6 +60,44 @@ class CourtDataProvider(ABC):
             CaseNotFoundError: No case exists for this CNR on this portal.
             CourtPortalError: The portal failed after retries.
             CaptchaSolveError: CAPTCHA solving failed after retries.
+        """
+
+    @abstractmethod
+    def list_orders(self, tracking_config: dict) -> list[CourtOrderRecord]:
+        """List the order/judgment PDFs the portal has uploaded for a case.
+
+        Requires a CNR in tracking_config (callers should inject
+        case.cnr_number if the saved config is cascade-shaped). Returns []
+        when the portal lists no orders for the case -- a common, normal
+        outcome (verified live: many district courts upload nothing).
+
+        Metadata only. Download links on both portals are SESSION-BOUND
+        (verified in the Phase B order-fetch spike: replaying an HC
+        display_pdf.php URL from a fresh session returns an error page,
+        not the PDF), so records carry no reusable URL -- use
+        download_order() to fetch the file.
+
+        Raises the same exceptions as fetch_case.
+        """
+
+    @abstractmethod
+    def download_order(
+        self, tracking_config: dict, order: CourtOrderRecord
+    ) -> bytes:
+        """Download one order's PDF, identified by a CourtOrderRecord from
+        a previous list_orders() call.
+
+        Because download links are session-bound, implementations
+        re-search the case in a fresh session and re-locate the matching
+        row (by order_number/order_date) before downloading -- each call
+        is self-contained and costs one portal search. Callers doing bulk
+        downloads must go sequentially with a delay between calls.
+
+        Returns the raw PDF bytes (any junk prefix before the %PDF magic
+        already stripped).
+
+        Raises CaseNotFoundError if the order can no longer be found, and
+        the same portal exceptions as fetch_case.
         """
 
     @abstractmethod

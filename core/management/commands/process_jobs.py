@@ -31,7 +31,8 @@ from django.core.management.base import BaseCommand
 from django.db import close_old_connections, connections, transaction
 from django.utils import timezone
 
-from core.models import Document, ProcessingJob
+from core.models import Case, Document, ProcessingJob
+from core.services.court_order_sync import sync_case_orders
 from core.services.document_processor import DocumentProcessor
 
 logger = logging.getLogger(__name__)
@@ -123,8 +124,8 @@ class Command(BaseCommand):
         for job in stale:
             if job.attempts >= MAX_ATTEMPTS:
                 logger.error(
-                    "Job %d (doc %d) crashed the worker %d times -- failing permanently.",
-                    job.id, job.document_id, job.attempts,
+                    "Job %d (%s) crashed the worker %d times -- failing permanently.",
+                    job.id, job, job.attempts,
                 )
                 job.status = "failed"
                 job.error = (
@@ -133,14 +134,15 @@ class Command(BaseCommand):
                 )
                 job.finished_at = timezone.now()
                 job.save(update_fields=["status", "error", "finished_at", "updated_at"])
+                # No-op for order_sync jobs (document_id is None).
                 Document.objects.filter(id=job.document_id).update(
                     processing_status="failed"
                 )
             else:
                 logger.warning(
-                    "Job %d (doc %d) looks abandoned (heartbeat stale) -- requeueing "
+                    "Job %d (%s) looks abandoned (heartbeat stale) -- requeueing "
                     "(attempt %d/%d).",
-                    job.id, job.document_id, job.attempts, MAX_ATTEMPTS,
+                    job.id, job, job.attempts, MAX_ATTEMPTS,
                 )
                 job.status = "queued"
                 job.progress_current = 0
@@ -151,10 +153,7 @@ class Command(BaseCommand):
     # ------------------------------------------------------------------
 
     def _process_job(self, job: ProcessingJob, processor: DocumentProcessor) -> None:
-        self.stdout.write(
-            f"Processing job {job.id} (document {job.document_id}, "
-            f"attempt {job.attempts})"
-        )
+        self.stdout.write(f"Processing job {job.id} ({job}, attempt {job.attempts})")
 
         stop_heartbeat = threading.Event()
         heartbeat = threading.Thread(
@@ -171,9 +170,14 @@ class Command(BaseCommand):
             )
 
         try:
-            processor.process_document(job.document_id, progress_callback=report_progress)
+            if job.job_type == "order_sync":
+                self._run_order_sync(job, report_progress)
+            else:
+                processor.process_document(job.document_id, progress_callback=report_progress)
         except Document.DoesNotExist:
             self._finish(job, "failed", error=f"Document {job.document_id} no longer exists.")
+        except Case.DoesNotExist:
+            self._finish(job, "failed", error=f"Case {job.case_id} no longer exists.")
         except Exception as exc:
             # DocumentProcessor already marked the document itself failed.
             logger.exception("Job %d failed", job.id)
@@ -184,6 +188,18 @@ class Command(BaseCommand):
         finally:
             stop_heartbeat.set()
             heartbeat.join(timeout=5)
+
+    def _run_order_sync(self, job: ProcessingJob, report_progress) -> None:
+        """Fetch new court-order PDFs for the job's case. Each downloaded
+        PDF gets its own document ProcessingJob, so this worker loop picks
+        the files up for the normal extract/OCR/embed pipeline next."""
+        case = Case.objects.get(id=job.case_id)
+        result = sync_case_orders(case, progress_callback=report_progress)
+        self.stdout.write(
+            f"Order sync for case {case.id}: {result['listed']} listed, "
+            f"{result['new']} new, {result['downloaded']} downloaded, "
+            f"{result['failed']} failed."
+        )
 
     @staticmethod
     def _finish(job: ProcessingJob, status: str, error: str = "") -> None:

@@ -66,6 +66,48 @@ Document excerpts:
 
 Answer (cite sources inline):"""
 
+# Appended to _ANSWER_SYSTEM only when the case has live tracking data.
+# Untracked cases must see the exact original prompt.
+_ANSWER_SYSTEM_TRACKING_ADDON = """
+
+A "Live court tracking data" block is also provided. It comes from the
+eCourts portal, NOT from any uploaded document.
+5. For questions about hearing dates, case status, case stage, the judge,
+   or the court, answer from that block and cite it inline as
+   [Tracking Data].
+6. NEVER cite a [Doc N] label for a fact that came from the tracking
+   block, and never present a tracking fact as if it came from a document.
+7. Rule 3's "not found in the uploaded documents" reply applies only when
+   neither the excerpts nor the tracking block contain the answer."""
+
+_TRACKING_BLOCK_TEMPLATE = """Live court tracking data ({source_label}):
+{block}"""
+
+_ANSWER_USER_WITH_TRACKING = """Question: {query}
+
+{tracking_block}
+
+Document excerpts:
+{context}
+
+Answer (cite sources inline):"""
+
+# Used when retrieval returned no chunks but the case has tracking data —
+# the old behaviour (canned "no documents found" reply, no LLM call) only
+# remains for cases with neither chunks nor tracking data.
+_ANSWER_USER_TRACKING_ONLY = """Question: {query}
+
+{tracking_block}
+
+No document excerpts were retrieved for this question. Answer ONLY if the
+tracking data above contains the answer, citing it inline as
+[Tracking Data]. Otherwise say exactly: "I could not find that information
+in the uploaded documents or the court tracking data."
+
+Answer:"""
+
+_TRACKING_MARKER_RE = re.compile(r"\[Tracking\s+Data\]", re.IGNORECASE)
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -122,9 +164,20 @@ def _format_sources_section(
     answer: str,
     citations: list[dict],
     chunks: list[ChunkData],
+    tracking_source_label: str | None = None,
 ) -> str:
-    """Append a de-duplicated sources list to the answer."""
-    if not citations:
+    """Append a de-duplicated sources list to the answer.
+
+    The tracking line is appended only when the answer actually cited
+    [Tracking Data] — its presence in the prompt alone doesn't make it a
+    source. It is labelled with the refresh timestamp (e.g. "eCourts
+    tracking data (refreshed 19 Jul 2026, 17:06 UTC)"), never as a
+    document.
+    """
+    tracking_used = bool(
+        tracking_source_label and _TRACKING_MARKER_RE.search(answer)
+    )
+    if not citations and not tracking_used:
         return answer
 
     seen_doc_ids: set[int] = set()
@@ -144,6 +197,9 @@ def _format_sources_section(
             if doc_type:
                 line += f" ({doc_type})"
             source_lines.append(line)
+
+    if tracking_used:
+        source_lines.append(f"- {tracking_source_label}")
 
     return answer + "\n".join(source_lines)
 
@@ -269,9 +325,17 @@ def generate_answer(state: AgentState, llm) -> AgentState:
     """
     query = state["user_query"]
     chunks = state["retrieved_chunks"]
+    tracking = state.get("tracking_context")
+    tracking_block = (
+        _TRACKING_BLOCK_TEMPLATE.format(
+            source_label=tracking["source_label"], block=tracking["block"]
+        )
+        if tracking
+        else None
+    )
 
-    # --- No results: skip LLM entirely ---
-    if not chunks:
+    # --- No results: skip LLM entirely (unless tracking data can answer) ---
+    if not chunks and not tracking_block:
         case_id = state.get("case_id")
         if case_id:
             message = (
@@ -295,17 +359,33 @@ def generate_answer(state: AgentState, llm) -> AgentState:
         state["clarification_question"] = None
         return state
 
-    # --- Build context ---
-    context = _build_context(chunks)
+    # --- Build prompt ---
+    # The tracking block (when present) is ALWAYS in the prompt — it is
+    # injected structured data, never subject to retrieval — and always
+    # kept separate from the retrieved excerpts so the model can't
+    # attribute a live-portal fact to a document.
+    system_prompt = _ANSWER_SYSTEM
+    if tracking_block:
+        system_prompt += _ANSWER_SYSTEM_TRACKING_ADDON
+
+    if not chunks:
+        user_content = _ANSWER_USER_TRACKING_ONLY.format(
+            query=query, tracking_block=tracking_block
+        )
+    elif tracking_block:
+        user_content = _ANSWER_USER_WITH_TRACKING.format(
+            query=query,
+            tracking_block=tracking_block,
+            context=_build_context(chunks),
+        )
+    else:
+        user_content = _ANSWER_USER.format(query=query, context=_build_context(chunks))
 
     # Include conversation history for follow-up awareness
-    messages: list[dict] = [{"role": "system", "content": _ANSWER_SYSTEM}]
+    messages: list[dict] = [{"role": "system", "content": system_prompt}]
     for msg in state.get("conversation_history", [])[-config.MAX_CONVERSATION_HISTORY:]:
         messages.append({"role": msg["role"], "content": msg["content"]})
-    messages.append({
-        "role": "user",
-        "content": _ANSWER_USER.format(query=query, context=context),
-    })
+    messages.append({"role": "user", "content": user_content})
 
     answer = llm.generate(
         messages,
@@ -313,27 +393,44 @@ def generate_answer(state: AgentState, llm) -> AgentState:
         max_tokens=config.LLM_MAX_TOKENS,
     )
 
+    # --- Inline citation extraction (no LLM call) ---
+    citations = _extract_citations_from_answer(answer, chunks)
+
     # --- Low confidence disclaimer (no LLM call) ---
-    if state["search_confidence"] < config.CONFIDENCE_THRESHOLD:
+    # Skipped for answers sourced purely from tracking data ([Tracking
+    # Data] cited, no document citations) — the excerpt-coverage warning
+    # is about retrieval quality and would be misleading there.
+    tracking_only_answer = bool(
+        tracking_block and _TRACKING_MARKER_RE.search(answer) and not citations
+    )
+    if state["search_confidence"] < config.CONFIDENCE_THRESHOLD and not tracking_only_answer:
         disclaimer = (
             "**Note:** The retrieved excerpts may not fully cover this topic. "
             "Please verify the answer against the original documents.\n\n"
         )
         answer = disclaimer + answer
 
-    # --- Inline citation extraction (no LLM call) ---
-    citations = _extract_citations_from_answer(answer, chunks)
-
     # --- Format sources section (no LLM call) ---
-    answer = _format_sources_section(answer, citations, chunks)
+    answer = _format_sources_section(
+        answer,
+        citations,
+        chunks,
+        tracking_source_label=tracking["source_label"] if tracking else None,
+    )
 
     # --- Confidence heuristic ---
     word_count = len(answer.split())
-    confidence = (
-        state["search_confidence"] * 0.5
-        + min(state["chunk_count"] / 5, 1.0) * 0.3
-        + min(word_count / 100, 1.0) * 0.2
-    )
+    if tracking_only_answer:
+        # Answered from live structured portal data, not retrieval — the
+        # retrieval-based factors below would misreport this as low
+        # confidence.
+        confidence = 0.9
+    else:
+        confidence = (
+            state["search_confidence"] * 0.5
+            + min(state["chunk_count"] / 5, 1.0) * 0.3
+            + min(word_count / 100, 1.0) * 0.2
+        )
 
     state["answer"] = answer
     state["citations"] = citations

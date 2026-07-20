@@ -15,6 +15,9 @@ export type DocumentType =
   | "brief"
   | "motion"
   | "order"
+  // Fetched automatically from the eCourts portal by order sync --
+  // rendered with a "From eCourts" badge.
+  | "court_order"
   | "other";
 
 export interface Document {

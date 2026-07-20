@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 
 from django.utils import timezone
 
-from core.models import ActivityLog, Case, CourtFetchLog, CourtTrackingPreview, Hearing
+from core.models import ActivityLog, Case, CourtFetchLog, CourtTrackingPreview, Hearing, ProcessingJob
 from core.services.court_data import CourtCaseData, CourtDataError, get_provider
 
 logger = logging.getLogger(__name__)
@@ -128,6 +128,8 @@ def refresh_case_tracking(case: Case, *, force: bool = False) -> dict:
             description=f"eCourts: new hearing date(s) found for {case.case_number}: {dates_str}",
         )
 
+    _enqueue_order_sync(case)
+
     return {
         "rate_limited": False,
         "retry_after": None,
@@ -135,6 +137,24 @@ def refresh_case_tracking(case: Case, *, force: bool = False) -> dict:
         "data": data,
         "new_hearing_dates": new_hearing_dates,
     }
+
+
+def _enqueue_order_sync(case: Case) -> None:
+    """Queue the Phase B order-sync step after a successful hearing sync.
+
+    Runs in the process_jobs worker, never inline -- the portal-facing
+    downloads (sequential, delayed) must not sit inside a request cycle.
+    Only reachable from refresh_case_tracking/confirm_case_tracking, both
+    of which sit behind the per-case refresh cooldown, so order sync
+    inherits that rate limit; ProcessingJob.enqueue_order_sync also
+    dedupes against an already-queued/running sync for the same case.
+    Never raises -- an enqueue failure must not fail the fetch that
+    triggered it.
+    """
+    try:
+        ProcessingJob.enqueue_order_sync(case)
+    except Exception:
+        logger.warning("Failed to enqueue order sync for case %s", case.id, exc_info=True)
 
 
 def _cleanup_expired_previews() -> None:
@@ -304,6 +324,8 @@ def confirm_case_tracking(case: Case, preview_token: str, *, user_id: int) -> di
             description=f"eCourts: new hearing date(s) found for {case.case_number}: {dates_str}",
         )
 
+    _enqueue_order_sync(case)
+
     # One-time use -- a stale token can't be replayed to re-persist the
     # same (or since-changed) payload after this.
     preview.delete()
@@ -436,3 +458,93 @@ def latest_snapshot(case: Case) -> dict | None:
     if log is None or not log.fields_changed:
         return None
     return log.fields_changed.get("snapshot")
+
+
+# Recent-hearing rows included in the AI context block. Kept small on
+# purpose -- the block must stay a few hundred tokens, not the full
+# hearing history (which can run to dozens of rows on an old case).
+AI_CONTEXT_MAX_HEARINGS = 5
+
+_AI_CONTEXT_DATE_FORMAT = "%d %b %Y"
+
+
+def build_ai_context(case: Case) -> dict | None:
+    """Compact court-tracking context for the Case Bot generation prompt.
+
+    Returns None unless the case has tracking enabled AND at least one
+    successful fetch (a snapshot to report) -- an untracked case must
+    leave the chat pipeline exactly as it was.
+
+    Returns:
+        {
+            "block": str,         # the data block injected into the prompt
+            "source_label": str,  # e.g. "eCourts tracking data (refreshed 19 Jul 2026, 17:06 UTC)"
+        }
+
+    This is prompt context from LIVE PORTAL DATA, not from any uploaded
+    document -- the caller must present it to the LLM as a separate block
+    from retrieved chunks so answers never attribute these facts to a
+    document citation.
+    """
+    if not case.tracking_enabled:
+        return None
+    snapshot = latest_snapshot(case)
+    if snapshot is None:
+        return None
+
+    if case.last_fetched_at:
+        local = timezone.localtime(case.last_fetched_at)
+        refreshed = local.strftime(f"{_AI_CONTEXT_DATE_FORMAT}, %H:%M %Z")
+    else:
+        refreshed = "unknown"
+
+    def _fmt_date(iso: str | None) -> str | None:
+        if not iso:
+            return None
+        try:
+            return datetime.fromisoformat(iso).strftime(_AI_CONTEXT_DATE_FORMAT)
+        except ValueError:
+            return iso
+
+    lines = []
+    if snapshot.get("case_status"):
+        lines.append(f"Case status: {snapshot['case_status']}")
+    if snapshot.get("case_stage"):
+        lines.append(f"Case stage: {snapshot['case_stage']}")
+    if snapshot.get("court_name"):
+        lines.append(f"Court: {snapshot['court_name']}")
+    if snapshot.get("court_and_judge"):
+        lines.append(f"Court number and judge: {snapshot['court_and_judge']}")
+    if case.cnr_number:
+        lines.append(f"CNR number: {case.cnr_number}")
+    next_date = _fmt_date(snapshot.get("next_hearing_date"))
+    if next_date:
+        lines.append(f"Next hearing date: {next_date}")
+    first_date = _fmt_date(snapshot.get("first_hearing_date"))
+    if first_date:
+        lines.append(f"First hearing date: {first_date}")
+    if snapshot.get("nature_of_disposal"):
+        lines.append(f"Nature of disposal: {snapshot['nature_of_disposal']}")
+
+    recent = (
+        Hearing.objects.filter(case=case, source="ecourts")
+        .order_by("-hearing_date")[:AI_CONTEXT_MAX_HEARINGS]
+    )
+    hearing_lines = []
+    for h in recent:
+        parts = [h.hearing_date.strftime(_AI_CONTEXT_DATE_FORMAT)]
+        if h.purpose:
+            parts.append(h.purpose)
+        parts.append(f"({h.status})")
+        hearing_lines.append("- " + " — ".join(parts[:-1]) + f" {parts[-1]}")
+    if hearing_lines:
+        lines.append(f"Most recent hearings (up to {AI_CONTEXT_MAX_HEARINGS}):")
+        lines.extend(hearing_lines)
+
+    if not lines:
+        return None
+
+    return {
+        "block": "\n".join(lines),
+        "source_label": f"eCourts tracking data (refreshed {refreshed})",
+    }

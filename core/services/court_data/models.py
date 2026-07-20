@@ -25,6 +25,29 @@ class HearingRecord:
 
 
 @dataclass
+class CourtOrderRecord:
+    """One row of a case's Orders table on the portal (metadata only --
+    the PDF itself is fetched separately via
+    CourtDataProvider.download_order, because the portals' download links
+    are session-bound and can't be stored/reused later).
+
+    dedup_key is the stable identity of an order across fetches:
+    "<cnr>:<order_number>:<order_date iso>". The portal's encrypted
+    download token is NOT part of it (it changes per session)."""
+
+    cnr: str
+    order_number: str
+    order_date: date | None = None
+    description: str = ""
+    judge: str = ""
+
+    @property
+    def dedup_key(self) -> str:
+        date_part = self.order_date.isoformat() if self.order_date else "unknown"
+        return f"{self.cnr}:{self.order_number}:{date_part}"
+
+
+@dataclass
 class CourtCaseData:
     """Normalized result of a single case lookup + history fetch."""
 
