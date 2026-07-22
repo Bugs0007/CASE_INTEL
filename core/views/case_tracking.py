@@ -201,7 +201,7 @@ class CaseTrackingView(APIView):
 
     def delete(self, request, pk):
         try:
-            case = Case.objects.get(pk=pk)
+            case = Case.objects.get(pk=pk, owner=request.user)
         except Case.DoesNotExist:
             return Response({"detail": "Case not found."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -225,7 +225,7 @@ class CaseTrackingPreviewView(APIView):
 
     def post(self, request, pk):
         try:
-            case = Case.objects.get(pk=pk)
+            case = Case.objects.get(pk=pk, owner=request.user)
         except Case.DoesNotExist:
             return Response({"detail": "Case not found."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -256,7 +256,7 @@ class CaseTrackingConfirmView(APIView):
 
     def post(self, request, pk):
         try:
-            case = Case.objects.get(pk=pk)
+            case = Case.objects.get(pk=pk, owner=request.user)
         except Case.DoesNotExist:
             return Response({"detail": "Case not found."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -284,7 +284,7 @@ class CaseTrackingRefreshView(APIView):
 
     def post(self, request, pk):
         try:
-            case = Case.objects.get(pk=pk)
+            case = Case.objects.get(pk=pk, owner=request.user)
         except Case.DoesNotExist:
             return Response({"detail": "Case not found."}, status=status.HTTP_404_NOT_FOUND)
 

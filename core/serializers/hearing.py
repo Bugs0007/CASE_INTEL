@@ -4,7 +4,7 @@ Serializers for case hearings.
 
 from rest_framework import serializers
 
-from core.models import Hearing
+from core.models import Case, Hearing
 
 
 class HearingSerializer(serializers.ModelSerializer):
@@ -13,6 +13,16 @@ class HearingSerializer(serializers.ModelSerializer):
         source="get_hearing_type_display", read_only=True
     )
     status_display = serializers.CharField(source="get_status_display", read_only=True)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Scope the writable "case" field to the requesting user's own
+        # cases -- without this, any case pk (including another user's)
+        # would pass field-level validation and let a hearing be attached
+        # to a case that isn't the caller's.
+        request = self.context.get("request")
+        if request is not None and "case" in self.fields:
+            self.fields["case"].queryset = Case.objects.filter(owner=request.user)
 
     class Meta:
         model = Hearing

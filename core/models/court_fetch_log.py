@@ -1,7 +1,9 @@
 from django.db import models
 
+from .mixins import OwnedModel
 
-class CourtFetchLog(models.Model):
+
+class CourtFetchLog(OwnedModel):
     """Audit trail for every real eCourts fetch attempt (not cache hits)."""
 
     case = models.ForeignKey(

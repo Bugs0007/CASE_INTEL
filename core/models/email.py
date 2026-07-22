@@ -1,7 +1,9 @@
 from django.db import models
 
+from .mixins import OwnedModel
 
-class Email(models.Model):
+
+class Email(OwnedModel):
     gmail_message_id = models.CharField(max_length=100, unique=True)
     gmail_thread_id = models.CharField(max_length=100, blank=True, null=True)
     case = models.ForeignKey(

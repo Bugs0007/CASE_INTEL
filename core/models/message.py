@@ -1,7 +1,9 @@
 from django.db import models
 
+from .mixins import OwnedModel
 
-class Message(models.Model):
+
+class Message(OwnedModel):
     ROLE_CHOICES = [
         ("user", "User"),
         ("assistant", "Assistant"),

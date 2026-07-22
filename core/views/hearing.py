@@ -7,9 +7,10 @@ from rest_framework import generics
 
 from core.models import Hearing
 from core.serializers import HearingSerializer
+from core.views.mixins import OwnerScopedMixin
 
 
-class HearingListCreateView(generics.ListCreateAPIView):
+class HearingListCreateView(OwnerScopedMixin, generics.ListCreateAPIView):
     """List or create hearings.
 
     GET  /api/hearings/
@@ -18,11 +19,16 @@ class HearingListCreateView(generics.ListCreateAPIView):
     GET  /api/hearings/?upcoming=true
     GET  /api/hearings/?past=true
     POST /api/hearings/
+
+    Scoped to request.user (OwnerScopedMixin). Note this also correctly
+    handles a case_id belonging to another user: filtering by case_id first
+    then owner last still yields an empty queryset, since no Hearing owned
+    by request.user can carry another user's case_id.
     """
 
     serializer_class = HearingSerializer
 
-    def get_queryset(self):
+    def get_base_queryset(self):
         qs = Hearing.objects.select_related("case")
 
         # Filter by case
@@ -46,12 +52,14 @@ class HearingListCreateView(generics.ListCreateAPIView):
         return qs
 
 
-class HearingDetailView(generics.RetrieveUpdateDestroyAPIView):
+class HearingDetailView(OwnerScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     """Retrieve, update, or delete a hearing.
 
     GET    /api/hearings/<id>/
     PATCH  /api/hearings/<id>/
     DELETE /api/hearings/<id>/
+
+    Scoped to request.user (OwnerScopedMixin).
     """
 
     serializer_class = HearingSerializer

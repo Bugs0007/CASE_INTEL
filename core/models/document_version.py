@@ -1,7 +1,9 @@
 from django.db import models
 
+from .mixins import OwnedModel
 
-class DocumentVersion(models.Model):
+
+class DocumentVersion(OwnedModel):
     document = models.ForeignKey(
         "core.Document", on_delete=models.CASCADE, related_name="versions"
     )

@@ -35,6 +35,8 @@ from core.views import (
     HearingDetailView,
     HearingListCreateView,
     LoginView,
+    LogoutView,
+    RegisterView,
     UpcomingHearingsView,
 )
 
@@ -42,7 +44,9 @@ app_name = "core"
 
 urlpatterns = [
     # Auth
+    path("auth/register/", RegisterView.as_view(), name="auth-register"),
     path("auth/login/", LoginView.as_view(), name="auth-login"),
+    path("auth/logout/", LogoutView.as_view(), name="auth-logout"),
 
     # Dashboard
     path("dashboard/", DashboardView.as_view(), name="dashboard"),

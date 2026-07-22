@@ -1,7 +1,9 @@
 from django.db import models
 
+from .mixins import OwnedModel
 
-class Conversation(models.Model):
+
+class Conversation(OwnedModel):
     case = models.ForeignKey(
         "core.Case", on_delete=models.CASCADE, blank=True, null=True,
         related_name="conversations"

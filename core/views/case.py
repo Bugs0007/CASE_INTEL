@@ -11,6 +11,7 @@ from rest_framework import generics
 
 from core.models import Case, Document, Hearing
 from core.serializers import CaseSerializer
+from core.views.mixins import OwnerScopedMixin
 
 
 def _annotate_needs_attention(qs, since_param):
@@ -53,7 +54,7 @@ def _annotate_next_hearing_date(qs):
     return qs.annotate(_next_hearing_date=Subquery(next_hearing))
 
 
-class CaseListCreateView(generics.ListCreateAPIView):
+class CaseListCreateView(OwnerScopedMixin, generics.ListCreateAPIView):
     """List or create cases.
 
     GET  /api/cases/
@@ -66,11 +67,14 @@ class CaseListCreateView(generics.ListCreateAPIView):
         document. `since` should be the caller's last-visit timestamp;
         omitting it just drops the eCourts-update signal.
     POST /api/cases/
+
+    All results are scoped to request.user (OwnerScopedMixin); POST always
+    stamps the new case with owner=request.user regardless of any input.
     """
 
     serializer_class = CaseSerializer
 
-    def get_queryset(self):
+    def get_base_queryset(self):
         qs = Case.objects.annotate(
             thread_count=Count("emails__gmail_thread_id", distinct=True),
             conversation_count=Count("conversations", distinct=True),
@@ -97,17 +101,20 @@ class CaseListCreateView(generics.ListCreateAPIView):
         return qs
 
 
-class CaseDetailView(generics.RetrieveUpdateDestroyAPIView):
+class CaseDetailView(OwnerScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     """Retrieve, update, or delete a case.
 
     GET    /api/cases/<id>/
     PATCH  /api/cases/<id>/
     DELETE /api/cases/<id>/
+
+    Scoped to request.user (OwnerScopedMixin) -- a case owned by another
+    user 404s here exactly as if it didn't exist.
     """
 
     serializer_class = CaseSerializer
 
-    def get_queryset(self):
+    def get_base_queryset(self):
         qs = Case.objects.annotate(
             thread_count=Count("emails__gmail_thread_id", distinct=True),
             conversation_count=Count("conversations", distinct=True),

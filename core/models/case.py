@@ -1,7 +1,9 @@
 from django.db import models
 
+from .mixins import OwnedModel
 
-class Case(models.Model):
+
+class Case(OwnedModel):
     CASE_TYPE_CHOICES = [
         ("civil", "Civil"),
         ("criminal", "Criminal"),
