@@ -5,6 +5,7 @@ Gmail OAuth and sync views.
 import logging
 from datetime import datetime, timedelta
 
+from django.core import signing
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
@@ -14,6 +15,13 @@ from rest_framework.views import APIView
 from core.models import Case, Email, GmailCredential
 
 logger = logging.getLogger(__name__)
+
+# Signs the initiating user's id into the OAuth "state" param so
+# GmailCallbackView (necessarily AllowAny -- see its docstring) can still
+# attribute the resulting GmailCredential to the right advocate, without
+# trusting an unsigned/forgeable value from a public redirect.
+_STATE_SALT = "core.views.gmail.oauth_state"
+_STATE_MAX_AGE_SECONDS = 600
 
 
 class GmailAuthView(APIView):
@@ -27,8 +35,9 @@ class GmailAuthView(APIView):
         try:
             from core.services.gmail_service import GmailService
 
+            state = signing.dumps({"user_id": request.user.id}, salt=_STATE_SALT)
             service = GmailService()
-            auth_url = service.get_auth_url()
+            auth_url = service.get_auth_url(state=state)
             return Response({"auth_url": auth_url})
         except ImportError as e:
             return Response(
@@ -62,11 +71,26 @@ class GmailCallbackView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        raw_state = request.query_params.get("state")
         try:
+            state = signing.loads(
+                raw_state or "", salt=_STATE_SALT, max_age=_STATE_MAX_AGE_SECONDS
+            )
+            owner_id = state["user_id"]
+        except (signing.BadSignature, KeyError, TypeError):
+            return Response(
+                {"detail": "Missing or invalid OAuth state. Please restart the Gmail connection flow."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            from django.contrib.auth.models import User
+
             from core.services.gmail_service import GmailService
 
+            owner = User.objects.get(id=owner_id)
             service = GmailService()
-            credential = service.handle_oauth_callback(code)
+            credential = service.handle_oauth_callback(code, owner=owner)
             return Response(
                 {
                     "message": "Gmail connected successfully",
@@ -88,7 +112,9 @@ class GmailStatusView(APIView):
     """
 
     def get(self, request: Request) -> Response:
-        credential = GmailCredential.objects.filter(is_active=True).first()
+        credential = GmailCredential.objects.filter(
+            owner=request.user, is_active=True
+        ).first()
         if not credential:
             return Response({"connected": False})
 
@@ -113,7 +139,9 @@ class GmailSyncView(APIView):
     """
 
     def post(self, request: Request) -> Response:
-        credential = GmailCredential.objects.filter(is_active=True).first()
+        credential = GmailCredential.objects.filter(
+            owner=request.user, is_active=True
+        ).first()
         if not credential:
             return Response(
                 {"detail": "Gmail not connected"},
@@ -137,6 +165,7 @@ class GmailSyncView(APIView):
                 labels=labels,
                 max_results=max_results,
                 after_date=after_date,
+                owner=request.user,
             )
             return Response(
                 {
@@ -161,7 +190,11 @@ class EmailListView(APIView):
     """
 
     def get(self, request: Request) -> Response:
-        qs = Email.objects.select_related("case").order_by("-sent_at")
+        qs = (
+            Email.objects.filter(owner=request.user)
+            .select_related("case")
+            .order_by("-sent_at")
+        )
 
         case_id = request.query_params.get("case_id")
         if case_id:
@@ -196,7 +229,7 @@ class EmailLinkView(APIView):
 
     def post(self, request: Request, pk: int) -> Response:
         try:
-            email = Email.objects.get(id=pk)
+            email = Email.objects.get(id=pk, owner=request.user)
         except Email.DoesNotExist:
             return Response(
                 {"detail": "Email not found"},
@@ -211,7 +244,7 @@ class EmailLinkView(APIView):
             )
 
         try:
-            case = Case.objects.get(id=case_id)
+            case = Case.objects.get(id=case_id, owner=request.user)
         except Case.DoesNotExist:
             return Response(
                 {"detail": "Case not found"},

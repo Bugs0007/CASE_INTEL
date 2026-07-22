@@ -112,6 +112,7 @@ def sync_case_orders(case: Case, progress_callback=None) -> dict:
             f"documents/court_orders/{filename}", ContentFile(pdf_bytes)
         )
         document = Document.objects.create(
+            owner=case.owner,
             case=case,
             filename=filename,
             file_path=saved_name,
@@ -123,6 +124,7 @@ def sync_case_orders(case: Case, progress_callback=None) -> dict:
             content_hash=hashlib.sha256(pdf_bytes).hexdigest(),
         )
         CourtOrder.objects.create(
+            owner=case.owner,
             case=case,
             order_number=record.order_number,
             order_date=record.order_date,
@@ -143,6 +145,7 @@ def sync_case_orders(case: Case, progress_callback=None) -> dict:
 
     if downloaded:
         ActivityLog.objects.create(
+            owner=case.owner,
             case=case,
             activity_type="court_order_fetched",
             description=(

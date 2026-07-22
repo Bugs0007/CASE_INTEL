@@ -109,6 +109,7 @@ def refresh_case_tracking(case: Case, *, force: bool = False) -> dict:
     finally:
         duration_ms = int((time.monotonic() - start) * 1000)
         CourtFetchLog.objects.create(
+            owner=case.owner,
             case=case,
             success=success,
             error_message=error_message,
@@ -123,6 +124,7 @@ def refresh_case_tracking(case: Case, *, force: bool = False) -> dict:
     if new_hearing_dates:
         dates_str = ", ".join(d.isoformat() for d in new_hearing_dates)
         ActivityLog.objects.create(
+            owner=case.owner,
             case=case,
             activity_type="court_hearing_update",
             description=f"eCourts: new hearing date(s) found for {case.case_number}: {dates_str}",
@@ -305,6 +307,7 @@ def confirm_case_tracking(case: Case, preview_token: str, *, user_id: int) -> di
     log_payload = _build_snapshot(data, new_hearing_dates)
 
     CourtFetchLog.objects.create(
+        owner=case.owner,
         case=case,
         success=True,
         error_message=None,
@@ -319,6 +322,7 @@ def confirm_case_tracking(case: Case, preview_token: str, *, user_id: int) -> di
     if new_hearing_dates:
         dates_str = ", ".join(d.isoformat() for d in new_hearing_dates)
         ActivityLog.objects.create(
+            owner=case.owner,
             case=case,
             activity_type="court_hearing_update",
             description=f"eCourts: new hearing date(s) found for {case.case_number}: {dates_str}",
@@ -363,6 +367,7 @@ def untrack_case(case: Case) -> None:
     )
 
     ActivityLog.objects.create(
+        owner=case.owner,
         case=case,
         activity_type="court_tracking_removed",
         description=f"Court tracking removed for {case.case_number}",
@@ -409,6 +414,7 @@ def _upsert_hearings(case: Case, data: CourtCaseData) -> list:
             hearing_date=hearing_datetime,
             source="ecourts",
             defaults={
+                "owner": case.owner,
                 "hearing_type": "other",
                 "location": data.court_name or "",
                 "judge": record.judge or "",

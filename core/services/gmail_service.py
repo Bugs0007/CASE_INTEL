@@ -38,8 +38,16 @@ class GmailService:
             }
         }
 
-    def get_auth_url(self) -> str:
-        """Generate OAuth authorization URL."""
+    def get_auth_url(self, state: str) -> str:
+        """Generate OAuth authorization URL.
+
+        `state` round-trips through Google back to GmailCallbackView (a
+        signed, timestamped user id -- see core/views/gmail.py) so the
+        credential created on callback can be attributed to the advocate
+        who started the flow, even though the callback itself is
+        necessarily unauthenticated (a top-level browser redirect from
+        Google, not a token-bearing frontend call).
+        """
         try:
             from urllib.parse import urlencode
 
@@ -49,7 +57,7 @@ class GmailService:
                 "GMAIL_REDIRECT_URI",
                 "http://localhost:8000/api/gmail/callback/",
             )
-            
+
             params = {
                 "client_id": client_id,
                 "redirect_uri": redirect_uri,
@@ -57,8 +65,9 @@ class GmailService:
                 "scope": " ".join(self.SCOPES),
                 "access_type": "offline",
                 "prompt": "consent",
+                "state": state,
             }
-            
+
             auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
             return auth_url
         except ImportError:
@@ -67,7 +76,7 @@ class GmailService:
                 "Install it with: pip install google-auth-oauthlib"
             )
 
-    def handle_oauth_callback(self, authorization_code: str) -> GmailCredential:
+    def handle_oauth_callback(self, authorization_code: str, owner) -> GmailCredential:
         """Exchange authorization code for tokens and store credentials."""
         import requests
         from google.oauth2.credentials import Credentials
@@ -112,10 +121,21 @@ class GmailService:
         else:
             token_expiry = datetime.now() + timedelta(hours=1)
 
-        # Store or update credentials
+        # Store or update credentials. email_address is globally unique on
+        # this model (one row per Gmail inbox), so if it's already claimed
+        # by a DIFFERENT advocate we refuse to silently reassign it to the
+        # user who just completed this OAuth flow -- that would hand one
+        # user's connected inbox to someone else.
+        existing = GmailCredential.objects.filter(email_address=email_address).first()
+        if existing is not None and existing.owner_id != owner.id:
+            raise ValueError(
+                f"{email_address} is already connected to a different Case Intel account."
+            )
+
         credential, created = GmailCredential.objects.update_or_create(
             email_address=email_address,
             defaults={
+                "owner": owner,
                 "access_token": creds.token,
                 "refresh_token": creds.refresh_token or "",
                 "token_expiry": token_expiry,
@@ -130,6 +150,7 @@ class GmailService:
     def sync_emails(
         self,
         credential: GmailCredential,
+        owner,
         labels: Optional[List[str]] = None,
         max_results: int = 50,
         after_date: Optional[datetime] = None,
@@ -198,6 +219,7 @@ class GmailService:
 
             # Create Email record
             email = Email.objects.create(
+                owner=owner,
                 gmail_message_id=msg_id,
                 gmail_thread_id=msg.get("threadId"),
                 subject=headers.get("Subject"),
@@ -258,6 +280,7 @@ class GmailService:
                 continue
 
             EmailAttachment.objects.create(
+                owner=email.owner,
                 email=email,
                 filename=filename,
                 gmail_attachment_id=attachment_id,

@@ -5,8 +5,8 @@ Conversation views — list, retrieve, and delete conversations.
 from django.db.models import Count, OuterRef, Prefetch, Subquery, TextField
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
-from django.views import View
 from rest_framework import generics
+from rest_framework.views import APIView
 
 from core.models import Conversation, Message
 from core.serializers import (
@@ -20,6 +20,7 @@ from core.services.conversation_utils import (
     build_pdf_transcript,
     build_text_transcript,
 )
+from core.views.mixins import OwnerScopedMixin
 
 
 def _conversation_queryset():
@@ -45,16 +46,18 @@ def _conversation_queryset():
     )
 
 
-class ConversationListView(generics.ListAPIView):
+class ConversationListView(OwnerScopedMixin, generics.ListAPIView):
     """List conversations, optionally filtered by case_id.
 
     GET /api/conversations/
     GET /api/conversations/?case_id=1
+
+    Scoped to request.user (OwnerScopedMixin).
     """
 
     serializer_class = ConversationListSerializer
 
-    def get_queryset(self):
+    def get_base_queryset(self):
         qs = _conversation_queryset()
         case_id = self.request.query_params.get("case_id")
         if case_id is not None:
@@ -62,26 +65,33 @@ class ConversationListView(generics.ListAPIView):
         return qs
 
 
-class ConversationDetailView(generics.RetrieveDestroyAPIView):
+class ConversationDetailView(OwnerScopedMixin, generics.RetrieveDestroyAPIView):
     """Retrieve or delete a conversation with its messages.
 
     GET    /api/conversations/<id>/
     DELETE /api/conversations/<id>/
+
+    Scoped to request.user (OwnerScopedMixin).
     """
 
     serializer_class = ConversationDetailSerializer
     queryset = _conversation_queryset()
 
 
-class ConversationMessagesView(generics.ListAPIView):
+class ConversationMessagesView(OwnerScopedMixin, generics.ListAPIView):
     """Return ordered message history for a conversation.
 
     GET /api/conversations/<id>/messages/
+
+    Scoped to request.user (OwnerScopedMixin) -- messages always carry the
+    same owner as their conversation, so this also correctly returns empty
+    for a conversation id that belongs to another user, rather than leaking
+    it.
     """
 
     serializer_class = MessageSerializer
 
-    def get_queryset(self):
+    def get_base_queryset(self):
         return (
             Message.objects.filter(conversation_id=self.kwargs["pk"])
             .prefetch_related(
@@ -93,15 +103,24 @@ class ConversationMessagesView(generics.ListAPIView):
         )
 
 
-class ConversationExportView(View):
+class ConversationExportView(APIView):
     """Export a conversation transcript.
 
     GET /api/conversations/<id>/export/?format=txt|md|pdf
+
+    NOTE: this was previously a plain django.views.View, which meant it sat
+    OUTSIDE DRF's request/authentication pipeline entirely -- DRF's
+    TokenAuthentication only ever runs inside APIView.dispatch(), so
+    request.user here was always AnonymousUser and this endpoint was
+    reachable with no auth at all regardless of the global
+    DEFAULT_PERMISSION_CLASSES setting. Now an APIView, it goes through the
+    same TokenAuthentication + IsAuthenticated + owner-scoping as every
+    other endpoint.
     """
 
     def get(self, request, *args, **kwargs):
         conversation = get_object_or_404(
-            _conversation_queryset().filter(pk=kwargs["pk"])
+            _conversation_queryset().filter(pk=kwargs["pk"], owner=request.user)
         )
         requested_format = (request.GET.get("format") or "txt").lower()
         export_format = requested_format if requested_format in {"txt", "md", "pdf"} else "txt"

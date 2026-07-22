@@ -318,6 +318,7 @@ class DocumentProcessor:
 
         cloned = [
             DocumentChunk(
+                owner=target_doc.owner,
                 document=target_doc,
                 chunk_index=chunk.chunk_index,
                 chunk_text=chunk.chunk_text,
@@ -367,7 +368,11 @@ class DocumentProcessor:
 
             existing = (
                 Document.objects
-                .filter(content_hash=file_hash, processing_status="completed")
+                .filter(
+                    content_hash=file_hash,
+                    processing_status="completed",
+                    owner=document.owner,
+                )
                 .exclude(id=document_id)
                 .first()
             )
@@ -447,6 +452,7 @@ class DocumentProcessor:
                 embeddings = embedding_service.embed_texts(batch)
                 DocumentChunk.objects.bulk_create([
                     DocumentChunk(
+                        owner=document.owner,
                         document=document,
                         chunk_index=start + i,
                         chunk_text=chunk_text,

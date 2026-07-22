@@ -1,7 +1,9 @@
 from django.db import models
 
+from .mixins import OwnedModel
 
-class EmailAttachment(models.Model):
+
+class EmailAttachment(OwnedModel):
     email = models.ForeignKey(
         "core.Email", on_delete=models.CASCADE, related_name="attachments"
     )

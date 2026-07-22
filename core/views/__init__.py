@@ -6,7 +6,7 @@ existing imports like ``from core.views import ChatView``
 continue to work.
 """
 
-from .auth import LoginView
+from .auth import LoginView, LogoutView, RegisterView
 from .case import CaseDetailView, CaseListCreateView
 from .case_tracking import (
     CaseTrackingConfirmView,
@@ -70,5 +70,7 @@ __all__ = [
     "HearingDetailView",
     "HearingListCreateView",
     "LoginView",
+    "LogoutView",
+    "RegisterView",
     "UpcomingHearingsView",
 ]

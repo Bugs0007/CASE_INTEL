@@ -1,7 +1,9 @@
 from django.db import models
 
+from .mixins import OwnedModel
 
-class CourtOrder(models.Model):
+
+class CourtOrder(OwnedModel):
     """An order/judgment PDF fetched from the court portal for a tracked
     case (Phase B).
 

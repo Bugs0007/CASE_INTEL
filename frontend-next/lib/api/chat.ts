@@ -1,3 +1,4 @@
+import { getToken } from "@/lib/auth";
 import { API_BASE_URL, APIError, apiClient } from "./client";
 import type {
   ChatRequest,
@@ -38,7 +39,15 @@ export const conversationsApi = {
     const url = new URL(`${API_BASE_URL}/conversations/${id}/export/`);
     url.searchParams.set("format", format);
 
-    const response = await fetch(url.toString());
+    // This endpoint now requires auth like every other (it used to be an
+    // unauthenticated plain Django view -- see core/views/conversation.py),
+    // so the Authorization header has to be attached explicitly here same
+    // as apiClient() does, since we can't use apiClient() itself (it JSON-
+    // parses responses; this one returns a raw file blob).
+    const token = getToken();
+    const response = await fetch(url.toString(), {
+      headers: token ? { Authorization: `Token ${token}` } : {},
+    });
     if (!response.ok) {
       const data = await response.json().catch(() => null);
       throw new APIError(response.status, data);

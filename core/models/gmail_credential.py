@@ -4,8 +4,10 @@ Gmail OAuth credential storage.
 
 from django.db import models
 
+from .mixins import OwnedModel
 
-class GmailCredential(models.Model):
+
+class GmailCredential(OwnedModel):
     """Stores Gmail OAuth tokens."""
 
     email_address = models.EmailField(unique=True)

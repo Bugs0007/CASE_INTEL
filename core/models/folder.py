@@ -1,7 +1,9 @@
 from django.db import models
 
+from .mixins import OwnedModel
 
-class Folder(models.Model):
+
+class Folder(OwnedModel):
     name = models.CharField(max_length=255)
     parent_folder = models.ForeignKey(
         "self", on_delete=models.CASCADE, blank=True, null=True, related_name="subfolders"
