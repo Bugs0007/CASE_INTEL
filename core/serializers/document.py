@@ -33,6 +33,17 @@ class DocumentSerializer(serializers.ModelSerializer):
     # Add folder name for display
     folder_name = serializers.CharField(source='folder.name', read_only=True, required=False)
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Scope the writable "folder" field to the requesting user's own
+        # folders -- the nested "case" field above never lets the caller
+        # reassign which case a document belongs to (see update() below),
+        # but "folder" is a plain writable PrimaryKeyRelatedField and would
+        # otherwise accept any folder id, including another user's.
+        request = self.context.get("request")
+        if request is not None and "folder" in self.fields:
+            self.fields["folder"].queryset = Folder.objects.filter(owner=request.user)
+
     # Latest background ProcessingJob (queued/running progress for the
     # frontend). Views prefetch processing_jobs newest-first (see
     # _with_latest_jobs in core/views/document.py) so these don't N+1.
@@ -163,11 +174,15 @@ class DocumentUploadSerializer(serializers.Serializer):
         return value
     
     def validate_case_id(self, value):
-        if value is not None and not Case.objects.filter(id=value).exists():
+        request = self.context.get("request")
+        owner = request.user if request is not None else None
+        if value is not None and not Case.objects.filter(id=value, owner=owner).exists():
             raise serializers.ValidationError(f"Case with id {value} does not exist.")
         return value
-    
+
     def validate_folder_id(self, value):
-        if value is not None and not Folder.objects.filter(id=value).exists():
+        request = self.context.get("request")
+        owner = request.user if request is not None else None
+        if value is not None and not Folder.objects.filter(id=value, owner=owner).exists():
             raise serializers.ValidationError(f"Folder with id {value} does not exist.")
         return value

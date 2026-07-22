@@ -1,7 +1,9 @@
 from django.db import models
 
+from .mixins import OwnedModel
 
-class Document(models.Model):
+
+class Document(OwnedModel):
     PROCESSING_STATUS_CHOICES = [
         ("pending", "Pending"),
         ("processing", "Processing"),

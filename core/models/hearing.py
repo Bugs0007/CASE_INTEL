@@ -1,7 +1,9 @@
 from django.db import models
 
+from .mixins import OwnedModel
 
-class Hearing(models.Model):
+
+class Hearing(OwnedModel):
     HEARING_TYPE_CHOICES = [
         ("preliminary", "Preliminary Hearing"),
         ("motion", "Motion Hearing"),

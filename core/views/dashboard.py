@@ -18,11 +18,14 @@ class DashboardView(APIView):
     """
 
     def get(self, request):
+        user = request.user
+
         # Core stats
-        active_cases = Case.objects.filter(status="open").count()
-        total_documents = Document.objects.count()
+        active_cases = Case.objects.filter(owner=user, status="open").count()
+        total_documents = Document.objects.filter(owner=user).count()
         email_threads = (
-            Email.objects.exclude(gmail_thread_id__isnull=True)
+            Email.objects.filter(owner=user)
+            .exclude(gmail_thread_id__isnull=True)
             .exclude(gmail_thread_id="")
             .values("gmail_thread_id")
             .distinct()
@@ -31,14 +34,15 @@ class DashboardView(APIView):
 
         # Documents by processing status
         documents_by_status = dict(
-            Document.objects.values("processing_status")
+            Document.objects.filter(owner=user)
+            .values("processing_status")
             .annotate(count=Count("id"))
             .values_list("processing_status", "count")
         )
 
         # Cases by priority (only open cases)
         cases_by_priority = dict(
-            Case.objects.filter(status="open")
+            Case.objects.filter(owner=user, status="open")
             .values("priority")
             .annotate(count=Count("id"))
             .values_list("priority", "count")
@@ -46,22 +50,29 @@ class DashboardView(APIView):
 
         # Cases by status
         cases_by_status = dict(
-            Case.objects.values("status")
+            Case.objects.filter(owner=user)
+            .values("status")
             .annotate(count=Count("id"))
             .values_list("status", "count")
         )
 
         # Recent emails (5 most recent)
-        recent_emails = Email.objects.select_related("case").order_by("-sent_at")[:5]
+        recent_emails = (
+            Email.objects.filter(owner=user)
+            .select_related("case")
+            .order_by("-sent_at")[:5]
+        )
 
         # Recent activity (10 most recent)
-        recent_activity = ActivityLog.objects.select_related("case").order_by(
-            "-created_at"
-        )[:10]
+        recent_activity = (
+            ActivityLog.objects.filter(owner=user)
+            .select_related("case")
+            .order_by("-created_at")[:10]
+        )
 
         # Active cases summary with document counts
         active_cases_qs = (
-            Case.objects.filter(status="open")
+            Case.objects.filter(owner=user, status="open")
             .annotate(document_count=Count("documents"))
             .order_by("-created_at")[:5]
         )
@@ -125,7 +136,8 @@ class UpcomingHearingsView(APIView):
     def get(self, request):
         today = timezone.localdate()
         hearings = (
-            Hearing.objects.select_related("case")
+            Hearing.objects.filter(owner=request.user)
+            .select_related("case")
             .filter(hearing_date__date__gte=today)
             .exclude(status__in=["cancelled", "completed"])
             .order_by("hearing_date")

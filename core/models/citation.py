@@ -1,7 +1,9 @@
 from django.db import models
 
+from .mixins import OwnedModel
 
-class Citation(models.Model):
+
+class Citation(OwnedModel):
     SOURCE_TYPE_CHOICES = [
         ("document", "Document"),
         ("email", "Email"),

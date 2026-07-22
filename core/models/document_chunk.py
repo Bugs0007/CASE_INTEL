@@ -3,8 +3,10 @@ from django.contrib.postgres.indexes import GinIndex
 from django.contrib.postgres.search import SearchVectorField
 from pgvector.django import HnswIndex, VectorField
 
+from .mixins import OwnedModel
 
-class DocumentChunk(models.Model):
+
+class DocumentChunk(OwnedModel):
     document = models.ForeignKey(
         "core.Document", on_delete=models.CASCADE, related_name="chunks"
     )

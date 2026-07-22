@@ -41,15 +41,19 @@ class ChatView(APIView):
             "conversation_id"
         )
 
-        # Validate case exists when provided
-        if case_id is not None and not Case.objects.filter(id=case_id).exists():
+        # Validate case exists AND belongs to this user when provided
+        if case_id is not None and not Case.objects.filter(
+            id=case_id, owner=request.user
+        ).exists():
             return Response(
                 {"detail": f"Case with id {case_id} does not exist."},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
         if conversation_id is not None:
-            conversation = Conversation.objects.filter(id=conversation_id).first()
+            conversation = Conversation.objects.filter(
+                id=conversation_id, owner=request.user
+            ).first()
             if conversation is None:
                 return Response(
                     {"detail": f"Conversation with id {conversation_id} does not exist."},
@@ -70,6 +74,7 @@ class ChatView(APIView):
 
         ai_response = _ai_service.process_query(
             user_query=query,
+            user=request.user,
             case_id=case_id,
             conversation_id=conversation_id,
         )

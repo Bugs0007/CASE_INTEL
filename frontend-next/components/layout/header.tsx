@@ -4,13 +4,23 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Search, Calendar, LogOut, Upload, Plus } from "lucide-react";
 import { clearToken, clearUsername } from "@/lib/auth";
+import { logout } from "@/lib/api/auth";
 import { useDialogs } from "@/providers/dialog-provider";
 
 export function Header() {
   const router = useRouter();
   const { openUploadDocument, openCreateCase } = useDialogs();
 
-  function handleLogout() {
+  async function handleLogout() {
+    // Best-effort: invalidate the token server-side too, so it can't be
+    // reused if it ever leaked (e.g. from browser history/logs). Clear
+    // local state and redirect regardless of whether the request succeeds.
+    try {
+      await logout();
+    } catch {
+      // Network error or already-invalid token -- proceed to clear local
+      // state anyway, since the whole point is to end this session.
+    }
     clearToken();
     clearUsername();
     router.push("/login");

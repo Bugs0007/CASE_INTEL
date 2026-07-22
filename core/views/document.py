@@ -15,6 +15,7 @@ from django.db.models import Prefetch
 
 from core.models import Case, Document, ProcessingJob
 from core.serializers import DocumentSerializer, DocumentUploadSerializer
+from core.views.mixins import OwnerScopedMixin
 
 
 def _with_latest_jobs(qs):
@@ -30,17 +31,19 @@ def _with_latest_jobs(qs):
 logger = logging.getLogger(__name__)
 
 
-class DocumentListView(generics.ListAPIView):
+class DocumentListView(OwnerScopedMixin, generics.ListAPIView):
     """List documents, optionally filtered by case_id and/or processing_status.
 
     GET /api/documents/
     GET /api/documents/?case_id=1
     GET /api/documents/?processing_status=failed
+
+    Scoped to request.user (OwnerScopedMixin).
     """
 
     serializer_class = DocumentSerializer
 
-    def get_queryset(self):
+    def get_base_queryset(self):
         qs = _with_latest_jobs(Document.objects.select_related("case"))
         case_id = self.request.query_params.get("case_id")
         if case_id is not None:
@@ -51,12 +54,14 @@ class DocumentListView(generics.ListAPIView):
         return qs
 
 
-class DocumentDetailView(generics.RetrieveUpdateDestroyAPIView):
+class DocumentDetailView(OwnerScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     """Retrieve, update, or delete a document.
 
     GET    /api/documents/<id>/
     PATCH  /api/documents/<id>/
     DELETE /api/documents/<id>/
+
+    Scoped to request.user (OwnerScopedMixin).
     """
 
     serializer_class = DocumentSerializer
@@ -76,19 +81,21 @@ class DocumentUploadView(APIView):
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request: Request) -> Response:
-        serializer = DocumentUploadSerializer(data=request.data)
+        serializer = DocumentUploadSerializer(
+            data=request.data, context={"request": request}
+        )
         serializer.is_valid(raise_exception=True)
 
         uploaded_file = serializer.validated_data["file"]
         case_id = serializer.validated_data.get("case_id")
+        folder_id = serializer.validated_data.get("folder_id")
         document_type = serializer.validated_data.get("document_type", "other")
 
-        # Validate case exists when provided
-        if case_id is not None and not Case.objects.filter(id=case_id).exists():
-            return Response(
-                {"detail": f"Case with id {case_id} does not exist."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+        # case_id/folder_id existence AND ownership are both already
+        # enforced by DocumentUploadSerializer's validate_case_id/
+        # validate_folder_id (scoped to request.user), so no further check
+        # is needed here -- a case_id/folder_id belonging to another user
+        # would already have failed validation above.
 
         # Determine file type from extension
         filename = uploaded_file.name
@@ -101,7 +108,9 @@ class DocumentUploadView(APIView):
 
         # Create document record
         document = Document.objects.create(
+            owner=request.user,
             case_id=case_id,
+            folder_id=folder_id,
             filename=filename,
             file_path=saved_name,
             file_type=file_type,
@@ -136,7 +145,7 @@ class DocumentProcessView(APIView):
 
     def post(self, request: Request, pk: int) -> Response:
         try:
-            document = Document.objects.get(id=pk)
+            document = Document.objects.get(id=pk, owner=request.user)
         except Document.DoesNotExist:
             return Response(
                 {"detail": "Document not found."},
@@ -175,7 +184,7 @@ class DocumentDownloadView(APIView):
 
     def get(self, request: Request, pk: int) -> Response:
         try:
-            document = Document.objects.get(id=pk)
+            document = Document.objects.get(id=pk, owner=request.user)
         except Document.DoesNotExist:
             return Response(
                 {"detail": "Document not found."},

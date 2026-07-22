@@ -106,6 +106,7 @@ class AIWorkflowService:
     @staticmethod
     def _save_user_message(conversation: Conversation, content: str) -> Message:
         return Message.objects.create(
+            owner=conversation.owner,
             conversation=conversation,
             role="user",
             content=content,
@@ -118,12 +119,14 @@ class AIWorkflowService:
         citations_data: list[dict],
     ) -> Message:
         message = Message.objects.create(
+            owner=conversation.owner,
             conversation=conversation,
             role="assistant",
             content=content,
         )
         citation_objects = [
             Citation(
+                owner=conversation.owner,
                 message=message,
                 source_type=cit.get("source_type", "chunk"),
                 document_id=cit.get("document_id"),
@@ -146,10 +149,16 @@ class AIWorkflowService:
         conversation_id: Optional[int],
         case_id: Optional[int],
         query: str,
+        user,
     ) -> Conversation:
         if conversation_id:
-            return Conversation.objects.get(id=conversation_id)
+            # Scoped to `user` -- this is the authoritative ownership check
+            # for the chat pipeline (not just a view-layer courtesy check),
+            # so a conversation_id belonging to another user raises
+            # DoesNotExist here rather than being silently reused.
+            return Conversation.objects.get(id=conversation_id, owner=user)
         return Conversation.objects.create(
+            owner=user,
             case_id=case_id,
             title=generate_conversation_title(query),
             last_message_at=timezone.now(),
@@ -163,12 +172,20 @@ class AIWorkflowService:
     def process_query(
         self,
         user_query: str,
+        user,
         case_id: Optional[int] = None,
         conversation_id: Optional[int] = None,
     ) -> AIResponse:
-        """Process a user query through the lean 3-node LangGraph pipeline."""
+        """Process a user query through the lean 3-node LangGraph pipeline.
+
+        `user` is the authoritative owner for any Conversation/Message/
+        Citation rows created or reused here -- ChatView already validates
+        that `case_id`/`conversation_id` belong to this user before calling
+        in, but this is the layer that actually stamps ownership, so it
+        stays correct even for other callers of this service.
+        """
         conversation = self._get_or_create_conversation(
-            conversation_id, case_id, user_query
+            conversation_id, case_id, user_query, user
         )
         self._save_user_message(conversation, user_query)
         if not conversation.title:
@@ -182,7 +199,7 @@ class AIWorkflowService:
         tracking_context = None
         if case_id is not None:
             try:
-                case = Case.objects.filter(id=case_id).first()
+                case = Case.objects.filter(id=case_id, owner=user).first()
                 if case is not None:
                     tracking_context = build_ai_context(case)
             except Exception:

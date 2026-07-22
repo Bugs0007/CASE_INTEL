@@ -1,7 +1,9 @@
 from django.db import models
 
+from .mixins import OwnedModel
 
-class ProcessingJob(models.Model):
+
+class ProcessingJob(OwnedModel):
     """A queued unit of document-processing work, claimed by the
     `process_jobs` worker via select_for_update(skip_locked=True).
 
@@ -91,7 +93,7 @@ class ProcessingJob(models.Model):
         )
         if existing is not None:
             return existing, False
-        return cls.objects.create(document=document), True
+        return cls.objects.create(owner=document.owner, document=document), True
 
     @classmethod
     def enqueue_order_sync(cls, case) -> tuple["ProcessingJob", bool]:
@@ -105,4 +107,4 @@ class ProcessingJob(models.Model):
         )
         if existing is not None:
             return existing, False
-        return cls.objects.create(case=case, job_type="order_sync"), True
+        return cls.objects.create(owner=case.owner, case=case, job_type="order_sync"), True
