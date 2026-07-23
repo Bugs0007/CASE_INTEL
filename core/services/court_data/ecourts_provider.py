@@ -62,6 +62,43 @@ number/party-name methods, never the portals' own CNR search pages):
   the response body; a rejected CAPTCHA there instead shows "ERROR_VAL"
   (the same portal-side error variable name already handled for
   showRecords -- confirmed by reading main.php's searchForError var).
+
+Advocate search (search_by_advocate, added for advocate onboarding --
+District Courts only so far; HC Services' equivalent hasn't been spiked):
+
+- Neither bharat-courts nor this module's own CNR-search work covers
+  advocate-name/bar-code search -- confirmed by grepping the installed
+  package (no case_status_by_advocate, no advocate endpoint helper in
+  districtcourts.endpoints). Discovered live by fetching
+  services.ecourts.gov.in/ecourtindia_v6/?p=casestatus/index directly and
+  its js/searchByCaseStatus.js (submit_adv_name()).
+- The portal's "Search by Advocate" tab (form id frm_adv_search_name)
+  POSTs to casestatus/submitAdvName -- a sibling of submitPartyName/
+  submitCaseNo, same JSON envelope shape ({status, div_captcha, adv_data}).
+- Two sub-modes selected by radAdvt: "1" = Advocate Name (field
+  advocate_name, min 3 chars per the page's own help text), "2" = Bar
+  Code -- submitted as THREE SEPARATE fields (adv_bar_state, adv_bar_code,
+  adv_bar_year), not one combined "STATE/NUMBER/YEAR" string; a bar code
+  argument here must be split on "/" before submitting.
+- case_status (Pending/Disposed/Both) is accepted same as party-name
+  search, but there is NO case-registration-year field for this search
+  mode at all -- confirmed by reading the live form HTML and its
+  client-side validation (validate_adv_name()), not assumed. This means a
+  single search call already returns everything; no year-range looping
+  is needed (unlike an earlier plan draft that assumed party-name
+  search's mandatory year requirement would carry over here).
+- The captcha field is named adv_bar_captcha... actually adv_captcha_code
+  -- a different name than fcaptcha_code (party/CNR) or case_captcha_code
+  (case-number search). Reuses the same generic captcha-image/OCR flow
+  (_solve_captcha()), just posted under this field's name.
+- Reuses parse_case_status_html for the adv_data payload -- same
+  results-grid shape the party-name/case-number searches already produce
+  (auto-detected 4- or 7-column format), not yet verified against a real
+  adv_data response body (a live end-to-end round trip during this spike
+  hit an unrelated "Invalid Request" error on list_districts() across
+  every state tried -- looks like a pre-existing bharat-courts/portal
+  drift issue, not something this method introduces; confirm this
+  independently if the manual CNR-cascade setup flow is also affected).
 """
 
 from __future__ import annotations
@@ -74,7 +111,7 @@ from datetime import date, datetime
 from bs4 import BeautifulSoup
 from django.core.cache import cache
 
-from bharat_courts import DistrictCourtClient, HCServicesClient, get_court, list_all_courts
+from bharat_courts import CaseInfo, DistrictCourtClient, HCServicesClient, get_court, list_all_courts
 from bharat_courts.districtcourts import endpoints as dc_endpoints
 from bharat_courts.districtcourts.parser import CaptchaError as DistrictCaptchaError
 from bharat_courts.districtcourts.parser import ServerError as DistrictServerError
@@ -132,6 +169,61 @@ def _normalize_ordinal_date(text: str) -> str:
     return _ORDINAL_RE.sub(r"\1", text)
 
 
+_BAR_CODE_RE = re.compile(r"^([A-Za-z]{2,3})/(\d+)/(\d{4})$")
+
+
+def split_bar_code(bar_code: str) -> tuple[str, str, str]:
+    """Split a "STATE/NUMBER/YEAR" bar registration number (e.g.
+    "MAH/1234/2015", per the portal's own help text) into the three
+    separate fields its Advocate-search form actually expects
+    (adv_bar_state/adv_bar_code/adv_bar_year) -- confirmed live, the
+    portal does NOT accept one combined string.
+
+    Raises ValueError if the format doesn't match."""
+    match = _BAR_CODE_RE.match(bar_code.strip())
+    if not match:
+        raise ValueError(
+            f"Bar code {bar_code!r} does not match the expected STATE/NUMBER/YEAR "
+            "format (e.g. MAH/1234/2015)."
+        )
+    return match.group(1).upper(), match.group(2), match.group(3)
+
+
+def _district_advocate_search_form(
+    *,
+    state_code: str,
+    dist_code: str,
+    court_complex_code: str,
+    est_code: str = "",
+    advocate_name: str = "",
+    bar_state: str = "",
+    bar_code: str = "",
+    bar_year: str = "",
+    status_filter: str = "Both",
+    captcha: str,
+) -> dict[str, str]:
+    """Form data for the District Courts "Search by Advocate" tab
+    (casestatus/submitAdvName) -- not in bharat_courts.districtcourts.
+    endpoints, discovered live (see module docstring). radAdvt selects
+    Advocate Name ("1") vs Bar Code ("2"); exactly one of advocate_name or
+    the bar_* trio should be populated by the caller."""
+    is_bar_code = bool(bar_state or bar_code or bar_year)
+    return {
+        "radAdvt": "2" if is_bar_code else "1",
+        "advocate_name": advocate_name,
+        "adv_bar_state": bar_state,
+        "adv_bar_code": bar_code,
+        "adv_bar_year": bar_year,
+        "case_status": status_filter,
+        "adv_captcha_code": captcha,
+        "state_code": state_code,
+        "dist_code": dist_code,
+        "court_complex_code": court_complex_code,
+        "est_code": est_code,
+        "case_type": "",
+    }
+
+
 _DETAIL_LABELS = {
     "first hearing date": "first_hearing_date",
     "next hearing date": "next_hearing_date",
@@ -163,6 +255,29 @@ def _extract_first_party(soup: BeautifulSoup, class_name: str) -> str:
             continue
         return _PARTY_NUMBERING_RE.sub("", line).strip()
     return ""
+
+
+_ADVOCATE_PREFIX_RE = re.compile(r"^advocate\s*[-:]\s*", re.I)
+
+
+def _extract_advocates(soup: BeautifulSoup, class_name: str) -> list[str]:
+    """Sibling of _extract_first_party: collects the "Advocate- ..." lines
+    that element interleaves with party names, instead of discarding them
+    (req: capture raw per-party advocate names for party-role detection).
+    Returns [] when the element has no advocate lines -- common; many
+    cases list no advocate, or the party is self-represented."""
+    el = soup.find(class_=class_name)
+    if el is None:
+        return []
+    advocates = []
+    for line in el.get_text("\n").split("\n"):
+        line = _clean(line)
+        if not line or not line.lower().startswith("advocate"):
+            continue
+        name = _ADVOCATE_PREFIX_RE.sub("", line).strip()
+        if name:
+            advocates.append(name)
+    return advocates
 
 
 def parse_case_history_html(html: str) -> CourtCaseData | None:
@@ -210,6 +325,14 @@ def parse_case_history_html(html: str) -> CourtCaseData | None:
 
     data.petitioner = _extract_first_party(soup, "Petitioner_Advocate_table")
     data.respondent = _extract_first_party(soup, "Respondent_Advocate_table")
+
+    petitioner_advocates = _extract_advocates(soup, "Petitioner_Advocate_table")
+    respondent_advocates = _extract_advocates(soup, "Respondent_Advocate_table")
+    if petitioner_advocates or respondent_advocates:
+        data.party_advocate_data = {
+            "petitioner_advocates": petitioner_advocates,
+            "respondent_advocates": respondent_advocates,
+        }
 
     # District Courts' CNR-search response has a court-name heading; HC
     # Services' doesn't expose an equivalent single element here, so
@@ -468,6 +591,49 @@ class EcourtsProvider(CourtDataProvider):
         raise ValueError(f"Unknown court_type: {court_type!r}")
 
     # ------------------------------------------------------------------
+    # Public: advocate search (District Courts only -- see module docstring)
+    # ------------------------------------------------------------------
+
+    def search_by_advocate(
+        self,
+        hierarchy: dict,
+        *,
+        advocate_name: str = "",
+        bar_code: str = "",
+        status_filter: str = "Both",
+    ) -> list[CaseInfo]:
+        """Search District Courts cases by advocate name or bar code.
+
+        Exactly one of advocate_name (min 3 chars, partial match per the
+        portal's own help text) or bar_code ("STATE/NUMBER/YEAR", e.g.
+        "MAH/1234/2015") must be given. No case-registration-year filter
+        exists for this search mode -- a single call already returns every
+        matching case for the given status_filter ("Pending"/"Disposed"/
+        "Both"), unlike case-number/party-name search.
+
+        hierarchy: {state_code, dist_code, court_complex_code, est_code?}.
+
+        Raises ValueError if neither/both of advocate_name/bar_code are
+        given, or bar_code doesn't match the expected format. Raises
+        CaseNotFoundError/CourtPortalError/CaptchaSolveError as usual.
+        """
+        if bool(advocate_name) == bool(bar_code):
+            raise ValueError("Exactly one of advocate_name or bar_code must be given.")
+        bar_state = bar_year = ""
+        if bar_code:
+            bar_state, bar_code, bar_year = split_bar_code(bar_code)
+        return asyncio.run(
+            self._district_search_by_advocate(
+                hierarchy,
+                advocate_name=advocate_name,
+                bar_state=bar_state,
+                bar_code=bar_code,
+                bar_year=bar_year,
+                status_filter=status_filter,
+            )
+        )
+
+    # ------------------------------------------------------------------
     # Public: orders (Phase B)
     # ------------------------------------------------------------------
 
@@ -636,6 +802,63 @@ class EcourtsProvider(CourtDataProvider):
         raise CourtPortalError(
             f"District Courts portal error after {MAX_RETRIES} attempts: {last_exc}"
         ) from last_exc
+
+    async def _district_search_by_advocate(
+        self,
+        hierarchy: dict,
+        *,
+        advocate_name: str,
+        bar_state: str,
+        bar_code: str,
+        bar_year: str,
+        status_filter: str,
+    ) -> list[CaseInfo]:
+        async with DistrictCourtClient() as client:
+            last_exc: Exception | None = None
+            for attempt in range(1, MAX_RETRIES + 1):
+                try:
+
+                    def build_form(captcha: str) -> dict:
+                        return _district_advocate_search_form(
+                            state_code=hierarchy["state_code"],
+                            dist_code=hierarchy["dist_code"],
+                            court_complex_code=hierarchy["court_complex_code"],
+                            est_code=hierarchy.get("est_code", ""),
+                            advocate_name=advocate_name,
+                            bar_state=bar_state,
+                            bar_code=bar_code,
+                            bar_year=bar_year,
+                            status_filter=status_filter,
+                            captcha=captcha,
+                        )
+
+                    result = await client._post_with_captcha_retry(
+                        "casestatus/submitAdvName",
+                        build_form,
+                        state_code=hierarchy["state_code"],
+                        dist_code=hierarchy["dist_code"],
+                        court_complex_code=hierarchy["court_complex_code"],
+                        est_code=hierarchy.get("est_code", ""),
+                    )
+                    html = result.get("adv_data", "")
+                    return parse_case_status_html(html)
+                except (DistrictServerError, DistrictCaptchaError) as exc:
+                    # Same gap as case-number/party-name search -- bharat-
+                    # courts' own retry only catches the literal "Invalid
+                    # Captcha" text; a generic ServerError propagates
+                    # uncaught without this outer loop.
+                    last_exc = exc
+                    logger.warning(
+                        "District Courts advocate search attempt %d/%d failed: %s",
+                        attempt, MAX_RETRIES, exc,
+                    )
+                    if attempt < MAX_RETRIES:
+                        await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
+            if isinstance(last_exc, DistrictCaptchaError):
+                raise CaptchaSolveError(f"CAPTCHA solving failed after {MAX_RETRIES} attempts.") from last_exc
+            raise CourtPortalError(
+                f"District Courts advocate search failed after {MAX_RETRIES} attempts: {last_exc}"
+            ) from last_exc
 
     async def _district_history_with_retry(self, client: DistrictCourtClient, view_args: dict):
         form = {

@@ -72,6 +72,16 @@ class Case(OwnedModel):
         max_length=20, choices=FETCH_STATUS_CHOICES, default="never_fetched"
     )
     tracking_enabled = models.BooleanField(default=False)
+    party_advocate_data = models.JSONField(
+        blank=True,
+        null=True,
+        help_text=(
+            "Raw per-party advocate name(s) as returned by eCourts case "
+            "details, e.g. {'petitioner_advocates': [...], "
+            "'respondent_advocates': [...]}. Captured during the full CNR "
+            "fetch for party-role detection."
+        ),
+    )
 
     class Meta:
         db_table = "cases"

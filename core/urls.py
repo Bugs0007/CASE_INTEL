@@ -7,6 +7,10 @@ All endpoints are prefixed with /api/ when included in the project root URLconf.
 from django.urls import path
 
 from core.views import (
+    AdvocateSearchImportStatusView,
+    AdvocateSearchImportView,
+    AdvocateSearchPreferenceView,
+    AdvocateSearchView,
     CaseDetailView,
     CaseListCreateView,
     CaseTrackingConfirmView,
@@ -103,6 +107,25 @@ urlpatterns = [
 
     # Court structure (eCourts hierarchy discovery for the tracking form)
     path("court-structure/", CourtStructureView.as_view(), name="court-structure"),
+
+    # Advocate search (search-by-name/bar-code + bulk import, secondary to
+    # the manual CNR entry above)
+    path("cases/search-advocate/", AdvocateSearchView.as_view(), name="advocate-search"),
+    path(
+        "cases/search-advocate/import/",
+        AdvocateSearchImportView.as_view(),
+        name="advocate-search-import",
+    ),
+    path(
+        "cases/search-advocate/import/<int:job_id>/",
+        AdvocateSearchImportStatusView.as_view(),
+        name="advocate-search-import-status",
+    ),
+    path(
+        "cases/search-advocate/preference/",
+        AdvocateSearchPreferenceView.as_view(),
+        name="advocate-search-preference",
+    ),
 
     # Hearings
     path("hearings/", HearingListCreateView.as_view(), name="hearing-list"),

@@ -6,6 +6,12 @@ existing imports like ``from core.views import ChatView``
 continue to work.
 """
 
+from .advocate_search import (
+    AdvocateSearchImportStatusView,
+    AdvocateSearchImportView,
+    AdvocateSearchPreferenceView,
+    AdvocateSearchView,
+)
 from .auth import LoginView, LogoutView, RegisterView
 from .case import CaseDetailView, CaseListCreateView
 from .case_tracking import (
@@ -42,6 +48,10 @@ from .gmail import (
 from .hearing import HearingDetailView, HearingListCreateView
 
 __all__ = [
+    "AdvocateSearchImportStatusView",
+    "AdvocateSearchImportView",
+    "AdvocateSearchPreferenceView",
+    "AdvocateSearchView",
     "CaseDetailView",
     "CaseListCreateView",
     "CaseTrackingConfirmView",

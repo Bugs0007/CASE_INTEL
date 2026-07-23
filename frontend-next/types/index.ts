@@ -5,3 +5,4 @@ export * from "./chat";
 export * from "./email";
 export * from "./dashboard";
 export * from "./case-tracking";
+export * from "./advocate-search";

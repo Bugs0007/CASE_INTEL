@@ -378,10 +378,20 @@ def _apply_case_data(case: Case, data: CourtCaseData) -> None:
     """Persist the CNR on first successful fetch. Everything else
     (status/stage/judge/next hearing) is derived from Hearing rows and
     the latest CourtFetchLog snapshot -- see _build_snapshot -- rather
-    than new Case columns, since Phase A1 deliberately didn't add them."""
+    than new Case columns, since Phase A1 deliberately didn't add them.
+
+    party_advocate_data is the exception -- it's raw per-party advocate
+    names captured for party-role detection, not a display snapshot, so
+    it's kept current on every successful fetch (not just the first)."""
+    update_fields = []
     if not case.cnr_number and data.cnr:
         case.cnr_number = data.cnr
-        case.save(update_fields=["cnr_number"])
+        update_fields.append("cnr_number")
+    if data.party_advocate_data and case.party_advocate_data != data.party_advocate_data:
+        case.party_advocate_data = data.party_advocate_data
+        update_fields.append("party_advocate_data")
+    if update_fields:
+        case.save(update_fields=update_fields)
 
 
 def _upsert_hearings(case: Case, data: CourtCaseData) -> list:
