@@ -10,6 +10,7 @@ from .advocate_search import (
     AdvocateSearchImportStatusView,
     AdvocateSearchImportView,
     AdvocateSearchPreferenceView,
+    AdvocateSearchStatusView,
     AdvocateSearchView,
 )
 from .auth import LoginView, LogoutView, RegisterView
@@ -51,6 +52,7 @@ __all__ = [
     "AdvocateSearchImportStatusView",
     "AdvocateSearchImportView",
     "AdvocateSearchPreferenceView",
+    "AdvocateSearchStatusView",
     "AdvocateSearchView",
     "CaseDetailView",
     "CaseListCreateView",

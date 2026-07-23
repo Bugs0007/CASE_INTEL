@@ -13,6 +13,7 @@ import { useCourtStructure } from "@/hooks/use-case-tracking";
 import {
   useAdvocateImportJob,
   useAdvocateSearch,
+  useAdvocateSearchJob,
   useAdvocateSearchPreference,
   useImportAdvocateCases,
 } from "@/hooks/use-advocate-search";
@@ -21,50 +22,36 @@ import { caseKeys } from "@/hooks/use-cases";
 import type { AdvocateSearchResult } from "@/types";
 
 const BAR_CODE_RE = /^[A-Za-z]{2,3}\/\d+\/\d{4}$/;
+const IMPORT_CAP = 100;
 
 export default function AdvocateSearchPage() {
   const queryClient = useQueryClient();
   const { data: preference } = useAdvocateSearchPreference();
 
   const [stateCode, setStateCode] = useState("");
-  const [distCode, setDistCode] = useState("");
-  const [complexValue, setComplexValue] = useState("");
   const [nameOrBarCode, setNameOrBarCode] = useState("");
   const [statusFilter, setStatusFilter] = useState<"Pending" | "Disposed" | "Both">("Both");
   const [formError, setFormError] = useState<string | null>(null);
-  const [results, setResults] = useState<AdvocateSearchResult[] | null>(null);
+
+  const [searchJobId, setSearchJobId] = useState<number | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [importJobId, setImportJobId] = useState<number | null>(null);
 
-  // Pre-fill state/district from the caller's last search, once -- court
-  // complex is left for reselection since the saved hierarchy_config
-  // stores the parsed complex_code, not the raw dropdown value the
-  // <Select> below needs to match against.
+  // Pre-fill the state from the caller's last search, once.
   useEffect(() => {
     if (!preference || stateCode) return;
     setStateCode(preference.hierarchy_config.state_code ?? "");
-    setDistCode(preference.hierarchy_config.dist_code ?? "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preference]);
 
   const states = useCourtStructure({ court_type: "district" });
-  const districts = useCourtStructure(
-    stateCode ? { court_type: "district", state_code: stateCode } : null,
-  );
-  const complexes = useCourtStructure(
-    stateCode && distCode ? { court_type: "district", state_code: stateCode, dist_code: distCode } : null,
-  );
-
-  const complexOption =
-    complexValue && complexes.data
-      ? (complexes.data.options[complexValue] as { label: string; complex_code?: string; est_code?: string })
-      : null;
 
   const nameLooksLikeBarCode = BAR_CODE_RE.test(nameOrBarCode.trim());
   const nameValid = nameLooksLikeBarCode || nameOrBarCode.trim().length >= 3;
-  const canSearch = !!complexOption?.complex_code && nameValid && nameOrBarCode.trim().length > 0;
+  const canSearch = !!stateCode && nameValid && nameOrBarCode.trim().length > 0;
 
   const search = useAdvocateSearch();
+  const searchJob = useAdvocateSearchJob(searchJobId);
   const startImport = useImportAdvocateCases();
   const importJob = useAdvocateImportJob(importJobId);
 
@@ -77,31 +64,26 @@ export default function AdvocateSearchPage() {
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
-    if (!canSearch || !complexOption) return;
+    if (!canSearch) return;
 
-    setResults(null);
     setSelected(new Set());
     setImportJobId(null);
+    setSearchJobId(null);
 
     try {
-      const response = await search.mutateAsync({
+      const { job_id } = await search.mutateAsync({
         name_or_bar_code: nameOrBarCode.trim(),
         court_type: "district",
-        hierarchy_config: {
-          state_code: stateCode,
-          dist_code: distCode,
-          court_complex_code: complexOption.complex_code!,
-          est_code: complexOption.est_code || "",
-        },
+        state_code: stateCode,
         status_filter: statusFilter,
       });
-      setResults(response.results);
+      setSearchJobId(job_id);
     } catch (error) {
       if (error instanceof APIError && error.data && typeof error.data === "object") {
         const detail = (error.data as { detail?: string }).detail;
-        setFormError(detail || "Could not reach the court portal. Please try again.");
+        setFormError(detail || "Could not start the search. Please try again.");
       } else {
-        setFormError("Could not reach the court portal. Please try again.");
+        setFormError("Could not reach the server. Please try again.");
       }
     }
   }
@@ -116,9 +98,11 @@ export default function AdvocateSearchPage() {
   }
 
   async function handleAddToMyCases() {
-    if (!results || selected.size === 0) return;
+    const results = searchJob.data?.results ?? [];
+    if (selected.size === 0) return;
     const toAdd = results
       .filter((r) => selected.has(r.cnr_number))
+      .slice(0, IMPORT_CAP)
       .map((r) => ({
         cnr_number: r.cnr_number,
         case_number: r.case_number,
@@ -142,8 +126,12 @@ export default function AdvocateSearchPage() {
       </option>
     ));
 
-  const job = importJob.data;
-  const importDone = job?.status === "succeeded" || job?.status === "failed";
+  const sj = searchJob.data;
+  const searchRunning =
+    searchJobId !== null && (!sj || sj.status === "queued" || sj.status === "running");
+  const results: AdvocateSearchResult[] = sj?.results ?? [];
+  const ij = importJob.data;
+  const importDone = ij?.status === "succeeded" || ij?.status === "failed";
 
   return (
     <div className="px-4 sm:px-7 pt-5 sm:pt-7 pb-[60px] max-w-[900px] mx-auto">
@@ -157,8 +145,8 @@ export default function AdvocateSearchPage() {
         </Link>
         <h1 className="text-page-title text-gray-900 mt-2 mb-1.5">Search by Advocate</h1>
         <p className="text-sm text-gray-600">
-          Find your cases on eCourts by advocate name or bar registration number, then add the
-          ones you want to Case Intel.
+          Pick a state and enter your advocate name or bar registration number. Case Intel searches
+          every district court in that state and gathers all your cases — then you choose which to add.
         </p>
       </div>
 
@@ -166,7 +154,7 @@ export default function AdvocateSearchPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Search className="h-5 w-5 text-gray-500" />
-            District Court
+            District Courts — State-wide
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -175,46 +163,13 @@ export default function AdvocateSearchPage() {
               <label className="mb-1 block text-sm font-medium text-gray-700">State</label>
               <Select
                 value={stateCode}
-                onChange={(e) => {
-                  setStateCode(e.target.value);
-                  setDistCode("");
-                  setComplexValue("");
-                }}
+                onChange={(e) => setStateCode(e.target.value)}
                 disabled={states.isLoading}
               >
                 <option value="">{states.isLoading ? "Loading..." : "Select a state"}</option>
                 {renderOptions(states.data?.options)}
               </Select>
             </div>
-            {stateCode && (
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">District</label>
-                <Select
-                  value={distCode}
-                  onChange={(e) => {
-                    setDistCode(e.target.value);
-                    setComplexValue("");
-                  }}
-                  disabled={districts.isLoading}
-                >
-                  <option value="">{districts.isLoading ? "Loading..." : "Select a district"}</option>
-                  {renderOptions(districts.data?.options)}
-                </Select>
-              </div>
-            )}
-            {distCode && (
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Court Complex</label>
-                <Select
-                  value={complexValue}
-                  onChange={(e) => setComplexValue(e.target.value)}
-                  disabled={complexes.isLoading}
-                >
-                  <option value="">{complexes.isLoading ? "Loading..." : "Select a court complex"}</option>
-                  {renderOptions(complexes.data?.options)}
-                </Select>
-              </div>
-            )}
 
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -249,6 +204,15 @@ export default function AdvocateSearchPage() {
               </div>
             </div>
 
+            <div className="flex items-start gap-2 rounded-lg bg-[#ebf3fb] border border-[#d6e7f7] p-3 text-xs text-[#2f6fb0]">
+              <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+              <span>
+                A state-wide search checks every district and court complex, one at a time, and can
+                take <strong>several minutes</strong> (longer for large states). You can leave this
+                page open — progress is shown below.
+              </span>
+            </div>
+
             {formError && (
               <div className="flex items-start gap-2 rounded-lg bg-[#fdecec] p-3 text-sm text-[#b32e26]">
                 <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
@@ -256,16 +220,20 @@ export default function AdvocateSearchPage() {
               </div>
             )}
 
-            <Button type="submit" disabled={!canSearch || search.isPending} className="w-full">
-              {search.isPending ? (
+            <Button
+              type="submit"
+              disabled={!canSearch || search.isPending || searchRunning}
+              className="w-full"
+            >
+              {search.isPending || searchRunning ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Searching eCourts...
+                  Searching…
                 </>
               ) : (
                 <>
                   <Search className="h-4 w-4" />
-                  Search
+                  Search State-wide
                 </>
               )}
             </Button>
@@ -273,21 +241,64 @@ export default function AdvocateSearchPage() {
         </CardContent>
       </Card>
 
-      {results !== null && (
-        <Card>
+      {searchJobId !== null && sj && (
+        <Card className="mb-6">
           <CardHeader>
-            <CardTitle>{results.length === 0 ? "No Results" : `${results.length} Case(s) Found`}</CardTitle>
+            <CardTitle>
+              {searchRunning
+                ? `Searching… (${sj.progress_current}/${sj.progress_total || "?"} districts)`
+                : sj.status === "failed"
+                  ? "Search failed"
+                  : `${results.length} Case(s) Found`}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            {results.length === 0 ? (
-              <p className="text-sm text-gray-500">
-                No cases found for this advocate/bar code in the selected court.
-              </p>
-            ) : (
+            {searchRunning && (
               <>
-                <div className="overflow-x-auto rounded-lg border border-gray-100 mb-4">
+                <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100 mb-2">
+                  <div
+                    className="h-full bg-primary transition-all"
+                    style={{
+                      width: sj.progress_total
+                        ? `${Math.round((sj.progress_current / sj.progress_total) * 100)}%`
+                        : "10%",
+                    }}
+                  />
+                </div>
+                <p className="flex items-center gap-2 text-sm text-gray-600">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Checking every district in the state — this can take several minutes.
+                </p>
+              </>
+            )}
+
+            {sj.status === "failed" && (
+              <div className="flex items-start gap-2 rounded-lg bg-[#fdecec] p-3 text-sm text-[#b32e26]">
+                <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                <span>{sj.error || "The court portal could not be reached. Please try again."}</span>
+              </div>
+            )}
+
+            {sj.status === "succeeded" && results.length === 0 && (
+              <p className="text-sm text-gray-500">
+                No cases found for this advocate/bar code anywhere in the selected state.
+              </p>
+            )}
+
+            {sj.status === "succeeded" && results.length > 0 && (
+              <>
+                {sj.failures.length > 0 && (
+                  <div className="mb-3 flex items-start gap-2 rounded-lg bg-[#fdf3e0] border border-[#f5e3c2] p-3 text-xs text-[#92610f]">
+                    <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                    <span>
+                      {sj.failures.length} court(s) couldn&apos;t be searched (CAPTCHA or portal
+                      timeout) and were skipped — results may be partial. Re-run to retry them.
+                    </span>
+                  </div>
+                )}
+                <div className="max-h-[480px] overflow-auto rounded-lg border border-gray-100 mb-4">
                   <table className="w-full text-sm">
-                    <thead className="bg-gray-50 text-left text-xs text-gray-500">
+                    <thead className="sticky top-0 bg-gray-50 text-left text-xs text-gray-500">
                       <tr>
                         <th className="px-3 py-2 w-8"></th>
                         <th className="px-3 py-2 font-medium">Case Number</th>
@@ -318,6 +329,12 @@ export default function AdvocateSearchPage() {
                   </table>
                 </div>
 
+                {selected.size > IMPORT_CAP && (
+                  <p className="mb-2 text-xs text-[#b32e26]">
+                    You can add up to {IMPORT_CAP} at a time — only the first {IMPORT_CAP} selected
+                    will be added.
+                  </p>
+                )}
                 <Button
                   onClick={handleAddToMyCases}
                   disabled={selected.size === 0 || startImport.isPending || (importJobId !== null && !importDone)}
@@ -325,7 +342,7 @@ export default function AdvocateSearchPage() {
                   {startImport.isPending ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Starting...
+                      Starting…
                     </>
                   ) : (
                     `Add ${selected.size || ""} to My Cases`
@@ -337,39 +354,39 @@ export default function AdvocateSearchPage() {
         </Card>
       )}
 
-      {importJobId !== null && job && (
-        <Card className="mt-6">
+      {importJobId !== null && ij && (
+        <Card>
           <CardHeader>
             <CardTitle>
-              {importDone ? "Import Complete" : `Adding cases... (${job.progress_current}/${job.progress_total})`}
+              {importDone ? "Import Complete" : `Adding cases… (${ij.progress_current}/${ij.progress_total})`}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             {!importDone && (
               <p className="flex items-center gap-2 text-gray-600">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Fetching each selected case from eCourts, one at a time...
+                Fetching each selected case from eCourts, one at a time…
               </p>
             )}
             {importDone && (
               <>
-                <p className="text-gray-900">{job.created.length} case(s) added.</p>
-                {job.skipped_duplicate.length > 0 && (
+                <p className="text-gray-900">{ij.created.length} case(s) added.</p>
+                {ij.skipped_duplicate.length > 0 && (
                   <p className="text-gray-600">
-                    {job.skipped_duplicate.length} already in your cases, skipped.
+                    {ij.skipped_duplicate.length} already in your cases, skipped.
                   </p>
                 )}
-                {job.skipped_conflict.length > 0 && (
+                {ij.skipped_conflict.length > 0 && (
                   <p className="text-gray-600">
-                    {job.skipped_conflict.length} already tracked by another user, skipped.
+                    {ij.skipped_conflict.length} already tracked by another user, skipped.
                   </p>
                 )}
-                {job.failed.length > 0 && (
+                {ij.failed.length > 0 && (
                   <div className="flex items-start gap-2 rounded-lg bg-[#fdecec] p-3 text-[#b32e26]">
                     <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
                     <span>
-                      {job.failed.length} case(s) could not be fetched (portal timeout or CAPTCHA) --
-                      you can try adding them again.
+                      {ij.failed.length} case(s) could not be fetched (portal timeout or CAPTCHA) —
+                      you can select them again and retry.
                     </span>
                   </div>
                 )}

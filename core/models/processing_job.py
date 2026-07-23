@@ -26,6 +26,7 @@ class ProcessingJob(OwnedModel):
         ("document", "Document Processing"),
         ("order_sync", "Court Order Sync"),
         ("advocate_import", "Advocate Case Import"),
+        ("advocate_search", "Advocate Search (state-wide fan-out)"),
     ]
 
     # Explicit pk so this model doesn't add to the pre-existing W042
@@ -128,4 +129,18 @@ class ProcessingJob(OwnedModel):
             job_type="advocate_import",
             payload={"selected": selected},
             progress_total=len(selected),
+        )
+
+    @classmethod
+    def enqueue_advocate_search(cls, owner, params: dict) -> "ProcessingJob":
+        """Enqueue a state-wide advocate search (fan-out across every
+        district and court complex in a state -- see
+        core/services/advocate_search.py). `params` carries the search
+        inputs ({state_code, court_type, advocate_name, bar_code,
+        status_filter}); the outcome ({results, failures, ...}) is written
+        back into the same payload on completion."""
+        return cls.objects.create(
+            owner=owner,
+            job_type="advocate_search",
+            payload=dict(params),
         )

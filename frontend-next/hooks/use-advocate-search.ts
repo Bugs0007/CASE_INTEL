@@ -9,10 +9,11 @@ const ACTIVE_POLL_MS = 1500;
 
 export const advocateSearchKeys = {
   preference: ["advocate-search", "preference"] as const,
+  searchJob: (jobId: number) => ["advocate-search", "search", jobId] as const,
   importJob: (jobId: number) => ["advocate-search", "import", jobId] as const,
 };
 
-/** Last-used court hierarchy, to pre-fill the search page on load. */
+/** Last-used state, to pre-fill the search page on load. */
 export function useAdvocateSearchPreference() {
   return useQuery({
     queryKey: advocateSearchKeys.preference,
@@ -21,16 +22,35 @@ export function useAdvocateSearchPreference() {
   });
 }
 
-/** One synchronous, CAPTCHA-gated portal call -- no polling needed. */
+/** Starts the async state-wide search; returns { job_id } to poll with
+ * useAdvocateSearchJob. */
 export function useAdvocateSearch() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (body: AdvocateSearchRequest) => advocateSearchApi.search(body),
     onSuccess: () => {
-      // The search itself upserts the server-side preference.
+      // The search enqueue also upserts the server-side state preference.
       queryClient.invalidateQueries({ queryKey: advocateSearchKeys.preference });
     },
+  });
+}
+
+/** Polls a state-wide search job until it reaches a terminal state. While
+ * running, progress_current/progress_total are districts_done/total. */
+export function useAdvocateSearchJob(jobId: number | null) {
+  return useQuery({
+    queryKey: advocateSearchKeys.searchJob(jobId ?? -1),
+    queryFn: () => advocateSearchApi.getSearchStatus(jobId!),
+    enabled: jobId !== null,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (!data || data.status === "succeeded" || data.status === "failed") {
+        return false;
+      }
+      return ACTIVE_POLL_MS;
+    },
+    refetchOnWindowFocus: false,
   });
 }
 

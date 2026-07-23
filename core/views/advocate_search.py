@@ -1,13 +1,14 @@
 """
-Advocate search views: search eCourts by advocate name/bar code (secondary
-entry point alongside the existing manual CNR entry in case_tracking.py),
-and bulk-import selected results into new Cases.
+Advocate search views: search eCourts by advocate name / bar code across a
+whole state (secondary entry point alongside the manual CNR entry in
+case_tracking.py), and bulk-import selected results into new Cases.
 
-Search is SYNCHRONOUS -- one CAPTCHA-gated portal call, no case-year
-filter exists for this search mode (see ecourts_provider.py's module
-docstring), so it fits the same request/response pattern as
-CaseTrackingPreviewView. Bulk import is ASYNC (ProcessingJob) -- N
-sequential CAPTCHA-gated fetches can run well past a request timeout.
+Both search and import are ASYNC (ProcessingJob) here. The search fans a
+single query out across every district and court complex in a state -- see
+core/services/advocate_search.py for why that is dozens-to-hundreds of
+sequential CAPTCHA-gated portal calls and must run in the worker, not a
+request. The user only picks a STATE; the backend discovers the districts
+and complexes itself.
 """
 
 from __future__ import annotations
@@ -19,53 +20,56 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.models import AdvocateSearchPreference, ProcessingJob
-from core.services.court_data import CourtDataError, get_provider
-from core.views.case_tracking import _error_response
 
 _BAR_CODE_RE = re.compile(r"^[A-Za-z]{2,3}/\d+/\d{4}$")
-MAX_IMPORT_BATCH = 25
+MAX_IMPORT_BATCH = 100
 
 
-def _validate_district_hierarchy(hierarchy_config: dict) -> str | None:
-    required = ["state_code", "dist_code", "court_complex_code"]
-    missing = [f for f in required if not hierarchy_config.get(f)]
-    if missing:
-        return f"Missing required field(s): {', '.join(missing)}."
-    return None
+def _parse_name_or_bar_code(raw: str) -> tuple[str, str, str | None]:
+    """Return (advocate_name, bar_code, error). Exactly one of the first
+    two is non-empty on success; error is a message when neither a valid
+    name (>=3 chars) nor a STATE/NUMBER/YEAR bar code was given."""
+    raw = (raw or "").strip()
+    if _BAR_CODE_RE.match(raw):
+        return "", raw, None
+    if len(raw) >= 3:
+        return raw, "", None
+    return (
+        "",
+        "",
+        "Enter an advocate name (at least 3 characters) or a bar code in "
+        "STATE/NUMBER/YEAR format (e.g. MAH/1234/2015).",
+    )
 
 
 class AdvocateSearchView(APIView):
-    """Search District Courts cases by advocate name or bar code.
+    """Start a state-wide advocate search.
 
     POST /api/cases/search-advocate/
     Body: {
         "name_or_bar_code": "<name, min 3 chars> or <STATE/NUMBER/YEAR>",
-        "court_type": "district",  # "high_court" not yet supported -- see
-                                    # ecourts_provider.py's module docstring
-        "hierarchy_config": {"state_code", "dist_code",
-                              "court_complex_code", "est_code"?},
-        "status_filter": "Pending" | "Disposed" | "Both",  # optional, default "Both"
+        "court_type": "district",     # "high_court" not supported yet
+        "state_code": "<eCourts state code>",
+        "status_filter": "Pending" | "Disposed" | "Both",  # optional
     }
-    Returns {"results": [...]} on success (200) -- an empty list is a
-    valid, non-error outcome, not a failure. CAPTCHA/timeout failures use
-    the same _error_response() mapping as the rest of court-tracking
-    (502, retryable -- never a bare 500).
+    Enqueues a ProcessingJob (job_type="advocate_search") that fans the
+    query out across every district/complex in the state, and returns
+    {"job_id": ...}, 202. Poll AdvocateSearchStatusView for progress and
+    results.
     """
 
     def post(self, request):
-        court_type = request.data.get("court_type")
+        court_type = request.data.get("court_type") or "district"
         if court_type != "district":
             return Response(
                 {"detail": "Only District Courts advocate search is supported currently."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        hierarchy_config = request.data.get("hierarchy_config") or {}
-        error = _validate_district_hierarchy(hierarchy_config)
-        if error:
-            return Response({"detail": error}, status=status.HTTP_400_BAD_REQUEST)
+        state_code = request.data.get("state_code")
+        if not state_code:
+            return Response({"detail": "state_code is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        name_or_bar_code = (request.data.get("name_or_bar_code") or "").strip()
         status_filter = request.data.get("status_filter") or "Both"
         if status_filter not in ("Pending", "Disposed", "Both"):
             return Response(
@@ -73,40 +77,65 @@ class AdvocateSearchView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        advocate_name = ""
-        bar_code = ""
-        if _BAR_CODE_RE.match(name_or_bar_code):
-            bar_code = name_or_bar_code
-        elif len(name_or_bar_code) >= 3:
-            advocate_name = name_or_bar_code
-        else:
-            return Response(
-                {
-                    "detail": "Enter an advocate name (at least 3 characters) or a bar "
-                    "code in STATE/NUMBER/YEAR format (e.g. MAH/1234/2015)."
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        advocate_name, bar_code, error = _parse_name_or_bar_code(request.data.get("name_or_bar_code"))
+        if error:
+            return Response({"detail": error}, status=status.HTTP_400_BAD_REQUEST)
 
-        provider = get_provider()
-        try:
-            results = provider.search_by_advocate(
-                hierarchy_config,
-                advocate_name=advocate_name,
-                bar_code=bar_code,
-                status_filter=status_filter,
-            )
-        except CourtDataError as exc:
-            return _error_response(exc)
-        except ValueError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        job = ProcessingJob.enqueue_advocate_search(
+            request.user,
+            {
+                "state_code": str(state_code),
+                "court_type": court_type,
+                "advocate_name": advocate_name,
+                "bar_code": bar_code,
+                "status_filter": status_filter,
+            },
+        )
 
         AdvocateSearchPreference.objects.update_or_create(
             owner=request.user,
-            defaults={"court_type": court_type, "hierarchy_config": hierarchy_config},
+            defaults={"court_type": court_type, "hierarchy_config": {"state_code": str(state_code)}},
         )
 
-        return Response({"results": [r.to_dict() for r in results]}, status=status.HTTP_200_OK)
+        return Response({"job_id": job.id}, status=status.HTTP_202_ACCEPTED)
+
+
+class AdvocateSearchStatusView(APIView):
+    """Poll the status/results of a state-wide advocate search job.
+
+    GET /api/cases/search-advocate/<job_id>/
+
+    While running, `results` is empty and progress_current/progress_total
+    are districts_done/total_districts. On success, `results` holds the
+    deduped matches and `failures` lists any court complexes skipped
+    (CAPTCHA/portal errors) -- a partial result is still a valid, useful
+    outcome, not an error. A failed job (e.g. the state's district list
+    couldn't be fetched at all) surfaces via status="failed" + error,
+    never a 500 here.
+    """
+
+    def get(self, request, job_id):
+        try:
+            job = ProcessingJob.objects.get(
+                pk=job_id, owner=request.user, job_type="advocate_search"
+            )
+        except ProcessingJob.DoesNotExist:
+            return Response({"detail": "Search job not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        payload = job.payload or {}
+        return Response(
+            {
+                "status": job.status,
+                "progress_current": job.progress_current,
+                "progress_total": job.progress_total,
+                "error": job.error,
+                "results": payload.get("results", []),
+                "failures": payload.get("failures", []),
+                "districts_total": payload.get("districts_total"),
+                "complexes_searched": payload.get("complexes_searched"),
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class AdvocateSearchImportView(APIView):
@@ -173,8 +202,7 @@ class AdvocateSearchImportStatusView(APIView):
 
 
 class AdvocateSearchPreferenceView(APIView):
-    """The caller's last-used court hierarchy, for pre-filling the search
-    page's hierarchy picker.
+    """The caller's last-used state, for pre-filling the search page.
 
     GET /api/cases/search-advocate/preference/
     """

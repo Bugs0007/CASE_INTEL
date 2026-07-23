@@ -10,6 +10,7 @@ from core.views import (
     AdvocateSearchImportStatusView,
     AdvocateSearchImportView,
     AdvocateSearchPreferenceView,
+    AdvocateSearchStatusView,
     AdvocateSearchView,
     CaseDetailView,
     CaseListCreateView,
@@ -125,6 +126,14 @@ urlpatterns = [
         "cases/search-advocate/preference/",
         AdvocateSearchPreferenceView.as_view(),
         name="advocate-search-preference",
+    ),
+    # Status poll for a state-wide search job. Placed after the literal
+    # "import/"/"preference/" routes above; <int:job_id> can't match those
+    # strings anyway, but order keeps it unambiguous.
+    path(
+        "cases/search-advocate/<int:job_id>/",
+        AdvocateSearchStatusView.as_view(),
+        name="advocate-search-status",
     ),
 
     # Hearings

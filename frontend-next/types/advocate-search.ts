@@ -20,16 +20,44 @@ export interface AdvocateSearchResult {
 export interface AdvocateSearchRequest {
   name_or_bar_code: string;
   court_type: CourtType;
-  hierarchy_config: Record<string, string>;
+  /** The user picks only a STATE; the backend fans out across every
+   * district and court complex in it. */
+  state_code: string;
   status_filter?: "Pending" | "Disposed" | "Both";
 }
 
-export interface AdvocateSearchResponse {
+export type AdvocateSearchJobStatus = "queued" | "running" | "succeeded" | "failed";
+
+/** One court complex that was skipped during the state-wide fan-out
+ * (CAPTCHA/portal error). court_complex is null when the district's
+ * complex-list call itself failed. */
+export interface AdvocateSearchFailure {
+  district: string;
+  court_complex: string | null;
+  error: string;
+}
+
+/** POST /api/cases/search-advocate/ enqueues a job and returns its id. */
+export interface AdvocateSearchStartResponse {
+  job_id: number;
+}
+
+/** GET /api/cases/search-advocate/<job_id>/ -- progress is
+ * districts_done / total_districts while running. */
+export interface AdvocateSearchJobResult {
+  status: AdvocateSearchJobStatus;
+  progress_current: number;
+  progress_total: number;
+  error: string;
   results: AdvocateSearchResult[];
+  failures: AdvocateSearchFailure[];
+  districts_total: number | null;
+  complexes_searched: number | null;
 }
 
 export interface AdvocateSearchPreference {
   court_type: CourtType;
+  /** { state_code } only -- district/complex are discovered server-side. */
   hierarchy_config: Record<string, string>;
 }
 

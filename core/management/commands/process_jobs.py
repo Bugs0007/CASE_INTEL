@@ -33,6 +33,7 @@ from django.utils import timezone
 
 from core.models import Case, Document, ProcessingJob
 from core.services.advocate_import import run_advocate_import
+from core.services.advocate_search import run_advocate_search
 from core.services.court_order_sync import sync_case_orders
 from core.services.document_processor import DocumentProcessor
 
@@ -175,6 +176,8 @@ class Command(BaseCommand):
                 self._run_order_sync(job, report_progress)
             elif job.job_type == "advocate_import":
                 run_advocate_import(job, progress_callback=report_progress)
+            elif job.job_type == "advocate_search":
+                run_advocate_search(job, progress_callback=report_progress)
             else:
                 processor.process_document(job.document_id, progress_callback=report_progress)
         except Document.DoesNotExist:

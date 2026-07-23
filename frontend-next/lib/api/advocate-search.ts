@@ -3,18 +3,24 @@ import type {
   AdvocateImportJobResult,
   AdvocateImportSelection,
   AdvocateImportStartResponse,
+  AdvocateSearchJobResult,
   AdvocateSearchPreference,
   AdvocateSearchRequest,
-  AdvocateSearchResponse,
+  AdvocateSearchStartResponse,
   CourtType,
 } from "@/types";
 
 export const advocateSearchApi = {
+  /** Enqueues the state-wide fan-out search -- async, poll
+   * getSearchStatus(job_id) for progress and results. */
   search: (body: AdvocateSearchRequest) =>
-    apiClient<AdvocateSearchResponse>("/cases/search-advocate/", {
+    apiClient<AdvocateSearchStartResponse>("/cases/search-advocate/", {
       method: "POST",
       body: JSON.stringify(body),
     }),
+
+  getSearchStatus: (jobId: number) =>
+    apiClient<AdvocateSearchJobResult>(`/cases/search-advocate/${jobId}/`),
 
   /** Enqueues the sequential, 1s-delayed fetch of each selected case --
    * async, poll getImportStatus(job_id) for the outcome. */
