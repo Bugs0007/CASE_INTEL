@@ -6,6 +6,7 @@ from django.contrib import admin
 
 from core.models import (
     ActivityLog,
+    AdvocateSearchPreference,
     Case,
     CaseTag,
     CaseTagMap,
@@ -181,6 +182,13 @@ class CourtTrackingPreviewAdmin(admin.ModelAdmin):
     list_filter = ("case",)
     readonly_fields = ("created_at",)
     date_hierarchy = "created_at"
+
+
+@admin.register(AdvocateSearchPreference)
+class AdvocateSearchPreferenceAdmin(admin.ModelAdmin):
+    list_display = ("owner", "court_type", "updated_at")
+    list_filter = ("court_type",)
+    readonly_fields = ("updated_at",)
 
 
 @admin.register(ActivityLog)

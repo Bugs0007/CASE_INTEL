@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, useMemo } from "react";
-import { Plus } from "lucide-react";
+import Link from "next/link";
+import { Plus, Search } from "lucide-react";
 import { CaseFilters } from "@/components/cases/case-filters";
 import { CaseGrid } from "@/components/cases/case-grid";
 import { CasesSkeleton } from "@/components/cases/cases-skeleton";
@@ -137,13 +138,22 @@ export default function CasesPage() {
             {filteredCases.length} cases across your workspace
           </p>
         </div>
-        <button
-          onClick={openCreateCase}
-          className="inline-flex items-center justify-center gap-2 h-11 sm:h-10 px-4 rounded-lg border-none bg-primary text-white text-sm font-semibold hover:bg-primary-hover transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          New Case
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/cases/search"
+            className="inline-flex items-center justify-center gap-2 h-11 sm:h-10 px-4 rounded-lg border border-gray-200 bg-white text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-colors"
+          >
+            <Search className="h-4 w-4" />
+            Search by Advocate
+          </Link>
+          <button
+            onClick={openCreateCase}
+            className="inline-flex items-center justify-center gap-2 h-11 sm:h-10 px-4 rounded-lg border-none bg-primary text-white text-sm font-semibold hover:bg-primary-hover transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            New Case
+          </button>
+        </div>
       </div>
 
       {/* Filters */}

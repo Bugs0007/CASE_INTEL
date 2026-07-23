@@ -62,6 +62,12 @@ class CourtCaseData:
     first_hearing_date: date | None = None
     nature_of_disposal: str = ""
     hearing_history: list[HearingRecord] = field(default_factory=list)
+    party_advocate_data: dict = field(default_factory=dict)
+    # {"petitioner_advocates": [...], "respondent_advocates": [...]} --
+    # raw advocate name(s) per party, parsed from the same case-history
+    # HTML that already yields petitioner/respondent (see
+    # ecourts_provider._extract_advocates). Empty dict when the portal
+    # response carried none.
 
     def to_dict(self) -> dict:
         """JSON-safe representation for storage in a JSONField (dates
@@ -79,6 +85,7 @@ class CourtCaseData:
             "next_hearing_date": self.next_hearing_date.isoformat() if self.next_hearing_date else None,
             "first_hearing_date": self.first_hearing_date.isoformat() if self.first_hearing_date else None,
             "nature_of_disposal": self.nature_of_disposal,
+            "party_advocate_data": self.party_advocate_data,
             "hearing_history": [
                 {
                     "hearing_date": h.hearing_date.isoformat() if h.hearing_date else None,
@@ -106,6 +113,7 @@ class CourtCaseData:
             next_hearing_date=date.fromisoformat(payload["next_hearing_date"]) if payload.get("next_hearing_date") else None,
             first_hearing_date=date.fromisoformat(payload["first_hearing_date"]) if payload.get("first_hearing_date") else None,
             nature_of_disposal=payload.get("nature_of_disposal", ""),
+            party_advocate_data=payload.get("party_advocate_data", {}) or {},
             hearing_history=[
                 HearingRecord(
                     hearing_date=date.fromisoformat(h["hearing_date"]) if h.get("hearing_date") else None,
