@@ -25,6 +25,8 @@ class ProcessingJob(OwnedModel):
     JOB_TYPE_CHOICES = [
         ("document", "Document Processing"),
         ("order_sync", "Court Order Sync"),
+        ("advocate_import", "Advocate Case Import"),
+        ("advocate_search", "Advocate Search (state-wide fan-out)"),
     ]
 
     # Explicit pk so this model doesn't add to the pre-existing W042
@@ -57,6 +59,12 @@ class ProcessingJob(OwnedModel):
     progress_current = models.IntegerField(default=0)
     progress_total = models.IntegerField(default=0)
     error = models.TextField(blank=True, default="")
+    # "advocate_import" jobs carry their input (selected search results to
+    # fetch) here and overwrite it with the outcome
+    # ({"created": [...], "skipped_duplicate": [...], "skipped_conflict":
+    # [...], "failed": [...]}) on completion -- case is left null since one
+    # job creates many Case rows, not one. Unused by "document"/"order_sync".
+    payload = models.JSONField(blank=True, null=True)
     # How many times this job has been claimed. Guards against a crash
     # loop: a job that keeps killing the worker is failed permanently
     # after MAX_ATTEMPTS (see process_jobs) instead of requeueing forever.
@@ -108,3 +116,31 @@ class ProcessingJob(OwnedModel):
         if existing is not None:
             return existing, False
         return cls.objects.create(owner=case.owner, case=case, job_type="order_sync"), True
+
+    @classmethod
+    def enqueue_advocate_import(cls, owner, selected: list[dict]) -> "ProcessingJob":
+        """Enqueue a bulk import of eCourts search results into new Cases.
+
+        No dedup against an existing job -- each submission is a distinct
+        batch (case is null, so there's no single target to dedup against
+        the way enqueue()/enqueue_order_sync() do)."""
+        return cls.objects.create(
+            owner=owner,
+            job_type="advocate_import",
+            payload={"selected": selected},
+            progress_total=len(selected),
+        )
+
+    @classmethod
+    def enqueue_advocate_search(cls, owner, params: dict) -> "ProcessingJob":
+        """Enqueue a state-wide advocate search (fan-out across every
+        district and court complex in a state -- see
+        core/services/advocate_search.py). `params` carries the search
+        inputs ({state_code, court_type, advocate_name, bar_code,
+        status_filter}); the outcome ({results, failures, ...}) is written
+        back into the same payload on completion."""
+        return cls.objects.create(
+            owner=owner,
+            job_type="advocate_search",
+            payload=dict(params),
+        )

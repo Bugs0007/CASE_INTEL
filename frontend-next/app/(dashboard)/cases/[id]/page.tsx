@@ -74,7 +74,7 @@ export default function CaseDetailPage() {
             Case not found
           </div>
           <div className="text-gray-500">
-            The case you're looking for doesn't exist.
+            The case you&apos;re looking for doesn&apos;t exist.
           </div>
         </div>
       </div>

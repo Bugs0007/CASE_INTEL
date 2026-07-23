@@ -7,6 +7,11 @@ All endpoints are prefixed with /api/ when included in the project root URLconf.
 from django.urls import path
 
 from core.views import (
+    AdvocateSearchImportStatusView,
+    AdvocateSearchImportView,
+    AdvocateSearchPreferenceView,
+    AdvocateSearchStatusView,
+    AdvocateSearchView,
     CaseDetailView,
     CaseListCreateView,
     CaseTrackingConfirmView,
@@ -103,6 +108,33 @@ urlpatterns = [
 
     # Court structure (eCourts hierarchy discovery for the tracking form)
     path("court-structure/", CourtStructureView.as_view(), name="court-structure"),
+
+    # Advocate search (search-by-name/bar-code + bulk import, secondary to
+    # the manual CNR entry above)
+    path("cases/search-advocate/", AdvocateSearchView.as_view(), name="advocate-search"),
+    path(
+        "cases/search-advocate/import/",
+        AdvocateSearchImportView.as_view(),
+        name="advocate-search-import",
+    ),
+    path(
+        "cases/search-advocate/import/<int:job_id>/",
+        AdvocateSearchImportStatusView.as_view(),
+        name="advocate-search-import-status",
+    ),
+    path(
+        "cases/search-advocate/preference/",
+        AdvocateSearchPreferenceView.as_view(),
+        name="advocate-search-preference",
+    ),
+    # Status poll for a state-wide search job. Placed after the literal
+    # "import/"/"preference/" routes above; <int:job_id> can't match those
+    # strings anyway, but order keeps it unambiguous.
+    path(
+        "cases/search-advocate/<int:job_id>/",
+        AdvocateSearchStatusView.as_view(),
+        name="advocate-search-status",
+    ),
 
     # Hearings
     path("hearings/", HearingListCreateView.as_view(), name="hearing-list"),
