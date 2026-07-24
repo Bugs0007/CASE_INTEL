@@ -533,33 +533,50 @@ class TestAdvocateSearchPreferenceIsolation:
 
 
 class TestTokenSeeding:
-    """_TokenSeedingDistrictClient must seed a real app_token from the
-    casestatus/index page -- the vendored client GETs the tokenless "/"
-    home page and sent app_token="" (the "Invalid Request" root cause)."""
+    """_TokenSeedingDistrictClient must (a) pin the live 'delimeter' header
+    from components.js and (b) seed a real app_token from casestatus/index.
+    The vendored client did neither, so every District Courts POST got
+    "Invalid Request" (empty app_token + no delimeter header)."""
 
-    def _client_with_page(self, html: str):
+    def _client(self, *, delimeter_js="", casestatus_html=""):
         client = _TokenSeedingDistrictClient()
-        resp = MagicMock()
-        resp.text = html
+        # _init_session GETs components.js first, then casestatus/index.
+        def fake_get(url, **kw):
+            r = MagicMock()
+            r.text = delimeter_js if "components.js" in url else casestatus_html
+            return r
         client._http = MagicMock()
-        client._http.get = AsyncMock(return_value=resp)
+        client._http.get = AsyncMock(side_effect=fake_get)
+        fake_httpx = MagicMock()
+        fake_httpx.headers = {}
+        client._http._ensure_client = MagicMock(return_value=fake_httpx)
+        client._fake_httpx = fake_httpx
         return client
 
-    def test_seeds_token_from_page(self):
-        client = self._client_with_page(
-            "<input type=\"hidden\" name=\"app_token\" id='app_token' value=\"abc123def456\">"
+    def test_seeds_token_from_casestatus_page(self):
+        client = self._client(
+            casestatus_html="<input name=\"app_token\" id='app_token' value=\"abc123def456\">"
         )
         asyncio.run(client._init_session())
         assert client._app_token == "abc123def456"
 
-    def test_seeds_from_casestatus_index_url(self):
-        client = self._client_with_page("id='app_token' value=\"deadbeef00\"")
+    def test_pins_live_delimeter_and_abc_headers(self):
+        client = self._client(
+            delimeter_js='function ajaxCall(o){var delimeter="vmgasjnn98dsf846";}',
+            casestatus_html="id='app_token' value=\"deadbeef00\"",
+        )
         asyncio.run(client._init_session())
-        called_url = client._http.get.call_args.args[0]
-        assert "casestatus/index" in called_url
+        assert client._fake_httpx.headers["delimeter"] == "vmgasjnn98dsf846"
+        assert client._fake_httpx.headers["abc"] == "xyz"
+
+    def test_seeds_from_casestatus_index_url(self):
+        client = self._client(casestatus_html="id='app_token' value=\"deadbeef00\"")
+        asyncio.run(client._init_session())
+        # The LAST get is the casestatus page (components.js is fetched first).
+        assert "casestatus/index" in client._http.get.call_args.args[0]
 
     def test_falls_back_to_vendored_when_no_token(self):
-        client = self._client_with_page("<html>no token here</html>")
+        client = self._client(casestatus_html="<html>no token here</html>")
         with patch.object(
             _TokenSeedingDistrictClient.__mro__[1], "_init_session", new_callable=AsyncMock
         ) as base_init:
