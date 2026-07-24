@@ -27,6 +27,7 @@ from core.models import AdvocateSearchPreference, Case, JobAlreadyRunningError, 
 from core.services.advocate_import import run_advocate_import
 from core.services.advocate_search import run_advocate_search
 from core.services.court_data import CaptchaSolveError, CourtPortalError
+from bharat_courts.districtcourts.parser import ServerError as DistrictServerError
 from core.services.court_data.ecourts_provider import _TokenSeedingDistrictClient, split_bar_code
 from core.services.court_data.models import CourtCaseData
 
@@ -525,6 +526,122 @@ class TestAdvocateSearchPreferenceIsolation:
         resp = client_a.get("/api/cases/search-advocate/preference/")
         assert resp.status_code == 200
         assert resp.data["hierarchy_config"] == {"state_code": "1"}
+
+
+# ---------------------------------------------------------------------------
+# _district_search_by_advocate's hand-rolled retry loop (25 Jul 2026 fix):
+# regression coverage for the two bugs found live --
+#   1. "Invalid Captcha" from submitAdvName raises ServerError (errormsg is
+#      populated), not CaptchaError -- bharat-courts' own
+#      _post_with_captcha_retry only catches CaptchaError, so it silently
+#      delivered just 1 real attempt instead of up to 5. This method no
+#      longer goes through that vendored retry helper at all.
+#   2. A blank/wrong-length OCR decode was being submitted to the server
+#      (a guaranteed-fail guess) instead of silently refetching.
+# Also covers: empty adv_data (missing/invalid dist_code or
+# court_complex_code) must raise CourtPortalError, not silently return [].
+# ---------------------------------------------------------------------------
+
+
+def _mock_district_client(*, captchas, post_ajax_results):
+    """A MagicMock standing in for _TokenSeedingDistrictClient, used as an
+    async context manager. captchas/post_ajax_results are consumed in
+    order, one per retry-loop attempt (post_ajax_results only consumed on
+    attempts where captchas didn't yield a blank string)."""
+    client = MagicMock()
+    client.__aenter__ = AsyncMock(return_value=client)
+    client.__aexit__ = AsyncMock(return_value=False)
+    client._init_session = AsyncMock()
+    client._setup_court = AsyncMock()
+    client._solve_captcha = AsyncMock(side_effect=captchas)
+    client._post_ajax = AsyncMock(side_effect=post_ajax_results)
+    return client
+
+
+HIERARCHY = {"state_code": "1", "dist_code": "26", "court_complex_code": "1010307", "est_code": "2"}
+
+
+class TestDistrictSearchByAdvocateRetryLogic:
+    def test_blank_ocr_decode_skips_submit_without_network_call(self):
+        """A blank _solve_captcha() result must NOT reach _post_ajax at
+        all (fix #2) -- it should silently loop to a fresh captcha fetch."""
+        from core.services.court_data.ecourts_provider import EcourtsProvider
+
+        client = _mock_district_client(
+            captchas=["", "abc123"],  # blank first, valid second
+            post_ajax_results=[{"adv_data": "<table></table>"}],  # only ONE real post
+        )
+        with patch("core.services.court_data.ecourts_provider._TokenSeedingDistrictClient", return_value=client), \
+             patch("core.services.court_data.ecourts_provider.asyncio.sleep", new_callable=AsyncMock):
+            provider = EcourtsProvider()
+            asyncio.run(
+                provider._district_search_by_advocate(
+                    HIERARCHY, advocate_name="Patil", bar_state="", bar_code="", bar_year="", status_filter="Both",
+                )
+            )
+        assert client._solve_captcha.call_count == 2
+        assert client._post_ajax.call_count == 1  # the blank decode never posted
+
+    def test_server_error_invalid_captcha_is_retried_not_fatal(self):
+        """Confirms fix #1: a ServerError (the real shape "Invalid Captcha"
+        responses take) is caught and retried here, not left to a vendored
+        helper that only catches CaptchaError."""
+        from core.services.court_data.ecourts_provider import EcourtsProvider
+
+        client = _mock_district_client(
+            captchas=["wrong1", "right1"],
+            post_ajax_results=[DistrictServerError("Invalid Captcha... "), {"adv_data": "<table></table>"}],
+        )
+        with patch("core.services.court_data.ecourts_provider._TokenSeedingDistrictClient", return_value=client), \
+             patch("core.services.court_data.ecourts_provider.asyncio.sleep", new_callable=AsyncMock):
+            provider = EcourtsProvider()
+            result = asyncio.run(
+                provider._district_search_by_advocate(
+                    HIERARCHY, advocate_name="Patil", bar_state="", bar_code="", bar_year="", status_filter="Both",
+                )
+            )
+        assert result == []  # empty parse of "<table></table>" -- just proving it didn't raise
+        assert client._post_ajax.call_count == 2
+
+    def test_empty_adv_data_raises_court_portal_error_not_silent_zero(self):
+        """Verified live 25 Jul 2026: submitting without a real dist_code
+        AND court_complex_code returns HTTP 200 with a blank body. That
+        must surface as an error, not an indistinguishable empty result."""
+        from core.services.court_data.ecourts_provider import ADVOCATE_SEARCH_MAX_ATTEMPTS, EcourtsProvider
+
+        client = _mock_district_client(
+            captchas=["abc123"] * ADVOCATE_SEARCH_MAX_ATTEMPTS,
+            post_ajax_results=[{"adv_data": ""}] * ADVOCATE_SEARCH_MAX_ATTEMPTS,
+        )
+        with patch("core.services.court_data.ecourts_provider._TokenSeedingDistrictClient", return_value=client), \
+             patch("core.services.court_data.ecourts_provider.asyncio.sleep", new_callable=AsyncMock):
+            provider = EcourtsProvider()
+            with pytest.raises(CourtPortalError, match="empty response"):
+                asyncio.run(
+                    provider._district_search_by_advocate(
+                        {**HIERARCHY, "dist_code": "0", "court_complex_code": "0"},
+                        advocate_name="Patil", bar_state="", bar_code="", bar_year="", status_filter="Both",
+                    )
+                )
+        assert client._post_ajax.call_count == ADVOCATE_SEARCH_MAX_ATTEMPTS
+
+    def test_exhausting_all_attempts_on_captcha_raises_captcha_solve_error(self):
+        from core.services.court_data.ecourts_provider import ADVOCATE_SEARCH_MAX_ATTEMPTS, EcourtsProvider
+
+        client = _mock_district_client(
+            captchas=[""] * ADVOCATE_SEARCH_MAX_ATTEMPTS,  # OCR never produces a valid guess
+            post_ajax_results=[],
+        )
+        with patch("core.services.court_data.ecourts_provider._TokenSeedingDistrictClient", return_value=client), \
+             patch("core.services.court_data.ecourts_provider.asyncio.sleep", new_callable=AsyncMock):
+            provider = EcourtsProvider()
+            with pytest.raises(CaptchaSolveError):
+                asyncio.run(
+                    provider._district_search_by_advocate(
+                        HIERARCHY, advocate_name="Patil", bar_state="", bar_code="", bar_year="", status_filter="Both",
+                    )
+                )
+        client._post_ajax.assert_not_called()  # never wasted a submit on a blank decode
 
 
 # ---------------------------------------------------------------------------
