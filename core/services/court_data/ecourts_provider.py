@@ -96,16 +96,17 @@ District Courts only so far; HC Services' equivalent hasn't been spiked):
   (auto-detected 4- or 7-column format).
 
 The "Invalid Request" bug that broke list_districts() (and every other
-District Courts AJAX call) was root-caused 24 Jul 2026: bharat-courts
-0.3.0's _init_session() GETs the tokenless BASE_URL + "/" home page and
-never obtains an app_token, so every POST went out with app_token=""
-(captured live: `state_code=1&ajax_req=true&app_token=`). The fix is
-_TokenSeedingDistrictClient below, which seeds the real app_token from
-casestatus/index. See that class's comment. (A separate environment-level
-WAF/IP block -- the portal also rejecting POSTs from some non-browser
-source IPs regardless of request shape -- is orthogonal and can't be fixed
-in request construction; that's why the fix must be verified from the EC2
-worker, not a blocked dev/CI box.)
+District Courts AJAX call) was root-caused and FIXED 24 Jul 2026. It was
+two independent missing pieces, both handled by _TokenSeedingDistrictClient
+below (see its block comment): (1) bharat-courts sent an empty app_token
+because its _init_session GETs the tokenless home page, and (2) nothing
+sent the per-session "delimeter" header the portal validates on every AJAX
+POST. With both fixed, list_districts / list_complexes / search_by_advocate
+were all verified live returning real data (41 Maharashtra districts, real
+advocate-search results). It was never a WAF/IP/TLS-fingerprint block -- a
+byte-and-fingerprint-faithful replay confirmed the server rejects on the
+missing delimeter at the application layer, identically from two different
+source IPs.
 """
 
 from __future__ import annotations
@@ -138,37 +139,74 @@ RETRY_BACKOFF_SECONDS = 1.5
 
 
 # ---------------------------------------------------------------------------
-# Token-seeding District Courts client
+# Token-seeding + delimeter District Courts client
 #
-# bharat-courts 0.3.0's DistrictCourtClient._init_session() GETs the bare
-# BASE_URL + "/" home page -- which renders NO #app_token hidden field --
-# and then tries to bootstrap a token via a getCaptcha POST. Since the home
-# page yielded nothing, that POST (and then fillDistrict, fillcomplex,
-# submitCaseNo, submitAdvName, searchByCNR, ...) all go out with
-# app_token="" and the portal rejects them with the JSON "Invalid Request"
-# error. Captured live 24 Jul 2026: `state_code=1&ajax_req=true&app_token=`.
+# The District Courts portal rejected EVERY bharat-courts AJAX POST
+# (fillDistrict, fillcomplex, submitCaseNo, submitAdvName, searchByCNR, ...)
+# with the JSON "Invalid Request" error. Root-caused live 24 Jul 2026 by
+# capturing the outgoing requests and diffing them byte-for-byte against the
+# portal's own dropdown JS. TWO independent things were missing:
 #
-# The casestatus/index page DOES render a session-bound #app_token (the
-# token the portal's own dropdown JS submits). Seeding _app_token from that
-# page instead of the tokenless home page repairs every District Courts
-# operation at once, since they all funnel through _init_session().
+# 1. A real app_token. bharat-courts 0.3.0's _init_session() GETs the bare
+#    BASE_URL + "/" home page, which renders NO #app_token hidden field, so
+#    every POST went out with app_token="" (captured:
+#    `state_code=1&ajax_req=true&app_token=`). The casestatus/index page DOES
+#    render a session-bound #app_token -- seed from there. A cold GET of that
+#    page is enough; the token does not need the browser's home->casestatus
+#    "arming" navigation (verified live).
 #
-# This fixes the request-construction bug only. A separate environment-level
-# block (the portal WAF rejecting POSTs from some source IPs / non-browser
-# TLS fingerprints -- reproduced exhaustively from the dev box) is NOT
-# fixable by request shape and must be verified from the live EC2 worker.
+# 2. A "delimeter" request header. The portal's own ajaxCall() (components.js)
+#    sends `headers: {delimeter: <value>, abc: "xyz"}` on EVERY AJAX POST,
+#    where <value> is a string baked into components.js that the server
+#    validates. It is NOT constant -- it rotates per session/deploy (observed
+#    changing between fetches: "1bsav864y624e" -> "19873bsav864y624etp" ->
+#    "vmgasjnn98dsf846"), so it must be scraped live from the components.js
+#    the current session is served, not hardcoded. Without it the server
+#    returns "Invalid Request" even with a perfect token. This is the piece
+#    that made byte-and-TLS-faithful replays (httpx, curl, curl_cffi Chrome
+#    impersonation) all fail until it was found -- it is an application-level
+#    check, not a WAF/IP/fingerprint block (two different source IPs, dev box
+#    and EC2, behaved identically).
+#
+# _init_session below does both: scrapes the live delimeter and pins it (plus
+# the static abc=xyz) as default headers on the shared httpx client so every
+# subsequent bharat-courts POST carries them, then seeds the app_token. This
+# repairs every District Courts operation at once, since they all funnel
+# through _init_session().
 # ---------------------------------------------------------------------------
 
 _APP_TOKEN_RE = re.compile(r"""id=['"]app_token['"]\s+value=["']([0-9a-f]+)["']""")
+_DELIMETER_RE = re.compile(r'var\s+delimeter\s*=\s*"([^"]+)"')
 _TOKEN_SEED_URL = f"{dc_endpoints.BASE_URL}/?p=casestatus/index"
+_COMPONENTS_JS_URL = f"{dc_endpoints.BASE_URL}/js/components.js"
 
 
 class _TokenSeedingDistrictClient(DistrictCourtClient):
-    """DistrictCourtClient whose _init_session seeds a real app_token from
-    the casestatus/index page rather than the tokenless home page the
-    vendored client uses (see the block comment above)."""
+    """DistrictCourtClient whose _init_session (a) pins the live 'delimeter'
+    anti-scraping header the portal validates on every AJAX POST, and (b)
+    seeds a real app_token from the casestatus/index page -- the vendored
+    client does neither, so every District Courts POST got "Invalid Request"
+    (see the block comment above)."""
 
     async def _init_session(self) -> None:
+        # (a) Scrape the current delimeter from components.js and pin it (plus
+        # the static abc=xyz) as default headers on the shared httpx client,
+        # so every subsequent bharat-courts _post_ajax carries them. The value
+        # rotates, so it must be read live from the same session that will POST.
+        try:
+            js = await self._http.get(_COMPONENTS_JS_URL)
+            delim = _DELIMETER_RE.search(js.text)
+            if delim:
+                client = self._http._ensure_client()  # underlying httpx.AsyncClient
+                client.headers["delimeter"] = delim.group(1)
+                client.headers["abc"] = "xyz"
+            else:
+                logger.warning("Could not find delimeter in %s; POSTs may be rejected.", _COMPONENTS_JS_URL)
+        except Exception:  # noqa: BLE001 -- delimeter is best-effort; token seed still runs
+            logger.warning("Failed to fetch/parse delimeter from %s.", _COMPONENTS_JS_URL, exc_info=True)
+
+        # (b) Seed the app_token from the casestatus page (not the tokenless
+        # home page the vendored client uses).
         resp = await self._http.get(
             _TOKEN_SEED_URL, headers={"Referer": f"{dc_endpoints.BASE_URL}/"}
         )
