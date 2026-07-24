@@ -93,12 +93,19 @@ District Courts only so far; HC Services' equivalent hasn't been spiked):
   (_solve_captcha()), just posted under this field's name.
 - Reuses parse_case_status_html for the adv_data payload -- same
   results-grid shape the party-name/case-number searches already produce
-  (auto-detected 4- or 7-column format), not yet verified against a real
-  adv_data response body (a live end-to-end round trip during this spike
-  hit an unrelated "Invalid Request" error on list_districts() across
-  every state tried -- looks like a pre-existing bharat-courts/portal
-  drift issue, not something this method introduces; confirm this
-  independently if the manual CNR-cascade setup flow is also affected).
+  (auto-detected 4- or 7-column format).
+
+The "Invalid Request" bug that broke list_districts() (and every other
+District Courts AJAX call) was root-caused 24 Jul 2026: bharat-courts
+0.3.0's _init_session() GETs the tokenless BASE_URL + "/" home page and
+never obtains an app_token, so every POST went out with app_token=""
+(captured live: `state_code=1&ajax_req=true&app_token=`). The fix is
+_TokenSeedingDistrictClient below, which seeds the real app_token from
+casestatus/index. See that class's comment. (A separate environment-level
+WAF/IP block -- the portal also rejecting POSTs from some non-browser
+source IPs regardless of request shape -- is orthogonal and can't be fixed
+in request construction; that's why the fix must be verified from the EC2
+worker, not a blocked dev/CI box.)
 """
 
 from __future__ import annotations
@@ -128,6 +135,54 @@ logger = logging.getLogger(__name__)
 
 MAX_RETRIES = 3
 RETRY_BACKOFF_SECONDS = 1.5
+
+
+# ---------------------------------------------------------------------------
+# Token-seeding District Courts client
+#
+# bharat-courts 0.3.0's DistrictCourtClient._init_session() GETs the bare
+# BASE_URL + "/" home page -- which renders NO #app_token hidden field --
+# and then tries to bootstrap a token via a getCaptcha POST. Since the home
+# page yielded nothing, that POST (and then fillDistrict, fillcomplex,
+# submitCaseNo, submitAdvName, searchByCNR, ...) all go out with
+# app_token="" and the portal rejects them with the JSON "Invalid Request"
+# error. Captured live 24 Jul 2026: `state_code=1&ajax_req=true&app_token=`.
+#
+# The casestatus/index page DOES render a session-bound #app_token (the
+# token the portal's own dropdown JS submits). Seeding _app_token from that
+# page instead of the tokenless home page repairs every District Courts
+# operation at once, since they all funnel through _init_session().
+#
+# This fixes the request-construction bug only. A separate environment-level
+# block (the portal WAF rejecting POSTs from some source IPs / non-browser
+# TLS fingerprints -- reproduced exhaustively from the dev box) is NOT
+# fixable by request shape and must be verified from the live EC2 worker.
+# ---------------------------------------------------------------------------
+
+_APP_TOKEN_RE = re.compile(r"""id=['"]app_token['"]\s+value=["']([0-9a-f]+)["']""")
+_TOKEN_SEED_URL = f"{dc_endpoints.BASE_URL}/?p=casestatus/index"
+
+
+class _TokenSeedingDistrictClient(DistrictCourtClient):
+    """DistrictCourtClient whose _init_session seeds a real app_token from
+    the casestatus/index page rather than the tokenless home page the
+    vendored client uses (see the block comment above)."""
+
+    async def _init_session(self) -> None:
+        resp = await self._http.get(
+            _TOKEN_SEED_URL, headers={"Referer": f"{dc_endpoints.BASE_URL}/"}
+        )
+        match = _APP_TOKEN_RE.search(resp.text)
+        if match:
+            self._app_token = match.group(1)
+        else:
+            # Page shape changed -- fall back to the vendored bootstrap
+            # rather than silently leaving the token unset.
+            logger.warning(
+                "Could not seed app_token from %s; falling back to vendored init_session.",
+                _TOKEN_SEED_URL,
+            )
+            await super()._init_session()
 
 # Court hierarchy barely ever changes -- cache aggressively via Django's
 # cache framework (Redis, already configured for this project) rather
@@ -691,12 +746,12 @@ class EcourtsProvider(CourtDataProvider):
             )
 
     async def _list_district_orders(self, cnr: str) -> list[CourtOrderRecord]:
-        async with DistrictCourtClient() as client:
+        async with _TokenSeedingDistrictClient() as client:
             html = await self._district_cnr_search(client, cnr)
             return [record for record, _args in _parse_district_orders(html, cnr)]
 
     async def _download_district_order(self, cnr: str, order: CourtOrderRecord) -> bytes:
-        async with DistrictCourtClient() as client:
+        async with _TokenSeedingDistrictClient() as client:
             html = await self._district_cnr_search(client, cnr)
             for record, args in _parse_district_orders(html, cnr):
                 if record.dedup_key != order.dedup_key:
@@ -727,7 +782,7 @@ class EcourtsProvider(CourtDataProvider):
     # ------------------------------------------------------------------
 
     async def _fetch_district(self, cfg: dict) -> CourtCaseData:
-        async with DistrictCourtClient() as client:
+        async with _TokenSeedingDistrictClient() as client:
             cases, raw_html = await self._district_search_with_retry(client, cfg)
             if not cases:
                 raise CaseNotFoundError(
@@ -813,7 +868,7 @@ class EcourtsProvider(CourtDataProvider):
         bar_year: str,
         status_filter: str,
     ) -> list[CaseInfo]:
-        async with DistrictCourtClient() as client:
+        async with _TokenSeedingDistrictClient() as client:
             last_exc: Exception | None = None
             for attempt in range(1, MAX_RETRIES + 1):
                 try:
@@ -907,7 +962,7 @@ class EcourtsProvider(CourtDataProvider):
         not-found signal is the literal "This Case Code does not exists"
         message in casetype_list, checked for below.
         """
-        async with DistrictCourtClient() as client:
+        async with _TokenSeedingDistrictClient() as client:
             html = await self._district_cnr_search(client, cnr)
             data = parse_case_history_html(html)
             if data is None:
@@ -1174,7 +1229,7 @@ class EcourtsProvider(CourtDataProvider):
         raise ValueError(f"Unknown court_type: {court_type!r}")
 
     async def _list_district_states(self) -> dict[str, str]:
-        async with DistrictCourtClient() as client:
+        async with _TokenSeedingDistrictClient() as client:
             return await client.list_states()
 
     def list_districts(self, state_code: str) -> dict[str, str]:
@@ -1184,7 +1239,7 @@ class EcourtsProvider(CourtDataProvider):
         )
 
     async def _list_districts(self, state_code: str) -> dict[str, str]:
-        async with DistrictCourtClient() as client:
+        async with _TokenSeedingDistrictClient() as client:
             return await client.list_districts(state_code)
 
     def list_complexes(self, state_code: str, dist_code: str) -> dict[str, str]:
@@ -1194,7 +1249,7 @@ class EcourtsProvider(CourtDataProvider):
         )
 
     async def _list_complexes(self, state_code: str, dist_code: str) -> dict[str, str]:
-        async with DistrictCourtClient() as client:
+        async with _TokenSeedingDistrictClient() as client:
             return await client.list_complexes(state_code, dist_code)
 
     def list_benches(self, hc_court_code: str) -> dict[str, str]:
@@ -1221,7 +1276,7 @@ class EcourtsProvider(CourtDataProvider):
         raise ValueError(f"Unknown court_type: {court_type!r}")
 
     async def _list_district_case_types(self, hierarchy: dict) -> dict[str, str]:
-        async with DistrictCourtClient() as client:
+        async with _TokenSeedingDistrictClient() as client:
             return await client.list_case_types(
                 hierarchy["state_code"],
                 hierarchy["dist_code"],

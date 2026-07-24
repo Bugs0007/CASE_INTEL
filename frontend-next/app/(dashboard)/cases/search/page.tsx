@@ -114,8 +114,13 @@ export default function AdvocateSearchPage() {
     try {
       const { job_id } = await startImport.mutateAsync({ courtType: "district", selected: toAdd });
       setImportJobId(job_id);
-    } catch {
-      showToast.error("Could not start import", "Please try again.");
+    } catch (error) {
+      if (error instanceof APIError && error.status === 409 && error.data && typeof error.data === "object") {
+        const detail = (error.data as { detail?: string }).detail;
+        showToast.error("Import already running", detail || "Please wait for the current import to finish.");
+      } else {
+        showToast.error("Could not start import", "Please try again.");
+      }
     }
   }
 

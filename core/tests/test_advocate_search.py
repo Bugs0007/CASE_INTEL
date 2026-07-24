@@ -14,7 +14,8 @@ district and court complex in the state. The IMPORT stays a separate async
 job (job_type="advocate_import").
 """
 
-from unittest.mock import MagicMock, patch
+import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from bharat_courts import CaseInfo
@@ -22,11 +23,11 @@ from django.contrib.auth.models import User
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
-from core.models import AdvocateSearchPreference, Case, ProcessingJob
+from core.models import AdvocateSearchPreference, Case, JobAlreadyRunningError, ProcessingJob
 from core.services.advocate_import import run_advocate_import
 from core.services.advocate_search import run_advocate_search
 from core.services.court_data import CaptchaSolveError, CourtPortalError
-from core.services.court_data.ecourts_provider import split_bar_code
+from core.services.court_data.ecourts_provider import _TokenSeedingDistrictClient, split_bar_code
 from core.services.court_data.models import CourtCaseData
 
 
@@ -524,3 +525,89 @@ class TestAdvocateSearchPreferenceIsolation:
         resp = client_a.get("/api/cases/search-advocate/preference/")
         assert resp.status_code == 200
         assert resp.data["hierarchy_config"] == {"state_code": "1"}
+
+
+# ---------------------------------------------------------------------------
+# Token seeding fix (the list_districts "Invalid Request" root cause)
+# ---------------------------------------------------------------------------
+
+
+class TestTokenSeeding:
+    """_TokenSeedingDistrictClient must seed a real app_token from the
+    casestatus/index page -- the vendored client GETs the tokenless "/"
+    home page and sent app_token="" (the "Invalid Request" root cause)."""
+
+    def _client_with_page(self, html: str):
+        client = _TokenSeedingDistrictClient()
+        resp = MagicMock()
+        resp.text = html
+        client._http = MagicMock()
+        client._http.get = AsyncMock(return_value=resp)
+        return client
+
+    def test_seeds_token_from_page(self):
+        client = self._client_with_page(
+            "<input type=\"hidden\" name=\"app_token\" id='app_token' value=\"abc123def456\">"
+        )
+        asyncio.run(client._init_session())
+        assert client._app_token == "abc123def456"
+
+    def test_seeds_from_casestatus_index_url(self):
+        client = self._client_with_page("id='app_token' value=\"deadbeef00\"")
+        asyncio.run(client._init_session())
+        called_url = client._http.get.call_args.args[0]
+        assert "casestatus/index" in called_url
+
+    def test_falls_back_to_vendored_when_no_token(self):
+        client = self._client_with_page("<html>no token here</html>")
+        with patch.object(
+            _TokenSeedingDistrictClient.__mro__[1], "_init_session", new_callable=AsyncMock
+        ) as base_init:
+            asyncio.run(client._init_session())
+            base_init.assert_awaited_once()
+
+
+# ---------------------------------------------------------------------------
+# System-wide single-in-flight cap on advocate_search / advocate_import
+# ---------------------------------------------------------------------------
+
+
+_SEARCH_BODY = {"name_or_bar_code": "Suresh", "court_type": "district", "state_code": "1"}
+_IMPORT_BODY = {"court_type": "district", "selected": [{"cnr_number": "X1", "case_number": "1/2024"}]}
+
+
+@pytest.mark.django_db
+class TestConcurrencyCap:
+    def test_enqueue_helper_raises_when_active(self, user_a):
+        ProcessingJob.enqueue_advocate_search(user_a, {"state_code": "1"})
+        with pytest.raises(JobAlreadyRunningError):
+            ProcessingJob.enqueue_advocate_search(user_a, {"state_code": "1"})
+
+    def test_second_search_rejected_409(self, client_a):
+        assert client_a.post("/api/cases/search-advocate/", _SEARCH_BODY, format="json").status_code == 202
+        resp = client_a.post("/api/cases/search-advocate/", _SEARCH_BODY, format="json")
+        assert resp.status_code == 409
+        assert resp.data["code"] == "search_already_running"
+
+    def test_search_cap_is_system_wide_across_users(self, client_a, client_b):
+        assert client_a.post("/api/cases/search-advocate/", _SEARCH_BODY, format="json").status_code == 202
+        # A different user is still blocked -- the cap is global, not per-owner.
+        resp = client_b.post("/api/cases/search-advocate/", _SEARCH_BODY, format="json")
+        assert resp.status_code == 409
+
+    def test_second_import_rejected_409(self, client_a):
+        assert client_a.post("/api/cases/search-advocate/import/", _IMPORT_BODY, format="json").status_code == 202
+        resp = client_a.post("/api/cases/search-advocate/import/", _IMPORT_BODY, format="json")
+        assert resp.status_code == 409
+        assert resp.data["code"] == "import_already_running"
+
+    def test_search_and_import_are_independent(self, client_a):
+        assert client_a.post("/api/cases/search-advocate/", _SEARCH_BODY, format="json").status_code == 202
+        # An active search must NOT block an import (different job type).
+        assert client_a.post("/api/cases/search-advocate/import/", _IMPORT_BODY, format="json").status_code == 202
+
+    def test_new_search_allowed_after_previous_finished(self, client_a):
+        r1 = client_a.post("/api/cases/search-advocate/", _SEARCH_BODY, format="json")
+        assert r1.status_code == 202
+        ProcessingJob.objects.filter(id=r1.data["job_id"]).update(status="succeeded")
+        assert client_a.post("/api/cases/search-advocate/", _SEARCH_BODY, format="json").status_code == 202
