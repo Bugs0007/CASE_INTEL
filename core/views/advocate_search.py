@@ -19,7 +19,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.models import AdvocateSearchPreference, ProcessingJob
+from core.models import AdvocateSearchPreference, JobAlreadyRunningError, ProcessingJob
 
 _BAR_CODE_RE = re.compile(r"^[A-Za-z]{2,3}/\d+/\d{4}$")
 MAX_IMPORT_BATCH = 100
@@ -81,16 +81,22 @@ class AdvocateSearchView(APIView):
         if error:
             return Response({"detail": error}, status=status.HTTP_400_BAD_REQUEST)
 
-        job = ProcessingJob.enqueue_advocate_search(
-            request.user,
-            {
-                "state_code": str(state_code),
-                "court_type": court_type,
-                "advocate_name": advocate_name,
-                "bar_code": bar_code,
-                "status_filter": status_filter,
-            },
-        )
+        try:
+            job = ProcessingJob.enqueue_advocate_search(
+                request.user,
+                {
+                    "state_code": str(state_code),
+                    "court_type": court_type,
+                    "advocate_name": advocate_name,
+                    "bar_code": bar_code,
+                    "status_filter": status_filter,
+                },
+            )
+        except JobAlreadyRunningError as exc:
+            return Response(
+                {"detail": str(exc), "code": "search_already_running"},
+                status=status.HTTP_409_CONFLICT,
+            )
 
         AdvocateSearchPreference.objects.update_or_create(
             owner=request.user,
@@ -167,7 +173,13 @@ class AdvocateSearchImportView(APIView):
             if isinstance(item, dict)
         ]
 
-        job = ProcessingJob.enqueue_advocate_import(request.user, normalized)
+        try:
+            job = ProcessingJob.enqueue_advocate_import(request.user, normalized)
+        except JobAlreadyRunningError as exc:
+            return Response(
+                {"detail": str(exc), "code": "import_already_running"},
+                status=status.HTTP_409_CONFLICT,
+            )
         return Response({"job_id": job.id}, status=status.HTTP_202_ACCEPTED)
 
 
