@@ -137,6 +137,16 @@ logger = logging.getLogger(__name__)
 MAX_RETRIES = 3
 RETRY_BACKOFF_SECONDS = 1.5
 
+# Advocate search gets more attempts than MAX_RETRIES (used by CNR/case-
+# number/party search): root-caused 25 Jul 2026 that bharat-courts'
+# _post_with_captcha_retry effectively delivered only ONE real captcha
+# attempt per outer retry here (see _district_search_by_advocate's
+# docstring) rather than its apparent 5, so the real budget was thinner
+# than intended. Now that each attempt is spent correctly (see below), a
+# higher count buys real additional captcha tries at low cost -- solving
+# is the dominant failure mode for this endpoint specifically.
+ADVOCATE_SEARCH_MAX_ATTEMPTS = 6
+
 
 # ---------------------------------------------------------------------------
 # Token-seeding + delimeter District Courts client
@@ -906,51 +916,118 @@ class EcourtsProvider(CourtDataProvider):
         bar_year: str,
         status_filter: str,
     ) -> list[CaseInfo]:
+        """Hand-rolled retry loop (matches _district_cnr_search's existing
+        pattern in this file) instead of bharat-courts' own
+        _post_with_captcha_retry. Root-caused live 25 Jul 2026 -- two real
+        bugs in the vendored path, both fixed here:
+
+        1. casestatus/submitAdvName's "Invalid Captcha" response body has
+           errormsg populated (confirmed live: {"errormsg":"Invalid
+           Captcha... ", "div_captcha": ...}), so bharat-courts' own
+           parse_ajax_response raises ServerError for it -- NOT CaptchaError
+           (that only fires when status==0 with no errormsg key, a
+           different response shape). _post_with_captcha_retry's inner loop
+           only catches CaptchaError, so a wrong-captcha response propagated
+           straight out on the FIRST sub-attempt, uncaught by its own 5-try
+           budget. Net effect: every "advocate search attempt N/3" in the
+           old code was exactly ONE real network attempt, not up to 5 --
+           the retry depth the code's structure implied was never actually
+           delivered.
+        2. A blank/wrong-length OCR decode (ddddocr correctly refuses to
+           return a non-6-char result -- see bharat_courts.captcha.ocr) was
+           still being SUBMITTED as adv_captcha_code="" instead of silently
+           refetching a new image, burning one of the (already-thin) real
+           attempts on a guaranteed-fail guess.
+
+        Fetching the client's own primitives directly here (matching
+        _district_cnr_search) fixes both: only CaptchaSolveError-worthy
+        blank decodes skip the network round-trip entirely (fix #2), and
+        this method's own except clause -- same as the rest of this file --
+        already catches both DistrictServerError and DistrictCaptchaError
+        uniformly, so misclassification no longer matters (fix #1).
+        ADVOCATE_SEARCH_MAX_ATTEMPTS (6) is used instead of the shared
+        MAX_RETRIES (3, used by CNR/case-number/party search) since a
+        correctly-spent attempt is now the norm and captcha-solving is the
+        dominant cost/failure mode specifically on this endpoint.
+
+        Also treats an empty adv_data (status==1, no error) as a portal
+        error rather than silently returning zero results -- confirmed live
+        that submitting without BOTH a real dist_code AND a real
+        court_complex_code returns HTTP 200 with a genuinely blank body,
+        indistinguishable from "no matching cases" unless checked for.
+        """
         async with _TokenSeedingDistrictClient() as client:
             last_exc: Exception | None = None
-            for attempt in range(1, MAX_RETRIES + 1):
-                try:
-
-                    def build_form(captcha: str) -> dict:
-                        return _district_advocate_search_form(
-                            state_code=hierarchy["state_code"],
-                            dist_code=hierarchy["dist_code"],
-                            court_complex_code=hierarchy["court_complex_code"],
-                            est_code=hierarchy.get("est_code", ""),
-                            advocate_name=advocate_name,
-                            bar_state=bar_state,
-                            bar_code=bar_code,
-                            bar_year=bar_year,
-                            status_filter=status_filter,
-                            captcha=captcha,
-                        )
-
-                    result = await client._post_with_captcha_retry(
-                        "casestatus/submitAdvName",
-                        build_form,
-                        state_code=hierarchy["state_code"],
-                        dist_code=hierarchy["dist_code"],
-                        court_complex_code=hierarchy["court_complex_code"],
-                        est_code=hierarchy.get("est_code", ""),
+            for attempt in range(1, ADVOCATE_SEARCH_MAX_ATTEMPTS + 1):
+                await client._init_session()
+                await client._setup_court(
+                    state_code=hierarchy["state_code"],
+                    dist_code=hierarchy["dist_code"],
+                    court_complex_code=hierarchy["court_complex_code"],
+                    est_code=hierarchy.get("est_code", ""),
+                )
+                captcha = await client._solve_captcha()
+                if not captcha:
+                    last_exc = CaptchaSolveError("OCR failed to read the CAPTCHA image.")
+                    logger.warning(
+                        "District Courts advocate search attempt %d/%d: OCR could not "
+                        "read a valid CAPTCHA, refetching without submitting.",
+                        attempt, ADVOCATE_SEARCH_MAX_ATTEMPTS,
                     )
-                    html = result.get("adv_data", "")
-                    return parse_case_status_html(html)
+                    if attempt < ADVOCATE_SEARCH_MAX_ATTEMPTS:
+                        await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
+                    continue
+
+                form = _district_advocate_search_form(
+                    state_code=hierarchy["state_code"],
+                    dist_code=hierarchy["dist_code"],
+                    court_complex_code=hierarchy["court_complex_code"],
+                    est_code=hierarchy.get("est_code", ""),
+                    advocate_name=advocate_name,
+                    bar_state=bar_state,
+                    bar_code=bar_code,
+                    bar_year=bar_year,
+                    status_filter=status_filter,
+                    captcha=captcha,
+                )
+                try:
+                    result = await client._post_ajax("casestatus/submitAdvName", form)
                 except (DistrictServerError, DistrictCaptchaError) as exc:
-                    # Same gap as case-number/party-name search -- bharat-
-                    # courts' own retry only catches the literal "Invalid
-                    # Captcha" text; a generic ServerError propagates
-                    # uncaught without this outer loop.
                     last_exc = exc
                     logger.warning(
                         "District Courts advocate search attempt %d/%d failed: %s",
-                        attempt, MAX_RETRIES, exc,
+                        attempt, ADVOCATE_SEARCH_MAX_ATTEMPTS, exc,
                     )
-                    if attempt < MAX_RETRIES:
+                    if attempt < ADVOCATE_SEARCH_MAX_ATTEMPTS:
                         await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
-            if isinstance(last_exc, DistrictCaptchaError):
-                raise CaptchaSolveError(f"CAPTCHA solving failed after {MAX_RETRIES} attempts.") from last_exc
+                    continue
+
+                html = result.get("adv_data", "")
+                if not html:
+                    last_exc = CourtPortalError(
+                        "District Courts advocate search returned an empty response -- "
+                        "dist_code/court_complex_code must both be a real, valid district "
+                        "and court complex (verified live: leaving either empty/0 returns "
+                        "HTTP 200 with a blank body, not an error)."
+                    )
+                    logger.warning(
+                        "District Courts advocate search attempt %d/%d: empty adv_data "
+                        "(missing/invalid dist_code or court_complex_code).",
+                        attempt, ADVOCATE_SEARCH_MAX_ATTEMPTS,
+                    )
+                    if attempt < ADVOCATE_SEARCH_MAX_ATTEMPTS:
+                        await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
+                    continue
+
+                return parse_case_status_html(html)
+
+            if isinstance(last_exc, (DistrictCaptchaError, CaptchaSolveError)):
+                raise CaptchaSolveError(
+                    f"CAPTCHA solving failed after {ADVOCATE_SEARCH_MAX_ATTEMPTS} attempts."
+                ) from last_exc
             raise CourtPortalError(
-                f"District Courts advocate search failed after {MAX_RETRIES} attempts: {last_exc}"
+                f"District Courts advocate search failed after {ADVOCATE_SEARCH_MAX_ATTEMPTS} "
+                f"attempts: {last_exc}"
             ) from last_exc
 
     async def _district_history_with_retry(self, client: DistrictCourtClient, view_args: dict):
