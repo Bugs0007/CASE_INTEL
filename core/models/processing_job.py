@@ -3,6 +3,18 @@ from django.db import models
 from .mixins import OwnedModel
 
 
+class JobAlreadyRunningError(Exception):
+    """Raised when a system-wide-singleton job type (advocate_search /
+    advocate_import) is enqueued while one is already queued or running.
+
+    These jobs fan a burst of sequential CAPTCHA-gated requests out at the
+    eCourts portal; running two at once caused a production outage, so only
+    one of each may be in flight across the WHOLE system at a time. The
+    caller should surface a "try again shortly" message, not queue behind
+    the running one.
+    """
+
+
 class ProcessingJob(OwnedModel):
     """A queued unit of document-processing work, claimed by the
     `process_jobs` worker via select_for_update(skip_locked=True).
@@ -118,12 +130,28 @@ class ProcessingJob(OwnedModel):
         return cls.objects.create(owner=case.owner, case=case, job_type="order_sync"), True
 
     @classmethod
+    def active_of_type_exists(cls, job_type: str) -> bool:
+        """True if any queued/running job of this type exists, SYSTEM-WIDE
+        (not scoped to an owner). Used to enforce the single-in-flight cap
+        on the advocate_* portal jobs."""
+        return cls.objects.filter(job_type=job_type, status__in=["queued", "running"]).exists()
+
+    @classmethod
     def enqueue_advocate_import(cls, owner, selected: list[dict]) -> "ProcessingJob":
         """Enqueue a bulk import of eCourts search results into new Cases.
 
-        No dedup against an existing job -- each submission is a distinct
-        batch (case is null, so there's no single target to dedup against
-        the way enqueue()/enqueue_order_sync() do)."""
+        No dedup against an existing job for the SAME batch -- each
+        submission is distinct -- but only one advocate_import may run
+        system-wide at a time (see JobAlreadyRunningError). The check and
+        the create aren't in one lock, so a truly simultaneous double-submit
+        could still slip a second job through; that's an acceptable, tiny
+        race for a manually-triggered heavy job (same tolerance the preview
+        throttle / refetch-interval checks already take), and the point is
+        to stop the portal from being hit by two fan-outs at once."""
+        if cls.active_of_type_exists("advocate_import"):
+            raise JobAlreadyRunningError(
+                "A case import is already running. Please wait for it to finish before adding more."
+            )
         return cls.objects.create(
             owner=owner,
             job_type="advocate_import",
@@ -138,7 +166,15 @@ class ProcessingJob(OwnedModel):
         core/services/advocate_search.py). `params` carries the search
         inputs ({state_code, court_type, advocate_name, bar_code,
         status_filter}); the outcome ({results, failures, ...}) is written
-        back into the same payload on completion."""
+        back into the same payload on completion.
+
+        Only one advocate_search may run system-wide at a time (see
+        JobAlreadyRunningError and enqueue_advocate_import's note on the
+        check/create race)."""
+        if cls.active_of_type_exists("advocate_search"):
+            raise JobAlreadyRunningError(
+                "A case search is already running. Please wait for it to finish before starting another."
+            )
         return cls.objects.create(
             owner=owner,
             job_type="advocate_search",

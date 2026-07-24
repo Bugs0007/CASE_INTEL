@@ -17,7 +17,7 @@ from .hearing import Hearing
 from .court_fetch_log import CourtFetchLog
 from .court_order import CourtOrder
 from .court_tracking_preview import CourtTrackingPreview
-from .processing_job import ProcessingJob
+from .processing_job import JobAlreadyRunningError, ProcessingJob
 from .advocate_search_preference import AdvocateSearchPreference
 
 __all__ = [
@@ -43,5 +43,6 @@ __all__ = [
     "CourtOrder",
     "CourtTrackingPreview",
     "ProcessingJob",
+    "JobAlreadyRunningError",
     "AdvocateSearchPreference",
 ]
