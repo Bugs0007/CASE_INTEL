@@ -131,6 +131,26 @@ class TestAdvocateSearchView:
         assert job.payload["bar_code"] == "MAH/1234/2015"
         assert job.payload["advocate_name"] == ""
 
+    def test_dist_code_sets_districts_filter_for_single_district_search(self, client_a):
+        resp = client_a.post(
+            "/api/cases/search-advocate/",
+            {"name_or_bar_code": "Suresh", "court_type": "district", "state_code": "1", "dist_code": "26"},
+            format="json",
+        )
+        assert resp.status_code == 202
+        job = ProcessingJob.objects.get(id=resp.data["job_id"])
+        assert job.payload["districts_filter"] == ["26"]
+
+    def test_omitting_dist_code_means_state_wide(self, client_a):
+        resp = client_a.post(
+            "/api/cases/search-advocate/",
+            {"name_or_bar_code": "Suresh", "court_type": "district", "state_code": "1"},
+            format="json",
+        )
+        assert resp.status_code == 202
+        job = ProcessingJob.objects.get(id=resp.data["job_id"])
+        assert (job.payload or {}).get("districts_filter") is None
+
     def test_name_too_short_rejected(self, client_a):
         resp = client_a.post(
             "/api/cases/search-advocate/",
@@ -208,6 +228,7 @@ class TestAdvocateSearchStatusView:
                 "results": [{"cnr_number": "X1"}, {"cnr_number": "X2"}],
                 "failures": [{"district": "Pune", "court_complex": "CX", "error": "captcha"}],
                 "districts_total": 30, "complexes_searched": 88,
+                "districts_status": {"1": {"name": "Pune", "status": "success", "complexes_total": 3, "complexes_ok": 3, "complexes_failed": 0}},
             },
         )
         resp = client_a.get(f"/api/cases/search-advocate/{job.id}/")
@@ -216,6 +237,15 @@ class TestAdvocateSearchStatusView:
         assert len(resp.data["results"]) == 2
         assert len(resp.data["failures"]) == 1
         assert resp.data["districts_total"] == 30
+        assert resp.data["districts_status"]["1"]["status"] == "success"
+
+    def test_running_job_with_no_districts_status_yet_returns_empty_dict(self, client_a, user_a):
+        job = ProcessingJob.objects.create(
+            owner=user_a, job_type="advocate_search", status="running", payload={"state_code": "1"},
+        )
+        resp = client_a.get(f"/api/cases/search-advocate/{job.id}/")
+        assert resp.status_code == 200
+        assert resp.data["districts_status"] == {}
 
     def test_failed_job_surfaces_error_not_500(self, client_a, user_a):
         job = ProcessingJob.objects.create(
@@ -237,6 +267,101 @@ class TestAdvocateSearchStatusView:
         job = ProcessingJob.objects.create(owner=user_a, job_type="advocate_import", payload={})
         resp = client_a.get(f"/api/cases/search-advocate/{job.id}/")
         assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# AdvocateSearchRetryFailedView
+# ---------------------------------------------------------------------------
+
+
+def _completed_job(user, *, districts_status, results=None, **payload_overrides):
+    payload = {
+        "state_code": "1", "court_type": "district", "advocate_name": "Suresh",
+        "bar_code": "", "status_filter": "Both",
+        "results": results or [], "failures": [], "districts_total": len(districts_status),
+        "districts_status": districts_status, "complexes_searched": 0,
+    }
+    payload.update(payload_overrides)
+    return ProcessingJob.objects.create(
+        owner=user, job_type="advocate_search", status="succeeded", payload=payload,
+    )
+
+
+@pytest.mark.django_db
+class TestAdvocateSearchRetryFailedView:
+    def test_enqueues_new_job_scoped_to_failed_districts_only(self, client_a, user_a):
+        original = _completed_job(
+            user_a,
+            results=[{"cnr_number": "OLD1"}],
+            districts_status={
+                "1": {"name": "Dist A", "status": "success", "complexes_total": 2, "complexes_ok": 2, "complexes_failed": 0},
+                "2": {"name": "Dist B", "status": "failed", "complexes_total": 2, "complexes_ok": 0, "complexes_failed": 2},
+            },
+        )
+        resp = client_a.post(f"/api/cases/search-advocate/{original.id}/retry-failed/")
+        assert resp.status_code == 202
+        new_job = ProcessingJob.objects.get(id=resp.data["job_id"])
+        assert new_job.id != original.id
+        assert new_job.payload["districts_filter"] == ["2"]
+        assert new_job.payload["seed_results"] == [{"cnr_number": "OLD1"}]
+        assert new_job.payload["seed_districts_status"] == {
+            "1": {"name": "Dist A", "status": "success", "complexes_total": 2, "complexes_ok": 2, "complexes_failed": 0},
+        }
+        assert new_job.payload["retry_of"] == original.id
+        # Search params carried forward from the original job.
+        assert new_job.payload["state_code"] == "1"
+        assert new_job.payload["advocate_name"] == "Suresh"
+
+    def test_partial_districts_are_also_retried(self, client_a, user_a):
+        original = _completed_job(
+            user_a,
+            districts_status={
+                "1": {"name": "Dist A", "status": "partial", "complexes_total": 2, "complexes_ok": 1, "complexes_failed": 1},
+            },
+        )
+        resp = client_a.post(f"/api/cases/search-advocate/{original.id}/retry-failed/")
+        assert resp.status_code == 202
+        new_job = ProcessingJob.objects.get(id=resp.data["job_id"])
+        assert new_job.payload["districts_filter"] == ["1"]
+
+    def test_nothing_to_retry_when_everything_succeeded(self, client_a, user_a):
+        original = _completed_job(
+            user_a,
+            districts_status={
+                "1": {"name": "Dist A", "status": "success", "complexes_total": 2, "complexes_ok": 2, "complexes_failed": 0},
+            },
+        )
+        resp = client_a.post(f"/api/cases/search-advocate/{original.id}/retry-failed/")
+        assert resp.status_code == 400
+
+    def test_cannot_retry_a_still_running_job(self, client_a, user_a):
+        job = ProcessingJob.objects.create(
+            owner=user_a, job_type="advocate_search", status="running", payload={"state_code": "1"},
+        )
+        resp = client_a.post(f"/api/cases/search-advocate/{job.id}/retry-failed/")
+        assert resp.status_code == 400
+
+    def test_other_users_job_not_retryable(self, client_a, user_b):
+        original = _completed_job(
+            user_b,
+            districts_status={
+                "1": {"name": "Dist A", "status": "failed", "complexes_total": 1, "complexes_ok": 0, "complexes_failed": 1},
+            },
+        )
+        resp = client_a.post(f"/api/cases/search-advocate/{original.id}/retry-failed/")
+        assert resp.status_code == 404
+
+    def test_blocked_by_concurrency_cap(self, client_a, user_a):
+        original = _completed_job(
+            user_a,
+            districts_status={
+                "1": {"name": "Dist A", "status": "failed", "complexes_total": 1, "complexes_ok": 0, "complexes_failed": 1},
+            },
+        )
+        # Another advocate_search is already running system-wide.
+        ProcessingJob.objects.create(owner=user_a, job_type="advocate_search", status="running", payload={})
+        resp = client_a.post(f"/api/cases/search-advocate/{original.id}/retry-failed/")
+        assert resp.status_code == 409
 
 
 # ---------------------------------------------------------------------------
@@ -351,6 +476,226 @@ class TestRunAdvocateSearch:
              patch("core.services.advocate_search.time.sleep"), \
              pytest.raises(CourtPortalError):
             run_advocate_search(job)
+
+    def test_districts_status_classifies_success_partial_failed(self, user_a):
+        job = _search_job(user_a)
+        provider = self._provider()  # Dist A/B, 2 complexes each
+        provider.search_by_advocate.side_effect = [
+            [_ci("CNR1")], [_ci("CNR2")],                    # Dist A: both complexes ok -> success
+            [_ci("CNR3")], CaptchaSolveError("bad captcha"),  # Dist B: 1 ok, 1 failed -> partial
+        ]
+        with patch("core.services.advocate_search.get_provider", return_value=provider), \
+             patch("core.services.advocate_search.parse_complex_code", return_value=("cc", "ec")), \
+             patch("core.services.advocate_search.time.sleep"):
+            run_advocate_search(job)
+
+        job.refresh_from_db()
+        status = job.payload["districts_status"]
+        assert status["1"]["status"] == "success"
+        assert status["1"]["complexes_ok"] == 2
+        assert status["2"]["status"] == "partial"
+        assert status["2"]["complexes_ok"] == 1
+        assert status["2"]["complexes_failed"] == 1
+
+    def test_districts_filter_restricts_to_requested_subset(self, user_a):
+        job = _search_job(user_a, districts_filter=["2"])
+        provider = self._provider()  # districts {"1": "Dist A", "2": "Dist B"}
+        provider.search_by_advocate.return_value = [_ci("CNR1")]
+        with patch("core.services.advocate_search.get_provider", return_value=provider), \
+             patch("core.services.advocate_search.parse_complex_code", return_value=("cc", "ec")), \
+             patch("core.services.advocate_search.time.sleep"):
+            run_advocate_search(job)
+
+        job.refresh_from_db()
+        assert job.payload["districts_total"] == 1
+        assert list(job.payload["districts_status"].keys()) == ["2"]
+        # Only District B's 2 complexes were searched, not District A's.
+        assert provider.search_by_advocate.call_count == 2
+
+    def test_seed_results_and_seed_districts_status_are_carried_forward(self, user_a):
+        job = _search_job(
+            user_a,
+            districts_filter=["2"],
+            seed_results=[_ci("OLD1").to_dict()],
+            seed_districts_status={"1": {"name": "Dist A", "status": "success", "complexes_total": 2, "complexes_ok": 2, "complexes_failed": 0}},
+        )
+        provider = self._provider()
+        provider.search_by_advocate.return_value = [_ci("NEW1")]
+        with patch("core.services.advocate_search.get_provider", return_value=provider), \
+             patch("core.services.advocate_search.parse_complex_code", return_value=("cc", "ec")), \
+             patch("core.services.advocate_search.time.sleep"):
+            run_advocate_search(job)
+
+        job.refresh_from_db()
+        cnrs = sorted(r["cnr_number"] for r in job.payload["results"])
+        assert cnrs == ["NEW1", "OLD1"]  # old seed result kept, new one merged in
+        # Both the seeded (already-successful) district AND the newly
+        # retried one appear in the final rollup.
+        assert set(job.payload["districts_status"].keys()) == {"1", "2"}
+        assert job.payload["districts_status"]["1"]["status"] == "success"
+
+    def test_incremental_persistence_mid_run(self, user_a):
+        """A snapshot taken BETWEEN districts (not after the whole job
+        finishes) must already reflect the first district's results --
+        proves _persist() writes incrementally, not only at the end."""
+        job = _search_job(user_a)
+        provider = self._provider()
+        provider.search_by_advocate.side_effect = [
+            [_ci("CNR1")], [],  # Dist A
+            [_ci("CNR2")], [],  # Dist B
+        ]
+        snapshots = []
+
+        def sleeping(*args, **kwargs):
+            snapshots.append(ProcessingJob.objects.get(id=job.id).payload)
+
+        with patch("core.services.advocate_search.get_provider", return_value=provider), \
+             patch("core.services.advocate_search.parse_complex_code", return_value=("cc", "ec")), \
+             patch("core.services.advocate_search.time.sleep", side_effect=sleeping):
+            run_advocate_search(job)
+
+        # By the time District B's first complex is being searched (some
+        # snapshot partway through), District A must already be recorded.
+        mid_run_snapshots = [s for s in snapshots if s and "1" in s.get("districts_status", {})]
+        assert mid_run_snapshots, "expected at least one mid-run snapshot with District A already persisted"
+        first_seen = mid_run_snapshots[0]
+        assert first_seen["districts_status"]["1"]["status"] == "success"
+
+    def test_systemic_session_failure_triggers_whole_district_retry(self, user_a):
+        """Every complex in a district failing with the 'Invalid Request'
+        session signature must trigger a whole-district retry (re-listing
+        complexes too), not an immediate permanent failure."""
+        job = _search_job(user_a)
+        provider = self._provider()
+        provider.list_complexes.side_effect = [
+            {"cx1@e@N": "Complex 1", "cx2@e@N": "Complex 2"},  # Dist A, attempt 1
+            {"cx1@e@N": "Complex 1", "cx2@e@N": "Complex 2"},  # Dist A, attempt 2 (retry re-lists)
+            {"cx1@e@N": "Complex 1", "cx2@e@N": "Complex 2"},  # Dist B
+        ]
+        provider.search_by_advocate.side_effect = [
+            CourtPortalError("...Invalid Request...Try once again"),  # Dist A cx1, attempt 1: session error
+            CourtPortalError("...Invalid Request...Try once again"),  # Dist A cx2, attempt 1: session error
+            [_ci("CNR1")],  # Dist A cx1, attempt 2 (after district retry): succeeds
+            [_ci("CNR2")],  # Dist A cx2, attempt 2: succeeds
+            [_ci("CNR3")],  # Dist B cx1
+            [],             # Dist B cx2
+        ]
+        with patch("core.services.advocate_search.get_provider", return_value=provider), \
+             patch("core.services.advocate_search.parse_complex_code", return_value=("cc", "ec")), \
+             patch("core.services.advocate_search.time.sleep") as mock_sleep:
+            run_advocate_search(job)
+
+        job.refresh_from_db()
+        assert job.payload["districts_status"]["1"]["status"] == "success"
+        cnrs = sorted(r["cnr_number"] for r in job.payload["results"])
+        assert cnrs == ["CNR1", "CNR2", "CNR3"]
+        assert job.payload["failures"] == []  # the retried district recovered fully, no permanent failure recorded
+        # The longer district-level cooldown must actually have been used.
+        from core.services.advocate_search import DISTRICT_RETRY_BACKOFF_SECONDS
+        assert any(c.args and c.args[0] == DISTRICT_RETRY_BACKOFF_SECONDS for c in mock_sleep.call_args_list)
+
+    def test_non_systemic_mixed_failure_does_not_trigger_district_retry(self, user_a):
+        """Only ONE complex failing (not all of them) with a session error
+        should NOT trigger a whole-district retry -- that's the normal
+        per-complex isolation path, already handled inside
+        search_by_advocate's own retries."""
+        job = _search_job(user_a)
+        provider = self._provider()
+        provider.search_by_advocate.side_effect = [
+            [_ci("CNR1")],                                    # Dist A cx1 ok
+            CourtPortalError("...Invalid Request..."),         # Dist A cx2: one session-classified failure
+            [_ci("CNR2")], [],                                # Dist B
+        ]
+        with patch("core.services.advocate_search.get_provider", return_value=provider), \
+             patch("core.services.advocate_search.parse_complex_code", return_value=("cc", "ec")), \
+             patch("core.services.advocate_search.time.sleep"):
+            run_advocate_search(job)
+
+        job.refresh_from_db()
+        # Only 4 search_by_advocate calls total (2 per district) -- no
+        # extra district-level retry calls were made for District A.
+        assert provider.search_by_advocate.call_count == 4
+        assert job.payload["districts_status"]["1"]["status"] == "partial"
+        assert job.payload["failures"][0]["error_type"] == "session"
+
+    def test_unexpected_exception_in_one_complex_does_not_crash_the_run(self, user_a):
+        """Regression test for a real live failure (26 Jul 2026): a very
+        common advocate name made one complex's response body 25.7MB and
+        the connection was cut mid-body, raising httpx.RemoteProtocolError
+        -- NOT a CourtDataError, so the old code let it propagate and crash
+        the entire job (results already found in earlier districts were
+        only saved because of incremental persistence, but the run itself
+        died and later districts were never attempted). One bad complex
+        must now be isolated like any other failure."""
+        import httpx
+
+        job = _search_job(user_a)
+        provider = self._provider()
+        provider.search_by_advocate.side_effect = [
+            [_ci("CNR1")],
+            httpx.RemoteProtocolError(
+                "peer closed connection without sending complete message body "
+                "(received 8912896 bytes, expected 25698031)"
+            ),
+            [_ci("CNR2")], [],
+        ]
+        with patch("core.services.advocate_search.get_provider", return_value=provider), \
+             patch("core.services.advocate_search.parse_complex_code", return_value=("cc", "ec")), \
+             patch("core.services.advocate_search.time.sleep"):
+            run_advocate_search(job)  # must not raise
+
+        job.refresh_from_db()
+        # The whole run completed -- District B was still attempted after
+        # District A's mid-run crash, not abandoned.
+        assert job.payload["districts_status"]["2"]["status"] == "success"
+        assert job.payload["districts_status"]["1"]["status"] == "partial"
+        cnrs = sorted(r["cnr_number"] for r in job.payload["results"])
+        assert cnrs == ["CNR1", "CNR2"]
+        assert len(job.payload["failures"]) == 1
+        assert "RemoteProtocolError" in job.payload["failures"][0]["error"]
+        assert job.payload["failures"][0]["error_type"] == "portal"
+
+    def test_unexpected_exception_listing_complexes_does_not_crash_the_run(self, user_a):
+        """Same isolation, for an unexpected (non-CourtDataError) exception
+        raised while listing a district's complexes rather than searching
+        one -- the district-level retry loop's broader except clause."""
+        job = _search_job(user_a)
+        provider = self._provider()
+
+        def complexes(state, dist):
+            if dist == "1":
+                raise ValueError("totally unexpected bug")
+            return {"cx1@e@N": "Complex 1", "cx2@e@N": "Complex 2"}
+
+        provider.list_complexes.side_effect = complexes
+        provider.search_by_advocate.return_value = [_ci("CNR1")]
+        with patch("core.services.advocate_search.get_provider", return_value=provider), \
+             patch("core.services.advocate_search.parse_complex_code", return_value=("cc", "ec")), \
+             patch("core.services.advocate_search.time.sleep"):
+            run_advocate_search(job)  # must not raise
+
+        job.refresh_from_db()
+        assert job.payload["districts_status"]["1"]["status"] == "failed"
+        assert job.payload["districts_status"]["2"]["status"] == "success"
+        assert "totally unexpected bug" in job.payload["failures"][0]["error"]
+
+
+class TestClassifyFailure:
+    def test_invalid_request_is_session(self):
+        from core.services.advocate_search import _classify_failure
+        assert _classify_failure("...Invalid Request...Try once again") == "session"
+
+    def test_invalid_captcha_is_captcha(self):
+        from core.services.advocate_search import _classify_failure
+        assert _classify_failure("Invalid Captcha... ") == "captcha"
+
+    def test_empty_response_is_data(self):
+        from core.services.advocate_search import _classify_failure
+        assert _classify_failure("District Courts advocate search returned an empty response -- dist_code/court_complex_code must both be a real, valid district and court complex") == "data"
+
+    def test_unrecognized_text_is_portal(self):
+        from core.services.advocate_search import _classify_failure
+        assert _classify_failure("connection timed out") == "portal"
 
 
 # ---------------------------------------------------------------------------
