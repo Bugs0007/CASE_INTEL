@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowLeft, Loader2, Search } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, RotateCcw, Search, XCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ import {
   useAdvocateSearchJob,
   useAdvocateSearchPreference,
   useImportAdvocateCases,
+  useRetryFailedDistricts,
 } from "@/hooks/use-advocate-search";
 import { useQueryClient } from "@tanstack/react-query";
 import { caseKeys } from "@/hooks/use-cases";
@@ -23,12 +24,14 @@ import type { AdvocateSearchResult } from "@/types";
 
 const BAR_CODE_RE = /^[A-Za-z]{2,3}\/\d+\/\d{4}$/;
 const IMPORT_CAP = 100;
+const ALL_DISTRICTS = "";
 
 export default function AdvocateSearchPage() {
   const queryClient = useQueryClient();
   const { data: preference } = useAdvocateSearchPreference();
 
   const [stateCode, setStateCode] = useState("");
+  const [distCode, setDistCode] = useState(ALL_DISTRICTS);
   const [nameOrBarCode, setNameOrBarCode] = useState("");
   const [statusFilter, setStatusFilter] = useState<"Pending" | "Disposed" | "Both">("Both");
   const [formError, setFormError] = useState<string | null>(null);
@@ -36,6 +39,7 @@ export default function AdvocateSearchPage() {
   const [searchJobId, setSearchJobId] = useState<number | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [importJobId, setImportJobId] = useState<number | null>(null);
+  const [districtsExpanded, setDistrictsExpanded] = useState(false);
 
   // Pre-fill the state from the caller's last search, once.
   useEffect(() => {
@@ -45,6 +49,7 @@ export default function AdvocateSearchPage() {
   }, [preference]);
 
   const states = useCourtStructure({ court_type: "district" });
+  const districts = useCourtStructure(stateCode ? { court_type: "district", state_code: stateCode } : null);
 
   const nameLooksLikeBarCode = BAR_CODE_RE.test(nameOrBarCode.trim());
   const nameValid = nameLooksLikeBarCode || nameOrBarCode.trim().length >= 3;
@@ -52,6 +57,7 @@ export default function AdvocateSearchPage() {
 
   const search = useAdvocateSearch();
   const searchJob = useAdvocateSearchJob(searchJobId);
+  const retryFailed = useRetryFailedDistricts();
   const startImport = useImportAdvocateCases();
   const importJob = useAdvocateImportJob(importJobId);
 
@@ -75,6 +81,7 @@ export default function AdvocateSearchPage() {
         name_or_bar_code: nameOrBarCode.trim(),
         court_type: "district",
         state_code: stateCode,
+        dist_code: distCode || undefined,
         status_filter: statusFilter,
       });
       setSearchJobId(job_id);
@@ -84,6 +91,22 @@ export default function AdvocateSearchPage() {
         setFormError(detail || "Could not start the search. Please try again.");
       } else {
         setFormError("Could not reach the server. Please try again.");
+      }
+    }
+  }
+
+  async function handleRetryFailed() {
+    if (searchJobId === null) return;
+    try {
+      const { job_id } = await retryFailed.mutateAsync(searchJobId);
+      setSearchJobId(job_id);
+      showToast.success("Retrying failed districts", "Already-found cases are kept.");
+    } catch (error) {
+      if (error instanceof APIError && error.data && typeof error.data === "object") {
+        const detail = (error.data as { detail?: string }).detail;
+        showToast.error("Could not retry", detail || "Please try again.");
+      } else {
+        showToast.error("Could not retry", "Please try again.");
       }
     }
   }
@@ -135,6 +158,9 @@ export default function AdvocateSearchPage() {
   const searchRunning =
     searchJobId !== null && (!sj || sj.status === "queued" || sj.status === "running");
   const results: AdvocateSearchResult[] = sj?.results ?? [];
+  const districtEntries = Object.entries(sj?.districts_status ?? {});
+  const failedDistrictCount = districtEntries.filter(([, d]) => d.status !== "success").length;
+  const canRetryFailed = sj?.status !== undefined && !searchRunning && failedDistrictCount > 0;
   const ij = importJob.data;
   const importDone = ij?.status === "succeeded" || ij?.status === "failed";
 
@@ -151,7 +177,7 @@ export default function AdvocateSearchPage() {
         <h1 className="text-page-title text-gray-900 mt-2 mb-1.5">Search by Advocate</h1>
         <p className="text-sm text-gray-600">
           Pick a state and enter your advocate name or bar registration number. Case Intel searches
-          every district court in that state and gathers all your cases — then you choose which to add.
+          district courts and gathers all your cases — then you choose which to add.
         </p>
       </div>
 
@@ -159,7 +185,7 @@ export default function AdvocateSearchPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Search className="h-5 w-5 text-gray-500" />
-            District Courts — State-wide
+            District Courts
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -168,13 +194,38 @@ export default function AdvocateSearchPage() {
               <label className="mb-1 block text-sm font-medium text-gray-700">State</label>
               <Select
                 value={stateCode}
-                onChange={(e) => setStateCode(e.target.value)}
+                onChange={(e) => {
+                  setStateCode(e.target.value);
+                  setDistCode(ALL_DISTRICTS);
+                }}
                 disabled={states.isLoading}
               >
                 <option value="">{states.isLoading ? "Loading..." : "Select a state"}</option>
                 {renderOptions(states.data?.options)}
               </Select>
             </div>
+
+            {stateCode && (
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  District <span className="font-normal text-gray-400">(optional)</span>
+                </label>
+                <Select
+                  value={distCode}
+                  onChange={(e) => setDistCode(e.target.value)}
+                  disabled={districts.isLoading}
+                >
+                  <option value={ALL_DISTRICTS}>
+                    {districts.isLoading ? "Loading..." : "All districts (thorough, several minutes)"}
+                  </option>
+                  {renderOptions(districts.data?.options)}
+                </Select>
+                <p className="mt-1 text-xs text-gray-500">
+                  If you mainly practice in one district, pick it here for a much faster search.
+                  Otherwise leave it on &quot;All districts&quot; to search the whole state.
+                </p>
+              </div>
+            )}
 
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -212,9 +263,10 @@ export default function AdvocateSearchPage() {
             <div className="flex items-start gap-2 rounded-lg bg-[#ebf3fb] border border-[#d6e7f7] p-3 text-xs text-[#2f6fb0]">
               <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
               <span>
-                A state-wide search checks every district and court complex, one at a time, and can
-                take <strong>several minutes</strong> (longer for large states). You can leave this
-                page open — progress is shown below.
+                {distCode
+                  ? "A single-district search usually takes under a minute."
+                  : "A state-wide search checks every district and court complex, one at a time, and can take several minutes (longer for large states)."}{" "}
+                You can leave this page open — cases already found appear below as they come in.
               </span>
             </div>
 
@@ -238,7 +290,7 @@ export default function AdvocateSearchPage() {
               ) : (
                 <>
                   <Search className="h-4 w-4" />
-                  Search State-wide
+                  {distCode ? "Search This District" : "Search State-wide"}
                 </>
               )}
             </Button>
@@ -251,7 +303,7 @@ export default function AdvocateSearchPage() {
           <CardHeader>
             <CardTitle>
               {searchRunning
-                ? `Searching… (${sj.progress_current}/${sj.progress_total || "?"} districts)`
+                ? `Searching… (${sj.progress_current}/${sj.progress_total || "?"} districts, ${results.length} found so far)`
                 : sj.status === "failed"
                   ? "Search failed"
                   : `${results.length} Case(s) Found`}
@@ -270,9 +322,10 @@ export default function AdvocateSearchPage() {
                     }}
                   />
                 </div>
-                <p className="flex items-center gap-2 text-sm text-gray-600">
+                <p className="flex items-center gap-2 text-sm text-gray-600 mb-3">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Checking every district in the state — this can take several minutes.
+                  Checking each district — results appear below as they&apos;re found. You can leave
+                  and come back; nothing is lost.
                 </p>
               </>
             )}
@@ -284,23 +337,73 @@ export default function AdvocateSearchPage() {
               </div>
             )}
 
+            {districtEntries.length > 0 && (
+              <div className="mb-4">
+                <button
+                  type="button"
+                  onClick={() => setDistrictsExpanded((v) => !v)}
+                  className="flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 mb-2"
+                >
+                  {districtEntries.filter(([, d]) => d.status === "success").length} of{" "}
+                  {districtEntries.length} district(s) fully searched
+                  {failedDistrictCount > 0 && (
+                    <span className="text-[#92610f]">
+                      {" "}
+                      · {failedDistrictCount} incomplete
+                    </span>
+                  )}
+                  {" — "}
+                  {districtsExpanded ? "hide" : "show"} details
+                </button>
+                {districtsExpanded && (
+                  <div className="max-h-[200px] overflow-auto rounded-lg border border-gray-100 divide-y divide-gray-100">
+                    {districtEntries.map(([code, d]) => (
+                      <div key={code} className="flex items-center gap-2 px-3 py-1.5 text-xs">
+                        {d.status === "success" ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-green-600 flex-shrink-0" />
+                        ) : (
+                          <XCircle className="h-3.5 w-3.5 text-[#b32e26] flex-shrink-0" />
+                        )}
+                        <span className="text-gray-700">{d.name}</span>
+                        <span className="text-gray-400 ml-auto">
+                          {d.complexes_ok}/{d.complexes_total} courts
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {canRetryFailed && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleRetryFailed}
+                    disabled={retryFailed.isPending}
+                    className="mt-2"
+                  >
+                    {retryFailed.isPending ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Starting retry…
+                      </>
+                    ) : (
+                      <>
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        Retry {failedDistrictCount} incomplete district(s)
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+            )}
+
             {sj.status === "succeeded" && results.length === 0 && (
               <p className="text-sm text-gray-500">
-                No cases found for this advocate/bar code anywhere in the selected state.
+                No cases found for this advocate/bar code {distCode ? "in this district" : "anywhere in the selected state"}.
               </p>
             )}
 
-            {sj.status === "succeeded" && results.length > 0 && (
+            {results.length > 0 && (
               <>
-                {sj.failures.length > 0 && (
-                  <div className="mb-3 flex items-start gap-2 rounded-lg bg-[#fdf3e0] border border-[#f5e3c2] p-3 text-xs text-[#92610f]">
-                    <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                    <span>
-                      {sj.failures.length} court(s) couldn&apos;t be searched (CAPTCHA or portal
-                      timeout) and were skipped — results may be partial. Re-run to retry them.
-                    </span>
-                  </div>
-                )}
                 <div className="max-h-[480px] overflow-auto rounded-lg border border-gray-100 mb-4">
                   <table className="w-full text-sm">
                     <thead className="sticky top-0 bg-gray-50 text-left text-xs text-gray-500">

@@ -54,6 +54,15 @@ export function useAdvocateSearchJob(jobId: number | null) {
   });
 }
 
+/** Enqueues a retry of just the failed/partial districts from a previous
+ * search job. Returns a NEW job id -- the caller should switch its
+ * polling to that id, same as starting a fresh search. */
+export function useRetryFailedDistricts() {
+  return useMutation({
+    mutationFn: (jobId: number) => advocateSearchApi.retryFailedDistricts(jobId),
+  });
+}
+
 export function useImportAdvocateCases() {
   const queryClient = useQueryClient();
 

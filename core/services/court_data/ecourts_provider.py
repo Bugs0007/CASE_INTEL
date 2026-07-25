@@ -116,6 +116,7 @@ import logging
 import re
 from datetime import date, datetime
 
+import httpx
 from bs4 import BeautifulSoup
 from django.core.cache import cache
 
@@ -997,6 +998,29 @@ class EcourtsProvider(CourtDataProvider):
                     logger.warning(
                         "District Courts advocate search attempt %d/%d failed: %s",
                         attempt, ADVOCATE_SEARCH_MAX_ATTEMPTS, exc,
+                    )
+                    if attempt < ADVOCATE_SEARCH_MAX_ATTEMPTS:
+                        await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
+                    continue
+                except httpx.HTTPError as exc:
+                    # Network/transport-level failure -- NOT an HTTP status
+                    # error (those are on the response, this is on reading
+                    # it), so bharat-courts' own parser never sees it.
+                    # Observed live 26 Jul 2026: a very common advocate name
+                    # can make the portal's own adv_data response body
+                    # enormous (one real case: 25.7MB), and the connection
+                    # gets cut mid-body (httpx.RemoteProtocolError, "peer
+                    # closed connection ... received 8912896 bytes, expected
+                    # 25698031") -- this is portal/network flakiness on a
+                    # huge payload, not a captcha or request-shape problem,
+                    # so it goes through the SAME per-attempt retry as
+                    # everything else here rather than crashing the whole
+                    # district/state run uncaught.
+                    last_exc = exc
+                    logger.warning(
+                        "District Courts advocate search attempt %d/%d: network/transport "
+                        "error (%s: %s).",
+                        attempt, ADVOCATE_SEARCH_MAX_ATTEMPTS, type(exc).__name__, exc,
                     )
                     if attempt < ADVOCATE_SEARCH_MAX_ATTEMPTS:
                         await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)

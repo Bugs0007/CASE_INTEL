@@ -10,6 +10,7 @@ from core.views import (
     AdvocateSearchImportStatusView,
     AdvocateSearchImportView,
     AdvocateSearchPreferenceView,
+    AdvocateSearchRetryFailedView,
     AdvocateSearchStatusView,
     AdvocateSearchView,
     CaseDetailView,
@@ -134,6 +135,11 @@ urlpatterns = [
         "cases/search-advocate/<int:job_id>/",
         AdvocateSearchStatusView.as_view(),
         name="advocate-search-status",
+    ),
+    path(
+        "cases/search-advocate/<int:job_id>/retry-failed/",
+        AdvocateSearchRetryFailedView.as_view(),
+        name="advocate-search-retry-failed",
     ),
 
     # Hearings

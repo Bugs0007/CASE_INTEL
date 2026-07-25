@@ -43,19 +43,23 @@ def _parse_name_or_bar_code(raw: str) -> tuple[str, str, str | None]:
 
 
 class AdvocateSearchView(APIView):
-    """Start a state-wide advocate search.
+    """Start an advocate search: state-wide (default, thorough) or scoped
+    to one district (fast -- for an advocate who knows they mainly
+    practice in one place).
 
     POST /api/cases/search-advocate/
     Body: {
         "name_or_bar_code": "<name, min 3 chars> or <STATE/NUMBER/YEAR>",
         "court_type": "district",     # "high_court" not supported yet
         "state_code": "<eCourts state code>",
+        "dist_code": "<eCourts district code>",  # optional -- omit for
+                                                   # the full state
         "status_filter": "Pending" | "Disposed" | "Both",  # optional
     }
     Enqueues a ProcessingJob (job_type="advocate_search") that fans the
-    query out across every district/complex in the state, and returns
-    {"job_id": ...}, 202. Poll AdvocateSearchStatusView for progress and
-    results.
+    query out across every district/complex in the state (or just the one
+    district, if dist_code was given), and returns {"job_id": ...}, 202.
+    Poll AdvocateSearchStatusView for progress and results.
     """
 
     def post(self, request):
@@ -70,6 +74,8 @@ class AdvocateSearchView(APIView):
         if not state_code:
             return Response({"detail": "state_code is required."}, status=status.HTTP_400_BAD_REQUEST)
 
+        dist_code = request.data.get("dist_code")
+
         status_filter = request.data.get("status_filter") or "Both"
         if status_filter not in ("Pending", "Disposed", "Both"):
             return Response(
@@ -81,17 +87,18 @@ class AdvocateSearchView(APIView):
         if error:
             return Response({"detail": error}, status=status.HTTP_400_BAD_REQUEST)
 
+        job_params = {
+            "state_code": str(state_code),
+            "court_type": court_type,
+            "advocate_name": advocate_name,
+            "bar_code": bar_code,
+            "status_filter": status_filter,
+        }
+        if dist_code:
+            job_params["districts_filter"] = [str(dist_code)]
+
         try:
-            job = ProcessingJob.enqueue_advocate_search(
-                request.user,
-                {
-                    "state_code": str(state_code),
-                    "court_type": court_type,
-                    "advocate_name": advocate_name,
-                    "bar_code": bar_code,
-                    "status_filter": status_filter,
-                },
-            )
+            job = ProcessingJob.enqueue_advocate_search(request.user, job_params)
         except JobAlreadyRunningError as exc:
             return Response(
                 {"detail": str(exc), "code": "search_already_running"},
@@ -107,17 +114,25 @@ class AdvocateSearchView(APIView):
 
 
 class AdvocateSearchStatusView(APIView):
-    """Poll the status/results of a state-wide advocate search job.
+    """Poll the status/results of an advocate search job.
 
     GET /api/cases/search-advocate/<job_id>/
 
-    While running, `results` is empty and progress_current/progress_total
-    are districts_done/total_districts. On success, `results` holds the
-    deduped matches and `failures` lists any court complexes skipped
-    (CAPTCHA/portal errors) -- a partial result is still a valid, useful
-    outcome, not an error. A failed job (e.g. the state's district list
-    couldn't be fetched at all) surfaces via status="failed" + error,
-    never a 500 here.
+    `results` and `failures` are populated INCREMENTALLY as districts
+    complete (not only once the whole job finishes), so polling mid-run
+    already shows cases found so far -- see
+    core/services/advocate_search.py's per-district _persist(). `status`
+    is job.status ("queued"/"running"/"succeeded"/"failed"), never a 500
+    for a partial/failed district (those show up in `failures` and
+    `districts_status` instead) -- only a genuinely fatal failure (e.g.
+    the state's district list itself couldn't be fetched) sets job.status
+    to "failed".
+
+    `districts_status` maps dist_code -> {name, status: "success"|
+    "failed"|"partial", complexes_total/ok/failed} for every district
+    attempted so far (including ones carried forward from a prior run via
+    a failed-districts retry) -- the frontend uses this to show which
+    districts are covered vs. still missing.
     """
 
     def get(self, request, job_id):
@@ -138,10 +153,76 @@ class AdvocateSearchStatusView(APIView):
                 "results": payload.get("results", []),
                 "failures": payload.get("failures", []),
                 "districts_total": payload.get("districts_total"),
+                "districts_status": payload.get("districts_status", {}),
                 "complexes_searched": payload.get("complexes_searched"),
             },
             status=status.HTTP_200_OK,
         )
+
+
+class AdvocateSearchRetryFailedView(APIView):
+    """Re-run ONLY the districts that didn't fully succeed in a previous
+    search job, reusing its already-collected results rather than
+    re-searching the whole state.
+
+    POST /api/cases/search-advocate/<job_id>/retry-failed/
+    Enqueues a NEW ProcessingJob (job_type="advocate_search"), seeded with
+    the original job's results and its successfully-searched districts'
+    status, with districts_filter set to just the failed/partial ones.
+    Returns {"job_id": ...}, 202 -- poll it exactly like a fresh search;
+    its districts_status carries forward the original successes too, so
+    it reads as a continuation, not a restart.
+    """
+
+    def post(self, request, job_id):
+        try:
+            original = ProcessingJob.objects.get(
+                pk=job_id, owner=request.user, job_type="advocate_search"
+            )
+        except ProcessingJob.DoesNotExist:
+            return Response({"detail": "Search job not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if original.status not in ("succeeded", "failed"):
+            return Response(
+                {"detail": "The original search is still running."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        payload = original.payload or {}
+        districts_status = payload.get("districts_status", {})
+        failed_codes = [code for code, d in districts_status.items() if d.get("status") != "success"]
+        if not failed_codes:
+            return Response(
+                {"detail": "Nothing to retry -- every district already succeeded."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        seed_districts_status = {
+            code: d for code, d in districts_status.items() if d.get("status") == "success"
+        }
+
+        try:
+            job = ProcessingJob.enqueue_advocate_search(
+                request.user,
+                {
+                    "state_code": payload.get("state_code"),
+                    "court_type": payload.get("court_type", "district"),
+                    "advocate_name": payload.get("advocate_name", ""),
+                    "bar_code": payload.get("bar_code", ""),
+                    "status_filter": payload.get("status_filter", "Both"),
+                    "districts_filter": failed_codes,
+                    "seed_results": payload.get("results", []),
+                    "seed_districts_status": seed_districts_status,
+                    "retry_of": original.id,
+                },
+            )
+        except JobAlreadyRunningError as exc:
+            return Response(
+                {"detail": str(exc), "code": "search_already_running"},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        return Response({"job_id": job.id}, status=status.HTTP_202_ACCEPTED)
 
 
 class AdvocateSearchImportView(APIView):
