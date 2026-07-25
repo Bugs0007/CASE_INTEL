@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { format, formatDistanceToNow, parseISO } from "date-fns";
+import type { ClientContact } from "@/types";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -89,6 +90,16 @@ export function getFileIcon(fileType: string | null): string {
   if (type.includes("msg") || type.includes("eml")) return "📧";
   if (type.includes("txt")) return "📃";
   return "📎";
+}
+
+/** The contact to lead with when showing "who's the client" for a case --
+ * the designated billing contact, else whichever contact was added first
+ * (client_contacts is ordered "-is_billing_contact", "name" by the API, so
+ * this is just the first entry), else null when none exist yet (a case
+ * fresh from advocate-search/import, before the details form is filled
+ * in). */
+export function primaryClientContact(contacts: ClientContact[]): ClientContact | null {
+  return contacts.find((c) => c.is_billing_contact) ?? contacts[0] ?? null;
 }
 
 export function truncate(str: string, maxLength: number): string {

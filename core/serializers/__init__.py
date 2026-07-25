@@ -13,6 +13,7 @@ from .chat import (
     CitationSerializer,
     MessageSerializer,
 )
+from .client_contact import ClientContactSerializer
 from .conversation import ConversationDetailSerializer, ConversationListSerializer
 from .document import DocumentSerializer, DocumentUploadSerializer
 from .hearing import HearingSerializer
@@ -22,6 +23,7 @@ __all__ = [
     "ChatRequestSerializer",
     "ChatResponseSerializer",
     "CitationSerializer",
+    "ClientContactSerializer",
     "ConversationDetailSerializer",
     "ConversationListSerializer",
     "DocumentSerializer",

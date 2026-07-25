@@ -1,5 +1,6 @@
 from .case import Case
 from .case_tag import CaseTag, CaseTagMap
+from .client_contact import ClientContact
 from .folder import Folder
 from .document import Document
 from .document_version import DocumentVersion
@@ -24,6 +25,7 @@ __all__ = [
     "Case",
     "CaseTag",
     "CaseTagMap",
+    "ClientContact",
     "Folder",
     "Document",
     "DocumentVersion",

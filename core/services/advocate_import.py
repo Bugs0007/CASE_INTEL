@@ -35,15 +35,11 @@ from django.db import IntegrityError, transaction
 from core.models import ActivityLog, Case, ProcessingJob
 from core.services.court_data import CourtDataError
 from core.services.court_tracking import refresh_case_tracking
+from core.services.party_role import detect_party_role
 
 logger = logging.getLogger(__name__)
 
 IMPORT_DELAY_SECONDS = 1
-
-
-def _case_title(petitioner: str, respondent: str, fallback: str) -> str:
-    parts = [p for p in (petitioner, respondent) if p]
-    return " vs ".join(parts) if parts else fallback
 
 
 def run_advocate_import(job: ProcessingJob, progress_callback=None) -> None:
@@ -53,12 +49,18 @@ def run_advocate_import(job: ProcessingJob, progress_callback=None) -> None:
     advocate-search endpoint (core.services.court_data.CaseInfo.to_dict()
     shape) plus "court_type" injected by the view: {"cnr_number",
     "court_type", "case_number", "petitioner", "respondent",
-    "court_name", ...}. Writes the outcome back into job.payload (never
-    raises -- per-item failures are isolated, and the worker's own
+    "court_name", ...}. job.payload["advocate_name"]/["bar_code"] (both
+    default "") are the identity originally searched with -- see
+    ProcessingJob.enqueue_advocate_import -- used below to auto-detect each
+    new Case's user_party_role. Writes the outcome back into job.payload
+    (never raises -- per-item failures are isolated, and the worker's own
     except/finally only sees this function return normally or raise on a
     genuine bug).
     """
-    selected = (job.payload or {}).get("selected", [])
+    payload = job.payload or {}
+    selected = payload.get("selected", [])
+    advocate_name = payload.get("advocate_name", "") or ""
+    bar_code = payload.get("bar_code", "") or ""
     total = len(selected)
 
     created: list[int] = []
@@ -89,14 +91,18 @@ def run_advocate_import(job: ProcessingJob, progress_callback=None) -> None:
             continue
 
         case_number = item.get("case_number") or cnr
-        title = _case_title(item.get("petitioner", ""), item.get("respondent", ""), case_number)
 
         try:
             with transaction.atomic():
                 case = Case.objects.create(
                     owner=job.owner,
                     case_number=case_number,
-                    title=title,
+                    # A free-text label the advocate assigns via the
+                    # case-details form -- starts as the case number itself
+                    # rather than an auto-generated "Petitioner vs
+                    # Respondent" string, since that's no longer this
+                    # field's purpose.
+                    title=case_number,
                     client_name="",
                     court_type=court_type,
                     tracking_config={"court_type": court_type, "cnr": cnr},
@@ -120,6 +126,14 @@ def run_advocate_import(job: ProcessingJob, progress_callback=None) -> None:
             if progress_callback:
                 progress_callback(i + 1, total)
             continue
+
+        # Best-effort, one-shot: only runs right here at import time, never
+        # on later periodic refreshes, so it can never silently overwrite a
+        # role the advocate has since set manually.
+        role = detect_party_role(advocate_name, bar_code, case.party_advocate_data)
+        if role != "unknown":
+            case.user_party_role = role
+            case.save(update_fields=["user_party_role"])
 
         created.append(case.id)
         if progress_callback:

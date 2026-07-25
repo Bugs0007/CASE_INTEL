@@ -135,7 +135,11 @@ export default function AdvocateSearchPage() {
       }));
 
     try {
-      const { job_id } = await startImport.mutateAsync({ courtType: "district", selected: toAdd });
+      const { job_id } = await startImport.mutateAsync({
+        courtType: "district",
+        selected: toAdd,
+        searchJobId: searchJobId ?? undefined,
+      });
       setImportJobId(job_id);
     } catch (error) {
       if (error instanceof APIError && error.status === 409 && error.data && typeof error.data === "object") {

@@ -231,10 +231,18 @@ class AdvocateSearchImportView(APIView):
     POST /api/cases/search-advocate/import/
     Body: {"court_type": "district", "selected": [{"cnr_number": ...,
            "case_number": ..., "petitioner": ..., "respondent": ...,
-           "court_name": ...}, ...]}
+           "court_name": ...}, ...], "search_job_id": <optional>}
     Enqueues an async ProcessingJob (job_type="advocate_import") -- each
     selected case is fetched sequentially, 1s apart (req: rate-limit,
     eCourts is CAPTCHA-gated). Returns {"job_id": ...}, 202.
+
+    search_job_id, when given, identifies the advocate_search job these
+    results came from -- its payload already holds the advocate_name/
+    bar_code the caller searched with (see AdvocateSearchView), which gets
+    carried into the import job so run_advocate_import can auto-detect
+    each new Case's user_party_role. Missing/not-found/not-owned just means
+    no auto-detection is attempted for this batch (safe no-op, not an
+    error) -- there's nothing else that depends on it.
     """
 
     def post(self, request):
@@ -254,8 +262,22 @@ class AdvocateSearchImportView(APIView):
             if isinstance(item, dict)
         ]
 
+        advocate_name = ""
+        bar_code = ""
+        search_job_id = request.data.get("search_job_id")
+        if search_job_id:
+            search_job = ProcessingJob.objects.filter(
+                pk=search_job_id, owner=request.user, job_type="advocate_search"
+            ).first()
+            if search_job is not None:
+                search_payload = search_job.payload or {}
+                advocate_name = search_payload.get("advocate_name", "") or ""
+                bar_code = search_payload.get("bar_code", "") or ""
+
         try:
-            job = ProcessingJob.enqueue_advocate_import(request.user, normalized)
+            job = ProcessingJob.enqueue_advocate_import(
+                request.user, normalized, advocate_name=advocate_name, bar_code=bar_code
+            )
         except JobAlreadyRunningError as exc:
             return Response(
                 {"detail": str(exc), "code": "import_already_running"},

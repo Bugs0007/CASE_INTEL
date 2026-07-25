@@ -40,6 +40,12 @@ class Case(OwnedModel):
         ("failed", "Failed"),
     ]
 
+    USER_PARTY_ROLE_CHOICES = [
+        ("unknown", "Unknown"),
+        ("petitioner", "Petitioner"),
+        ("respondent", "Respondent"),
+    ]
+
     case_number = models.CharField(max_length=100, unique=True)
     title = models.CharField(max_length=500)
     client_name = models.CharField(max_length=255)
@@ -81,6 +87,9 @@ class Case(OwnedModel):
             "'respondent_advocates': [...]}. Captured during the full CNR "
             "fetch for party-role detection."
         ),
+    )
+    user_party_role = models.CharField(
+        max_length=20, choices=USER_PARTY_ROLE_CHOICES, default="unknown"
     )
 
     class Meta:

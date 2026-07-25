@@ -9,7 +9,7 @@ import { useDialogs } from "@/providers/dialog-provider";
 
 export function Header() {
   const router = useRouter();
-  const { openUploadDocument, openCreateCase } = useDialogs();
+  const { openUploadDocument } = useDialogs();
 
   async function handleLogout() {
     // Best-effort: invalidate the token server-side too, so it can't be
@@ -55,7 +55,7 @@ export function Header() {
         </button>
 
         <button
-          onClick={openCreateCase}
+          onClick={() => router.push("/cases/search")}
           aria-label="New Case"
           title="New Case"
           className="inline-flex lg:hidden items-center justify-center h-11 w-11 rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 transition-colors"
