@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useMemo } from "react";
 import Link from "next/link";
-import { Plus, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { CaseFilters } from "@/components/cases/case-filters";
 import { CaseGrid } from "@/components/cases/case-grid";
 import { CasesSkeleton } from "@/components/cases/cases-skeleton";
@@ -10,7 +10,6 @@ import { showToast } from "@/components/ui/toaster";
 import { useCases, useDeleteCase } from "@/hooks/use-cases";
 import { useUpcomingHearings } from "@/hooks/use-dashboard";
 import { useDocuments } from "@/hooks/use-documents";
-import { useDialogs } from "@/providers/dialog-provider";
 import { getLastDashboardVisit } from "@/lib/last-visit";
 import { reasonForCase, sortByUrgencyPriority, type UrgencyReason } from "@/lib/case-urgency";
 import type { CaseStatus } from "@/types";
@@ -19,7 +18,6 @@ export default function CasesPage() {
   const [activeStatus, setActiveStatus] = useState<CaseStatus | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [othersExpanded, setOthersExpanded] = useState(false);
-  const { openCreateCase } = useDialogs();
 
   // Read (never write) the same "since last visit" marker the Dashboard
   // sets, so a case's urgency status agrees between the two screens.
@@ -85,7 +83,7 @@ export default function CasesPage() {
       (caseItem) =>
         caseItem.title.toLowerCase().includes(query) ||
         caseItem.case_number.toLowerCase().includes(query) ||
-        caseItem.client_name.toLowerCase().includes(query) ||
+        caseItem.client_contacts.some((c) => c.name.toLowerCase().includes(query)) ||
         caseItem.opposing_party?.toLowerCase().includes(query),
     );
   }, [cases, searchQuery]);
@@ -141,18 +139,11 @@ export default function CasesPage() {
         <div className="flex items-center gap-2">
           <Link
             href="/cases/search"
-            className="inline-flex items-center justify-center gap-2 h-11 sm:h-10 px-4 rounded-lg border border-gray-200 bg-white text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-colors"
+            className="inline-flex items-center justify-center gap-2 h-11 sm:h-10 px-4 rounded-lg border-none bg-primary text-white text-sm font-semibold hover:bg-primary-hover transition-colors"
           >
             <Search className="h-4 w-4" />
             Search by Advocate
           </Link>
-          <button
-            onClick={openCreateCase}
-            className="inline-flex items-center justify-center gap-2 h-11 sm:h-10 px-4 rounded-lg border-none bg-primary text-white text-sm font-semibold hover:bg-primary-hover transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            New Case
-          </button>
         </div>
       </div>
 

@@ -11,6 +11,7 @@ from core.models import (
     CaseTag,
     CaseTagMap,
     Citation,
+    ClientContact,
     Conversation,
     Document,
     DocumentChunk,
@@ -35,11 +36,22 @@ from core.models import (
 class CaseAdmin(admin.ModelAdmin):
     list_display = (
         "case_number", "title", "client_name", "case_type", "status", "priority",
-        "tracking_enabled", "fetch_status", "cnr_number", "created_at",
+        "user_party_role", "tracking_enabled", "fetch_status", "cnr_number", "created_at",
     )
-    list_filter = ("status", "case_type", "priority", "tracking_enabled", "fetch_status")
+    list_filter = (
+        "status", "case_type", "priority", "user_party_role",
+        "tracking_enabled", "fetch_status",
+    )
     search_fields = ("case_number", "title", "client_name", "opposing_party", "cnr_number")
     readonly_fields = ("created_at", "last_fetched_at")
+
+
+@admin.register(ClientContact)
+class ClientContactAdmin(admin.ModelAdmin):
+    list_display = ("name", "case", "role", "is_billing_contact", "email", "phone", "created_at")
+    list_filter = ("role", "is_billing_contact")
+    search_fields = ("name", "email", "phone")
+    readonly_fields = ("created_at",)
 
 
 @admin.register(CaseTag)

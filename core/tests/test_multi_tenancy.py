@@ -11,7 +11,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
-from core.models import Case, Document, Hearing
+from core.models import Case, ClientContact, Document, Hearing
 
 
 @pytest.fixture
@@ -96,20 +96,13 @@ class TestCaseIsolation:
         assert resp.status_code == 204
         assert not Case.objects.filter(id=case_a.id).exists()
 
-    def test_create_ignores_client_supplied_owner(self, client_a, user_a, user_b):
-        resp = client_a.post(
-            "/api/cases/",
-            {
-                "case_number": "A-002",
-                "title": "New Case",
-                "client_name": "Someone",
-                "owner": user_b.id,
-            },
-            format="json",
-        )
-        assert resp.status_code == 201
-        case = Case.objects.get(id=resp.data["id"])
-        assert case.owner_id == user_a.id
+    # There's no test_create_ignores_client_supplied_owner here anymore --
+    # POST /api/cases/ was retired (CaseListView is list-only; a Case is
+    # only ever created via the advocate-search/import flow, see
+    # core/services/advocate_import.py). The equivalent owner-stamping
+    # coverage now lives on ClientContact creation instead, see
+    # TestClientContactIsolation.test_create_ignores_client_supplied_owner
+    # below -- same OwnerScopedMixin.perform_create code path.
 
 
 @pytest.mark.django_db
@@ -152,6 +145,63 @@ class TestHearingIsolation:
         )
         resp = client_a.get(f"/api/hearings/{hearing.id}/")
         assert resp.status_code == 404
+
+
+@pytest.mark.django_db
+class TestClientContactIsolation:
+    def test_create_ignores_client_supplied_owner(self, client_a, user_a, user_b, case_a):
+        resp = client_a.post(
+            "/api/client-contacts/",
+            {"case": case_a.id, "name": "Someone", "owner": user_b.id},
+            format="json",
+        )
+        assert resp.status_code == 201
+        contact = ClientContact.objects.get(id=resp.data["id"])
+        assert contact.owner_id == user_a.id
+
+    def test_cannot_attach_contact_to_other_users_case(self, client_a, case_b):
+        resp = client_a.post(
+            "/api/client-contacts/",
+            {"case": case_b.id, "name": "Someone"},
+            format="json",
+        )
+        # case_b isn't in client_a's scoped PK queryset for the "case"
+        # field, so this must fail validation, not silently attach.
+        assert resp.status_code == 400
+
+    def test_list_scoped_by_owner_even_with_case_id_filter(self, user_a, user_b, client_a, case_a, case_b):
+        ClientContact.objects.create(owner=user_a, case=case_a, name="Alice's client")
+        ClientContact.objects.create(owner=user_b, case=case_b, name="Bob's client")
+
+        resp = client_a.get("/api/client-contacts/")
+        assert resp.status_code == 200
+        assert len(resp.data) == 1
+        assert resp.data[0]["case"] == case_a.id
+
+        # Even querying explicitly by the other user's case_id must not leak.
+        resp = client_a.get(f"/api/client-contacts/?case_id={case_b.id}")
+        assert resp.status_code == 200
+        assert resp.data == []
+
+    def test_retrieve_other_users_contact_404s(self, user_b, client_a, case_b):
+        contact = ClientContact.objects.create(owner=user_b, case=case_b, name="Bob's client")
+        resp = client_a.get(f"/api/client-contacts/{contact.id}/")
+        assert resp.status_code == 404
+
+    def test_update_other_users_contact_404s(self, user_b, client_a, case_b):
+        contact = ClientContact.objects.create(owner=user_b, case=case_b, name="Bob's client")
+        resp = client_a.patch(
+            f"/api/client-contacts/{contact.id}/", {"name": "Hacked"}, format="json"
+        )
+        assert resp.status_code == 404
+        contact.refresh_from_db()
+        assert contact.name == "Bob's client"
+
+    def test_delete_other_users_contact_404s(self, user_b, client_a, case_b):
+        contact = ClientContact.objects.create(owner=user_b, case=case_b, name="Bob's client")
+        resp = client_a.delete(f"/api/client-contacts/{contact.id}/")
+        assert resp.status_code == 404
+        assert ClientContact.objects.filter(id=contact.id).exists()
 
 
 @pytest.mark.django_db

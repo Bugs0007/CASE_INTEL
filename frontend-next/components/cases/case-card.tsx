@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, PriorityBadge } from "@/components/ui/badge";
 import { MoreVertical, Trash2 } from "lucide-react";
-import { cn, staggerDelay } from "@/lib/utils";
+import { cn, staggerDelay, primaryClientContact } from "@/lib/utils";
 import type { UrgencyReason } from "@/lib/case-urgency";
 import type { Case } from "@/types";
 
@@ -24,6 +24,7 @@ interface CaseCardProps {
 
 export function CaseCard({ case: caseItem, onDelete, isDeleting, urgencyReason, index = 0 }: CaseCardProps) {
   const router = useRouter();
+  const client = primaryClientContact(caseItem.client_contacts);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -106,7 +107,7 @@ export function CaseCard({ case: caseItem, onDelete, isDeleting, urgencyReason, 
       <h3 className="text-base font-semibold text-gray-900 mb-2 line-clamp-2 leading-snug">
         {caseItem.title}
       </h3>
-      <div className="text-meta text-gray-600 mb-3.5">{caseItem.client_name}</div>
+      <div className="text-meta text-gray-600 mb-3.5">{client?.name || "No client on file"}</div>
 
       {/* Footer */}
       <div className="flex items-center gap-3.5 pt-3 border-t border-[#f2f3f5] text-xs text-gray-400">

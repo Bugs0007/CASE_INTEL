@@ -13,7 +13,6 @@ import {
   Calendar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useDialogs } from "@/providers/dialog-provider";
 import { hearingKeys } from "@/hooks/use-hearings";
 import { hearingsApi } from "@/lib/api/hearings";
 import { caseKeys } from "@/hooks/use-cases";
@@ -30,7 +29,6 @@ const NAV_ITEMS = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { openCreateCase } = useDialogs();
   const queryClient = useQueryClient();
   const [username, setUsername] = useState<string | null>(null);
 
@@ -63,15 +61,16 @@ export function Sidebar() {
         </Link>
       </div>
 
-      {/* New Case Button */}
+      {/* New Case Button -- always the advocate-search flow; there's no
+          direct-entry form (see CaseListView). */}
       <div className="p-4">
-        <button
-          onClick={openCreateCase}
+        <Link
+          href="/cases/search"
           className="w-full flex items-center justify-center gap-2 h-10 rounded-lg border-none bg-primary text-white text-sm font-semibold hover:bg-primary-hover transition-colors"
         >
           <Plus className="h-4 w-4" />
           New Case
-        </button>
+        </Link>
       </div>
 
       {/* Navigation */}
