@@ -10,6 +10,7 @@ from .advocate_search import (
     AdvocateSearchImportStatusView,
     AdvocateSearchImportView,
     AdvocateSearchPreferenceView,
+    AdvocateSearchRetryFailedView,
     AdvocateSearchStatusView,
     AdvocateSearchView,
 )
@@ -52,6 +53,7 @@ __all__ = [
     "AdvocateSearchImportStatusView",
     "AdvocateSearchImportView",
     "AdvocateSearchPreferenceView",
+    "AdvocateSearchRetryFailedView",
     "AdvocateSearchStatusView",
     "AdvocateSearchView",
     "CaseDetailView",

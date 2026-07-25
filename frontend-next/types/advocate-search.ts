@@ -20,21 +20,38 @@ export interface AdvocateSearchResult {
 export interface AdvocateSearchRequest {
   name_or_bar_code: string;
   court_type: CourtType;
-  /** The user picks only a STATE; the backend fans out across every
-   * district and court complex in it. */
+  /** The user always picks a STATE; the backend fans out across every
+   * district and court complex in it -- unless dist_code narrows it to
+   * just one district (fast path for an advocate who mainly practices
+   * in one place). */
   state_code: string;
+  dist_code?: string;
   status_filter?: "Pending" | "Disposed" | "Both";
 }
 
 export type AdvocateSearchJobStatus = "queued" | "running" | "succeeded" | "failed";
 
-/** One court complex that was skipped during the state-wide fan-out
- * (CAPTCHA/portal error). court_complex is null when the district's
- * complex-list call itself failed. */
+/** One court complex that was skipped during the fan-out (CAPTCHA/portal
+ * error). court_complex is null when the district's complex-list call
+ * itself failed. error_type distinguishes WHY, for both display and
+ * whether a retry is likely to help: "session" (the portal rejected the
+ * request before captcha, worth retrying), "captcha" (a wrong OCR guess,
+ * already retried per-attempt), "data" (a bad district/complex code,
+ * retrying won't help), "portal" (anything else). */
 export interface AdvocateSearchFailure {
   district: string;
   court_complex: string | null;
   error: string;
+  error_type?: "session" | "captcha" | "data" | "portal";
+}
+
+/** Per-district rollup, keyed by eCourts district code. */
+export interface AdvocateSearchDistrictStatus {
+  name: string;
+  status: "success" | "failed" | "partial";
+  complexes_total: number;
+  complexes_ok: number;
+  complexes_failed: number;
 }
 
 /** POST /api/cases/search-advocate/ enqueues a job and returns its id. */
@@ -43,7 +60,10 @@ export interface AdvocateSearchStartResponse {
 }
 
 /** GET /api/cases/search-advocate/<job_id>/ -- progress is
- * districts_done / total_districts while running. */
+ * districts_done / total_districts for the districts THIS job is
+ * covering (the whole state, one district, or a failed-districts retry
+ * subset). results/failures/districts_status are populated
+ * INCREMENTALLY as districts complete, even while status is "running". */
 export interface AdvocateSearchJobResult {
   status: AdvocateSearchJobStatus;
   progress_current: number;
@@ -52,6 +72,7 @@ export interface AdvocateSearchJobResult {
   results: AdvocateSearchResult[];
   failures: AdvocateSearchFailure[];
   districts_total: number | null;
+  districts_status: Record<string, AdvocateSearchDistrictStatus>;
   complexes_searched: number | null;
 }
 
