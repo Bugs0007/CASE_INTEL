@@ -54,8 +54,8 @@ def _annotate_next_hearing_date(qs):
     return qs.annotate(_next_hearing_date=Subquery(next_hearing))
 
 
-class CaseListCreateView(OwnerScopedMixin, generics.ListCreateAPIView):
-    """List or create cases.
+class CaseListView(OwnerScopedMixin, generics.ListAPIView):
+    """List cases.
 
     GET  /api/cases/
     GET  /api/cases/?status=open
@@ -66,16 +66,17 @@ class CaseListCreateView(OwnerScopedMixin, generics.ListCreateAPIView):
         within 7 days, an eCourts hearing update after `since`, or a failed
         document. `since` should be the caller's last-visit timestamp;
         omitting it just drops the eCourts-update signal.
-    POST /api/cases/
 
-    All results are scoped to request.user (OwnerScopedMixin); POST always
-    stamps the new case with owner=request.user regardless of any input.
+    All results are scoped to request.user (OwnerScopedMixin). No POST here
+    -- a Case is only ever created via the advocate-search/import flow
+    (core/services/advocate_import.py), never directly from client input;
+    the old direct "Create Case" form/endpoint is retired.
     """
 
     serializer_class = CaseSerializer
 
     def get_base_queryset(self):
-        qs = Case.objects.annotate(
+        qs = Case.objects.prefetch_related("client_contacts").annotate(
             thread_count=Count("emails__gmail_thread_id", distinct=True),
             conversation_count=Count("conversations", distinct=True),
         )
@@ -115,7 +116,7 @@ class CaseDetailView(OwnerScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     serializer_class = CaseSerializer
 
     def get_base_queryset(self):
-        qs = Case.objects.annotate(
+        qs = Case.objects.prefetch_related("client_contacts").annotate(
             thread_count=Count("emails__gmail_thread_id", distinct=True),
             conversation_count=Count("conversations", distinct=True),
         )

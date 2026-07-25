@@ -7,6 +7,8 @@ from rest_framework import serializers
 
 from core.models import Case
 
+from .client_contact import ClientContactSerializer
+
 
 class CaseSerializer(serializers.ModelSerializer):
     document_count = serializers.SerializerMethodField()
@@ -15,6 +17,7 @@ class CaseSerializer(serializers.ModelSerializer):
     conversation_count = serializers.IntegerField(read_only=True, default=0)
     needs_attention = serializers.SerializerMethodField()
     next_hearing_date = serializers.SerializerMethodField()
+    client_contacts = ClientContactSerializer(many=True, read_only=True)
 
     class Meta:
         model = Case
@@ -23,7 +26,9 @@ class CaseSerializer(serializers.ModelSerializer):
             "case_number",
             "title",
             "client_name",
+            "client_contacts",
             "opposing_party",
+            "user_party_role",
             "case_type",
             "status",
             "priority",

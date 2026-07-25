@@ -732,6 +732,68 @@ class TestAdvocateImport:
         assert case.tracking_enabled is True
         assert case.party_advocate_data["petitioner_advocates"] == ["A. Sharma"]
 
+    def test_title_defaults_to_case_number_not_vs_format(self, user_a):
+        # Title is now a free-text label the advocate assigns via the
+        # case-details form -- it no longer auto-generates "Petitioner vs
+        # Respondent" at import time (that was the old _case_title
+        # behavior, now removed).
+        job = ProcessingJob.enqueue_advocate_import(
+            user_a, [{"cnr_number": "MHAU019999992024", "case_number": "123/2024"}]
+        )
+        with patch("core.services.court_tracking.get_provider") as mock_get_provider, \
+             patch("core.services.advocate_import.time.sleep"):
+            mock_get_provider.return_value.fetch_case.return_value = _fake_case_data("MHAU019999992024")
+            run_advocate_import(job)
+
+        job.refresh_from_db()
+        case = Case.objects.get(id=job.payload["created"][0])
+        assert case.title == "123/2024"
+
+    def test_auto_detects_party_role_on_clean_match(self, user_a):
+        job = ProcessingJob.enqueue_advocate_import(
+            user_a,
+            [{"cnr_number": "MHAU019999992024", "case_number": "123/2024"}],
+            advocate_name="A. Sharma",
+        )
+        with patch("core.services.court_tracking.get_provider") as mock_get_provider, \
+             patch("core.services.advocate_import.time.sleep"):
+            mock_get_provider.return_value.fetch_case.return_value = _fake_case_data("MHAU019999992024")
+            run_advocate_import(job)
+
+        job.refresh_from_db()
+        case = Case.objects.get(id=job.payload["created"][0])
+        assert case.user_party_role == "petitioner"
+
+    def test_party_role_stays_unknown_on_no_match(self, user_a):
+        job = ProcessingJob.enqueue_advocate_import(
+            user_a,
+            [{"cnr_number": "MHAU019999992024", "case_number": "123/2024"}],
+            advocate_name="Someone Else",
+        )
+        with patch("core.services.court_tracking.get_provider") as mock_get_provider, \
+             patch("core.services.advocate_import.time.sleep"):
+            mock_get_provider.return_value.fetch_case.return_value = _fake_case_data("MHAU019999992024")
+            run_advocate_import(job)
+
+        job.refresh_from_db()
+        case = Case.objects.get(id=job.payload["created"][0])
+        assert case.user_party_role == "unknown"
+
+    def test_party_role_stays_unknown_for_bar_code_search(self, user_a):
+        job = ProcessingJob.enqueue_advocate_import(
+            user_a,
+            [{"cnr_number": "MHAU019999992024", "case_number": "123/2024"}],
+            bar_code="MAH/1234/2015",
+        )
+        with patch("core.services.court_tracking.get_provider") as mock_get_provider, \
+             patch("core.services.advocate_import.time.sleep"):
+            mock_get_provider.return_value.fetch_case.return_value = _fake_case_data("MHAU019999992024")
+            run_advocate_import(job)
+
+        job.refresh_from_db()
+        case = Case.objects.get(id=job.payload["created"][0])
+        assert case.user_party_role == "unknown"
+
     def test_duplicate_cnr_for_same_user_is_skipped(self, user_a):
         Case.objects.create(
             owner=user_a, case_number="EXISTING-1", title="Existing", client_name="",
@@ -822,6 +884,60 @@ class TestAdvocateImportEndpoints:
         job = ProcessingJob.objects.get(id=resp.data["job_id"])
         assert job.job_type == "advocate_import"
         assert job.payload["selected"][0]["court_type"] == "district"
+
+    def test_search_job_id_threads_advocate_name_into_import_payload(self, client_a, user_a):
+        search_job = ProcessingJob.objects.create(
+            owner=user_a,
+            job_type="advocate_search",
+            payload={"advocate_name": "A. Sharma", "bar_code": ""},
+        )
+        resp = client_a.post(
+            "/api/cases/search-advocate/import/",
+            {
+                "court_type": "district",
+                "selected": [{"cnr_number": "MHAU019999992024", "case_number": "123/2024"}],
+                "search_job_id": search_job.id,
+            },
+            format="json",
+        )
+        assert resp.status_code == 202
+        job = ProcessingJob.objects.get(id=resp.data["job_id"])
+        assert job.payload["advocate_name"] == "A. Sharma"
+        assert job.payload["bar_code"] == ""
+
+    def test_other_users_search_job_id_is_ignored_not_leaked(self, client_a, user_b):
+        # search_job_id pointing at another user's job must not leak that
+        # job's advocate_name/bar_code -- silently falls back to "" (no
+        # auto-detection attempted), not an error.
+        other_search_job = ProcessingJob.objects.create(
+            owner=user_b, job_type="advocate_search", payload={"advocate_name": "Bob's Search"}
+        )
+        resp = client_a.post(
+            "/api/cases/search-advocate/import/",
+            {
+                "court_type": "district",
+                "selected": [{"cnr_number": "MHAU019999992024", "case_number": "123/2024"}],
+                "search_job_id": other_search_job.id,
+            },
+            format="json",
+        )
+        assert resp.status_code == 202
+        job = ProcessingJob.objects.get(id=resp.data["job_id"])
+        assert job.payload["advocate_name"] == ""
+
+    def test_missing_search_job_id_defaults_to_no_auto_detection(self, client_a):
+        resp = client_a.post(
+            "/api/cases/search-advocate/import/",
+            {
+                "court_type": "district",
+                "selected": [{"cnr_number": "MHAU019999992024", "case_number": "123/2024"}],
+            },
+            format="json",
+        )
+        assert resp.status_code == 202
+        job = ProcessingJob.objects.get(id=resp.data["job_id"])
+        assert job.payload["advocate_name"] == ""
+        assert job.payload["bar_code"] == ""
 
     def test_empty_selection_rejected(self, client_a):
         resp = client_a.post(

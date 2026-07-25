@@ -15,7 +15,7 @@ from .advocate_search import (
     AdvocateSearchView,
 )
 from .auth import LoginView, LogoutView, RegisterView
-from .case import CaseDetailView, CaseListCreateView
+from .case import CaseDetailView, CaseListView
 from .case_tracking import (
     CaseTrackingConfirmView,
     CaseTrackingPreviewView,
@@ -24,6 +24,7 @@ from .case_tracking import (
     CourtStructureView,
 )
 from .chat import ChatView
+from .client_contact import ClientContactDetailView, ClientContactListCreateView
 from .conversation import (
     ConversationDetailView,
     ConversationExportView,
@@ -57,12 +58,14 @@ __all__ = [
     "AdvocateSearchStatusView",
     "AdvocateSearchView",
     "CaseDetailView",
-    "CaseListCreateView",
+    "CaseListView",
     "CaseTrackingConfirmView",
     "CaseTrackingPreviewView",
     "CaseTrackingRefreshView",
     "CaseTrackingView",
     "ChatView",
+    "ClientContactDetailView",
+    "ClientContactListCreateView",
     "ConversationDetailView",
     "ConversationExportView",
     "ConversationListView",

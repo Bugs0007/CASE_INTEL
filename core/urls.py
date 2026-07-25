@@ -14,12 +14,14 @@ from core.views import (
     AdvocateSearchStatusView,
     AdvocateSearchView,
     CaseDetailView,
-    CaseListCreateView,
+    CaseListView,
     CaseTrackingConfirmView,
     CaseTrackingPreviewView,
     CaseTrackingRefreshView,
     CaseTrackingView,
     ChatView,
+    ClientContactDetailView,
+    ClientContactListCreateView,
     ConversationDetailView,
     ConversationExportView,
     ConversationListView,
@@ -84,7 +86,7 @@ urlpatterns = [
     ),
 
     # Cases
-    path("cases/", CaseListCreateView.as_view(), name="case-list"),
+    path("cases/", CaseListView.as_view(), name="case-list"),
     path("cases/<int:pk>/", CaseDetailView.as_view(), name="case-detail"),
     path(
         "cases/<int:pk>/tracking/",
@@ -145,6 +147,14 @@ urlpatterns = [
     # Hearings
     path("hearings/", HearingListCreateView.as_view(), name="hearing-list"),
     path("hearings/<int:pk>/", HearingDetailView.as_view(), name="hearing-detail"),
+
+    # Client contacts
+    path("client-contacts/", ClientContactListCreateView.as_view(), name="client-contact-list"),
+    path(
+        "client-contacts/<int:pk>/",
+        ClientContactDetailView.as_view(),
+        name="client-contact-detail",
+    ),
 
     # Documents
     path("documents/", DocumentListView.as_view(), name="document-list"),

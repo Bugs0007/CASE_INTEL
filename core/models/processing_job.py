@@ -137,8 +137,18 @@ class ProcessingJob(OwnedModel):
         return cls.objects.filter(job_type=job_type, status__in=["queued", "running"]).exists()
 
     @classmethod
-    def enqueue_advocate_import(cls, owner, selected: list[dict]) -> "ProcessingJob":
+    def enqueue_advocate_import(
+        cls, owner, selected: list[dict], *, advocate_name: str = "", bar_code: str = ""
+    ) -> "ProcessingJob":
         """Enqueue a bulk import of eCourts search results into new Cases.
+
+        advocate_name/bar_code are the identity originally searched with
+        (see core/views/advocate_search.py's AdvocateSearchImportView,
+        which pulls these off the originating advocate_search job) --
+        carried through so run_advocate_import can auto-detect each new
+        Case's user_party_role against its freshly-fetched
+        party_advocate_data. Both default to "" (no detection attempted)
+        for callers that don't have/need it.
 
         No dedup against an existing job for the SAME batch -- each
         submission is distinct -- but only one advocate_import may run
@@ -155,7 +165,7 @@ class ProcessingJob(OwnedModel):
         return cls.objects.create(
             owner=owner,
             job_type="advocate_import",
-            payload={"selected": selected},
+            payload={"selected": selected, "advocate_name": advocate_name, "bar_code": bar_code},
             progress_total=len(selected),
         )
 

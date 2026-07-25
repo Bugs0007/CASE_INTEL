@@ -31,11 +31,16 @@ export const advocateSearchApi = {
     }),
 
   /** Enqueues the sequential, 1s-delayed fetch of each selected case --
-   * async, poll getImportStatus(job_id) for the outcome. */
-  startImport: (courtType: CourtType, selected: AdvocateImportSelection[]) =>
+   * async, poll getImportStatus(job_id) for the outcome. searchJobId, when
+   * given, identifies the advocate_search job these results came from --
+   * the backend pulls the advocate_name/bar_code that was searched with
+   * off it for user_party_role auto-detection (see
+   * AdvocateSearchImportView). Omit if unavailable; auto-detection is
+   * simply skipped for that batch. */
+  startImport: (courtType: CourtType, selected: AdvocateImportSelection[], searchJobId?: number) =>
     apiClient<AdvocateImportStartResponse>("/cases/search-advocate/import/", {
       method: "POST",
-      body: JSON.stringify({ court_type: courtType, selected }),
+      body: JSON.stringify({ court_type: courtType, selected, search_job_id: searchJobId }),
     }),
 
   getImportStatus: (jobId: number) =>

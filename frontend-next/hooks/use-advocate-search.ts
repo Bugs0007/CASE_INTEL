@@ -64,16 +64,16 @@ export function useRetryFailedDistricts() {
 }
 
 export function useImportAdvocateCases() {
-  const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: ({
       courtType,
       selected,
+      searchJobId,
     }: {
       courtType: CourtType;
       selected: AdvocateImportSelection[];
-    }) => advocateSearchApi.startImport(courtType, selected),
+      searchJobId?: number;
+    }) => advocateSearchApi.startImport(courtType, selected, searchJobId),
   });
 }
 
