@@ -1,5 +1,6 @@
 "use client";
 
+import { Construction } from "lucide-react";
 import { GmailStatusCard } from "@/components/emails/gmail-status";
 import { SyncConfigCard } from "@/components/emails/sync-config";
 import { EmailsTable } from "@/components/emails/emails-table";
@@ -7,6 +8,12 @@ import { showToast } from "@/components/ui/toaster";
 import { useGmailStatus, useSyncEmails } from "@/hooks/use-gmail";
 import { useEmails, useLinkEmail } from "@/hooks/use-emails";
 import type { SyncConfig } from "@/types";
+
+// Gmail integration is still under development — the OAuth connect flow
+// isn't wired up end-to-end yet. Gate the live-action controls on this page
+// behind this flag rather than removing them, so re-enabling later is a
+// one-line change.
+const GMAIL_INTEGRATION_ENABLED = false;
 
 export default function EmailsPage() {
   const { data: gmailStatus, isLoading: statusLoading } = useGmailStatus();
@@ -50,6 +57,22 @@ export default function EmailsPage() {
         </p>
       </div>
 
+      {/* Under Development Notice */}
+      {!GMAIL_INTEGRATION_ENABLED && (
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <Construction className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <div className="font-medium text-amber-900">
+              Under development — coming soon
+            </div>
+            <div className="text-sm text-amber-700">
+              Gmail integration is still being built. Connecting an account
+              and syncing emails are disabled for now.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Section: Gmail Status + Sync Config */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <GmailStatusCard
@@ -63,7 +86,11 @@ export default function EmailsPage() {
           }
           isLoading={statusLoading}
         />
-        <SyncConfigCard onSync={handleSync} isSyncing={syncEmails.isPending} />
+        <SyncConfigCard
+          onSync={handleSync}
+          isSyncing={syncEmails.isPending}
+          disabled={!GMAIL_INTEGRATION_ENABLED}
+        />
       </div>
 
       {/* Emails Table */}
@@ -75,6 +102,7 @@ export default function EmailsPage() {
           emails={emails}
           isLoading={emailsLoading}
           onLinkEmail={handleLinkEmail}
+          disabled={!GMAIL_INTEGRATION_ENABLED}
         />
       </div>
 

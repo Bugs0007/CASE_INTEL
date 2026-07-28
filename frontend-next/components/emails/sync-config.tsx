@@ -8,9 +8,14 @@ import type { SyncConfig } from "@/types";
 interface SyncConfigCardProps {
   onSync: (config: SyncConfig) => void;
   isSyncing?: boolean;
+  disabled?: boolean;
 }
 
-export function SyncConfigCard({ onSync, isSyncing }: SyncConfigCardProps) {
+export function SyncConfigCard({
+  onSync,
+  isSyncing,
+  disabled,
+}: SyncConfigCardProps) {
   const [config, setConfig] = useState<SyncConfig>({
     start_date: "",
     end_date: "",
@@ -37,6 +42,7 @@ export function SyncConfigCard({ onSync, isSyncing }: SyncConfigCardProps) {
             <Input
               type="date"
               value={config.start_date}
+              disabled={disabled}
               onChange={(e) =>
                 setConfig({ ...config, start_date: e.target.value })
               }
@@ -49,6 +55,7 @@ export function SyncConfigCard({ onSync, isSyncing }: SyncConfigCardProps) {
             <Input
               type="date"
               value={config.end_date}
+              disabled={disabled}
               onChange={(e) =>
                 setConfig({ ...config, end_date: e.target.value })
               }
@@ -64,6 +71,7 @@ export function SyncConfigCard({ onSync, isSyncing }: SyncConfigCardProps) {
           <Input
             placeholder="e.g., lawsuit, settlement, deposition"
             value={config.keywords}
+            disabled={disabled}
             onChange={(e) => setConfig({ ...config, keywords: e.target.value })}
           />
         </div>
@@ -76,6 +84,7 @@ export function SyncConfigCard({ onSync, isSyncing }: SyncConfigCardProps) {
           <Input
             placeholder="e.g., Legal, Clients, Important"
             value={config.labels}
+            disabled={disabled}
             onChange={(e) => setConfig({ ...config, labels: e.target.value })}
           />
         </div>
@@ -85,10 +94,11 @@ export function SyncConfigCard({ onSync, isSyncing }: SyncConfigCardProps) {
           variant="primary"
           className="w-full"
           onClick={handleSync}
-          disabled={isSyncing}
+          disabled={disabled || isSyncing}
+          title={disabled ? "Gmail integration is under development" : undefined}
         >
           <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
-          {isSyncing ? "Syncing..." : "Sync Emails"}
+          {disabled ? "Coming soon" : isSyncing ? "Syncing..." : "Sync Emails"}
         </Button>
       </CardContent>
     </Card>
