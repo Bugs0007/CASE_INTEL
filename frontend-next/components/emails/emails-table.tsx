@@ -8,12 +8,14 @@ interface EmailsTableProps {
   emails: Email[];
   isLoading?: boolean;
   onLinkEmail: (emailId: number, caseId: number) => void;
+  disabled?: boolean;
 }
 
 export function EmailsTable({
   emails,
   isLoading,
   onLinkEmail,
+  disabled,
 }: EmailsTableProps) {
   const [linkingEmailId, setLinkingEmailId] = useState<number | null>(null);
 
@@ -163,9 +165,15 @@ export function EmailsTable({
                       variant="secondary"
                       size="sm"
                       onClick={() => handleLink(email.id)}
+                      disabled={disabled}
+                      title={
+                        disabled
+                          ? "Gmail integration is under development"
+                          : undefined
+                      }
                     >
                       <LinkIcon className="h-4 w-4" />
-                      Link to Case
+                      {disabled ? "Coming soon" : "Link to Case"}
                     </Button>
                   )}
                 </td>
