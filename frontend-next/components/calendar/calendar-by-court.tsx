@@ -2,6 +2,7 @@ import Link from "next/link";
 import { format, parseISO } from "date-fns";
 import { Landmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CauseListBadge } from "@/components/hearings/cause-list-badge";
 import { cn } from "@/lib/utils";
 import type { Hearing } from "@/types";
 
@@ -79,6 +80,7 @@ export function CalendarByCourt({ hearings, caseMeta }: CalendarByCourtProps) {
                         >
                           {h.source === "ecourts" ? "eCourts" : "Manual"}
                         </span>
+                        <CauseListBadge hearing={h} />
                       </div>
                       <div className="text-xs text-gray-500">
                         {format(parseISO(h.hearing_date), "h:mm a")}

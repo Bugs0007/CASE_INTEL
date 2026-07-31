@@ -306,6 +306,57 @@ else:
     }
 
 # ============================================================================
+# Cause lists (core/services/cause_list/) -- Telangana High Court only
+# ============================================================================
+# URL template for the TS High Court daily cause list, taking {date}
+# (ISO), {dd}, {mm} and/or {yyyy}, e.g.
+#   https://<host>/causelist?date={dd}-{mm}-{yyyy}
+#
+# NO DEFAULT ON PURPOSE. The saved sample the parser was built against
+# carries no URL of its own (its #globalUrl field is blank), so a guessed
+# default would give a scheduled job that silently downloads the wrong
+# page instead of failing loudly. `manage.py fetch_cause_lists` raises a
+# CommandError naming this setting until it is set.
+TELANGANA_HC_CAUSE_LIST_URL = config("TELANGANA_HC_CAUSE_LIST_URL", default="")
+
+# ============================================================================
+# Outbound email (invoice delivery to a case's billing contact)
+# ============================================================================
+# All read from the environment via decouple, like every other
+# environment-dependent setting here -- nothing is hardcoded.
+#
+# REQUIRED IN .env FOR REAL DELIVERY:
+#   EMAIL_HOST           e.g. smtp.gmail.com
+#   EMAIL_PORT           e.g. 587
+#   EMAIL_HOST_USER      the sending mailbox
+#   EMAIL_HOST_PASSWORD  app password / SMTP credential
+#   EMAIL_USE_TLS        true for port 587, false if using SSL on 465
+#   DEFAULT_FROM_EMAIL   the From: address shown to clients
+#
+# When EMAIL_HOST/EMAIL_HOST_USER/EMAIL_HOST_PASSWORD are absent,
+# INVOICE_EMAIL_CONFIGURED is False and
+# core/services/invoice_service.py:send_invoice() LOGS the delivery
+# (recipient, invoice number, amount) at WARNING and returns sent=False
+# instead of raising -- the feature stays usable end-to-end on a box with
+# no mail credentials, and the fee is recorded as send_status='logged',
+# never 'sent'. The console backend below makes that path visible in the
+# server log rather than silently discarding the message.
+EMAIL_HOST = config("EMAIL_HOST", default="")
+EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
+EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
+EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
+EMAIL_USE_SSL = config("EMAIL_USE_SSL", default=False, cast=bool)
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="no-reply@caseintel.local")
+
+INVOICE_EMAIL_CONFIGURED = bool(EMAIL_HOST and EMAIL_HOST_USER and EMAIL_HOST_PASSWORD)
+
+if INVOICE_EMAIL_CONFIGURED:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+else:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+# ============================================================================
 # Gmail OAuth Configuration
 # ============================================================================
 GMAIL_CLIENT_ID = config("GMAIL_CLIENT_ID", default="")

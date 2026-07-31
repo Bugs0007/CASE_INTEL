@@ -86,6 +86,15 @@ spacy==3.8.14
 # pikepdf comes with it and is also used directly for page-batch slicing.
 ocrmypdf==17.8.1
 
+# Invoice PDF generation (core/services/invoice_service.py). fpdf2, NOT
+# WeasyPrint: WeasyPrint needs GTK/Pango/Cairo as SYSTEM packages, which
+# would mean another apt line in deploy/provision.sh and a GTK install on
+# every Windows dev box. fpdf2 is pure Python and renders identically on
+# Windows and the Linux EC2 host from the wheel alone. Note its core
+# fonts are Latin-1 only -- invoice_service._pdf_safe() substitutes
+# out-of-range characters rather than letting them raise.
+fpdf2==2.8.7
+
 # ============================================================================
 # FILE STORAGE (AWS S3 via django-storages -- used when USE_S3=true)
 # ============================================================================

@@ -14,6 +14,8 @@ import {
 } from "date-fns";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CauseListBadge } from "@/components/hearings/cause-list-badge";
+import { OrderSummaryBody } from "@/components/cases/order-overview";
 import { cn } from "@/lib/utils";
 import type { Hearing } from "@/types";
 
@@ -172,6 +174,7 @@ export function CalendarMonth({ hearings, caseMeta }: CalendarMonthProps) {
                     >
                       {h.source === "ecourts" ? "eCourts" : "Manual"}
                     </span>
+                    <CauseListBadge hearing={h} />
                   </div>
                   <div className="text-sm font-semibold text-gray-900 mb-0.5">
                     {h.case_title}
@@ -179,6 +182,13 @@ export function CalendarMonth({ hearings, caseMeta }: CalendarMonthProps) {
                   <div className="text-xs text-gray-500 mb-2.5">
                     {h.location || "No location specified"}
                   </div>
+                  {/* What the court actually did on this date, when an
+                      order was filed and summarised. */}
+                  {h.order_summary && (
+                    <div className="mb-2.5 rounded-lg border border-gray-100 bg-gray-50/60 p-2.5">
+                      <OrderSummaryBody summary={h.order_summary} />
+                    </div>
+                  )}
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-gray-500">
                       {meta ? `${meta.documentCount} docs on file` : ""}

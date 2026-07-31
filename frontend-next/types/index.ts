@@ -1,3 +1,4 @@
+export * from "./billing";
 export * from "./case";
 export * from "./document";
 export * from "./hearing";

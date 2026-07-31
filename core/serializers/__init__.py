@@ -6,6 +6,8 @@ existing imports like ``from core.serializers import CaseSerializer``
 continue to work.
 """
 
+from .advocate_profile import AdvocateProfileSerializer
+from .appearance_fee import AppearanceFeeSerializer, NestedAppearanceFeeSerializer
 from .case import CaseSerializer
 from .chat import (
     ChatRequestSerializer,
@@ -18,8 +20,19 @@ from .conversation import ConversationDetailSerializer, ConversationListSerializ
 from .court_order import CourtOrderSerializer
 from .document import DocumentSerializer, DocumentUploadSerializer
 from .hearing import HearingSerializer
+from .travel_booking import (
+    NestedTravelBookingSerializer,
+    TravelBookingSerializer,
+    TravelBookingUploadSerializer,
+)
 
 __all__ = [
+    "AdvocateProfileSerializer",
+    "AppearanceFeeSerializer",
+    "NestedAppearanceFeeSerializer",
+    "NestedTravelBookingSerializer",
+    "TravelBookingSerializer",
+    "TravelBookingUploadSerializer",
     "CaseSerializer",
     "ChatRequestSerializer",
     "ChatResponseSerializer",

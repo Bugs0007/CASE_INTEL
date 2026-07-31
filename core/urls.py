@@ -7,12 +7,19 @@ All endpoints are prefixed with /api/ when included in the project root URLconf.
 from django.urls import path
 
 from core.views import (
+    AdvocateProfileView,
     AdvocateSearchImportStatusView,
     AdvocateSearchImportView,
     AdvocateSearchPreferenceView,
     AdvocateSearchRetryFailedView,
     AdvocateSearchStatusView,
     AdvocateSearchView,
+    AppearanceFeeDetailView,
+    AppearanceFeeInvoiceFileView,
+    AppearanceFeeInvoiceView,
+    AppearanceFeeListCreateView,
+    AppearanceFeeMarkPaidView,
+    AppearanceFeeSendView,
     CaseDetailView,
     CaseListView,
     CaseOrdersView,
@@ -47,6 +54,10 @@ from core.views import (
     LoginView,
     LogoutView,
     RegisterView,
+    TravelBookingDetailView,
+    TravelBookingFileView,
+    TravelBookingListCreateView,
+    TravelBookingUploadView,
     UpcomingHearingsView,
 )
 
@@ -154,6 +165,67 @@ urlpatterns = [
     # Hearings
     path("hearings/", HearingListCreateView.as_view(), name="hearing-list"),
     path("hearings/<int:pk>/", HearingDetailView.as_view(), name="hearing-detail"),
+
+    # Advocate billing profile (invoice letterhead + default fee). A
+    # singleton per user -- no id in the path, see AdvocateProfileView.
+    path("advocate-profile/", AdvocateProfileView.as_view(), name="advocate-profile"),
+
+    # Appearance fees + invoicing. The literal "invoice/file/" route is
+    # listed before "invoice/" only for readability; they can't shadow
+    # each other (different trailing segments).
+    path(
+        "appearance-fees/",
+        AppearanceFeeListCreateView.as_view(),
+        name="appearance-fee-list",
+    ),
+    path(
+        "appearance-fees/<int:pk>/",
+        AppearanceFeeDetailView.as_view(),
+        name="appearance-fee-detail",
+    ),
+    path(
+        "appearance-fees/<int:pk>/invoice/",
+        AppearanceFeeInvoiceView.as_view(),
+        name="appearance-fee-invoice",
+    ),
+    path(
+        "appearance-fees/<int:pk>/invoice/file/",
+        AppearanceFeeInvoiceFileView.as_view(),
+        name="appearance-fee-invoice-file",
+    ),
+    path(
+        "appearance-fees/<int:pk>/send/",
+        AppearanceFeeSendView.as_view(),
+        name="appearance-fee-send",
+    ),
+    path(
+        "appearance-fees/<int:pk>/mark-paid/",
+        AppearanceFeeMarkPaidView.as_view(),
+        name="appearance-fee-mark-paid",
+    ),
+
+    # Travel/hotel bookings. "upload/" is declared before the
+    # <int:pk> detail route so it can never be swallowed by it.
+    path(
+        "travel-bookings/",
+        TravelBookingListCreateView.as_view(),
+        name="travel-booking-list",
+    ),
+    path(
+        "travel-bookings/upload/",
+        TravelBookingUploadView.as_view(),
+        name="travel-booking-upload",
+    ),
+    path(
+        "travel-bookings/<int:pk>/",
+        TravelBookingDetailView.as_view(),
+        name="travel-booking-detail",
+    ),
+    path(
+        "travel-bookings/<int:pk>/file/",
+        TravelBookingFileView.as_view(),
+        name="travel-booking-file",
+    ),
 
     # Client contacts
     path("client-contacts/", ClientContactListCreateView.as_view(), name="client-contact-list"),
