@@ -15,6 +15,7 @@ from core.views import (
     AdvocateSearchView,
     CaseDetailView,
     CaseListView,
+    CaseOrdersView,
     CaseTrackingConfirmView,
     CaseTrackingPreviewView,
     CaseTrackingRefreshView,
@@ -26,6 +27,7 @@ from core.views import (
     ConversationExportView,
     ConversationListView,
     ConversationMessagesView,
+    CourtOrderFileView,
     CourtStructureView,
     DashboardView,
     DocumentDetailView,
@@ -88,6 +90,11 @@ urlpatterns = [
     # Cases
     path("cases/", CaseListView.as_view(), name="case-list"),
     path("cases/<int:pk>/", CaseDetailView.as_view(), name="case-detail"),
+    path(
+        "cases/<int:pk>/orders/",
+        CaseOrdersView.as_view(),
+        name="case-orders",
+    ),
     path(
         "cases/<int:pk>/tracking/",
         CaseTrackingView.as_view(),
@@ -170,6 +177,10 @@ urlpatterns = [
         DocumentDownloadView.as_view(),
         name="document-download",
     ),
+
+    # Court orders (the PDF itself is streamed by this view, never exposed
+    # as a storage URL -- see CourtOrderFileView)
+    path("orders/<int:pk>/file/", CourtOrderFileView.as_view(), name="court-order-file"),
 
     # Folders
     path("folders/", FolderListView.as_view(), name="folder-list"),

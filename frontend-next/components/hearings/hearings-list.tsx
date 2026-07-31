@@ -1,14 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CollapseToggle } from "@/components/ui/collapse-toggle";
 import { Collapsible } from "@/components/ui/collapsible";
 import { formatDateTime, staggerDelay } from "@/lib/utils";
-import { Calendar, MapPin, User, Plus, Edit, Trash2, Loader2 } from "lucide-react";
-import type { Hearing } from "@/types";
+import { groupOrdersByDate, hearingDateKey } from "@/hooks/use-court-orders";
+import {
+  Calendar,
+  MapPin,
+  User,
+  Plus,
+  Edit,
+  Trash2,
+  Loader2,
+  FileText,
+} from "lucide-react";
+import type { CourtOrder, Hearing } from "@/types";
 
 const DEFAULT_VISIBLE_COUNT = 5;
 
@@ -20,6 +30,11 @@ interface HearingsListProps {
   onEditHearing?: (hearing: Hearing) => void;
   onDeleteHearing?: (id: number) => void;
   deletingId?: number;
+  /** All of the case's court orders; bucketed by date here so each card
+      can show the order(s) filed on its own hearing date. */
+  orders?: CourtOrder[];
+  onViewOrder?: (orderId: number) => void;
+  viewingOrderId?: number;
 }
 
 export function HearingsList({
@@ -30,7 +45,11 @@ export function HearingsList({
   onEditHearing,
   onDeleteHearing,
   deletingId,
+  orders = [],
+  onViewOrder,
+  viewingOrderId,
 }: HearingsListProps) {
+  const ordersByDate = useMemo(() => groupOrdersByDate(orders), [orders]);
   const [sectionOpen, setSectionOpen] = useState(true);
   const [upcomingShowAll, setUpcomingShowAll] = useState(false);
   // Past hearings grow unbounded over a long case and are rarely what the
@@ -109,6 +128,9 @@ export function HearingsList({
                     onEdit={onEditHearing}
                     onDelete={onDeleteHearing}
                     isDeleting={deletingId === hearing.id}
+                    orders={ordersByDate.get(hearingDateKey(hearing.hearing_date))}
+                    onViewOrder={onViewOrder}
+                    viewingOrderId={viewingOrderId}
                   />
                 ))}
               </div>
@@ -148,6 +170,9 @@ export function HearingsList({
                       onEdit={onEditHearing}
                       onDelete={onDeleteHearing}
                       isDeleting={deletingId === hearing.id}
+                      orders={ordersByDate.get(hearingDateKey(hearing.hearing_date))}
+                      onViewOrder={onViewOrder}
+                      viewingOrderId={viewingOrderId}
                     />
                   ))}
                 </div>
@@ -190,9 +215,24 @@ interface HearingItemProps {
   isDeleting?: boolean;
   /** Position within its (upcoming/past) list, for a stagger-in delay. */
   index?: number;
+  /** Court orders filed on this hearing's date, already in portal
+      sequence (the API sorts them). */
+  orders?: CourtOrder[];
+  onViewOrder?: (orderId: number) => void;
+  viewingOrderId?: number;
 }
 
-function HearingItem({ hearing, isUpcoming, onEdit, onDelete, isDeleting, index = 0 }: HearingItemProps) {
+function HearingItem({
+  hearing,
+  isUpcoming,
+  onEdit,
+  onDelete,
+  isDeleting,
+  index = 0,
+  orders,
+  onViewOrder,
+  viewingOrderId,
+}: HearingItemProps) {
   return (
     <div
       style={staggerDelay(index)}
@@ -246,6 +286,15 @@ function HearingItem({ hearing, isUpcoming, onEdit, onDelete, isDeleting, index 
           {hearing.notes && (
             <div className="mt-2 text-sm text-gray-600">📝 {hearing.notes}</div>
           )}
+
+          {/* Order PDFs filed on this date. A date routinely carries more
+              than one, so a single order gets one button and several get a
+              labelled stack rather than a row of identical buttons. */}
+          <HearingOrders
+            orders={orders}
+            onViewOrder={onViewOrder}
+            viewingOrderId={viewingOrderId}
+          />
         </div>
 
         {/* Actions -- eCourts-sourced hearings are edited via Court Tracking
@@ -279,5 +328,83 @@ function HearingItem({ hearing, isUpcoming, onEdit, onDelete, isDeleting, index 
         )}
       </div>
     </div>
+  );
+}
+
+interface HearingOrdersProps {
+  orders?: CourtOrder[];
+  onViewOrder?: (orderId: number) => void;
+  viewingOrderId?: number;
+}
+
+/** The order PDF(s) filed on a hearing's date.
+ *
+ * Orders arrive already sorted in portal sequence from the API. Each opens
+ * in a new tab via GET /api/orders/<id>/file/, which streams the bytes
+ * behind an ownership check -- there is no direct file URL to link to, so
+ * the click goes through the fetch-to-blob path in useViewOrder(). */
+function HearingOrders({ orders, onViewOrder, viewingOrderId }: HearingOrdersProps) {
+  // has_file is false when the underlying Document row is gone -- the
+  // serve endpoint would 404, so don't offer a button at all.
+  const openable = (orders ?? []).filter((order) => order.has_file);
+  if (openable.length === 0) return null;
+
+  if (openable.length === 1) {
+    const order = openable[0];
+    return (
+      <div className="mt-3">
+        <OrderButton
+          order={order}
+          label="Order"
+          onViewOrder={onViewOrder}
+          isViewing={viewingOrderId === order.id}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3">
+      <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
+        Orders ({openable.length})
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {openable.map((order) => (
+          <OrderButton
+            key={order.id}
+            order={order}
+            label={`Order ${order.order_number}`}
+            onViewOrder={onViewOrder}
+            isViewing={viewingOrderId === order.id}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+interface OrderButtonProps {
+  order: CourtOrder;
+  label: string;
+  onViewOrder?: (orderId: number) => void;
+  isViewing?: boolean;
+}
+
+function OrderButton({ order, label, onViewOrder, isViewing }: OrderButtonProps) {
+  return (
+    <Button
+      variant="secondary"
+      size="sm"
+      onClick={() => onViewOrder?.(order.id)}
+      disabled={isViewing}
+      title={order.description || `Open ${label} (PDF, opens in a new tab)`}
+    >
+      {isViewing ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <FileText className="h-4 w-4" />
+      )}
+      {label}
+    </Button>
   );
 }
