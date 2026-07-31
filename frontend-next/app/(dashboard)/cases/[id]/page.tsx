@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { useCase } from "@/hooks/use-cases";
 import { useDocuments } from "@/hooks/use-documents";
 import { useDeleteHearing, useHearings } from "@/hooks/use-hearings";
+import { useCaseOrders, useViewOrder } from "@/hooks/use-court-orders";
 import { CaseDetailHeader } from "@/components/cases/case-detail-header";
 import { CaseOverview } from "@/components/cases/case-overview";
 import { CaseDetailSkeleton } from "@/components/cases/case-detail-skeleton";
@@ -56,11 +57,15 @@ export default function CaseDetailPage() {
   const { data: hearings = [], isLoading: hearingsLoading } = useHearings({
     case_id: caseId,
   });
+  // Fetched once for the whole case and bucketed by date inside
+  // HearingsList, rather than one request per hearing card.
+  const { data: courtOrders = [] } = useCaseOrders(caseId);
 
   const processDocument = useProcessDocument();
   const deleteDocument = useDeleteDocument();
   const viewDocument = useViewDocument();
   const deleteHearing = useDeleteHearing();
+  const viewOrder = useViewOrder();
 
   if (caseLoading) {
     return <CaseDetailSkeleton />;
@@ -108,6 +113,15 @@ export default function CaseDetailPage() {
       onError: (error) => {
         console.error("Failed to open document:", error);
         showToast.error("Could not open document", "Try again in a moment.");
+      },
+    });
+  };
+
+  const handleViewOrder = (orderId: number) => {
+    viewOrder.mutate(orderId, {
+      onError: (error) => {
+        console.error("Failed to open order:", error);
+        showToast.error("Could not open order", "Try again in a moment.");
       },
     });
   };
@@ -185,6 +199,9 @@ export default function CaseDetailPage() {
               onEditHearing={handleEditHearing}
               onDeleteHearing={handleDeleteHearing}
               deletingId={deleteHearing.variables}
+              orders={courtOrders}
+              onViewOrder={handleViewOrder}
+              viewingOrderId={viewOrder.isPending ? viewOrder.variables : undefined}
             />
           </div>
         </div>

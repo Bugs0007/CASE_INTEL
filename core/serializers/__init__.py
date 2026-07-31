@@ -15,6 +15,7 @@ from .chat import (
 )
 from .client_contact import ClientContactSerializer
 from .conversation import ConversationDetailSerializer, ConversationListSerializer
+from .court_order import CourtOrderSerializer
 from .document import DocumentSerializer, DocumentUploadSerializer
 from .hearing import HearingSerializer
 
@@ -26,6 +27,7 @@ __all__ = [
     "ClientContactSerializer",
     "ConversationDetailSerializer",
     "ConversationListSerializer",
+    "CourtOrderSerializer",
     "DocumentSerializer",
     "DocumentUploadSerializer",
     "HearingSerializer",

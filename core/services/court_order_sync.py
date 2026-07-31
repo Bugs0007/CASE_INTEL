@@ -31,6 +31,7 @@ import hashlib
 import logging
 import re
 import time
+from datetime import date
 
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
@@ -43,13 +44,88 @@ logger = logging.getLogger(__name__)
 DOWNLOAD_DELAY_SECONDS = 5
 MAX_DOWNLOADS_PER_SYNC = 5
 
+ORDER_STORAGE_DIR = "documents/court_orders"
+
 _FILENAME_SAFE_RE = re.compile(r"[^A-Za-z0-9._-]+")
+# Written by _order_filename() when the portal listed no date for an order.
+_UNDATED_TOKEN = "undated"
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def _order_filename(case: Case, record: CourtOrderRecord) -> str:
-    date_part = record.order_date.isoformat() if record.order_date else "undated"
+    date_part = record.order_date.isoformat() if record.order_date else _UNDATED_TOKEN
     stem = f"{record.cnr}_order_{record.order_number}_{date_part}"
     return _FILENAME_SAFE_RE.sub("-", stem) + ".pdf"
+
+
+def parse_order_filename(filename: str) -> CourtOrderRecord | None:
+    """Inverse of _order_filename(): recover a CourtOrderRecord from a
+    stored order PDF's name. Lives next to the writer above so the two
+    can't drift apart.
+
+    Returns None (and logs why) for anything unparseable -- callers scan
+    whole storage directories, where one odd name must skip that file, not
+    abort the scan. Never raises.
+
+    The date segment is located by scanning "_"-separated segments RIGHT
+    TO LEFT rather than just taking the last one, because
+    default_storage.save() appends a random suffix on name collision
+    (Django's Storage.get_available_name -> "<stem>_XXXXXXX.pdf"), which
+    would otherwise sit where the date is expected. Anything after the
+    date segment is that suffix and is ignored.
+    """
+    stem, dot, extension = filename.rpartition(".")
+    if not dot or extension.lower() != "pdf":
+        logger.warning("Skipping non-PDF order file %r.", filename)
+        return None
+
+    cnr, marker, rest = stem.partition("_order_")
+    if not marker:
+        logger.warning("Skipping order file %r: no '_order_' marker in the name.", filename)
+        return None
+    if not cnr:
+        logger.warning("Skipping order file %r: empty CNR.", filename)
+        return None
+
+    segments = rest.split("_")
+    for i in range(len(segments) - 1, -1, -1):
+        segment = segments[i]
+        if segment == _UNDATED_TOKEN:
+            order_date = None
+            break
+        if _ISO_DATE_RE.match(segment):
+            try:
+                order_date = date.fromisoformat(segment)
+            except ValueError:
+                # Right shape, impossible value (e.g. "2026-13-45") --
+                # keep scanning left; a real date may still be there.
+                continue
+            break
+    else:
+        logger.warning(
+            "Skipping order file %r: no parseable order date in the name.", filename
+        )
+        return None
+
+    order_number = "_".join(segments[:i])
+    if not order_number:
+        logger.warning("Skipping order file %r: no order number in the name.", filename)
+        return None
+
+    return CourtOrderRecord(cnr=cnr, order_number=order_number, order_date=order_date)
+
+
+def order_sequence_sort_key(order_number: str) -> tuple:
+    """Sort key putting orders in portal sequence.
+
+    order_number is free text off the portal, so a plain string sort files
+    "10" before "2". All-digit values sort numerically and first;
+    anything else falls in after them, alphabetically.
+    """
+    value = (order_number or "").strip()
+    if value.isdigit():
+        return (0, int(value), "")
+    return (1, 0, value.lower())
 
 
 def sync_case_orders(case: Case, progress_callback=None) -> dict:
@@ -109,7 +185,7 @@ def sync_case_orders(case: Case, progress_callback=None) -> dict:
 
         filename = _order_filename(case, record)
         saved_name = default_storage.save(
-            f"documents/court_orders/{filename}", ContentFile(pdf_bytes)
+            f"{ORDER_STORAGE_DIR}/{filename}", ContentFile(pdf_bytes)
         )
         document = Document.objects.create(
             owner=case.owner,
