@@ -68,6 +68,46 @@ export async function apiClient<T>(
   return response.json();
 }
 
+/** Like apiClient, but returns the raw response body as a Blob.
+ *
+ * For endpoints that stream a file rather than JSON (e.g. an order PDF at
+ * /orders/<id>/file/). Fetching instead of linking is what lets the
+ * `Authorization: Token` header ride along -- a plain <a target="_blank">
+ * can't send headers, and those endpoints deliberately have no
+ * unauthenticated URL to link to. */
+export async function apiBlob(
+  endpoint: string,
+  { params, ...config }: RequestConfig = {},
+): Promise<Blob> {
+  const url = new URL(`${API_BASE_URL}${endpoint}`);
+
+  if (params) {
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
+        url.searchParams.set(key, String(value));
+      }
+    });
+  }
+
+  const response = await fetch(url.toString(), {
+    ...config,
+    headers: {
+      ...authHeader(),
+      ...config.headers,
+    },
+  });
+
+  if (!response.ok) {
+    handleUnauthorized(response.status);
+    // Errors from these endpoints are still JSON (DRF Response), even
+    // though a success is binary.
+    const data = await response.json().catch(() => null);
+    throw new APIError(response.status, data);
+  }
+
+  return response.blob();
+}
+
 export async function uploadFile<T>(
   endpoint: string,
   formData: FormData,
