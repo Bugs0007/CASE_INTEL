@@ -77,6 +77,14 @@ opencv-python-headless==5.0.0.93
 # DOCUMENT PROCESSING
 # ============================================================================
 PyPDF2==3.0.1
+# Cause-list PDF parsing (core/services/cause_list/telangana_hc.py) needs
+# per-character COORDINATES, not just text: the TS High Court lists are
+# tables whose S.No. column must be paired with the case-number column by
+# vertical position. PyPDF2 exposes no layout geometry, so pdfminer.six is
+# declared explicitly here -- it was already installed as an ocrmypdf
+# transitive dependency, and relying on that by accident would break the
+# cause list the day ocrmypdf drops it.
+pdfminer.six==20260107
 python-docx==1.2.0
 lxml==6.0.2
 spacy==3.8.14

@@ -308,16 +308,21 @@ else:
 # ============================================================================
 # Cause lists (core/services/cause_list/) -- Telangana High Court only
 # ============================================================================
-# URL template for the TS High Court daily cause list, taking {date}
-# (ISO), {dd}, {mm} and/or {yyyy}, e.g.
-#   https://<host>/causelist?date={dd}-{mm}-{yyyy}
+# TS High Court cause list (core/services/cause_list/)
+# ============================================================================
+# There is NO cause-list URL to configure. Verified live 3 Aug 2026: the
+# list is not a GET-able page but a CAPTCHA-gated POST to a fixed
+# hcservices endpoint (cases_qry/index_qry.php, action_code=showCauseList),
+# which returns a table of per-bench PDF links. The endpoint lives in
+# bharat_courts; only the court identity is configurable.
 #
-# NO DEFAULT ON PURPOSE. The saved sample the parser was built against
-# carries no URL of its own (its #globalUrl field is blank), so a guessed
-# default would give a scheduled job that silently downloads the wrong
-# page instead of failing loudly. `manage.py fetch_cause_lists` raises a
-# CommandError naming this setting until it is set.
-TELANGANA_HC_CAUSE_LIST_URL = config("TELANGANA_HC_CAUSE_LIST_URL", default="")
+# Defaults work as-is -- neither of these needs to be in .env.
+#   TELANGANA_HC_COURT_KEY: bharat_courts court-registry key (state_code 29).
+#   TELANGANA_HC_BENCH_CODE: the bench dropdown value. Telangana has
+#     exactly one ("1", Principal Bench at Hyderabad) -- the judge names
+#     visible on the portal are rows in the RESULT table, not benches.
+TELANGANA_HC_COURT_KEY = config("TELANGANA_HC_COURT_KEY", default="telangana")
+TELANGANA_HC_BENCH_CODE = config("TELANGANA_HC_BENCH_CODE", default="1")
 
 # ============================================================================
 # Outbound email (invoice delivery to a case's billing contact)

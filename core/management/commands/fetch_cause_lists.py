@@ -63,20 +63,21 @@ class Command(BaseCommand):
             ),
         )
         parser.add_argument(
-            "--html-file",
+            "--pdf-dir",
             help=(
-                "Parse this local HTML file instead of downloading. Requires "
-                "--date, since a saved file can't say which day it was fetched for."
+                "Parse saved cause-list PDFs from this directory instead of "
+                "downloading (every *.pdf in it). Requires --date, since saved "
+                "files can't say which day they were fetched for. Useful for "
+                "re-running against core/tests/fixtures/causelists/."
             ),
         )
 
     def handle(self, *args, **options):
-        html = None
-        if options["html_file"]:
+        cause_list_day = None
+        if options["pdf_dir"]:
             if not options["date"]:
-                raise CommandError("--html-file requires --date.")
-            with open(options["html_file"], encoding="utf-8", errors="replace") as handle:
-                html = handle.read()
+                raise CommandError("--pdf-dir requires --date.")
+            cause_list_day = self._load_local(options["pdf_dir"])
 
         if options["date"]:
             from datetime import date as date_cls
@@ -91,7 +92,7 @@ class Command(BaseCommand):
 
         for target in dates:
             try:
-                result = check_cause_list_for_date(target, html=html)
+                result = check_cause_list_for_date(target, cause_list_day=cause_list_day)
             except CauseListNotConfiguredError as exc:
                 # Configuration, not a court problem -- fail the whole run
                 # loudly so the operator sees it, rather than logging every
@@ -103,6 +104,36 @@ class Command(BaseCommand):
                 continue
 
             self.stdout.write(self._describe(target, result))
+
+    def _load_local(self, pdf_dir: str):
+        """Build a CauseListDay from saved PDFs (no network, no CAPTCHA)."""
+        import pathlib
+
+        from core.services.cause_list.telangana_hc import (
+            CauseListDay,
+            parse_cause_list_pdf,
+        )
+
+        directory = pathlib.Path(pdf_dir)
+        if not directory.is_dir():
+            raise CommandError(f"--pdf-dir {pdf_dir!r} is not a directory.")
+
+        paths = sorted(directory.glob("*.pdf"))
+        if not paths:
+            raise CommandError(f"No *.pdf files in {pdf_dir!r}.")
+
+        documents = []
+        for path in paths:
+            try:
+                documents.append(parse_cause_list_pdf(path.read_bytes()))
+            except Exception as exc:  # noqa: BLE001
+                self.stderr.write(self.style.WARNING(f"{path.name}: {exc}"))
+        if not documents:
+            raise CommandError(f"None of the PDFs in {pdf_dir!r} could be parsed.")
+
+        list_date = next((d.list_date for d in documents if d.list_date), None)
+        self.stdout.write(f"Loaded {len(documents)} local document(s) from {pdf_dir}.")
+        return CauseListDay(list_date=list_date, documents=documents)
 
     def _describe(self, target, result: dict) -> str:
         status = result.get("status")
@@ -123,8 +154,10 @@ class Command(BaseCommand):
                 f"{target}: portal served a list for {result.get('document_date')} "
                 f"-- not applied."
             )
+        halls = result.get("court_halls") or []
         return self.style.SUCCESS(
-            f"{target}: court hall {result.get('court_hall') or '?'} -- "
+            f"{target}: {result.get('documents', 0)} document(s), "
+            f"court hall(s) {', '.join(halls) or '?'} -- "
             f"{result.get('listed', 0)} listed, {result.get('not_listed', 0)} not listed, "
             f"{result.get('unmatchable', 0)} unmatchable "
             f"({result.get('unmatched_items', 0)} of {result.get('total_items', 0)} "

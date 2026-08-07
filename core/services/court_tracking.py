@@ -35,6 +35,16 @@ class MissingTrackingConfigError(Exception):
     """Raised when tracking_enabled=True but tracking_config is empty."""
 
 
+class InvalidTrackingConfigError(Exception):
+    """Raised when tracking_config carries an unusable court_type.
+
+    Distinct from MissingTrackingConfigError: the config exists, it just
+    can't be dispatched. Previously this surfaced as a bare ValueError out
+    of the provider, which no caller caught -- a 500 from the refresh
+    endpoint and a dead import job. See _resolve_court_type().
+    """
+
+
 class PreviewThrottledError(Exception):
     """Raised when a user exceeds the preview rate limit."""
 
@@ -88,6 +98,8 @@ def refresh_case_tracking(case: Case, *, force: bool = False) -> dict:
     if not case.tracking_config:
         raise MissingTrackingConfigError(f"Case {case.id} has no tracking_config set")
 
+    tracking_config = _resolve_court_type(case)
+
     provider = get_provider()
     start = time.monotonic()
     success = False
@@ -96,7 +108,7 @@ def refresh_case_tracking(case: Case, *, force: bool = False) -> dict:
     new_hearing_dates: list = []
 
     try:
-        data = provider.fetch_case(case.tracking_config)
+        data = provider.fetch_case(tracking_config)
         success = True
         _apply_case_data(case, data)
         new_hearing_dates = _upsert_hearings(case, data)
@@ -139,6 +151,50 @@ def refresh_case_tracking(case: Case, *, force: bool = False) -> dict:
         "data": data,
         "new_hearing_dates": new_hearing_dates,
     }
+
+
+VALID_COURT_TYPES = ("district", "high_court")
+
+
+def _resolve_court_type(case: Case) -> dict:
+    """Return case.tracking_config with a dispatchable court_type.
+
+    The provider dispatches on tracking_config["court_type"] and raises a
+    bare ValueError for anything outside VALID_COURT_TYPES. Nothing caught
+    that: the refresh endpoint 500'd and an import job died outright.
+
+    Two behaviours, both deliberate:
+
+      - **Graceful fallback.** If tracking_config's court_type is unusable
+        but Case.court_type is valid, use the latter. The two are written
+        together everywhere (confirm_case_tracking, advocate_import), so a
+        config missing it is a data-shape gap, not a real ambiguity, and
+        the case is perfectly refreshable.
+      - **No guessing.** If NEITHER is valid we raise rather than defaulting
+        to "district". Silently picking a branch would fetch against the
+        wrong portal and either fail confusingly or -- much worse -- bind
+        the case to a different real case that happens to share the number.
+    """
+    config = dict(case.tracking_config or {})
+    if config.get("court_type") in VALID_COURT_TYPES:
+        return config
+
+    if case.court_type in VALID_COURT_TYPES:
+        logger.warning(
+            "Case %s: tracking_config.court_type=%r is unusable; falling back "
+            "to Case.court_type=%r.",
+            case.id,
+            config.get("court_type"),
+            case.court_type,
+        )
+        config["court_type"] = case.court_type
+        return config
+
+    raise InvalidTrackingConfigError(
+        f"Case {case.id} has no usable court_type "
+        f"(tracking_config={config.get('court_type')!r}, case={case.court_type!r}). "
+        f"Re-run court tracking setup for this case."
+    )
 
 
 def _enqueue_order_sync(case: Case) -> None:

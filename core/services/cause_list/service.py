@@ -2,8 +2,13 @@
 result on the Hearing rows.
 
 Split from the parser on purpose: the parser is pure
-(HTML -> CauseList) and the whole matching/storage policy lives here, so
-the tests can exercise matching against a fixture without any network.
+(PDF bytes -> CauseListDocument) and the whole matching/storage policy
+lives here, so the tests can exercise matching against the real fixtures
+without any network.
+
+Works against a CauseListDay -- every document published for a date, ~58
+of them across several court halls -- rather than a single document. The
+court hall therefore comes from the matched ITEM, not from the day.
 """
 
 from __future__ import annotations
@@ -20,7 +25,12 @@ from .exceptions import (
     CauseListNotPublishedError,
     CauseListParseError,
 )
-from .telangana_hc import COURT_KEY, CauseList, fetch_cause_list, normalize_case_token
+from .telangana_hc import (
+    COURT_KEY,
+    CauseListDay,
+    fetch_cause_list_day,
+    normalize_case_token,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +72,7 @@ def candidate_keys_for_case(case: Case) -> set[tuple[str, str, str]]:
 
 
 def apply_cause_list(
-    cause_list: CauseList, hearings: list[Hearing], *, court_key: str = COURT_KEY
+    cause_list: CauseListDay, hearings: list[Hearing], *, court_key: str = COURT_KEY
 ) -> dict:
     """Record each hearing's listing state against a PUBLISHED list.
 
@@ -112,7 +122,10 @@ def apply_cause_list(
         matched_keys.update(key for key in keys if key in index)
         hearing.cause_list_status = Hearing.CAUSE_LIST_LISTED
         hearing.cause_list_item_number = item.item_number
-        hearing.cause_list_court_hall = cause_list.court_hall
+        # From the ITEM, not the day: one date spans many halls, and the
+        # hall an advocate must walk into is the one their own matter is
+        # listed in.
+        hearing.cause_list_court_hall = item.court_hall
         hearing.cause_list_stage = item.stage
         hearing.cause_list_checked_at = now
         hearing.cause_list_source = court_key
@@ -125,14 +138,17 @@ def apply_cause_list(
     ]
     if unmatched_items:
         logger.info(
-            "Cause list %s (%s, court hall %s): %d of %d listed matters belong to "
+            "Cause list %s (%s, %d document(s)): %d of %d listed matters belong to "
             "no tracked case. Sample: %s",
             court_key,
             cause_list.list_date.isoformat() if cause_list.list_date else "undated",
-            cause_list.court_hall or "?",
+            len(cause_list.documents),
             len(unmatched_items),
             len(index),
-            ", ".join(f"item {i.item_number} {i.case_token}" for i in unmatched_items[:5]),
+            ", ".join(
+                f"item {i.item_number} {i.case_token} (hall {i.court_hall or '?'})"
+                for i in unmatched_items[:5]
+            ),
         )
 
     logger.info(
@@ -149,7 +165,8 @@ def apply_cause_list(
         "unmatchable": len(unmatchable),
         "unmatched_items": len(unmatched_items),
         "total_items": len(index),
-        "court_hall": cause_list.court_hall,
+        "documents": len(cause_list.documents),
+        "court_halls": sorted({d.court_hall for d in cause_list.documents if d.court_hall}),
         "list_date": cause_list.list_date,
     }
 
@@ -220,11 +237,13 @@ def tracked_hearings_on(target_date: date) -> list[Hearing]:
     )
 
 
-def check_cause_list_for_date(target_date: date, *, html: str | None = None) -> dict:
-    """Fetch (or accept) the list for `target_date` and apply it.
+def check_cause_list_for_date(
+    target_date: date, *, cause_list_day: CauseListDay | None = None
+) -> dict:
+    """Fetch (or accept) every list for `target_date` and apply it.
 
-    `html` is an injection point for tests and for re-running against a
-    saved document; when given, nothing is downloaded.
+    `cause_list_day` is an injection point for tests and for re-running
+    against saved documents; when given, nothing is downloaded.
 
     Returns a result dict; never raises for the ordinary
     "not published yet" case, which is recorded and reported instead.
@@ -235,12 +254,11 @@ def check_cause_list_for_date(target_date: date, *, html: str | None = None) -> 
         return {"date": target_date, "hearings": 0, "status": "no_hearings"}
 
     try:
-        if html is not None:
-            from .telangana_hc import parse_cause_list_html
-
-            cause_list = parse_cause_list_html(html)
-        else:
-            cause_list = fetch_cause_list(target_date)
+        cause_list = (
+            cause_list_day
+            if cause_list_day is not None
+            else fetch_cause_list_day(target_date)
+        )
     except CauseListNotPublishedError as exc:
         count = mark_not_published(hearings)
         logger.info(

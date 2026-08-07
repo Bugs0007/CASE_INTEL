@@ -7,10 +7,14 @@ class CauseListError(Exception):
 
 
 class CauseListNotConfiguredError(CauseListError):
-    """The cause-list source URL isn't set (see
-    TELANGANA_HC_CAUSE_LIST_URL in settings.py).
+    """The court identity is unusable (see TELANGANA_HC_COURT_KEY /
+    TELANGANA_HC_BENCH_CODE in settings.py).
 
-    An operator problem, not a court problem -- the fetch never left the
+    There is no URL to configure -- the endpoint is a fixed POST target in
+    bharat_courts -- so in practice this only fires when the registry key
+    is wrong.
+
+    An operator problem, not a court problem: the fetch never left the
     building, so nothing should be recorded as "not published".
     """
 

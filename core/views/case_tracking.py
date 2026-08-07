@@ -9,6 +9,8 @@ outcome (wrong case number, case not in this court), not a server error.
 
 from __future__ import annotations
 
+import logging
+
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -18,6 +20,7 @@ from core.serializers import CaseSerializer, HearingSerializer
 from core.services.court_data import CaptchaSolveError, CaseNotFoundError, CourtDataError, CourtPortalError, get_provider
 from core.services.court_data.ecourts_provider import parse_complex_code
 from core.services.court_tracking import (
+    InvalidTrackingConfigError,
     MissingTrackingConfigError,
     PreviewExpiredError,
     PreviewThrottledError,
@@ -28,6 +31,8 @@ from core.services.court_tracking import (
     refresh_case_tracking,
     untrack_case,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _error_response(exc: Exception) -> Response:
@@ -303,11 +308,42 @@ class CaseTrackingRefreshView(APIView):
                 {"detail": "This case has no tracking configuration saved.", "code": "missing_config"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        except InvalidTrackingConfigError as exc:
+            return Response(
+                {
+                    "detail": (
+                        "This case's court tracking setup is incomplete or invalid. "
+                        "Remove tracking and set it up again."
+                    ),
+                    "code": "invalid_config",
+                    "debug": str(exc),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         except CourtDataError as exc:
             case.refresh_from_db()
             error_resp = _error_response(exc)
             error_resp.data["case"] = CaseSerializer(case).data
             return error_resp
+        except Exception:  # noqa: BLE001
+            # Anything unmapped (a provider ValueError, a parser bug, a
+            # transport error) used to propagate out of the view. In
+            # production that is a 500 at best; when it happens inside the
+            # portal call it can instead hold the worker until gunicorn's
+            # 120s timeout kills it, which nginx reports as a 502. Either way
+            # the user got no actionable message. Log the traceback and
+            # return a real response.
+            logger.exception("Unexpected error refreshing tracking for case %s", case.id)
+            return Response(
+                {
+                    "detail": (
+                        "Something went wrong refreshing this case from the court "
+                        "portal. The error has been logged -- please try again."
+                    ),
+                    "code": "refresh_failed",
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         case.refresh_from_db()
 
