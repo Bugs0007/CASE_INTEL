@@ -1,6 +1,9 @@
+from .advocate_profile import AdvocateProfile
+from .appearance_fee import AppearanceFee
 from .case import Case
 from .case_tag import CaseTag, CaseTagMap
 from .client_contact import ClientContact
+from .travel_booking import TravelBooking
 from .folder import Folder
 from .document import Document
 from .document_version import DocumentVersion
@@ -22,10 +25,13 @@ from .processing_job import JobAlreadyRunningError, ProcessingJob
 from .advocate_search_preference import AdvocateSearchPreference
 
 __all__ = [
+    "AdvocateProfile",
+    "AppearanceFee",
     "Case",
     "CaseTag",
     "CaseTagMap",
     "ClientContact",
+    "TravelBooking",
     "Folder",
     "Document",
     "DocumentVersion",

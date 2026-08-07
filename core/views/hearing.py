@@ -29,7 +29,14 @@ class HearingListCreateView(OwnerScopedMixin, generics.ListCreateAPIView):
     serializer_class = HearingSerializer
 
     def get_base_queryset(self):
-        qs = Hearing.objects.select_related("case")
+        # appearance_fee is a REVERSE OneToOne -- Django does not fetch it
+        # with the row, so without select_related here HearingSerializer's
+        # embedded fee costs one query per hearing and the calendar scales
+        # with the diary. court_orders is prefetched for the same reason,
+        # so get_order_summary can match in Python.
+        qs = Hearing.objects.select_related("case", "appearance_fee").prefetch_related(
+            "case__court_orders", "travel_bookings"
+        )
 
         # Filter by case
         case_id = self.request.query_params.get("case_id")
@@ -63,4 +70,6 @@ class HearingDetailView(OwnerScopedMixin, generics.RetrieveUpdateDestroyAPIView)
     """
 
     serializer_class = HearingSerializer
-    queryset = Hearing.objects.select_related("case")
+    queryset = Hearing.objects.select_related("case", "appearance_fee").prefetch_related(
+        "case__court_orders", "travel_bookings"
+    )

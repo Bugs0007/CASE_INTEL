@@ -126,6 +126,19 @@ def run_advocate_import(job: ProcessingJob, progress_callback=None) -> None:
             if progress_callback:
                 progress_callback(i + 1, total)
             continue
+        except Exception as exc:  # noqa: BLE001
+            # Per-item isolation has to cover EVERY exception, not just
+            # CourtDataError. This module documents "one bad fetch is recorded
+            # under 'failed' and the batch continues", but anything unmapped
+            # (a ValueError out of the provider's court_type dispatch, a
+            # transport error, a parser bug) used to escape and kill the whole
+            # job -- losing every case after the bad one and leaving already-
+            # created rows behind with fetch_status="never_fetched".
+            logger.exception("Advocate import: unexpected error for CNR %s", cnr)
+            failed.append({"cnr": cnr, "error": f"{type(exc).__name__}: {exc}"})
+            if progress_callback:
+                progress_callback(i + 1, total)
+            continue
 
         # Best-effort, one-shot: only runs right here at import time, never
         # on later periodic refreshes, so it can never silently overwrite a

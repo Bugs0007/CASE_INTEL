@@ -77,6 +77,14 @@ opencv-python-headless==5.0.0.93
 # DOCUMENT PROCESSING
 # ============================================================================
 PyPDF2==3.0.1
+# Cause-list PDF parsing (core/services/cause_list/telangana_hc.py) needs
+# per-character COORDINATES, not just text: the TS High Court lists are
+# tables whose S.No. column must be paired with the case-number column by
+# vertical position. PyPDF2 exposes no layout geometry, so pdfminer.six is
+# declared explicitly here -- it was already installed as an ocrmypdf
+# transitive dependency, and relying on that by accident would break the
+# cause list the day ocrmypdf drops it.
+pdfminer.six==20260107
 python-docx==1.2.0
 lxml==6.0.2
 spacy==3.8.14
@@ -85,6 +93,15 @@ spacy==3.8.14
 # installed as system packages (see deploy/provision.sh / PROVISIONING.md).
 # pikepdf comes with it and is also used directly for page-batch slicing.
 ocrmypdf==17.8.1
+
+# Invoice PDF generation (core/services/invoice_service.py). fpdf2, NOT
+# WeasyPrint: WeasyPrint needs GTK/Pango/Cairo as SYSTEM packages, which
+# would mean another apt line in deploy/provision.sh and a GTK install on
+# every Windows dev box. fpdf2 is pure Python and renders identically on
+# Windows and the Linux EC2 host from the wheel alone. Note its core
+# fonts are Latin-1 only -- invoice_service._pdf_safe() substitutes
+# out-of-range characters rather than letting them raise.
+fpdf2==2.8.7
 
 # ============================================================================
 # FILE STORAGE (AWS S3 via django-storages -- used when USE_S3=true)

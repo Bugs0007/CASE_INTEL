@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CollapseToggle } from "@/components/ui/collapse-toggle";
+import { CauseListBadge } from "@/components/hearings/cause-list-badge";
 import { Collapsible } from "@/components/ui/collapsible";
 import { formatDateTime, staggerDelay } from "@/lib/utils";
 import { groupOrdersByDate, hearingDateKey } from "@/hooks/use-court-orders";
@@ -17,8 +18,15 @@ import {
   Trash2,
   Loader2,
   FileText,
+  Plane,
 } from "lucide-react";
-import type { CourtOrder, Hearing } from "@/types";
+import type {
+  CourtOrder,
+  FeeStatus,
+  Hearing,
+  NestedAppearanceFee,
+  NestedTravelBooking,
+} from "@/types";
 
 const DEFAULT_VISIBLE_COUNT = 5;
 
@@ -272,9 +280,12 @@ function HearingItem({
             )}
           </div>
 
-          {/* Status and Outcome */}
-          <div className="mt-2 flex items-center gap-2">
+          {/* Status, fee badge and travel state */}
+          <div className="mt-2 flex items-center gap-2 flex-wrap">
             <StatusBadge status={hearing.status} />
+            <CauseListBadge hearing={hearing} />
+            <FeeBadge fee={hearing.appearance_fee} />
+            <TravelBadge bookings={hearing.travel_bookings} />
           </div>
 
           {hearing.outcome && (
@@ -328,6 +339,79 @@ function HearingItem({
         )}
       </div>
     </div>
+  );
+}
+
+const FEE_BADGE_STYLES: Record<FeeStatus, string> = {
+  pending: "bg-[#fdf3e3] text-[#8a5a0b]",
+  invoiced: "bg-[#eef1fb] text-[#33449b]",
+  paid: "bg-[#e6f6ed] text-[#1d6b3f]",
+};
+
+/** The fee state for this hearing, at a glance.
+ *
+ * Renders nothing when no fee has been recorded -- an absent fee is not
+ * the same as a zero one, and a badge on every hearing whether or not
+ * the advocate uses invoicing would just be noise. */
+function FeeBadge({ fee }: { fee: NestedAppearanceFee | null }) {
+  if (!fee) return null;
+
+  // Amounts arrive as decimal strings so money never round-trips
+  // through a float; format for display only.
+  const amount = Number(fee.amount);
+  const formatted = Number.isFinite(amount)
+    ? amount.toLocaleString("en-IN", {
+        style: "currency",
+        currency: "INR",
+        maximumFractionDigits: 0,
+      })
+    : fee.amount;
+
+  const title =
+    fee.status === "paid"
+      ? `Paid${fee.invoice_number ? ` (invoice ${fee.invoice_number})` : ""}`
+      : fee.status === "invoiced"
+        ? `Invoiced as ${fee.invoice_number}${
+            // "logged" means the server had no SMTP configured -- say so
+            // rather than letting it read as delivered.
+            fee.send_status === "sent"
+              ? ", emailed to the billing contact"
+              : fee.send_status === "logged"
+                ? ", logged only (email not configured on the server)"
+                : ", not yet sent"
+          }`
+        : "Fee recorded, not yet invoiced";
+
+  return (
+    <span
+      title={title}
+      className={`text-[11px] font-semibold h-5 px-2 inline-flex items-center flex-shrink-0 whitespace-nowrap rounded-full ${FEE_BADGE_STYLES[fee.status]}`}
+    >
+      {formatted} · {fee.status_display}
+    </span>
+  );
+}
+
+/** Travel/hotel bookings for this hearing. Collapses to one badge --
+ * the detail belongs on the booking list, not the hearing card. */
+function TravelBadge({ bookings }: { bookings: NestedTravelBooking[] }) {
+  if (!bookings || bookings.length === 0) return null;
+
+  const booked = bookings.filter((b) => b.status === "booked").length;
+  const allBooked = booked === bookings.length;
+
+  return (
+    <span
+      title={bookings
+        .map((b) => `${b.booking_type_display}: ${b.status_display}`)
+        .join(" · ")}
+      className={`text-[11px] font-semibold h-5 px-2 inline-flex items-center gap-1 flex-shrink-0 whitespace-nowrap rounded-full ${
+        allBooked ? "bg-[#e6f6ed] text-[#1d6b3f]" : "bg-[#fdf3e3] text-[#8a5a0b]"
+      }`}
+    >
+      <Plane className="h-3 w-3" />
+      {allBooked ? `Travel booked${bookings.length > 1 ? ` (${booked})` : ""}` : `Travel ${booked}/${bookings.length}`}
+    </span>
   );
 }
 
