@@ -162,6 +162,10 @@ export default function AdvocateSearchPage() {
   const searchRunning =
     searchJobId !== null && (!sj || sj.status === "queued" || sj.status === "running");
   const results: AdvocateSearchResult[] = sj?.results ?? [];
+  // results is capped server-side; results_total is the real match count.
+  // Fall back to results.length so an older backend still reads correctly.
+  const resultsTotal = sj?.results_total ?? results.length;
+  const resultsTruncated = sj?.results_truncated ?? false;
   const districtEntries = Object.entries(sj?.districts_status ?? {});
   const failedDistrictCount = districtEntries.filter(([, d]) => d.status !== "success").length;
   const canRetryFailed = sj?.status !== undefined && !searchRunning && failedDistrictCount > 0;
@@ -307,10 +311,10 @@ export default function AdvocateSearchPage() {
           <CardHeader>
             <CardTitle>
               {searchRunning
-                ? `Searching… (${sj.progress_current}/${sj.progress_total || "?"} districts, ${results.length} found so far)`
+                ? `Searching… (${sj.progress_current}/${sj.progress_total || "?"} districts, ${resultsTotal} found so far)`
                 : sj.status === "failed"
                   ? "Search failed"
-                  : `${results.length} Case(s) Found`}
+                  : `${resultsTotal} Case(s) Found`}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -404,6 +408,15 @@ export default function AdvocateSearchPage() {
               <p className="text-sm text-gray-500">
                 No cases found for this advocate/bar code {distCode ? "in this district" : "anywhere in the selected state"}.
               </p>
+            )}
+
+            {resultsTruncated && (
+              <div className="mb-4 rounded-lg border border-[#e6d5a8] bg-[#fdf8ec] px-3.5 py-3 text-sm text-[#7a5c12]">
+                Showing the first {results.length.toLocaleString()} of{" "}
+                {resultsTotal.toLocaleString()} matches. Narrow the search — pick a
+                single district, or use a bar code instead of a name — to see the
+                rest.
+              </div>
             )}
 
             {results.length > 0 && (

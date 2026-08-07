@@ -69,7 +69,13 @@ export interface AdvocateSearchJobResult {
   progress_current: number;
   progress_total: number;
   error: string;
+  /** Capped at MAX_RESULTS_IN_RESPONSE server-side -- may be a prefix of
+   * results_total. A state-wide search on a common name matches tens of
+   * thousands of cases, and returning them all took the API down. */
   results: AdvocateSearchResult[];
+  /** The real match count, which may exceed results.length. */
+  results_total: number;
+  results_truncated: boolean;
   failures: AdvocateSearchFailure[];
   districts_total: number | null;
   districts_status: Record<string, AdvocateSearchDistrictStatus>;

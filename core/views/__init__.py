@@ -6,6 +6,7 @@ existing imports like ``from core.views import ChatView``
 continue to work.
 """
 
+from .advocate_profile import AdvocateProfileView
 from .advocate_search import (
     AdvocateSearchImportStatusView,
     AdvocateSearchImportView,
@@ -13,6 +14,14 @@ from .advocate_search import (
     AdvocateSearchRetryFailedView,
     AdvocateSearchStatusView,
     AdvocateSearchView,
+)
+from .appearance_fee import (
+    AppearanceFeeDetailView,
+    AppearanceFeeInvoiceFileView,
+    AppearanceFeeInvoiceView,
+    AppearanceFeeListCreateView,
+    AppearanceFeeMarkPaidView,
+    AppearanceFeeSendView,
 )
 from .auth import LoginView, LogoutView, RegisterView
 from .case import CaseDetailView, CaseListView
@@ -50,8 +59,25 @@ from .gmail import (
     GmailSyncView,
 )
 from .hearing import HearingDetailView, HearingListCreateView
+from .travel_booking import (
+    TravelBookingDetailView,
+    TravelBookingFileView,
+    TravelBookingListCreateView,
+    TravelBookingUploadView,
+)
 
 __all__ = [
+    "AdvocateProfileView",
+    "AppearanceFeeDetailView",
+    "AppearanceFeeInvoiceFileView",
+    "AppearanceFeeInvoiceView",
+    "AppearanceFeeListCreateView",
+    "AppearanceFeeMarkPaidView",
+    "AppearanceFeeSendView",
+    "TravelBookingDetailView",
+    "TravelBookingFileView",
+    "TravelBookingListCreateView",
+    "TravelBookingUploadView",
     "AdvocateSearchImportStatusView",
     "AdvocateSearchImportView",
     "AdvocateSearchPreferenceView",

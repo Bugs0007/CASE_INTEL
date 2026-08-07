@@ -9,6 +9,8 @@ import { useDeleteHearing, useHearings } from "@/hooks/use-hearings";
 import { useCaseOrders, useViewOrder } from "@/hooks/use-court-orders";
 import { CaseDetailHeader } from "@/components/cases/case-detail-header";
 import { CaseOverview } from "@/components/cases/case-overview";
+import { CaseFeeSummaryCard } from "@/components/cases/case-fee-summary";
+import { OrderOverviewCard } from "@/components/cases/order-overview";
 import { CaseDetailSkeleton } from "@/components/cases/case-detail-skeleton";
 import { CourtTrackingCard } from "@/components/cases/court-tracking-card";
 import { HearingsList } from "@/components/hearings/hearings-list";
@@ -169,8 +171,21 @@ export default function CaseDetailPage() {
             this is the sole column and always full-width. */}
         <div className="flex-1 overflow-y-auto min-w-0 lg:min-w-[400px]">
           <div className="@container max-w-[900px] mx-auto px-4 sm:px-7 pt-6 pb-[var(--mobile-nav-height)] lg:pb-[60px] space-y-5">
+            {/* Order Overview -- the AI summary of the most recent
+                order, deliberately above Case Overview: it is the
+                "what just happened" the advocate opened the page for. */}
+            <OrderOverviewCard
+              orders={courtOrders}
+              onViewOrder={handleViewOrder}
+              viewingOrderId={viewOrder.isPending ? viewOrder.variables : undefined}
+            />
+
             {/* Case Overview */}
             <CaseOverview case={caseItem} />
+
+            {/* Appearance fee position -- renders nothing until the case
+                has at least one fee recorded. */}
+            <CaseFeeSummaryCard summary={caseItem.fee_summary} />
 
             {/* Court Tracking */}
             <CourtTrackingCard caseItem={caseItem} hearings={hearings} />

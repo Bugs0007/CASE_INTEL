@@ -1,3 +1,5 @@
+import type { CaseFeeSummary } from "./billing";
+
 export type CaseStatus = "open" | "closed" | "pending" | "archived";
 export type CasePriority = "low" | "medium" | "high" | "critical";
 export type CaseType =
@@ -61,6 +63,7 @@ export interface Case {
   last_fetched_at: string | null;
   needs_attention: boolean;
   next_hearing_date: string | null;
+  fee_summary: CaseFeeSummary;
 }
 
 /** PATCH /api/cases/<id>/ -- a Case is never created directly (see

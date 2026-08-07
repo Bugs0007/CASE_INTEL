@@ -6,7 +6,9 @@ from django.contrib import admin
 
 from core.models import (
     ActivityLog,
+    AdvocateProfile,
     AdvocateSearchPreference,
+    AppearanceFee,
     Case,
     CaseTag,
     CaseTagMap,
@@ -29,6 +31,7 @@ from core.models import (
     Message,
     ProcessingJob,
     Task,
+    TravelBooking,
 )
 
 
@@ -221,3 +224,46 @@ class GmailCredentialAdmin(admin.ModelAdmin):
     list_filter = ("is_active",)
     search_fields = ("email_address",)
     readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(AdvocateProfile)
+class AdvocateProfileAdmin(admin.ModelAdmin):
+    list_display = (
+        "owner", "letterhead_name", "bar_registration_number",
+        "default_fee_amount", "invoice_prefix", "last_invoice_sequence",
+    )
+    search_fields = ("letterhead_name", "bar_registration_number")
+    # last_invoice_sequence is the live invoice counter -- editable here
+    # it would let an operator rewind it and mint a duplicate number for
+    # an invoice already sent (same reason it's read-only in the API).
+    readonly_fields = ("last_invoice_sequence", "created_at", "updated_at")
+
+
+@admin.register(AppearanceFee)
+class AppearanceFeeAdmin(admin.ModelAdmin):
+    list_display = (
+        "invoice_number", "hearing", "amount", "status", "send_status",
+        "invoiced_at", "paid_at",
+    )
+    list_filter = ("status", "send_status")
+    search_fields = ("invoice_number",)
+    # The whole invoicing lifecycle is owned by
+    # core/services/invoice_service.py; editing these by hand in admin
+    # would bypass the transition rules and the numbering lock.
+    readonly_fields = (
+        "invoice_number", "invoice_sequence", "invoice_pdf_path",
+        "invoiced_at", "paid_at", "sent_at", "sent_to_email", "send_status",
+        "created_at", "updated_at",
+    )
+    date_hierarchy = "created_at"
+
+
+@admin.register(TravelBooking)
+class TravelBookingAdmin(admin.ModelAdmin):
+    list_display = ("hearing", "booking_type", "status", "filename", "created_at")
+    list_filter = ("booking_type", "status")
+    search_fields = ("filename",)
+    readonly_fields = (
+        "filename", "file_path", "file_type", "file_size", "created_at", "updated_at",
+    )
+    date_hierarchy = "created_at"

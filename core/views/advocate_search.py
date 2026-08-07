@@ -24,6 +24,23 @@ from core.models import AdvocateSearchPreference, JobAlreadyRunningError, Proces
 _BAR_CODE_RE = re.compile(r"^[A-Za-z]{2,3}/\d+/\d{4}$")
 MAX_IMPORT_BATCH = 100
 
+VALID_COURT_TYPES = ("district", "high_court")
+
+# Hard cap on how many search results a single status response may carry.
+#
+# A state-wide search on a common advocate name legitimately matches tens of
+# thousands of cases -- a real local job returned 130,032, which serialises to
+# ~38.7 MB. The frontend polls this endpoint every 1.5s while a job runs, so
+# an uncapped response meant repeatedly building a 38.7 MB string in a
+# gunicorn worker on a 1 GB t3.micro with 2 workers: enough to exhaust memory
+# and get the worker killed, which nginx surfaces as a 502 for whatever
+# request happened to be in flight -- including an unrelated case-tracking
+# refresh. It also froze the browser, which .map()s every row into the DOM.
+#
+# 500 is far more than anyone picks from by hand; past that the answer is to
+# narrow the search, which results_total/results_truncated tell the user to do.
+MAX_RESULTS_IN_RESPONSE = 500
+
 
 def _parse_name_or_bar_code(raw: str) -> tuple[str, str, str | None]:
     """Return (advocate_name, bar_code, error). Exactly one of the first
@@ -144,13 +161,21 @@ class AdvocateSearchStatusView(APIView):
             return Response({"detail": "Search job not found."}, status=status.HTTP_404_NOT_FOUND)
 
         payload = job.payload or {}
+        all_results = payload.get("results", [])
+        results = all_results[:MAX_RESULTS_IN_RESPONSE]
+
         return Response(
             {
                 "status": job.status,
                 "progress_current": job.progress_current,
                 "progress_total": job.progress_total,
                 "error": job.error,
-                "results": payload.get("results", []),
+                "results": results,
+                # results_total is the real match count; results may be a
+                # truncated prefix of it. See MAX_RESULTS_IN_RESPONSE for why
+                # returning all of them took the API down.
+                "results_total": len(all_results),
+                "results_truncated": len(all_results) > len(results),
                 "failures": payload.get("failures", []),
                 "districts_total": payload.get("districts_total"),
                 "districts_status": payload.get("districts_status", {}),
@@ -255,12 +280,35 @@ class AdvocateSearchImportView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Validate court_type here, the way AdvocateSearchView already does.
+        # Without this, an arbitrary value ("banana", "High Court", "") was
+        # written straight through to Case.court_type and
+        # tracking_config["court_type"] -- Django does not enforce `choices`
+        # on save() -- producing cases that could never refresh: every later
+        # fetch raised ValueError("Unknown court_type") out of the provider.
         court_type = request.data.get("court_type") or "district"
-        normalized = [
-            {**item, "court_type": item.get("court_type") or court_type}
-            for item in selected
-            if isinstance(item, dict)
-        ]
+        if court_type not in VALID_COURT_TYPES:
+            return Response(
+                {"detail": f"court_type must be one of: {', '.join(VALID_COURT_TYPES)}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        normalized = []
+        for item in selected:
+            if not isinstance(item, dict):
+                continue
+            item_court_type = item.get("court_type") or court_type
+            if item_court_type not in VALID_COURT_TYPES:
+                return Response(
+                    {
+                        "detail": (
+                            f"Invalid court_type {item_court_type!r} on a selected "
+                            f"case. Must be one of: {', '.join(VALID_COURT_TYPES)}."
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            normalized.append({**item, "court_type": item_court_type})
 
         advocate_name = ""
         bar_code = ""

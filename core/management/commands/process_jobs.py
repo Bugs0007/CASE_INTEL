@@ -180,6 +180,11 @@ class Command(BaseCommand):
                 run_advocate_search(job, progress_callback=report_progress)
             else:
                 processor.process_document(job.document_id, progress_callback=report_progress)
+                # Order Overview runs here and ONLY here: the text (and
+                # OCR) this needs only exists once the line above has
+                # finished, and generating it at ingest is what keeps it
+                # off the page-view path entirely.
+                self._summarize_order_if_any(job.document_id)
         except Document.DoesNotExist:
             self._finish(job, "failed", error=f"Document {job.document_id} no longer exists.")
         except Case.DoesNotExist:
@@ -194,6 +199,39 @@ class Command(BaseCommand):
         finally:
             stop_heartbeat.set()
             heartbeat.join(timeout=5)
+
+    def _summarize_order_if_any(self, document_id: int) -> None:
+        """Generate the Order Overview when the processed document is a
+        court order.
+
+        Never raises: a summarisation failure must not fail the document
+        job that produced a perfectly good, searchable document. The
+        order row records its own FAILED status and can be retried on its
+        own (summarize_court_order(force=True)).
+        """
+        from core.models import CourtOrder
+
+        try:
+            order = (
+                CourtOrder.objects.select_related("case", "document")
+                .filter(document_id=document_id)
+                .first()
+            )
+            if order is None:
+                return
+
+            from core.services.order_summary import summarize_court_order
+
+            summarize_court_order(order)
+            self.stdout.write(
+                f"Order {order.id} overview: {order.summary_status} "
+                f"(route={order.summary_route}, llm_calls={order.summary_llm_calls})"
+            )
+        except Exception:  # noqa: BLE001 -- must never fail the document job
+            logger.exception(
+                "Order Overview failed for document %d (document itself is fine).",
+                document_id,
+            )
 
     def _run_order_sync(self, job: ProcessingJob, report_progress) -> None:
         """Fetch new court-order PDFs for the job's case. Each downloaded
