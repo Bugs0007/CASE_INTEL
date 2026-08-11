@@ -9,11 +9,13 @@ REM   1. PostgreSQL running with case_intel database
 REM   2. Python virtual environment activated
 REM   3. Ollama installed (if USE_OLLAMA=true)
 REM
-REM NOTE: Redis and Celery are NOT started here. Verified 2026-07-16 that
-REM Celery has zero real task dispatch anywhere in this codebase (no
-REM .delay(/.apply_async(/@shared_task calls), and the default cache backend
-REM is now LocMemCache (see case_intel_project/settings.py) -- neither is
-REM needed to run this app. See REDIS_SETUP.md for the same finding.
+REM NOTE: Redis and Celery are NOT started here -- they are not part of this
+REM project. Zero real task dispatch anywhere in this codebase (no
+REM .delay(/.apply_async(/@shared_task calls), and the cache backend is
+REM LocMemCache (see case_intel_project/settings.py) -- neither is needed to
+REM run this app. This script also does not start the process_jobs worker --
+REM run `python manage.py process_jobs` in a separate terminal, or uploads/
+REM order summaries/advocate search stay queued forever. See CLAUDE.md.
 REM ============================================================================
 
 echo.

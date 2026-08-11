@@ -23,7 +23,6 @@ from core.models import CourtOrder
 
 from .prompt import build_messages, build_retry_messages
 from .routing import (
-    ROUTE_LLM,
     ROUTE_ROUTINE,
     ROUTE_SHORT,
     ROUTE_UNREADABLE,

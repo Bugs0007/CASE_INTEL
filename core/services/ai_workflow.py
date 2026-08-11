@@ -17,7 +17,7 @@ from typing import Optional
 from django.db import transaction
 from django.utils import timezone
 
-from core.models import Case, Citation, Conversation, DocumentChunk, Message
+from core.models import Case, Citation, Conversation, Message
 from core.services.conversation_utils import generate_conversation_title
 from core.services.court_tracking import build_ai_context
 from core.services.graph.builder import build_legal_ai_graph

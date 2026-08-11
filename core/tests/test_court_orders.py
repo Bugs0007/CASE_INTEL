@@ -9,7 +9,6 @@ Covers the three things most likely to break quietly:
     come back in portal sequence ("2" before "10", not string order).
 """
 
-import io
 from datetime import date
 
 import pytest

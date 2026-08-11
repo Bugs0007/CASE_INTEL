@@ -13,7 +13,7 @@ from rest_framework.views import APIView
 
 from django.db.models import Prefetch
 
-from core.models import Case, Document, ProcessingJob
+from core.models import Document, ProcessingJob
 from core.serializers import DocumentSerializer, DocumentUploadSerializer
 from core.views.mixins import OwnerScopedMixin
 

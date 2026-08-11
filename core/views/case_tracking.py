@@ -18,7 +18,7 @@ from rest_framework.views import APIView
 from core.models import Case, Hearing
 from core.serializers import CaseSerializer, HearingSerializer
 from core.services.court_data import CaptchaSolveError, CaseNotFoundError, CourtDataError, CourtPortalError, get_provider
-from core.services.court_data.ecourts_provider import parse_complex_code
+from core.services.court_data.ecourts_parsing import parse_complex_code
 from core.services.court_tracking import (
     InvalidTrackingConfigError,
     MissingTrackingConfigError,
