@@ -27,15 +27,22 @@ restarting the service with a half-applied deploy):
    venv was fresh or already had it.
 4. `python manage.py migrate --noinput`
 5. `python manage.py collectstatic --noinput`
-6. `sudo systemctl restart case-intel` — the systemd unit (gunicorn behind Nginx)
-   that was created manually on the server and is **not** in this repo.
+6. `sudo systemctl restart case-intel` — the gunicorn-behind-Nginx systemd unit.
+7. `sudo systemctl restart case-intel-worker` — the `manage.py process_jobs`
+   background worker (see `deploy/case-intel-worker.service`). It runs the same
+   codebase, so it needs restarting too or it keeps processing document
+   uploads/order summaries/advocate search with the old code until the next
+   reboot.
+
+Both systemd units, the Nginx site, and the narrow sudoers rule permitting
+passwordless restarts of exactly these two units are created by
+`deploy/provision.sh` (see `PROVISIONING.md`) — not hand-configured on the
+server, and not "missing from this repo."
 
 **Known gaps to verify before trusting this workflow on a real deploy:**
-- The `PROJECT_DIR` and `VENV_DIR` values at the top of `deploy.yml`'s script are
-  best guesses (`~/CASE_INTEL`, `.venv`) — confirm they match the actual server
-  layout.
-- `sudo systemctl restart case-intel` requires the SSH user to have passwordless
-  sudo for that specific command — unverified.
+- The `PROJECT_DIR` and `VENV_DIR` values at the top of `deploy.yml`'s script
+  (`~/CASE_INTEL`, `.venv`) must match `provision.env`'s `PROJECT_DIR`/`DEPLOY_USER`
+  from whatever ran `provision.sh` on that box.
 - `git reset --hard` will discard any uncommitted changes that exist directly on
   the server — if anyone has ever hotfixed EC2 by hand outside of git, that work
   is destroyed on the next deploy.
