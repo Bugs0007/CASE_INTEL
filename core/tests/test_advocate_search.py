@@ -28,7 +28,8 @@ from core.services.advocate_import import run_advocate_import
 from core.services.advocate_search import run_advocate_search
 from core.services.court_data import CaptchaSolveError, CourtPortalError
 from bharat_courts.districtcourts.parser import ServerError as DistrictServerError
-from core.services.court_data.ecourts_provider import _TokenSeedingDistrictClient, split_bar_code
+from core.services.court_data.ecourts_parsing import split_bar_code
+from core.services.court_data.ecourts_provider import _TokenSeedingDistrictClient
 from core.services.court_data.models import CourtCaseData
 
 
