@@ -61,7 +61,7 @@ import time
 
 from core.models import ActivityLog, ProcessingJob
 from core.services.court_data import CourtDataError, get_provider
-from core.services.court_data.ecourts_provider import parse_complex_code
+from core.services.court_data.ecourts_parsing import parse_complex_code
 
 logger = logging.getLogger(__name__)
 
