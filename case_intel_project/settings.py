@@ -10,7 +10,6 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
-import os
 from pathlib import Path
 
 from decouple import Csv, config
@@ -48,8 +47,6 @@ INSTALLED_APPS = [
     "rest_framework.authtoken",
     "corsheaders",
     "django_extensions",
-    "django_celery_beat",
-    "django_celery_results",
     "storages",
     "core",
 ]
@@ -371,27 +368,16 @@ GMAIL_REDIRECT_URI = config(
 )
 
 # ============================================================================
-# Celery Configuration -- DISABLED (dead infrastructure, not just unused)
-# ============================================================================
-# Verified 2026-07-16: zero .delay(/.apply_async(/@shared_task calls or
-# tasks.py files anywhere in core/, no CELERY_BEAT_SCHEDULE. case_intel_project/
-# celery.py defines the app + a debug_task and nothing else ever dispatches
-# through it. ARCHITECTURE.md independently confirms document processing is
-# synchronous. django_celery_beat/django_celery_results stay in INSTALLED_APPS
-# (harmless -- just DB-backed models/admin, no live connection) but the
-# broker/backend settings that would point Celery at Redis are intentionally
-# not defined here. If Celery is ever actually wired up to a task, restore
-# CELERY_BROKER_URL / CELERY_RESULT_BACKEND (and provision a Redis instance --
-# see PROVISIONING.md) at that point, not before.
-
-# ============================================================================
 # Cache Configuration
 # ============================================================================
 CACHES = {
     'default': {
-        # LocMemCache -- Redis was never needed for anything except this
-        # cache (Celery is unused, see above). Only two real consumers, both
-        # via the plain get/set/incr cache API, nothing Redis-specific:
+        # LocMemCache -- Celery/Redis were never wired to anything real
+        # (zero .delay(/.apply_async(/@shared_task calls anywhere in core/,
+        # confirmed and then removed -- document processing runs through the
+        # process_jobs worker instead, see CLAUDE.md) and removed
+        # entirely. Only two real cache consumers, both via the plain
+        # get/set/incr cache API, nothing Redis-specific:
         #   - core/services/court_data/ecourts_provider.py: court hierarchy
         #     lookups (states/districts/complexes/benches), "changes ~never"
         #     per that file's own comment -- fine to be per-process.
