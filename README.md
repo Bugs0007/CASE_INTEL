@@ -1,473 +1,146 @@
-<p align="center">
-  <img src="https://img.shields.io/badge/Django-6.0.3-092E20?style=for-the-badge&logo=django&logoColor=white" alt="Django"/>
-  <img src="https://img.shields.io/badge/Next.js-15-000000?style=for-the-badge&logo=nextdotjs&logoColor=white" alt="Next.js"/>
-  <img src="https://img.shields.io/badge/PostgreSQL-pgvector-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL"/>
-  <img src="https://img.shields.io/badge/LangGraph-AI-FF6B6B?style=for-the-badge&logo=langchain&logoColor=white" alt="LangGraph"/>
-  <img src="https://img.shields.io/badge/Ollama-Local_AI-000000?style=for-the-badge&logo=ollama&logoColor=white" alt="Ollama"/>
-</p>
+# Case Intel
 
-<p align="center">
-  <a href="https://github.com/Bugs0007/CASE_INTEL/stargazers"><img src="https://img.shields.io/github/stars/Bugs0007/CASE_INTEL?style=social" alt="Stars"/></a>
-  <a href="https://github.com/Bugs0007/CASE_INTEL/network/members"><img src="https://img.shields.io/github/forks/Bugs0007/CASE_INTEL?style=social" alt="Forks"/></a>
-  <a href="https://github.com/Bugs0007/CASE_INTEL"><img src="https://img.shields.io/github/last-commit/Bugs0007/CASE_INTEL" alt="Last Commit"/></a>
-</p>
+Legal case management platform for a solo/small-firm advocate practicing in Indian courts.
 
-<h1 align="center">Case Intel</h1>
+## What it does
 
-<p align="center">
-  <strong>AI-Powered Legal Case Management Platform</strong><br>
-  <em>Semantic document search, intelligent Q&A, and case organization for legal professionals</em>
-</p>
+- **Case tracking against live eCourts data** — enter a CNR or a case number/court/year, and Case Intel fetches case status, hearing history, and orders directly from `services.ecourts.gov.in` (District Courts) or `hcservices.ecourts.gov.in` (High Courts), then keeps them refreshed.
+- **Advocate search** — search an advocate by name or bar code across every district/court complex in a state at once, and bulk-import the matching cases.
+- **Document management with AI order summaries** — upload case documents; court orders are automatically summarized (what happened, directions for each party, next hearing date) by an LLM, with cheap non-LLM paths for unreadable/routine/short orders.
+- **"Case Bot"** — a general-purpose AI chat over a case's uploaded documents (retrieval-augmented, with citations), separate from the order-summary feature above.
+- **Cause lists** — Telangana High Court daily cause-list PDFs, fetched and parsed automatically.
+- **Appearance-fee invoicing** — record a fee, generate a PDF invoice, email it to the client's billing contact, track paid/unpaid.
+- **Travel booking, hearing scheduling, Gmail sync** for case-related correspondence.
 
-<p align="center">
-  <a href="#-features">Features</a> •
-  <a href="#-quick-start">Quick Start</a> •
-  <a href="#-architecture">Architecture</a> •
-  <a href="#-api-reference">API</a> •
-  <a href="#-contributing">Contributing</a>
-</p>
+Everything is scoped per advocate (multi-tenant, token-authenticated) — see [CLAUDE.md](CLAUDE.md) for the full architecture reference.
 
----
+## Stack
 
-## Why Case Intel?
+| Layer          | Technology                                                    |
+| -------------- | --------------------------------------------------------------|
+| Backend        | Django 5.1.11 + Django REST Framework                         |
+| Database       | PostgreSQL + `pgvector`                                       |
+| AI (chat)      | LangGraph — hybrid pgvector/keyword retrieval + LLM generation|
+| AI (summaries) | Direct LLM call, no retrieval — see CLAUDE.md                 |
+| LLM providers  | Groq, Ollama, or OpenAI (switchable independently of embeddings) |
+| Embeddings     | Gemini, Ollama, or OpenAI (switchable independently of the LLM)  |
+| Court data     | `bharat-courts` against the live eCourts portals               |
+| Frontend       | Next.js 15, React 19, TypeScript, Tailwind CSS                 |
+| Background jobs| Postgres-backed queue (`ProcessingJob` + `manage.py process_jobs`) — no Celery/Redis |
 
-Legal professionals spend **60% of their time** searching through documents. Case Intel changes that.
+## Prerequisites
 
-- **Ask questions in plain English** — Get instant answers with source citations
-- **Semantic search** — Find relevant content even if keywords don't match
-- **100% private** — Run entirely locally with Ollama, or use OpenAI for cloud power
-- **Modern stack** — Django + Next.js + LangGraph for reliability and extensibility
+- Python 3.11+ (the pinned `ddddocr`/`opencv-python-headless` versions target 3.13; anything 3.11+ works)
+- Node.js 18+
+- PostgreSQL 15+ with the [pgvector](https://github.com/pgvector/pgvector) extension
+- Tesseract OCR + Ghostscript (needed by `ocrmypdf` for scanned documents — see Gotchas in CLAUDE.md for platform-specific install notes)
+- At least one LLM provider reachable: [Ollama](https://ollama.ai) running locally, or a Groq/OpenAI API key
+- At least one embedding provider reachable: Ollama, or a Gemini/OpenAI API key
 
----
+## Setup
 
-## Features
-
-### Document Intelligence
-
-- **Upload & Process** — PDF, DOCX, TXT support with automatic text extraction
-- **Smart Chunking** — Semantic segmentation preserves context
-- **Vector Embeddings** — 768-dim (Ollama) or 1536-dim (OpenAI) embeddings via pgvector
-
-### AI-Powered Q&A
-
-- **Natural Language Queries** — "What were the key arguments in the motion?"
-- **Source Citations** — Every answer links back to source documents
-- **Confidence Scores** — Know how reliable each answer is
-- **Conversation History** — Continue discussions across sessions
-
-### Case Management
-
-- **Organize Cases** — Track case number, parties, status, priority
-- **Hearing Scheduler** — Manage upcoming and past court dates
-- **Document Folders** — Hierarchical organization
-- **Gmail Integration** — Sync case-related emails (OAuth)
-
-### Flexible AI Backend
-
-```
-┌─────────────────────────────────────────────────────┐
-│          Single ENV variable switches AI            │
-│                                                     │
-│   USE_OLLAMA=true          USE_OLLAMA=false        │
-│   ┌─────────────────┐      ┌─────────────────┐     │
-│   │  Ollama Local   │      │  OpenAI Cloud   │     │
-│   │  llama3.1:8b    │      │  gpt-4o         │     │
-│   │  nomic-embed    │      │  text-embed-3   │     │
-│   │  Zero API cost  │      │  Superior perf  │     │
-│   │  Full privacy   │      │  Easy setup     │     │
-│   └─────────────────┘      └─────────────────┘     │
-└─────────────────────────────────────────────────────┘
-```
-
----
-
-## Quick Start
-
-### Prerequisites
-
-- Python 3.12+
-- Node.js 18+ (for frontend)
-- PostgreSQL 15+ with [pgvector](https://github.com/pgvector/pgvector) extension
-- [Ollama](https://ollama.ai) (recommended) OR OpenAI API key
-
-### 1. Clone & Setup Backend
+### 1. Backend
 
 ```bash
-git clone https://github.com/Bugs0007/CASE_INTEL.git
+git clone <repo-url>
 cd CASE_INTEL
 
-# Create virtual environment
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
-# Install dependencies
 pip install -r requirements.txt
+python -m spacy download en_core_web_sm   # required — see Gotchas in CLAUDE.md
 
-# Configure environment
 cp .env.example .env
-# Edit .env with your database credentials
+# edit .env — see Environment variables below
 ```
 
-### 2. Setup Database
+### 2. Database
 
 ```bash
-# Create PostgreSQL database with pgvector
 psql -U postgres -c "CREATE DATABASE case_intel;"
 psql -U postgres -d case_intel -c "CREATE EXTENSION vector;"
 
-# Run migrations
 python manage.py migrate
+python manage.py createsuperuser
 ```
 
-### 3. Setup AI (Choose One)
+### 3. AI provider
 
-**Option A: Ollama (Recommended — Free & Private)**
+Pick one LLM provider and one embedding provider (they're independent — see [CLAUDE.md](CLAUDE.md#stack)):
 
 ```bash
-# Install Ollama from https://ollama.ai
+# Ollama (local, free, covers both axes)
 ollama pull llama3.1:8b
 ollama pull nomic-embed-text
-ollama serve  # Start in separate terminal
+ollama serve
+
+# OR set in .env: USE_GROQ=true + GROQ_API_KEY=... (LLM)
+# OR set in .env: USE_GEMINI_EMBEDDINGS=true + GEMINI_API_KEY=... (embeddings)
 ```
 
-**Option B: OpenAI**
+### 4. Run it
 
 ```bash
-# Add to .env
-USE_OLLAMA=false
-OPENAI_API_KEY=sk-your-key-here
-```
-
-### 4. Start Development Servers
-
-```bash
-# Terminal 1: Backend
+# Terminal 1 — backend
 python manage.py runserver
 
-# Terminal 2: Frontend (optional - there's also a vanilla JS frontend)
+# Terminal 2 — background worker (required: uploads/order summaries/advocate
+# search/cause lists all sit "queued" forever without this running)
+python manage.py process_jobs
+
+# Terminal 3 — frontend
 cd frontend-next
-npm install
+npm install   # always run this even if node_modules exists — see CLAUDE.md
 npm run dev
-
-# Terminal 3: Ollama (if using)
-ollama serve
 ```
-
-**Access the app:**
 
 - Backend API: http://localhost:8000/api/
-- Next.js Frontend: http://localhost:3000
-- Next.js Frontend: Run `cd frontend-next && npm run dev`
+- Frontend: http://localhost:3000
 
----
+## Environment variables
 
-## Architecture
+`.env.example` documents every variable settings.py reads, with defaults where they exist. The ones actually required to get a working local instance:
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         FRONTEND LAYER                              │
-│                                                                     │
-│   Next.js 15 (TypeScript)          Vanilla JS (Single Page)        │
-│   ├── App Router                    ├── index.html                  │
-│   ├── React Query                   └── app.js                      │
-│   └── Tailwind CSS                                                  │
-└────────────────────────────────┬────────────────────────────────────┘
-                                 │ REST API
-                                 ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                      DJANGO REST FRAMEWORK                          │
-│                                                                     │
-│   /api/cases/     /api/documents/     /api/chat/     /api/hearings/ │
-│   /api/conversations/     /api/gmail/     /api/dashboard/           │
-└────────────────────────────────┬────────────────────────────────────┘
-                                 │
-                                 ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                      BUSINESS LOGIC LAYER                           │
-│                                                                     │
-│  ┌──────────────────────────────────────────────────────────────┐   │
-│  │  LangGraph AI Pipeline                                        │   │
-│  │  route_query → analyze → vector_search → rank → generate →   │   │
-│  │  extract_citations → format_response                          │   │
-│  └──────────────────────────────────────────────────────────────┘   │
-│                                                                     │
-│  ┌─────────────────────┐  ┌─────────────────────┐                  │
-│  │  Document Processor │  │  Vector Search      │                  │
-│  │  Extract → Chunk →  │  │  Embed query →      │                  │
-│  │  Embed → Store      │  │  pgvector search    │                  │
-│  └─────────────────────┘  └─────────────────────┘                  │
-│                                                                     │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │  AI Service Factory → Routes to Ollama OR OpenAI            │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-└────────────────────────────────┬────────────────────────────────────┘
-                                 │
-                                 ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                      DATA LAYER                                     │
-│                                                                     │
-│  PostgreSQL + pgvector                                              │
-│  ├── cases, hearings, tasks                                         │
-│  ├── documents, document_chunks (768-dim vectors)                   │
-│  ├── conversations, messages, citations                             │
-│  └── emails, gmail_credentials                                      │
-└─────────────────────────────────────────────────────────────────────┘
-```
+| Variable | Required? | Notes |
+| --- | --- | --- |
+| `SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS` | Yes | `SECRET_KEY` has an insecure fallback in `settings.py` for local dev only — never rely on it in production |
+| `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` | Yes | |
+| One of: `USE_OLLAMA=true`, or `USE_GROQ=true` + `GROQ_API_KEY` | Yes | LLM (chat generation) provider |
+| One of: Ollama running, or `USE_GEMINI_EMBEDDINGS=true` + `GEMINI_API_KEY` | Yes | Embedding provider — independent toggle from the LLM one |
+| `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET` | Only for Gmail sync | Everything else works without it |
+| `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL` | Only for invoice email delivery | **Not set anywhere yet, including production.** Without these, invoice "send" logs the delivery instead of emailing it — the feature stays usable, just without real email. |
+| `USE_S3` + `AWS_*` | Only for S3 storage | Defaults to local disk under `media/` |
+| `TELANGANA_HC_COURT_KEY`, `TELANGANA_HC_BENCH_CODE` | No | Defaults work as-is |
 
-### Project Structure
-
-```
-case-intel/
-├── case_intel_project/          # Django settings
-├── core/
-│   ├── models/                  # 17 Django models
-│   ├── views/                   # REST API views
-│   ├── serializers/             # DRF serializers
-│   ├── services/                # Business logic
-│   │   ├── ai_service_factory.py
-│   │   ├── ollama_llm_client.py
-│   │   ├── document_processor.py
-│   │   ├── vector_search_service.py
-│   │   └── graph/               # LangGraph pipeline
-│   └── admin.py
-├── frontend/                    # Vanilla JS SPA
-├── frontend-next/               # Next.js 15 app
-├── documentations/              # Project docs
-├── scripts/                     # Utility scripts
-├── requirements.txt
-└── manage.py
-```
-
----
-
-## API Reference
-
-### Cases
-
-| Method   | Endpoint           | Description      |
-| -------- | ------------------ | ---------------- |
-| `GET`    | `/api/cases/`      | List all cases   |
-| `POST`   | `/api/cases/`      | Create a case    |
-| `GET`    | `/api/cases/{id}/` | Get case details |
-| `PATCH`  | `/api/cases/{id}/` | Update a case    |
-| `DELETE` | `/api/cases/{id}/` | Delete a case    |
-
-### Documents
-
-| Method   | Endpoint                       | Description     |
-| -------- | ------------------------------ | --------------- |
-| `GET`    | `/api/documents/`              | List documents  |
-| `POST`   | `/api/documents/upload/`       | Upload document |
-| `POST`   | `/api/documents/{id}/process/` | Process & embed |
-| `DELETE` | `/api/documents/{id}/`         | Delete document |
-
-### AI Chat
-
-| Method | Endpoint     | Description    |
-| ------ | ------------ | -------------- |
-| `POST` | `/api/chat/` | Ask a question |
-
-**Request:**
-
-```json
-{
-  "user_query": "What were the key arguments in the motion?",
-  "case_id": 1,
-  "conversation_id": null
-}
-```
-
-**Response:**
-
-```json
-{
-  "answer": "The motion argued that...",
-  "confidence": 0.87,
-  "query_type": "analysis",
-  "citations": [
-    {
-      "document_id": 5,
-      "chunk_id": 12,
-      "citation_text": "The court must dismiss..."
-    }
-  ],
-  "conversation_id": 3
-}
-```
-
-### Hearings
-
-| Method   | Endpoint                       | Description       |
-| -------- | ------------------------------ | ----------------- |
-| `GET`    | `/api/hearings/`               | List hearings     |
-| `GET`    | `/api/hearings/?upcoming=true` | Upcoming hearings |
-| `POST`   | `/api/hearings/`               | Create hearing    |
-| `PATCH`  | `/api/hearings/{id}/`          | Update hearing    |
-| `DELETE` | `/api/hearings/{id}/`          | Delete hearing    |
-
-> **Full API docs:** See [documentations/02-reference/API_CONTRACTS.md](documentations/02-reference/API_CONTRACTS.md)
-
----
-
-## Tech Stack
-
-| Layer                | Technology                                | Purpose                        |
-| -------------------- | ----------------------------------------- | ------------------------------ |
-| **Frontend**         | Next.js 15, TypeScript, Tailwind CSS      | Modern React framework         |
-| **Backend**          | Django 6.0.3, Django REST Framework       | Python web framework           |
-| **Database**         | PostgreSQL 15+, pgvector                  | Vector similarity search       |
-| **AI Orchestration** | LangGraph                                 | State machine for AI pipelines |
-| **LLM (Local)**      | Ollama, llama3.1:8b                       | Local inference                |
-| **LLM (Cloud)**      | OpenAI, GPT-4o                            | Cloud inference                |
-| **Embeddings**       | nomic-embed-text / text-embedding-3-small | Vector generation              |
-| **Document Parsing** | PyPDF2, python-docx                       | Extract text from files        |
-
----
-
-## Contributing
-
-We welcome contributions! Here's how to get started:
-
-### Development Setup
-
-```bash
-# Fork and clone the repo
-git clone https://github.com/Bugs0007/CASE_INTEL.git
-cd CASE_INTEL
-
-# Create a feature branch
-git checkout -b feature/amazing-feature
-
-# Install dev dependencies
-pip install -r requirements.txt
-cd frontend-next && npm install
-```
-
-### Areas to Contribute
-
-| Area                 | Difficulty   | Description                                       |
-| -------------------- | ------------ | ------------------------------------------------- |
-| **UI Improvements**  | Beginner     | Enhance frontend components, add dark mode        |
-| **Document Types**   | Beginner     | Add support for more file formats (Excel, images) |
-| **API Tests**        | Intermediate | Expand test coverage for REST endpoints           |
-| **Search Filters**   | Intermediate | Add date range, document type filters             |
-| **Authentication**   | Intermediate | Implement user auth & multi-tenancy               |
-| **Streaming**        | Advanced     | Stream LLM responses in real-time                 |
-| **RAG Improvements** | Advanced     | Hybrid search, re-ranking algorithms              |
-| **Mobile App**       | Advanced     | React Native or Flutter client                    |
-
-### Contribution Guidelines
-
-1. **Fork** the repository
-2. Create a **feature branch** (`git checkout -b feature/amazing-feature`)
-3. **Commit** your changes (`git commit -m 'Add amazing feature'`)
-4. **Push** to the branch (`git push origin feature/amazing-feature`)
-5. Open a **Pull Request**
-
-### Code Style
-
-- **Python:** Follow PEP 8, use type hints
-- **TypeScript:** ESLint + Prettier configuration included
-- **Commits:** Use conventional commits (`feat:`, `fix:`, `docs:`)
-
----
-
-## Configuration
-
-### Environment Variables
-
-```bash
-# Database
-DB_NAME=case_intel
-DB_USER=postgres
-DB_PASSWORD=your_password
-DB_HOST=localhost
-DB_PORT=5432
-
-# AI Provider (switch with one variable)
-USE_OLLAMA=true
-
-# Ollama (if USE_OLLAMA=true)
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=llama3.1:8b
-OLLAMA_EMBEDDING_MODEL=nomic-embed-text
-
-# OpenAI (if USE_OLLAMA=false)
-OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-4o
-OPENAI_EMBEDDING_MODEL=text-embedding-3-small
-
-# Gmail Integration (optional)
-GOOGLE_CLIENT_ID=...
-GOOGLE_CLIENT_SECRET=...
-```
-
----
+See [CLAUDE.md](CLAUDE.md) for exactly how the LLM/embedding provider toggle chains resolve, and the 768-dim embedding column gotcha if you ever change providers on a running deployment with existing data.
 
 ## Testing
 
 ```bash
-# Backend tests
-python manage.py test core
+pytest                                        # ~340 tests, pytest-django (pytest.ini at repo root)
 
-# Test Ollama integration
-python test_ollama_integration.py
-
-# Frontend tests (coming soon)
-cd frontend-next && npm test
+cd frontend-next
+npm install && npm run build && npm run lint  # required whenever frontend-next/ files change
 ```
 
----
+## Deployment
 
-## Roadmap
+Production runs on a single EC2 instance behind Nginx (gunicorn + a separate `process_jobs` systemd worker), with RDS Postgres and Vercel for the frontend.
 
-- [x] Core case & document management
-- [x] LangGraph AI pipeline
-- [x] Ollama local LLM support
-- [x] Gmail integration
-- [x] Next.js frontend
-- [ ] User authentication & multi-tenancy
-- [ ] Real-time streaming responses
-- [ ] OCR for scanned documents
-- [ ] Mobile application
-- [ ] Advanced analytics dashboard
+- **First-time provisioning** (fresh AWS account → live app): [PROVISIONING.md](PROVISIONING.md) — mostly automated by `deploy/provision.sh`, with the genuinely manual steps (RDS creation, DNS, TLS cert, GitHub Actions secrets) called out explicitly.
+- **Ongoing deploys**: push to `main` triggers [.github/workflows/deploy.yml](.github/workflows/deploy.yml) — pulls, migrates, `collectstatic`, restarts both the web and worker systemd units. Assumes provisioning already happened.
+- **Cron**: `manage.py fetch_cause_lists` has no scheduler wired into any deploy config — there's deliberately no Celery/Redis in this project. An operator needs to add two lines to the box's crontab (or an equivalent pair of systemd timers):
 
----
+  ```cron
+  0 19 * * *   cd /home/ubuntu/CASE_INTEL && .venv/bin/python manage.py fetch_cause_lists   # evening before
+  30 6 * * *   cd /home/ubuntu/CASE_INTEL && .venv/bin/python manage.py fetch_cause_lists   # morning of
+  ```
+
+  Two runs a day is intentional, not redundant — a missed evening run is fully repaired by the next morning's.
 
 ## Documentation
 
-| Document                                                  | Description                |
-| --------------------------------------------------------- | -------------------------- |
-| [README.md](documentations/README.md)                                 | Documentation entry point  |
-| [QUICKSTART.md](documentations/QUICKSTART.md)                         | Verified local setup       |
-| [ARCHITECTURE.md](documentations/01-architecture/ARCHITECTURE.md)     | Current system architecture |
-| [API_CONTRACTS.md](documentations/02-reference/API_CONTRACTS.md)      | Current API reference      |
-| [DB_SCHEMA.md](documentations/02-reference/DB_SCHEMA.md)              | Current database schema    |
-| [OLLAMA_SETUP.md](documentations/03-setup/OLLAMA_SETUP.md)            | Local AI configuration     |
-| [INTERVIEW_FAQ.md](documentations/04-interview-prep/INTERVIEW_FAQ.md) | Interview talking points   |
-
----
-
-## License
-
-MIT License — see [LICENSE](LICENSE) for details.
-
----
-
-## Support
-
-- **Repository:** [github.com/Bugs0007/CASE_INTEL](https://github.com/Bugs0007/CASE_INTEL)
-- **Questions?** Open an issue or reach out to the maintainers
-
----
-
-<p align="center">
-  <strong>Built with Django, Next.js, and LangGraph</strong><br>
-  <em>Star this repo if you find it useful!</em>
-</p>
-
-<p align="center">
-  <a href="https://github.com/Bugs0007/CASE_INTEL">
-    <img src="https://img.shields.io/github/stars/Bugs0007/CASE_INTEL?style=for-the-badge&color=yellow" alt="Star on GitHub"/>
-  </a>
-</p>
+- [CLAUDE.md](CLAUDE.md) — architecture, conventions, and gotchas (the canonical reference — kept current, everything else here is a summary of it)
+- [PROVISIONING.md](PROVISIONING.md) — full server provisioning walkthrough
+- [documentations/05-future-scope/](documentations/05-future-scope/) — forward-looking design notes for unimplemented features
