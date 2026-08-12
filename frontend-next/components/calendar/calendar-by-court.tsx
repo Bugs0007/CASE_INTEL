@@ -3,7 +3,6 @@ import { format, parseISO } from "date-fns";
 import { Landmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CauseListBadge } from "@/components/hearings/cause-list-badge";
-import { cn } from "@/lib/utils";
 import type { Hearing } from "@/types";
 
 interface CalendarByCourtProps {
@@ -62,7 +61,7 @@ export function CalendarByCourt({ hearings, caseMeta }: CalendarByCourtProps) {
                   className="flex items-center justify-between gap-3 py-3 border-b border-gray-50 last:border-b-0 flex-wrap"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-[70px] flex-shrink-0 text-[13px] font-bold text-gray-900">
+                    <div className="w-[70px] flex-shrink-0 text-[13px] font-bold font-mono text-gray-900">
                       {format(parseISO(h.hearing_date), "MMM d")}
                     </div>
                     <div className="min-w-0">
@@ -70,19 +69,12 @@ export function CalendarByCourt({ hearings, caseMeta }: CalendarByCourtProps) {
                         <span className="text-sm font-semibold text-gray-900">
                           {h.case_title}
                         </span>
-                        <span
-                          className={cn(
-                            "inline-flex items-center h-[18px] px-1.5 rounded-full text-[10.5px] font-bold flex-shrink-0 whitespace-nowrap",
-                            h.source === "ecourts"
-                              ? "bg-[#ebf3fb] text-[#2f6fb0]"
-                              : "bg-gray-100 text-gray-600",
-                          )}
-                        >
+                        <span className="ci-chip ci-chip--none">
                           {h.source === "ecourts" ? "eCourts" : "Manual"}
                         </span>
                         <CauseListBadge hearing={h} />
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs font-mono text-gray-500">
                         {format(parseISO(h.hearing_date), "h:mm a")}
                         {meta ? ` · ${meta.documentCount} docs on file` : ""}
                       </div>

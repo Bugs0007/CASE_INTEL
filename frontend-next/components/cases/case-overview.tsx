@@ -70,7 +70,7 @@ export function CaseOverview({ case: caseItem }: CaseOverviewProps) {
                     <span className="font-medium text-gray-900">{contact.name}</span>
                     <span className="text-xs text-gray-400 capitalize">{contact.role}</span>
                     {contact.is_billing_contact && (
-                      <span className="inline-flex items-center h-5 px-1.5 rounded-full bg-[#eef1fb] text-primary-active text-[11px] font-semibold">
+                      <span className="ci-chip ci-chip--none">
                         Billing
                       </span>
                     )}

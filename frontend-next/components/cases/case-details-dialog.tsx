@@ -229,8 +229,8 @@ export function CaseDetailsDialog({ isOpen, onClose, case: caseItem }: CaseDetai
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <FileEdit className="h-5 w-5 text-blue-600" />
+            <div className="p-2 bg-gray-100 rounded-lg">
+              <FileEdit className="h-5 w-5 text-gray-700" />
             </div>
             <h2 id="case-details-dialog-title" className="text-lg font-semibold text-gray-900">
               Edit Case Details
@@ -248,7 +248,7 @@ export function CaseDetailsDialog({ isOpen, onClose, case: caseItem }: CaseDetai
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           <div>
             <label htmlFor="case-title" className="block text-sm font-medium text-gray-700 mb-1">
-              Title <span className="text-red-500">*</span>
+              Title <span className="text-status-alert">*</span>
             </label>
             <Input
               id="case-title"
@@ -342,7 +342,7 @@ export function CaseDetailsDialog({ isOpen, onClose, case: caseItem }: CaseDetai
                     <button
                       type="button"
                       onClick={() => handleRemoveContact(row.key)}
-                      className="p-2 text-gray-400 hover:text-destructive hover:bg-[#fdecec] rounded-lg transition-colors"
+                      className="p-2 text-gray-400 hover:text-destructive hover:bg-status-alert-soft rounded-lg transition-colors"
                       aria-label="Remove contact"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -363,8 +363,8 @@ export function CaseDetailsDialog({ isOpen, onClose, case: caseItem }: CaseDetai
           </div>
 
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm text-red-600">{error}</p>
+            <div className="p-3 bg-status-alert-soft border border-status-alert-soft rounded-lg">
+              <p className="text-sm text-status-alert">{error}</p>
             </div>
           )}
 

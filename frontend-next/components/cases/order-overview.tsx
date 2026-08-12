@@ -79,7 +79,7 @@ export function OrderOverviewCard({
 export function OrderSummaryBody({ summary }: { summary: OrderSummary }) {
   if (summary.status === "failed") {
     return (
-      <div className="flex items-start gap-2 text-sm text-[#8a5a0b]">
+      <div className="flex items-start gap-2 text-sm text-status-alert">
         <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
         <div>
           <div className="font-medium">Summary unavailable</div>
@@ -192,13 +192,13 @@ function DirectionsList({
     <div
       className={
         emphasis
-          ? "rounded-lg border border-[#dbe3f7] bg-[#f7f9fe] p-3"
+          ? "rounded-lg border border-accent-soft bg-accent-soft p-3"
           : "rounded-lg border border-gray-100 p-3"
       }
     >
       <div
         className={`text-xs font-semibold uppercase tracking-wide mb-1.5 ${
-          emphasis ? "text-[#33449b]" : "text-gray-500"
+          emphasis ? "text-accent" : "text-gray-500"
         }`}
       >
         {label}

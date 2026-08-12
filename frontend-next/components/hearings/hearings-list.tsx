@@ -253,13 +253,13 @@ function HearingItem({
               squeezing it and the date until the badge's own text wraps and
               breaks its pill shape. */}
           <div className="flex items-center gap-2 mb-2 flex-wrap">
-            <div className="text-sm font-medium text-gray-900 flex-shrink-0">
+            <div className="text-sm font-medium font-mono text-gray-900 flex-shrink-0">
               {formatDateTime(hearing.hearing_date)}
             </div>
-            <span className="text-[11px] font-semibold bg-[#f3ecfb] text-[#6b3aa0] h-5 px-2 inline-flex items-center flex-shrink-0 whitespace-nowrap rounded-full">
+            <span className="ci-chip ci-chip--none flex-shrink-0">
               {hearing.hearing_type_display}
             </span>
-            <span className="text-[11px] font-semibold bg-gray-100 text-[#4b5468] h-5 px-2 inline-flex items-center flex-shrink-0 whitespace-nowrap rounded-full">
+            <span className="ci-chip ci-chip--none flex-shrink-0">
               {hearing.source === "manual" ? "Manual" : "eCourts"}
             </span>
           </div>
@@ -342,10 +342,12 @@ function HearingItem({
   );
 }
 
-const FEE_BADGE_STYLES: Record<FeeStatus, string> = {
-  pending: "bg-[#fdf3e3] text-[#8a5a0b]",
-  invoiced: "bg-[#eef1fb] text-[#33449b]",
-  paid: "bg-[#e6f6ed] text-[#1d6b3f]",
+// "invoiced" still reads as pending -- billed but not yet paid is the same
+// ok/pending/alert bucket as not-yet-billed, just further along.
+const FEE_BADGE_CHIP: Record<FeeStatus, "ok" | "pending"> = {
+  pending: "pending",
+  invoiced: "pending",
+  paid: "ok",
 };
 
 /** The fee state for this hearing, at a glance.
@@ -385,7 +387,7 @@ function FeeBadge({ fee }: { fee: NestedAppearanceFee | null }) {
   return (
     <span
       title={title}
-      className={`text-[11px] font-semibold h-5 px-2 inline-flex items-center flex-shrink-0 whitespace-nowrap rounded-full ${FEE_BADGE_STYLES[fee.status]}`}
+      className={`ci-chip ci-chip--${FEE_BADGE_CHIP[fee.status]} flex-shrink-0`}
     >
       {formatted} · {fee.status_display}
     </span>
@@ -405,9 +407,7 @@ function TravelBadge({ bookings }: { bookings: NestedTravelBooking[] }) {
       title={bookings
         .map((b) => `${b.booking_type_display}: ${b.status_display}`)
         .join(" · ")}
-      className={`text-[11px] font-semibold h-5 px-2 inline-flex items-center gap-1 flex-shrink-0 whitespace-nowrap rounded-full ${
-        allBooked ? "bg-[#e6f6ed] text-[#1d6b3f]" : "bg-[#fdf3e3] text-[#8a5a0b]"
-      }`}
+      className={`ci-chip ${allBooked ? "ci-chip--ok" : "ci-chip--pending"} inline-flex items-center gap-1 flex-shrink-0`}
     >
       <Plane className="h-3 w-3" />
       {allBooked ? `Travel booked${bookings.length > 1 ? ` (${booked})` : ""}` : `Travel ${booked}/${bookings.length}`}

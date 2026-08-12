@@ -6,16 +6,20 @@ import type { Document } from "@/types";
  * falling back to the document's own processing_status for legacy rows.
  */
 
-const STATUS_STYLES: Record<string, string> = {
-  completed: "bg-[#e9f7f1] text-[#146349]",
-  processing: "bg-[#ebf3fb] text-[#2f6fb0]",
-  queued: "bg-[#fdf4e3] text-[#8a6116]",
-  pending: "bg-gray-100 text-[#4b5468]",
-  failed: "bg-[#fdecec] text-[#b32e26]",
+// Resolves to the three chip meanings case-intel-theme.css defines (see
+// components/ui/badge.tsx) -- completed is the only "ok" state, everything
+// still in flight (queued/processing/pending) reads as "awaiting", and
+// failed is the one alert.
+const STATUS_CHIP: Record<string, "ok" | "pending" | "alert" | "none"> = {
+  completed: "ok",
+  processing: "pending",
+  queued: "pending",
+  pending: "pending",
+  failed: "alert",
 };
 
 export function getDocumentDisplayStatus(doc: Document): {
-  key: keyof typeof STATUS_STYLES;
+  key: string;
   label: string;
 } {
   if (doc.job_status === "queued") {
@@ -49,14 +53,17 @@ export function DocumentStatusBadge({ document }: { document: Document }) {
   return (
     <span className="inline-flex items-center gap-1.5 flex-shrink-0">
       <span
-        className={`text-xs font-semibold h-[22px] px-2.5 inline-flex items-center whitespace-nowrap rounded-full ${STATUS_STYLES[key] || STATUS_STYLES.pending}`}
+        className={`ci-chip ci-chip--${STATUS_CHIP[key] || "pending"} inline-flex items-center whitespace-nowrap`}
         title={document.job_error || undefined}
       >
         {label}
       </span>
       {document.ocr_applied && (
+        // Not a status -- an attribute of the document (it had no
+        // extractable text and was OCRed) -- so it stays neutral rather
+        // than borrowing one of the three status colors.
         <span
-          className="text-xs font-semibold h-[22px] px-2.5 inline-flex items-center rounded-full bg-[#f3ebfb] text-[#6b2fb0]"
+          className="ci-chip ci-chip--none inline-flex items-center"
           title="This document had no extractable text and was OCRed"
         >
           OCR

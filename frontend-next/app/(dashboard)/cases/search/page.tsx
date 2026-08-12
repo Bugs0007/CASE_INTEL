@@ -268,7 +268,7 @@ export default function AdvocateSearchPage() {
               </div>
             </div>
 
-            <div className="flex items-start gap-2 rounded-lg bg-[#ebf3fb] border border-[#d6e7f7] p-3 text-xs text-[#2f6fb0]">
+            <div className="flex items-start gap-2 rounded-lg bg-gray-100 border border-gray-200 p-3 text-xs text-gray-600">
               <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
               <span>
                 {distCode
@@ -279,7 +279,7 @@ export default function AdvocateSearchPage() {
             </div>
 
             {formError && (
-              <div className="flex items-start gap-2 rounded-lg bg-[#fdecec] p-3 text-sm text-[#b32e26]">
+              <div className="flex items-start gap-2 rounded-lg bg-status-alert-soft p-3 text-sm text-status-alert">
                 <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
                 <span>{formError}</span>
               </div>
@@ -339,7 +339,7 @@ export default function AdvocateSearchPage() {
             )}
 
             {sj.status === "failed" && (
-              <div className="flex items-start gap-2 rounded-lg bg-[#fdecec] p-3 text-sm text-[#b32e26]">
+              <div className="flex items-start gap-2 rounded-lg bg-status-alert-soft p-3 text-sm text-status-alert">
                 <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
                 <span>{sj.error || "The court portal could not be reached. Please try again."}</span>
               </div>
@@ -355,7 +355,7 @@ export default function AdvocateSearchPage() {
                   {districtEntries.filter(([, d]) => d.status === "success").length} of{" "}
                   {districtEntries.length} district(s) fully searched
                   {failedDistrictCount > 0 && (
-                    <span className="text-[#92610f]">
+                    <span className="text-status-pending">
                       {" "}
                       · {failedDistrictCount} incomplete
                     </span>
@@ -368,9 +368,9 @@ export default function AdvocateSearchPage() {
                     {districtEntries.map(([code, d]) => (
                       <div key={code} className="flex items-center gap-2 px-3 py-1.5 text-xs">
                         {d.status === "success" ? (
-                          <CheckCircle2 className="h-3.5 w-3.5 text-green-600 flex-shrink-0" />
+                          <CheckCircle2 className="h-3.5 w-3.5 text-status-ok flex-shrink-0" />
                         ) : (
-                          <XCircle className="h-3.5 w-3.5 text-[#b32e26] flex-shrink-0" />
+                          <XCircle className="h-3.5 w-3.5 text-status-alert flex-shrink-0" />
                         )}
                         <span className="text-gray-700">{d.name}</span>
                         <span className="text-gray-400 ml-auto">
@@ -411,7 +411,7 @@ export default function AdvocateSearchPage() {
             )}
 
             {resultsTruncated && (
-              <div className="mb-4 rounded-lg border border-[#e6d5a8] bg-[#fdf8ec] px-3.5 py-3 text-sm text-[#7a5c12]">
+              <div className="mb-4 rounded-lg border border-status-pending bg-status-pending-soft px-3.5 py-3 text-sm text-status-pending">
                 Showing the first {results.length.toLocaleString()} of{" "}
                 {resultsTotal.toLocaleString()} matches. Narrow the search — pick a
                 single district, or use a bar code instead of a name — to see the
@@ -455,7 +455,7 @@ export default function AdvocateSearchPage() {
                 </div>
 
                 {selected.size > IMPORT_CAP && (
-                  <p className="mb-2 text-xs text-[#b32e26]">
+                  <p className="mb-2 text-xs text-status-alert">
                     You can add up to {IMPORT_CAP} at a time — only the first {IMPORT_CAP} selected
                     will be added.
                   </p>
@@ -507,7 +507,7 @@ export default function AdvocateSearchPage() {
                   </p>
                 )}
                 {ij.failed.length > 0 && (
-                  <div className="flex items-start gap-2 rounded-lg bg-[#fdecec] p-3 text-[#b32e26]">
+                  <div className="flex items-start gap-2 rounded-lg bg-status-alert-soft p-3 text-status-alert">
                     <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
                     <span>
                       {ij.failed.length} case(s) could not be fetched (portal timeout or CAPTCHA) —

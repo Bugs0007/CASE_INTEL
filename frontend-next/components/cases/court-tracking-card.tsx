@@ -242,7 +242,7 @@ function TrackingSetupForm({ caseId }: { caseId: number }) {
               setFormError(null);
             }}
             className={`rounded-full px-3 py-1 font-medium transition-colors ${
-              mode === "cnr" ? "bg-primary text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              mode === "cnr" ? "bg-primary text-page" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}
           >
             Have a CNR
@@ -254,7 +254,7 @@ function TrackingSetupForm({ caseId }: { caseId: number }) {
               setFormError(null);
             }}
             className={`rounded-full px-3 py-1 font-medium transition-colors ${
-              mode === "cascade" ? "bg-primary text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              mode === "cascade" ? "bg-primary text-page" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}
           >
             Search by case number
@@ -413,7 +413,7 @@ function TrackingSetupForm({ caseId }: { caseId: number }) {
           )}
 
           {formError && (
-            <div className="flex items-start gap-2 rounded-lg bg-[#fdecec] p-3 text-sm text-[#b32e26]">
+            <div className="flex items-start gap-2 rounded-lg bg-status-alert-soft p-3 text-sm text-status-alert">
               <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
               <span>{formError}</span>
             </div>
@@ -466,7 +466,7 @@ function TrackingPreviewPanel({
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="mb-4 flex items-start gap-2 rounded-lg bg-[#fdf3e0] border border-[#f5e3c2] p-3 text-xs text-[#92610f]">
+        <div className="mb-4 flex items-start gap-2 rounded-lg bg-status-pending-soft border border-status-pending p-3 text-xs text-status-pending">
           <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
           <span>
             This is fetched from eCourts and has NOT been saved yet. Check the parties below match
@@ -498,7 +498,7 @@ function TrackingPreviewPanel({
         </div>
 
         {error && (
-          <div className="mb-4 flex items-start gap-2 rounded-lg bg-[#fdecec] p-3 text-sm text-[#b32e26]">
+          <div className="mb-4 flex items-start gap-2 rounded-lg bg-status-alert-soft p-3 text-sm text-status-alert">
             <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
             <span>{error}</span>
           </div>
@@ -616,7 +616,7 @@ function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hea
             onClick={handleUntrack}
             disabled={untrackTracking.isPending}
             title="Untrack this case / fix a wrong case match"
-            className="text-destructive hover:bg-[#fdecec] hover:text-destructive-hover"
+            className="text-destructive hover:bg-status-alert-soft hover:text-destructive-hover"
           >
             {untrackTracking.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -628,7 +628,7 @@ function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hea
         </div>
       </CardHeader>
       <CardContent>
-        <div className="mb-4 rounded-lg bg-[#ebf3fb] border border-[#d6e7f7] p-3 text-xs text-[#2f6fb0]">
+        <div className="mb-4 rounded-lg bg-gray-100 border border-gray-200 p-3 text-xs text-gray-600">
           Data sourced from eCourts ({caseItem.court_type === "high_court" ? "hcservices" : "services"}
           .ecourts.gov.in). May be delayed or incomplete -- always verify against official court
           records.{" "}
@@ -699,7 +699,7 @@ function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hea
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {[...ecourtsHearings].reverse().map((h) => (
-                      <tr key={h.id} className={h.hearing_date.slice(0, 10) >= today ? "bg-[#ebf3fb]/50" : ""}>
+                      <tr key={h.id} className={h.hearing_date.slice(0, 10) >= today ? "bg-gray-100" : ""}>
                         <td className="px-3 py-2 whitespace-nowrap">{formatDate(h.hearing_date)}</td>
                         <td className="px-3 py-2 text-gray-600">{h.purpose || "—"}</td>
                         <td className="px-3 py-2 text-gray-600">{h.judge || "—"}</td>

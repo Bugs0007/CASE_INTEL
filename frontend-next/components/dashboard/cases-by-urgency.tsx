@@ -31,7 +31,7 @@ export function CasesByUrgency({
         <CardTitle>Cases</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="text-eyebrow text-[#9a4a12] mb-3">
+        <div className="text-eyebrow text-status-pending mb-3">
           Needs Attention This Week · {needsAttention.length}
         </div>
         {needsAttention.length === 0 ? (
@@ -54,16 +54,14 @@ export function CasesByUrgency({
                   className="flex items-center justify-between gap-3 p-3 border border-gray-100 rounded-lg flex-wrap animate-fade-up motion-reduce:animate-none"
                 >
                   <div className="min-w-0 flex items-center gap-3 flex-wrap">
-                    <span
-                      className={`inline-flex items-center h-5 px-2 rounded-full text-[11px] font-semibold flex-shrink-0 ${reason.className}`}
-                    >
+                    <span className={`ci-chip ci-chip--${reason.chip} flex-shrink-0`}>
                       {reason.label}
                     </span>
                     <div>
                       <div className="text-sm font-semibold text-gray-900">
                         {c.title}
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs font-mono text-gray-500">
                         {c.case_number} · {c.priority} priority
                       </div>
                     </div>
