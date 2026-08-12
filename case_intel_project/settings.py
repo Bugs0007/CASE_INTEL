@@ -327,34 +327,38 @@ TELANGANA_HC_BENCH_CODE = config("TELANGANA_HC_BENCH_CODE", default="1")
 # All read from the environment via decouple, like every other
 # environment-dependent setting here -- nothing is hardcoded.
 #
-# REQUIRED IN .env FOR REAL DELIVERY:
-#   EMAIL_HOST           e.g. smtp.gmail.com
-#   EMAIL_PORT           e.g. 587
-#   EMAIL_HOST_USER      the sending mailbox
-#   EMAIL_HOST_PASSWORD  app password / SMTP credential
-#   EMAIL_USE_TLS        true for port 587, false if using SSL on 465
-#   DEFAULT_FROM_EMAIL   the From: address shown to clients
+# Sent via Resend's transactional email API (django-anymail's Resend
+# backend) rather than raw SMTP -- one API key, no mailbox/app-password to
+# provision. See ADMIN_EMAIL_SETUP.md for the one-time signup steps.
 #
-# When EMAIL_HOST/EMAIL_HOST_USER/EMAIL_HOST_PASSWORD are absent,
-# INVOICE_EMAIL_CONFIGURED is False and
+# REQUIRED IN .env FOR REAL DELIVERY:
+#   RESEND_API_KEY       from resend.com/api-keys
+#   DEFAULT_FROM_EMAIL   the From: address shown to clients -- must be on a
+#                        domain verified in the Resend dashboard. Defaults
+#                        to onboarding@resend.dev, Resend's shared sandbox
+#                        sender that needs no domain verification at all --
+#                        but it ONLY delivers to the Resend account's own
+#                        signup email, never to a real client, so this is a
+#                        placeholder for testing until a domain is bought
+#                        and verified (no domain is verified yet -- see
+#                        ADMIN_EMAIL_SETUP.md). Override DEFAULT_FROM_EMAIL
+#                        in .env once one is.
+#
+# When RESEND_API_KEY is absent, INVOICE_EMAIL_CONFIGURED is False and
 # core/services/invoice_service.py:send_invoice() LOGS the delivery
 # (recipient, invoice number, amount) at WARNING and returns sent=False
 # instead of raising -- the feature stays usable end-to-end on a box with
 # no mail credentials, and the fee is recorded as send_status='logged',
 # never 'sent'. The console backend below makes that path visible in the
 # server log rather than silently discarding the message.
-EMAIL_HOST = config("EMAIL_HOST", default="")
-EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
-EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
-EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
-EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
-EMAIL_USE_SSL = config("EMAIL_USE_SSL", default=False, cast=bool)
-DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="no-reply@caseintel.local")
+RESEND_API_KEY = config("RESEND_API_KEY", default="")
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="onboarding@resend.dev")
 
-INVOICE_EMAIL_CONFIGURED = bool(EMAIL_HOST and EMAIL_HOST_USER and EMAIL_HOST_PASSWORD)
+INVOICE_EMAIL_CONFIGURED = bool(RESEND_API_KEY)
 
 if INVOICE_EMAIL_CONFIGURED:
-    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_BACKEND = "anymail.backends.resend.EmailBackend"
+    ANYMAIL = {"RESEND_API_KEY": RESEND_API_KEY}
 else:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 

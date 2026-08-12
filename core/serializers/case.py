@@ -131,3 +131,44 @@ class CaseSerializer(serializers.ModelSerializer):
             or getattr(obj, "has_ecourts_update", False)
             or getattr(obj, "has_failed_document", False)
         )
+
+
+class CaseCreateSerializer(serializers.ModelSerializer):
+    """Validates manual case entry: POST /api/cases/.
+
+    The alternative to the advocate-search/import flow (core/services/
+    advocate_import.py) -- for a case that search doesn't turn up, or when
+    the advocate would rather just type it in. Deliberately narrow: no
+    cnr_number/court_type/tracking_config/tracking_enabled/fetch_status/
+    party_advocate_data fields here at all, since those are only ever set
+    through the court-tracking preview/confirm flow (core/services/
+    court_tracking.py), which works identically regardless of how the case
+    was created -- a manually-created case can be linked to a CNR
+    afterwards exactly the same way an imported one can.
+
+    client_name is left optional (default "") rather than required: the
+    richer ClientContact model (name/email/phone/role/billing flag) is
+    the actual source of truth for client info now, added via the case
+    detail page's "Edit Details" dialog right after creation -- same
+    two-step flow an advocate-search import already uses.
+    """
+
+    class Meta:
+        model = Case
+        fields = [
+            "case_number",
+            "title",
+            "client_name",
+            "opposing_party",
+            "user_party_role",
+            "case_type",
+            "status",
+            "priority",
+            "filing_date",
+            "notes",
+        ]
+        extra_kwargs = {
+            "client_name": {"required": False, "allow_blank": True, "default": ""},
+            "opposing_party": {"required": False, "allow_blank": True, "allow_null": True},
+            "notes": {"required": False, "allow_blank": True, "allow_null": True},
+        }

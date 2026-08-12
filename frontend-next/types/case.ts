@@ -66,11 +66,26 @@ export interface Case {
   fee_summary: CaseFeeSummary;
 }
 
-/** PATCH /api/cases/<id>/ -- a Case is never created directly (see
- * CaseListView); it always originates from the advocate-search/import
- * flow. This is the case-details form's write shape. */
+/** PATCH /api/cases/<id>/ -- the case-details form's write shape. */
 export interface CaseUpdateInput {
   title?: string;
+  opposing_party?: string;
+  user_party_role?: UserPartyRole;
+  case_type?: CaseType;
+  status?: CaseStatus;
+  priority?: CasePriority;
+  filing_date?: string;
+  notes?: string;
+}
+
+/** POST /api/cases/ -- manual case entry, the alternative to the
+ * advocate-search/import flow. Deliberately excludes cnr_number/
+ * court_type/tracking_config: those are only ever set afterwards, through
+ * the court-tracking setup flow on the case detail page, the same way for
+ * a manually-entered case as for an imported one. */
+export interface CaseCreateInput {
+  case_number: string;
+  title: string;
   opposing_party?: string;
   user_party_role?: UserPartyRole;
   case_type?: CaseType;

@@ -96,13 +96,55 @@ class TestCaseIsolation:
         assert resp.status_code == 204
         assert not Case.objects.filter(id=case_a.id).exists()
 
-    # There's no test_create_ignores_client_supplied_owner here anymore --
-    # POST /api/cases/ was retired (CaseListView is list-only; a Case is
-    # only ever created via the advocate-search/import flow, see
-    # core/services/advocate_import.py). The equivalent owner-stamping
-    # coverage now lives on ClientContact creation instead, see
-    # TestClientContactIsolation.test_create_ignores_client_supplied_owner
-    # below -- same OwnerScopedMixin.perform_create code path.
+    def test_create_ignores_client_supplied_owner(self, client_a, user_b):
+        resp = client_a.post(
+            "/api/cases/",
+            {"case_number": "A-002", "title": "Manually Entered Case", "owner": user_b.id},
+            format="json",
+        )
+        assert resp.status_code == 201
+        case = Case.objects.get(case_number="A-002")
+        # owner is stamped from request.user (OwnerScopedMixin.perform_create),
+        # never from client-supplied input -- the "owner": user_b.id above
+        # must be silently ignored.
+        assert case.owner_id != user_b.id
+
+    def test_create_duplicate_case_number_across_users_rejected(self, client_b, case_a):
+        # case_number is globally unique (not per-owner) -- the same
+        # constraint advocate-search import already has to handle.
+        resp = client_b.post(
+            "/api/cases/",
+            {"case_number": case_a.case_number, "title": "Someone Else's Number"},
+            format="json",
+        )
+        assert resp.status_code == 400
+        assert "case_number" in resp.data
+
+    def test_create_requires_case_number_and_title(self, client_a):
+        resp = client_a.post("/api/cases/", {}, format="json")
+        assert resp.status_code == 400
+        assert "case_number" in resp.data
+        assert "title" in resp.data
+
+    def test_create_cannot_set_tracking_fields(self, client_a):
+        # CaseCreateSerializer doesn't expose cnr_number/tracking_config/
+        # tracking_enabled at all -- a manually-created case starts
+        # untracked, same as before, and gets linked to a CNR later only
+        # through the court-tracking preview/confirm flow.
+        resp = client_a.post(
+            "/api/cases/",
+            {
+                "case_number": "A-003",
+                "title": "New Case",
+                "cnr_number": "AB01CD0000112026",
+                "tracking_enabled": True,
+            },
+            format="json",
+        )
+        assert resp.status_code == 201
+        case = Case.objects.get(case_number="A-003")
+        assert case.cnr_number is None
+        assert case.tracking_enabled is False
 
 
 @pytest.mark.django_db

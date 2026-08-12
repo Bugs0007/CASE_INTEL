@@ -109,7 +109,7 @@ npm run dev
 | One of: `USE_OLLAMA=true`, or `USE_GROQ=true` + `GROQ_API_KEY` | Yes | LLM (chat generation) provider |
 | One of: Ollama running, or `USE_GEMINI_EMBEDDINGS=true` + `GEMINI_API_KEY` | Yes | Embedding provider — independent toggle from the LLM one |
 | `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET` | Only for Gmail sync | Everything else works without it |
-| `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL` | Only for invoice email delivery | **Not set anywhere yet, including production.** Without these, invoice "send" logs the delivery instead of emailing it — the feature stays usable, just without real email. |
+| `RESEND_API_KEY`, `DEFAULT_FROM_EMAIL` | Only for invoice email delivery | Sent via Resend's API (django-anymail), not SMTP. Without `RESEND_API_KEY`, invoice "send" logs the delivery instead of emailing it — the feature stays usable, just without real email. See `ADMIN_EMAIL_SETUP.md`. |
 | `USE_S3` + `AWS_*` | Only for S3 storage | Defaults to local disk under `media/` |
 | `TELANGANA_HC_COURT_KEY`, `TELANGANA_HC_BENCH_CODE` | No | Defaults work as-is |
 

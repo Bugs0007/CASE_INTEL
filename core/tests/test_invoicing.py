@@ -388,12 +388,10 @@ class TestInvoiceSending:
         assert response.status_code == 200
         assert response.data["sent"] is False
         assert response.data["recipient"] == "billing@example.com"
-        assert "EMAIL_HOST" in response.data["missing_env_vars"]
-        assert "EMAIL_HOST_PASSWORD" in response.data["missing_env_vars"]
+        assert "RESEND_API_KEY" in response.data["missing_env_vars"]
         # The full checklist is returned too, so the caller is told every
         # var it needs, not only the ones that gate the config flag.
         assert "DEFAULT_FROM_EMAIL" in response.data["required_env_vars"]
-        assert "EMAIL_PORT" in response.data["required_env_vars"]
         assert len(mail.outbox) == 0
         assert "EMAIL NOT CONFIGURED" in caplog.text
         assert "billing@example.com" in caplog.text

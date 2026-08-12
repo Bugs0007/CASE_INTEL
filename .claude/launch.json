@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "frontend-next", "run", "dev"],
       "port": 3000
+    },
+    {
+      "name": "django-backend",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["manage.py", "runserver", "8000"],
+      "port": 8000
     }
   ]
 }
