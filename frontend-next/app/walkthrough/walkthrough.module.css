@@ -1,0 +1,41 @@
+/* Spotlight: darkens the whole stage except the highlighted element, via a
+   box-shadow with a huge spread on the element itself -- no measurement or
+   positioning math needed, and it reflows correctly with the page. */
+.spotlight {
+  position: relative;
+  z-index: 60;
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 4px var(--ci-seal),
+    0 0 0 9999px rgba(20, 32, 44, 0.62);
+  transition: box-shadow 0.25s ease;
+  scroll-margin: 140px;
+}
+
+.stage {
+  position: relative;
+}
+
+.fadeSwap {
+  animation: walkthroughFadeIn 0.22s ease-out both;
+}
+
+@keyframes walkthroughFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spotlight {
+    transition: none;
+  }
+  .fadeSwap {
+    animation: none;
+  }
+}
