@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, Calendar, LogOut, Upload, Plus } from "lucide-react";
+import { Search, Calendar, LogOut, Upload, Plus, HelpCircle } from "lucide-react";
 import { clearToken, clearUsername } from "@/lib/auth";
 import { logout } from "@/lib/api/auth";
 import { useDialogs } from "@/providers/dialog-provider";
+import { WALKTHROUGH_ENABLED } from "@/lib/feature-flags";
 
 export function Header() {
   const router = useRouter();
@@ -48,6 +49,18 @@ export function Header() {
           These use the ci-btn primitives directly (not <Button>) so the
           .ci-on-field ancestor flips solid/line to the on-dark treatment. */}
       <div className="flex items-center gap-1.5 sm:gap-2.5">
+        {WALKTHROUGH_ENABLED && (
+          <Link
+            href="/walkthrough"
+            aria-label="Guided tour"
+            title="Guided tour — see how Case Intel works with sample data"
+            className="ci-btn ci-btn--line h-9 w-9 lg:w-auto p-0 lg:px-3.5 justify-center text-[13px]"
+          >
+            <HelpCircle className="h-[15px] w-[15px]" strokeWidth={1.8} />
+            <span className="hidden lg:inline">Guided Tour</span>
+          </Link>
+        )}
+
         <button
           onClick={() => router.push("/calendar")}
           className="ci-btn ci-btn--line hidden lg:inline-flex h-9 px-3.5 text-[13px]"
