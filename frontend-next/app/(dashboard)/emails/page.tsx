@@ -59,13 +59,13 @@ export default function EmailsPage() {
 
       {/* Under Development Notice */}
       {!GMAIL_INTEGRATION_ENABLED && (
-        <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-          <Construction className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+        <div className="mb-6 flex items-start gap-3 rounded-lg border border-status-pending bg-status-pending-soft px-4 py-3">
+          <Construction className="h-5 w-5 text-status-pending flex-shrink-0 mt-0.5" />
           <div>
-            <div className="font-medium text-amber-900">
+            <div className="font-medium text-status-pending">
               Under development — coming soon
             </div>
-            <div className="text-sm text-amber-700">
+            <div className="text-sm text-status-pending">
               Gmail integration is still being built. Connecting an account
               and syncing emails are disabled for now.
             </div>

@@ -51,8 +51,8 @@ export class ErrorBoundary extends Component<
       return (
         <div className="min-h-[400px] flex items-center justify-center p-6">
           <div className="text-center max-w-md">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-100 mb-6">
-              <AlertTriangle className="w-8 h-8 text-red-600" />
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-status-alert-soft mb-6">
+              <AlertTriangle className="w-8 h-8 text-status-alert" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
               Something went wrong
@@ -64,7 +64,7 @@ export class ErrorBoundary extends Component<
 
             {process.env.NODE_ENV === "development" && this.state.error && (
               <div className="mb-6 p-4 bg-gray-100 rounded-lg text-left">
-                <p className="text-sm font-mono text-red-600 break-all">
+                <p className="text-sm font-mono text-status-alert break-all">
                   {this.state.error.message}
                 </p>
               </div>
@@ -79,7 +79,7 @@ export class ErrorBoundary extends Component<
                 <RefreshCw className="w-4 h-4" />
                 Try Again
               </Button>
-              <Link href="/">
+              <Link href="/dashboard">
                 <Button variant="secondary" className="gap-2">
                   <Home className="w-4 h-4" />
                   Go to Dashboard
@@ -109,8 +109,8 @@ export function ErrorMessage({
 }: ErrorMessageProps) {
   return (
     <div className="p-6 text-center">
-      <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-red-100 mb-4">
-        <AlertTriangle className="w-6 h-6 text-red-600" />
+      <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-status-alert-soft mb-4">
+        <AlertTriangle className="w-6 h-6 text-status-alert" />
       </div>
       <h3 className="text-lg font-semibold text-gray-900 mb-1">{title}</h3>
       <p className="text-gray-600 mb-4">{message}</p>

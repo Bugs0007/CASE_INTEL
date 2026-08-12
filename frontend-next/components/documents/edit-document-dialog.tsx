@@ -130,8 +130,8 @@ export function EditDocumentDialog({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <FileEdit className="h-5 w-5 text-blue-600" />
+            <div className="p-2 bg-gray-100 rounded-lg">
+              <FileEdit className="h-5 w-5 text-gray-700" />
             </div>
             <h2
               id="edit-document-title"
@@ -156,7 +156,7 @@ export function EditDocumentDialog({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Document Name
             </label>
-            <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 text-sm">
+            <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 text-sm font-mono">
               {documentData.filename}
             </div>
             <p className="mt-1 text-xs text-gray-500">

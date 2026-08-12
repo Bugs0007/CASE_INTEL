@@ -8,10 +8,7 @@ interface CardProps extends HTMLAttributes<HTMLDivElement> {
 export function Card({ children, className, ...props }: CardProps) {
   return (
     <div
-      className={cn(
-        "rounded-xl bg-white shadow-[0_1px_2px_rgba(20,23,31,0.04)] border border-gray-100",
-        className,
-      )}
+      className={cn("ci-card", className)}
       {...props}
     >
       {children}
@@ -53,7 +50,7 @@ export function CardFooter({ children, className, ...props }: CardProps) {
   return (
     <div
       className={cn(
-        "px-5 py-4 border-t border-gray-100 bg-gray-50 rounded-b-xl",
+        "px-5 py-4 border-t border-gray-100 bg-gray-50 rounded-b-lg",
         className,
       )}
       {...props}

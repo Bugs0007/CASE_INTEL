@@ -49,7 +49,7 @@ export default function CalendarPage() {
     return (
       <div className="px-4 sm:px-7 pt-5 sm:pt-7 pb-[60px] max-w-[1240px] mx-auto">
         <div className="text-center py-12">
-          <div className="text-[#b32e26] text-lg font-medium mb-2">
+          <div className="text-status-alert text-lg font-medium mb-2">
             Failed to load calendar
           </div>
           <div className="text-gray-500 text-sm">

@@ -46,7 +46,7 @@ export function EmailsTable({
   const getStatusBadge = (email: Email) => {
     if (email.linked_case) {
       return (
-        <div className="flex items-center gap-1 text-xs px-2 py-1 bg-green-100 text-green-800 rounded-md font-medium">
+        <div className="ci-chip ci-chip--ok inline-flex items-center gap-1">
           <LinkIcon className="h-3 w-3" />
           Linked
         </div>
@@ -55,18 +55,14 @@ export function EmailsTable({
 
     if (email.suggested_case_id) {
       return (
-        <div className="flex items-center gap-1 text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-md font-medium">
+        <div className="ci-chip ci-chip--pending inline-flex items-center gap-1">
           <Sparkles className="h-3 w-3" />
           Suggestion
         </div>
       );
     }
 
-    return (
-      <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded-md font-medium">
-        Unlinked
-      </span>
-    );
+    return <span className="ci-chip ci-chip--none">Unlinked</span>;
   };
 
   const handleLink = (emailId: number) => {
@@ -131,7 +127,7 @@ export function EmailsTable({
                 </td>
 
                 {/* Date */}
-                <td className="py-4 px-6 text-sm text-gray-600">
+                <td className="py-4 px-6 text-sm font-mono text-gray-600">
                   {formatDateTime(email.received_date, "MMM d, yyyy")}
                 </td>
 
@@ -139,7 +135,7 @@ export function EmailsTable({
                 <td className="py-4 px-6">
                   {email.linked_case ? (
                     <div>
-                      <div className="text-sm font-medium text-gray-900">
+                      <div className="text-sm font-mono font-medium text-gray-900">
                         {email.linked_case.case_number}
                       </div>
                       <div className="text-xs text-gray-500 truncate max-w-xs">
@@ -147,7 +143,7 @@ export function EmailsTable({
                       </div>
                     </div>
                   ) : email.suggested_case_id ? (
-                    <div className="text-sm text-blue-600">
+                    <div className="text-sm text-accent">
                       Suggested: Case #{email.suggested_case_id}
                     </div>
                   ) : (

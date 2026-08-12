@@ -60,7 +60,7 @@ export default function DashboardPage() {
     return (
       <div className="px-4 sm:px-7 pt-5 sm:pt-7">
         <div className="text-center py-12">
-          <div className="text-[#b32e26] text-lg font-medium mb-2">
+          <div className="text-status-alert text-lg font-medium mb-2">
             Failed to load dashboard
           </div>
           <div className="text-gray-500 text-sm">

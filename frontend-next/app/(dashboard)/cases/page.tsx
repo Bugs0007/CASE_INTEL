@@ -112,7 +112,7 @@ export default function CasesPage() {
     return (
       <div className="px-4 sm:px-7 pt-5 sm:pt-7">
         <div className="text-center py-12">
-          <div className="text-[#b32e26] text-lg font-medium mb-2">
+          <div className="text-status-alert text-lg font-medium mb-2">
             Failed to load cases
           </div>
           <div className="text-gray-500 text-sm">
@@ -161,7 +161,7 @@ export default function CasesPage() {
         <div className="mb-8">
           <div className="flex items-center gap-2.5 mb-3.5">
             <h2 className="text-card-title text-gray-900">Needs Attention This Week</h2>
-            <span className="inline-flex items-center h-5 px-2 rounded-full bg-[#fdf0e4] text-[#9a4a12] text-xs font-bold">
+            <span className="ci-chip ci-chip--pending">
               {needsAttentionCases.length}
             </span>
           </div>

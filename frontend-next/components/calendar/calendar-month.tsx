@@ -113,7 +113,7 @@ export function CalendarMonth({ hearings, caseMeta }: CalendarMonthProps) {
                   onClick={() => setSelectedDate(cell.date as Date)}
                   className={cn(
                     "text-center rounded-lg py-2 px-0.5 min-h-[44px] sm:min-h-[58px] border transition-colors",
-                    selected ? "border-[#323b83] bg-[#eef1fb]" : "border-transparent hover:bg-gray-50",
+                    selected ? "border-primary bg-gray-100" : "border-transparent hover:bg-gray-50",
                   )}
                 >
                   <div
@@ -131,7 +131,10 @@ export function CalendarMonth({ hearings, caseMeta }: CalendarMonthProps) {
                         style={{
                           height: `${6 + dayHearings.length * 5}px`,
                           width: "70%",
-                          background: dayHearings.length >= 2 ? "#323b83" : "#8d9bdb",
+                          background:
+                            dayHearings.length >= 2
+                              ? "var(--ci-warn)"
+                              : "color-mix(in srgb, var(--ci-warn) 45%, white)",
                         }}
                       />
                       <div className="text-[10px] text-gray-500 mt-1 hidden sm:block">
@@ -161,17 +164,10 @@ export function CalendarMonth({ hearings, caseMeta }: CalendarMonthProps) {
               return (
                 <div key={h.id} className="border border-gray-100 rounded-lg p-3">
                   <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                    <span className="text-[13px] font-bold text-gray-900">
+                    <span className="text-[13px] font-bold font-mono text-gray-900">
                       {format(parseISO(h.hearing_date), "h:mm a")}
                     </span>
-                    <span
-                      className={cn(
-                        "inline-flex items-center h-[18px] px-1.5 rounded-full text-[10.5px] font-bold flex-shrink-0 whitespace-nowrap",
-                        h.source === "ecourts"
-                          ? "bg-[#ebf3fb] text-[#2f6fb0]"
-                          : "bg-gray-100 text-gray-600",
-                      )}
-                    >
+                    <span className="ci-chip ci-chip--none">
                       {h.source === "ecourts" ? "eCourts" : "Manual"}
                     </span>
                     <CauseListBadge hearing={h} />

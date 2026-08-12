@@ -107,27 +107,7 @@ export function truncate(str: string, maxLength: number): string {
   return str.slice(0, maxLength - 3) + "...";
 }
 
-export function getStatusColor(status: string): string {
-  const colors: Record<string, string> = {
-    open: "bg-green-100 text-green-800",
-    active: "bg-green-100 text-green-800",
-    pending: "bg-yellow-100 text-yellow-800",
-    closed: "bg-gray-100 text-gray-800",
-    archived: "bg-gray-100 text-gray-600",
-    scheduled: "bg-blue-100 text-blue-800",
-    completed: "bg-green-100 text-green-800",
-    cancelled: "bg-red-100 text-red-800",
-    postponed: "bg-orange-100 text-orange-800",
-  };
-  return colors[status] || "bg-gray-100 text-gray-800";
-}
-
-export function getPriorityColor(priority: string): string {
-  const colors: Record<string, string> = {
-    low: "bg-green-100 text-green-800",
-    medium: "bg-yellow-100 text-yellow-800",
-    high: "bg-orange-100 text-orange-800",
-    critical: "bg-red-100 text-red-800",
-  };
-  return colors[priority] || "bg-gray-100 text-gray-800";
-}
+// getStatusColor/getPriorityColor (dead code, unused anywhere in the app)
+// were removed during the case-intel-theme reskin -- StatusBadge/
+// PriorityBadge in components/ui/badge.tsx are the single source of truth
+// for status/priority color now, mapped onto the three ci-chip meanings.

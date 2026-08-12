@@ -219,8 +219,8 @@ export function UploadDocumentDialog({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <Upload className="h-5 w-5 text-green-600" />
+            <div className="p-2 bg-gray-100 rounded-lg">
+              <Upload className="h-5 w-5 text-gray-700" />
             </div>
             <h2
               id="upload-document-title"
@@ -243,7 +243,7 @@ export function UploadDocumentDialog({
           {/* File Drop Zone */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Document File <span className="text-red-500">*</span>
+              Document File <span className="text-status-alert">*</span>
             </label>
 
             <input
@@ -264,13 +264,13 @@ export function UploadDocumentDialog({
                 className={cn(
                   "border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors",
                   isDragging
-                    ? "border-blue-500 bg-blue-50"
+                    ? "border-accent bg-accent-soft"
                     : "border-gray-300 hover:border-gray-400 hover:bg-gray-50",
                 )}
               >
                 <Upload className="h-10 w-10 text-gray-400 mx-auto mb-3" />
                 <p className="text-sm text-gray-600 mb-1">
-                  <span className="font-medium text-blue-600">
+                  <span className="font-medium text-accent">
                     Click to upload
                   </span>{" "}
                   or drag and drop
@@ -283,11 +283,11 @@ export function UploadDocumentDialog({
             ) : (
               <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <File className="h-5 w-5 text-blue-600" />
+                  <div className="p-2 bg-gray-100 rounded-lg">
+                    <File className="h-5 w-5 text-gray-700" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-900 truncate max-w-[200px]">
+                    <p className="text-sm font-medium text-gray-900 truncate max-w-[200px] font-mono">
                       {selectedFile.name}
                     </p>
                     <p className="text-xs text-gray-500">
@@ -298,7 +298,7 @@ export function UploadDocumentDialog({
                 <button
                   type="button"
                   onClick={removeFile}
-                  className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                  className="p-1 text-gray-400 hover:text-status-alert hover:bg-status-alert-soft rounded transition-colors"
                   aria-label="Remove file"
                 >
                   <X className="h-4 w-4" />
@@ -361,9 +361,9 @@ export function UploadDocumentDialog({
 
           {/* Error Message */}
           {error && (
-            <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-600">{error}</p>
+            <div className="flex items-start gap-2 p-3 bg-status-alert-soft border border-status-alert-soft rounded-lg">
+              <AlertCircle className="h-5 w-5 text-status-alert flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-status-alert">{error}</p>
             </div>
           )}
 

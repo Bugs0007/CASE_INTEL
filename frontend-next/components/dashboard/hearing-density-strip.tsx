@@ -40,25 +40,28 @@ export function HearingDensityStrip({ hearings }: HearingDensityStripProps) {
           {days.map((day, i) => {
             const isSelected = i === selectedIndex;
             const barHeight = 12 + day.hearings.length * 16;
+            // A density scale, not a status one -- more hearings reads as
+            // "busier", not "worse", so this stays on the warm/ink family
+            // rather than borrowing the alert color for a full day.
             const barColor = isSelected
-              ? "#323b83"
+              ? "var(--ci-ink)"
               : day.hearings.length === 0
-                ? "#eceef2"
+                ? "var(--ci-ink-14)"
                 : day.hearings.length >= 2
-                  ? "#8d9bdb"
-                  : "#b9c3ec";
+                  ? "var(--ci-warn)"
+                  : "color-mix(in srgb, var(--ci-warn) 45%, white)";
             return (
               <button
                 key={day.date.toISOString()}
                 onClick={() => setSelectedIndex(i)}
                 className="flex flex-col items-center gap-1.5 rounded-lg py-1 px-0.5"
-                style={{ background: isSelected ? "#eef1fb" : "transparent" }}
+                style={{ background: isSelected ? "var(--ci-ink-08)" : "transparent" }}
               >
                 <div
-                  className="text-[11px] leading-tight"
+                  className="text-[11px] leading-tight font-mono"
                   style={{
                     fontWeight: isSelected ? 700 : 400,
-                    color: isSelected ? "#272e68" : "#9aa1b2",
+                    color: isSelected ? "var(--ci-ink)" : "var(--ci-ink-45)",
                   }}
                 >
                   {format(day.date, "EEE")}
@@ -70,10 +73,14 @@ export function HearingDensityStrip({ hearings }: HearingDensityStripProps) {
                   style={{ height: `${barHeight}px`, background: barColor }}
                 />
                 <div
-                  className="text-[11px]"
+                  className="text-[11px] font-mono"
                   style={{
                     fontWeight: isSelected ? 700 : 400,
-                    color: isSelected ? "#272e68" : day.hearings.length > 0 ? "#717889" : "#c3c9d4",
+                    color: isSelected
+                      ? "var(--ci-ink)"
+                      : day.hearings.length > 0
+                        ? "var(--ci-ink-70)"
+                        : "var(--ci-ink-14)",
                   }}
                 >
                   {day.hearings.length}
@@ -106,7 +113,7 @@ export function HearingDensityStrip({ hearings }: HearingDensityStripProps) {
                     <div className="text-xs text-gray-500">
                       {h.hearing_type}
                       {h.judge ? ` · ${h.judge}` : ""} ·{" "}
-                      {format(parseISO(h.hearing_date), "h:mm a")}
+                      <span className="font-mono">{format(parseISO(h.hearing_date), "h:mm a")}</span>
                     </div>
                   </div>
                   <Link href={`/cases/${h.case_id}`}>

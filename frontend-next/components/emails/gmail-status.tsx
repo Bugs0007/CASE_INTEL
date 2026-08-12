@@ -35,8 +35,8 @@ export function GmailStatusCard({ status, isLoading }: GmailStatusCardProps) {
           <div className="flex items-center gap-3">
             {status.is_connected ? (
               <>
-                <div className="flex items-center justify-center w-10 h-10 bg-green-100 rounded-full">
-                  <CheckCircle className="h-6 w-6 text-green-600" />
+                <div className="flex items-center justify-center w-10 h-10 bg-status-ok-soft rounded-full">
+                  <CheckCircle className="h-6 w-6 text-status-ok" />
                 </div>
                 <div>
                   <div className="font-medium text-gray-900">Connected</div>
@@ -47,8 +47,8 @@ export function GmailStatusCard({ status, isLoading }: GmailStatusCardProps) {
               </>
             ) : (
               <>
-                <div className="flex items-center justify-center w-10 h-10 bg-red-100 rounded-full">
-                  <XCircle className="h-6 w-6 text-red-600" />
+                <div className="flex items-center justify-center w-10 h-10 bg-status-alert-soft rounded-full">
+                  <XCircle className="h-6 w-6 text-status-alert" />
                 </div>
                 <div>
                   <div className="font-medium text-gray-900">Disconnected</div>
