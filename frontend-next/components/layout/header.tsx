@@ -27,28 +27,30 @@ export function Header() {
   }
 
   return (
-    <header className="h-16 bg-white border-b border-gray-100 flex items-center justify-between px-4 sm:px-7 sticky top-0 z-[5] gap-3">
+    <header className="ci-appbar ci-on-field h-16 flex items-center justify-between px-4 sm:px-7 sticky top-0 z-[5] gap-3">
       {/* Brand -- Sidebar (which normally shows this) is hidden below lg, so
           this keeps the wordmark on screen instead of losing it entirely. */}
-      <Link href="/" className="text-[17px] font-bold text-primary-active shrink-0 lg:hidden">
+      <Link href="/dashboard" className="font-serif text-[17px] text-[color:var(--ci-on-field)] shrink-0 lg:hidden">
         Case Intel
       </Link>
 
       {/* Global Search -- desktop/tablet only; hidden on mobile since there's
           no room and this input is decorative (no search wired up yet). */}
-      <div className="hidden md:flex items-center gap-2.5 flex-1 max-w-[360px] h-[38px] rounded-lg border border-gray-200 bg-gray-50 px-3">
-        <Search className="h-4 w-4 text-gray-400 flex-shrink-0" strokeWidth={1.8} />
-        <span className="text-sm text-gray-400 truncate">
+      <div className="hidden md:flex items-center gap-2.5 flex-1 max-w-[360px] h-[38px] rounded border border-[var(--ci-field-line)] bg-[rgba(241,240,234,0.06)] px-3">
+        <Search className="h-4 w-4 text-[color:var(--ci-on-field-dim)] flex-shrink-0" strokeWidth={1.8} />
+        <span className="text-sm text-[color:var(--ci-on-field-dim)] truncate">
           Search cases, documents, emails&hellip;
         </span>
       </div>
 
       {/* Action Buttons -- full set at lg+, condensed to icon-only on mobile
-          (Calendar drops entirely there since it's already a bottom tab). */}
+          (Calendar drops entirely there since it's already a bottom tab).
+          These use the ci-btn primitives directly (not <Button>) so the
+          .ci-on-field ancestor flips solid/line to the on-dark treatment. */}
       <div className="flex items-center gap-1.5 sm:gap-2.5">
         <button
           onClick={() => router.push("/calendar")}
-          className="hidden lg:inline-flex items-center gap-2 h-9 px-3.5 rounded-lg border border-gray-200 bg-white text-gray-800 text-[13px] font-semibold hover:bg-gray-50 transition-colors"
+          className="ci-btn ci-btn--line hidden lg:inline-flex h-9 px-3.5 text-[13px]"
         >
           <Calendar className="h-[15px] w-[15px]" strokeWidth={1.8} />
           Calendar
@@ -58,7 +60,7 @@ export function Header() {
           onClick={() => router.push("/cases/search")}
           aria-label="New Case"
           title="New Case"
-          className="inline-flex lg:hidden items-center justify-center h-11 w-11 rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 transition-colors"
+          className="ci-btn ci-btn--line lg:hidden h-11 w-11 p-0 justify-center"
         >
           <Plus className="h-[18px] w-[18px]" strokeWidth={1.8} />
         </button>
@@ -67,7 +69,7 @@ export function Header() {
           onClick={openUploadDocument}
           aria-label="Upload Document"
           title="Upload Document"
-          className="inline-flex items-center justify-center gap-2 h-11 w-11 px-0 lg:h-9 lg:w-auto lg:px-3.5 rounded-lg border-none bg-primary text-white text-[13px] font-semibold hover:bg-primary-hover transition-colors"
+          className="ci-btn ci-btn--solid h-11 w-11 lg:w-auto p-0 lg:h-9 lg:px-3.5 justify-center text-[13px]"
         >
           <Upload className="h-[18px] w-[18px] lg:h-[15px] lg:w-[15px]" strokeWidth={1.8} />
           <span className="hidden lg:inline">Upload Document</span>
@@ -77,7 +79,7 @@ export function Header() {
           onClick={handleLogout}
           aria-label="Log Out"
           title="Log Out"
-          className="inline-flex items-center justify-center gap-2 h-11 w-11 px-0 lg:h-9 lg:w-auto lg:px-3 rounded-lg border-none bg-transparent text-gray-600 hover:bg-gray-50 transition-colors"
+          className="inline-flex items-center justify-center gap-2 h-11 w-11 px-0 lg:h-9 lg:w-auto lg:px-3 rounded border-none bg-transparent text-[color:var(--ci-on-field-dim)] hover:bg-[var(--ci-field-line)] hover:text-[color:var(--ci-on-field)] transition-colors"
         >
           <LogOut className="h-[18px] w-[18px] lg:h-[15px] lg:w-[15px]" strokeWidth={1.8} />
           <span className="hidden lg:inline text-[13px] font-semibold">Log Out</span>

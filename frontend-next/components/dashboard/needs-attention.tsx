@@ -48,8 +48,8 @@ export function NeedsAttention({
     items.push({
       key: `hearing-${h.id}`,
       href: `/cases/${h.case_id}`,
-      iconBg: "bg-[#fdecec]",
-      iconColor: "text-[#b32e26]",
+      iconBg: "bg-status-pending-soft",
+      iconColor: "text-status-pending",
       icon: CalendarClock,
       message: (
         <>
@@ -67,8 +67,8 @@ export function NeedsAttention({
     items.push({
       key: `ecourts-${h.id}`,
       href: `/cases/${h.case_id}`,
-      iconBg: "bg-[#ebf3fb]",
-      iconColor: "text-[#2f6fb0]",
+      iconBg: "bg-gray-100",
+      iconColor: "text-gray-600",
       icon: RefreshCw,
       message: (
         <>
@@ -84,8 +84,8 @@ export function NeedsAttention({
     items.push({
       key: `doc-${d.id}`,
       href: d.case_id ? `/cases/${d.case_id}` : "/documents",
-      iconBg: "bg-[#fdecec]",
-      iconColor: "text-[#b32e26]",
+      iconBg: "bg-status-alert-soft",
+      iconColor: "text-status-alert",
       icon: FileWarning,
       message: (
         <>
@@ -103,7 +103,7 @@ export function NeedsAttention({
         <CardTitle className="flex items-center gap-2.5 text-lg font-bold">
           Needs Your Attention
           {items.length > 0 && (
-            <span className="inline-flex items-center h-5 px-2 rounded-full bg-[#fdf0e4] text-[#9a4a12] text-xs font-bold">
+            <span className="ci-chip ci-chip--pending">
               {items.length}
             </span>
           )}
@@ -134,7 +134,7 @@ export function NeedsAttention({
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm text-gray-900">{item.message}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">{item.meta}</div>
+                    <div className="text-xs font-mono text-gray-500 mt-0.5">{item.meta}</div>
                   </div>
                   <Link href={item.href}>
                     <Button variant="secondary" size="sm">

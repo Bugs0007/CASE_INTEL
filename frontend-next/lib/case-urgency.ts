@@ -19,7 +19,10 @@ export function sortByUrgencyPriority(cases: Case[]): Case[] {
 
 export interface UrgencyReason {
   label: string;
-  className: string;
+  /** One of the three ci-chip meanings (see components/ui/badge.tsx) --
+   * "alert" is reserved for genuine failures, everything else that's
+   * merely time-pressured or informational reads as pending/neutral. */
+  chip: "ok" | "pending" | "alert" | "none";
 }
 
 export function reasonForCase(
@@ -29,13 +32,13 @@ export function reasonForCase(
   failedDocCaseIds: Set<number>,
 ): UrgencyReason {
   if (hearingSoonCaseIds.has(caseId)) {
-    return { label: "Hearing this week", className: "bg-[#fdecec] text-[#b32e26]" };
+    return { label: "Hearing this week", chip: "pending" };
   }
   if (ecourtsUpdateCaseIds.has(caseId)) {
-    return { label: "eCourts update", className: "bg-[#ebf3fb] text-[#2f6fb0]" };
+    return { label: "eCourts update", chip: "none" };
   }
   if (failedDocCaseIds.has(caseId)) {
-    return { label: "Processing failed", className: "bg-[#fdecec] text-[#b32e26]" };
+    return { label: "Processing failed", chip: "alert" };
   }
-  return { label: "Needs attention", className: "bg-gray-100 text-[#4b5468]" };
+  return { label: "Needs attention", chip: "pending" };
 }

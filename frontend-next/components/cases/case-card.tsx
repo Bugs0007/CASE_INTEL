@@ -46,16 +46,14 @@ export function CaseCard({ case: caseItem, onDelete, isDeleting, urgencyReason, 
       style={staggerDelay(index)}
       className={cn(
         "p-[18px] cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 animate-fade-up motion-reduce:animate-none motion-reduce:hover:translate-y-0",
-        urgencyReason && "border-[#f0d9bb]",
+        urgencyReason && "border-status-pending",
       )}
     >
       {/* Header */}
       <div className="flex items-start justify-between mb-2.5">
         <div className="flex items-center gap-2 flex-wrap">
           {urgencyReason && (
-            <span
-              className={`inline-flex items-center h-5 px-2 rounded-full text-[11px] font-semibold flex-shrink-0 whitespace-nowrap ${urgencyReason.className}`}
-            >
+            <span className={`ci-chip ci-chip--${urgencyReason.chip} flex-shrink-0`}>
               {urgencyReason.label}
             </span>
           )}
@@ -81,7 +79,7 @@ export function CaseCard({ case: caseItem, onDelete, isDeleting, urgencyReason, 
             <div
               role="menu"
               onClick={(e) => e.stopPropagation()}
-              className="absolute right-0 top-full mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-10"
+              className="absolute right-0 top-full mt-1 w-40 bg-surface rounded-lg shadow-lg border border-gray-100 py-1 z-10"
             >
               <button
                 role="menuitem"
@@ -90,7 +88,7 @@ export function CaseCard({ case: caseItem, onDelete, isDeleting, urgencyReason, 
                   setIsMenuOpen(false);
                   onDelete?.(caseItem.id);
                 }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-[#fdecec] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-status-alert-soft disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <Trash2 className="h-4 w-4" />
                 {isDeleting ? "Deleting..." : "Delete Case"}
@@ -100,7 +98,9 @@ export function CaseCard({ case: caseItem, onDelete, isDeleting, urgencyReason, 
         </div>
       </div>
 
-      {/* Case number + title + client */}
+      {/* Case number + title + client -- case number is an identifier, so
+          it gets the mono treatment (font-mono already present, now points
+          at IBM Plex Mono via the tailwind.config remap). */}
       <div className="text-xs text-gray-400 font-mono mb-1">
         {caseItem.case_number}
       </div>
@@ -110,7 +110,7 @@ export function CaseCard({ case: caseItem, onDelete, isDeleting, urgencyReason, 
       <div className="text-meta text-gray-600 mb-3.5">{client?.name || "No client on file"}</div>
 
       {/* Footer */}
-      <div className="flex items-center gap-3.5 pt-3 border-t border-[#f2f3f5] text-xs text-gray-400">
+      <div className="flex items-center gap-3.5 pt-3 border-t border-gray-100 text-xs text-gray-400">
         <span>{caseItem.document_count} docs</span>
         <span>{caseItem.hearing_count} hearings</span>
       </div>

@@ -1,9 +1,13 @@
 import type { Config } from "tailwindcss";
 
-// Every hex value below is read directly from the Claude Design bundle's
-// "Design System.dc.html" (color swatches + typography section) plus the
-// literal inline styles used across Dashboard/Cases/CaseDetail/Calendar/
-// Documents/Login .dc.html -- not approximated from memory.
+// Every color/radius/shadow/font token below is a CSS custom property from
+// app/case-intel-theme.css (imported globally, ahead of this config's own
+// output, in app/layout.tsx) rather than a duplicated raw value -- so a
+// `bg-primary`, `text-gray-600`, `rounded-lg`, or `font-sans` anywhere in
+// the app automatically tracks the design tokens instead of drifting from
+// them. Status/priority chips prefer the `.ci-chip--*` primitives directly
+// (see components/ui/badge.tsx) rather than these color utilities, since
+// theme.css's chip is purpose-built for the ok/pending/alert three-way.
 const config: Config = {
   content: [
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -12,54 +16,78 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        page: "#f6f7f9",
+        page: "var(--ci-paper)",
+        surface: "var(--ci-surface)",
         primary: {
-          DEFAULT: "#323b83", // Primary 600 -- default
-          hover: "#272e68", // Primary 700 -- hover
-          active: "#1d2350", // Primary 800 -- active
-          light: "#dde3f7", // Primary 100 -- active-nav bg
+          DEFAULT: "var(--ci-ink)", // ci-btn--solid's resting state
+          hover: "var(--ci-seal)", // ci-btn--solid's hover state
+          active: "var(--ci-seal)",
+          light: "var(--ci-seal-soft)",
         },
         destructive: {
-          DEFAULT: "#d1372e", // Red 600
-          hover: "#b32e26", // Red 700 -- hover
+          DEFAULT: "var(--ci-seal)",
+          hover: "var(--ci-seal)",
         },
-        // Overrides Tailwind's default gray scale with the design system's
-        // own Neutrals swatch (25/100/200/300/400/500/700/900 given
-        // explicitly; 600/800 interpolated from the exact body-text/
-        // meta-text colors used pervasively across every screen's inline
-        // styles: #545b6c for meta/secondary text, #23273e for base body
-        // text).
+        // Collapses Tailwind's default 10-step gray scale onto theme.css's
+        // 5-step ink scale (ci-ink / ci-ink-70 / ci-ink-45 / ci-ink-14 /
+        // ci-ink-08) rather than keeping a separate, unrelated gray ramp --
+        // every bg-gray-*/text-gray-* usage across the app now resolves to
+        // the same ink tokens the primitives (.ci-card, .ci-table, etc) use.
         gray: {
-          50: "#fafafb", // Gray 25
-          100: "#eceef2", // Gray 100
-          200: "#dde1e8", // Gray 200
-          300: "#c3c9d4", // Gray 300
-          400: "#9aa1b2", // Gray 400
-          500: "#717889", // Gray 500
-          600: "#545b6c", // Meta/13 text color (between Gray 500 and 700)
-          700: "#383e4e", // Gray 700
-          800: "#23273e", // universal base body-text color on every screen
-          900: "#14171f", // Gray 900 -- headings
+          50: "var(--ci-ink-08)",
+          100: "var(--ci-ink-08)",
+          200: "var(--ci-ink-14)",
+          300: "var(--ci-ink-14)",
+          400: "var(--ci-ink-45)",
+          500: "var(--ci-ink-45)",
+          600: "var(--ci-ink-70)",
+          700: "var(--ci-ink-70)",
+          800: "var(--ci-ink)",
+          900: "var(--ci-ink)",
         },
-        semantic: {
-          success: { bg: "#e9f7f1", text: "#146349" },
-          warning: { bg: "#fdf3e0", text: "#92610f" },
-          attention: { bg: "#fdf0e4", text: "#9a4a12" },
-          critical: { bg: "#f3ecfb", text: "#6b3aa0" },
-          info: { bg: "#ebf3fb", text: "#2f6fb0" },
-          neutral: { bg: "#eceef2", text: "#4b5468" },
-          error: { bg: "#fdecec", text: "#b32e26" },
+        // The 3-way status meaning, for anything that needs a bare color
+        // rather than a full .ci-chip (icons, dots, thin accents). Status
+        // chips themselves should use .ci-chip--ok/--pending/--alert/--none.
+        status: {
+          ok: "var(--ci-listed)",
+          "ok-soft": "var(--ci-listed-soft)",
+          pending: "var(--ci-warn)",
+          "pending-soft": "var(--ci-warn-soft)",
+          alert: "var(--ci-seal)",
+          "alert-soft": "var(--ci-seal-soft)",
+        },
+        // Same underlying color as status.alert (--ci-seal is deliberately
+        // dual-purpose in theme.css: "primary accent, destructive, active
+        // nav") but named for its other job -- drawing attention to
+        // something without claiming it's a failure/alert, e.g. the "your
+        // side" emphasis block on an order summary.
+        accent: {
+          DEFAULT: "var(--ci-seal)",
+          soft: "var(--ci-seal-soft)",
         },
       },
+      borderRadius: {
+        // theme.css is deliberately near-square ("a register, not a toy") --
+        // this replaces Tailwind's default rounded scale everywhere except
+        // `rounded-full`, which stays for circular chrome (avatars, dots,
+        // notification-count pills) that isn't a status/content surface.
+        none: "0px",
+        sm: "var(--ci-radius)",
+        DEFAULT: "var(--ci-radius)",
+        md: "var(--ci-radius)",
+        lg: "var(--ci-radius-lg)",
+        xl: "var(--ci-radius-lg)",
+        "2xl": "var(--ci-radius-lg)",
+        "3xl": "var(--ci-radius-lg)",
+        full: "9999px",
+      },
+      boxShadow: {
+        card: "var(--ci-shadow)",
+      },
       fontFamily: {
-        sans: [
-          "var(--font-public-sans)",
-          "-apple-system",
-          "BlinkMacSystemFont",
-          "Segoe UI",
-          "sans-serif",
-        ],
-        mono: ["ui-monospace", "SFMono-Regular", "monospace"],
+        sans: ["var(--ci-sans)"],
+        serif: ["var(--ci-serif)"],
+        mono: ["var(--ci-mono)"],
       },
       fontSize: {
         // Design System.dc.html's literal type scale.

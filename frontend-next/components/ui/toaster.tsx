@@ -9,13 +9,17 @@ export function Toaster() {
       toastOptions={{
         classNames: {
           toast:
-            "group border-gray-200 bg-white text-gray-900 shadow-lg rounded-lg",
+            "group border-gray-200 bg-white text-gray-900 shadow-lg rounded-lg font-sans",
           title: "text-sm font-medium",
           description: "text-sm text-gray-500",
-          success: "!border-green-200 !bg-green-50",
-          error: "!border-red-200 !bg-red-50",
-          warning: "!border-yellow-200 !bg-yellow-50",
-          info: "!border-blue-200 !bg-blue-50",
+          // Same three chip meanings as everywhere else -- "warning" and
+          // "info" both fall outside ok/alert, so they share the pending
+          // and neutral tokens respectively rather than getting their own
+          // colors.
+          success: "!border-status-ok !bg-status-ok-soft",
+          error: "!border-status-alert !bg-status-alert-soft",
+          warning: "!border-status-pending !bg-status-pending-soft",
+          info: "!border-gray-200 !bg-gray-100",
         },
       }}
       closeButton

@@ -343,7 +343,7 @@ export function ChatPanel({ caseId, className, onClose }: ChatPanelProps) {
                     className={cn(
                       "w-full rounded-xl border px-3 py-3 text-left transition-colors",
                       isActive
-                        ? "border-primary-light bg-[#eef1fb]"
+                        ? "border-accent bg-accent-soft"
                         : "border-transparent bg-white hover:border-gray-200 hover:bg-gray-100",
                     )}
                   >
@@ -462,7 +462,7 @@ export function ChatPanel({ caseId, className, onClose }: ChatPanelProps) {
           </div>
 
           {sendError && (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div className="rounded-xl border border-status-alert-soft bg-status-alert-soft px-4 py-3 text-sm text-status-alert">
               <div className="font-medium">Request failed</div>
               <div className="mt-1">{sendError}</div>
               {lastFailedRequest && (
@@ -690,7 +690,7 @@ function SidebarError({
   onRetry: () => void;
 }) {
   return (
-    <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+    <div className="rounded-xl border border-status-alert-soft bg-status-alert-soft p-3 text-sm text-status-alert">
       <div>{message}</div>
       <Button variant="secondary" size="sm" className="mt-3" onClick={onRetry}>
         Retry
@@ -716,7 +716,7 @@ function CenteredError({
 }) {
   return (
     <div className="flex h-full items-center justify-center">
-      <div className="max-w-sm rounded-2xl border border-red-200 bg-white p-6 text-center shadow-sm">
+      <div className="max-w-sm rounded-2xl border border-status-alert-soft bg-white p-6 text-center shadow-sm">
         <div className="text-base font-semibold text-gray-900">Could not load chat</div>
         <div className="mt-2 text-sm text-gray-600">{message}</div>
         {onRetry && (

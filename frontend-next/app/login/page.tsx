@@ -22,7 +22,7 @@ export default function LoginPage() {
       const data = await login(username, password);
       setToken(data.token);
       storeUsername(data.username);
-      router.push("/");
+      router.push("/dashboard");
     } catch {
       setError("Invalid username or password.");
     } finally {
@@ -34,17 +34,14 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-page">
       <div className="w-[400px] max-w-[calc(100vw-40px)]">
         <div className="text-center mb-7">
-          <div className="text-[22px] font-bold text-primary-active">Case Intel</div>
+          <div className="font-serif text-[26px] text-gray-900">Case Intel</div>
           <div className="text-sm text-gray-500 mt-1.5">Sign in to your workspace</div>
         </div>
 
-        <div className="bg-white border border-gray-100 rounded-xl shadow-[0_1px_2px_rgba(20,23,31,0.04)] p-8">
+        <div className="ci-card p-8">
           <form onSubmit={handleSubmit} className="flex flex-col gap-[18px]">
             <div>
-              <label
-                htmlFor="username"
-                className="block text-[13px] font-semibold text-gray-700 mb-1.5"
-              >
+              <label htmlFor="username" className="ci-label">
                 Username
               </label>
               <input
@@ -54,14 +51,11 @@ export default function LoginPage() {
                 autoComplete="username"
                 placeholder="advocate@caseintel.com"
                 required
-                className="w-full h-11 rounded-lg border border-gray-200 px-3.5 text-sm text-gray-800 outline-none focus:ring-2 focus:ring-primary/30"
+                className="ci-input"
               />
             </div>
             <div>
-              <label
-                htmlFor="password"
-                className="block text-[13px] font-semibold text-gray-700 mb-1.5"
-              >
+              <label htmlFor="password" className="ci-label">
                 Password
               </label>
               <input
@@ -72,26 +66,18 @@ export default function LoginPage() {
                 autoComplete="current-password"
                 placeholder="••••••••"
                 required
-                className="w-full h-11 rounded-lg border border-gray-200 px-3.5 text-sm text-gray-800 outline-none focus:ring-2 focus:ring-primary/30"
+                className="ci-input"
               />
             </div>
-            {error && (
-              <div className="text-[13px] text-[#b32e26] bg-[#fdecec] rounded-lg px-3 py-2.5">
-                {error}
-              </div>
-            )}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full h-11 rounded-lg border-none bg-primary text-white text-sm font-semibold hover:bg-primary-hover disabled:opacity-50 disabled:pointer-events-none transition-colors"
-            >
+            {error && <div className="ci-error bg-status-alert-soft rounded px-3 py-2.5 mt-0">{error}</div>}
+            <button type="submit" disabled={loading} className="ci-btn ci-btn--solid w-full justify-center">
               {loading ? "Signing in..." : "Sign In"}
             </button>
           </form>
         </div>
         <div className="text-center mt-[18px] text-[13px] text-gray-400">
           Don&apos;t have an account?{" "}
-          <Link href="/register" className="text-primary-active font-semibold hover:underline">
+          <Link href="/register" className="text-accent font-semibold hover:underline">
             Create one
           </Link>
         </div>

@@ -36,21 +36,23 @@ export function CaseFeeSummaryCard({ summary }: CaseFeeSummaryCardProps) {
       hint: "Recorded but not yet invoiced",
       amount: summary.pending_amount,
       count: summary.pending_count,
-      className: "text-[#8a5a0b]",
+      className: "text-status-pending",
     },
     {
       label: "Invoiced",
       hint: "Billed, awaiting payment",
       amount: summary.invoiced_amount,
       count: summary.invoiced_count,
-      className: "text-[#33449b]",
+      // Still "awaiting" in the ok/pending/alert sense (billed, but not yet
+      // received) -- same warm token as Pending rather than a fourth color.
+      className: "text-status-pending",
     },
     {
       label: "Paid",
       hint: "Received",
       amount: summary.paid_amount,
       count: summary.paid_count,
-      className: "text-[#1d6b3f]",
+      className: "text-status-ok",
     },
   ];
 

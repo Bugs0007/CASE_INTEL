@@ -25,8 +25,7 @@ export function CauseListBadge({ hearing, className }: CauseListBadgeProps) {
   const status = hearing.cause_list_status;
   if (!status || status === "not_checked") return null;
 
-  const base =
-    "text-[11px] font-semibold h-5 px-2 inline-flex items-center flex-shrink-0 whitespace-nowrap rounded-full";
+  const base = "ci-chip inline-flex items-center flex-shrink-0";
 
   if (status === "listed") {
     const parts = [
@@ -41,7 +40,7 @@ export function CauseListBadge({ hearing, className }: CauseListBadgeProps) {
             ? `Cause list: ${hearing.cause_list_stage}`
             : "Listed in the court's cause list"
         }
-        className={cn(base, "bg-[#e6f6ed] text-[#1d6b3f]", className)}
+        className={cn(base, "ci-chip--ok", className)}
       >
         {parts.length > 0 ? parts.join(" · ") : "Listed"}
       </span>
@@ -52,7 +51,7 @@ export function CauseListBadge({ hearing, className }: CauseListBadgeProps) {
     return (
       <span
         title="The court has not published the cause list for this date yet."
-        className={cn(base, "bg-gray-100 text-[#4b5468]", className)}
+        className={cn(base, "ci-chip--none", className)}
       >
         Not yet listed
       </span>
@@ -62,7 +61,7 @@ export function CauseListBadge({ hearing, className }: CauseListBadgeProps) {
   return (
     <span
       title="The cause list for this date is published and this matter is not in it."
-      className={cn(base, "bg-[#fdf3e3] text-[#8a5a0b]", className)}
+      className={cn(base, "ci-chip--pending", className)}
     >
       Not listed
     </span>

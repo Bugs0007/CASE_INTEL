@@ -20,7 +20,7 @@ import { casesApi } from "@/lib/api/cases";
 import { getUsername } from "@/lib/auth";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/cases", label: "Cases", icon: Briefcase },
   { href: "/documents", label: "Documents", icon: FileText },
   { href: "/calendar", label: "Calendar", icon: Calendar },
@@ -53,27 +53,34 @@ export function Sidebar() {
   }
 
   return (
-    <div className="hidden lg:flex fixed left-0 top-0 h-screen w-60 bg-white border-r border-gray-100 flex-col z-10">
-      {/* Logo */}
-      <div className="px-5 py-[22px] border-b border-gray-100">
-        <Link href="/" className="text-[19px] font-bold text-primary-active">
+    <div className="ci-sidebar ci-on-field hidden lg:flex fixed left-0 top-0 h-screen w-60 flex-col z-10">
+      {/* Logo -- Newsreader wordmark + mono eyebrow subtitle, same pairing
+          as the landing page's header mark, so the app doesn't feel like a
+          different product once an advocate logs in. */}
+      <div className="px-5 py-[22px] border-b border-[var(--ci-field-line)] flex items-baseline gap-2">
+        <Link href="/dashboard" className="font-serif text-[19px] text-[color:var(--ci-on-field)]">
           Case Intel
         </Link>
+        <span className="font-mono text-[10px] tracking-[0.16em] uppercase text-[color:var(--ci-on-field-dim)]">
+          eCourts
+        </span>
       </div>
 
       {/* New Case Button -- always the advocate-search flow; there's no
-          direct-entry form (see CaseListView). */}
+          direct-entry form (see CaseListView). Uses the ci-btn primitive
+          directly (not the <Button> component) since .ci-on-field flips
+          its solid variant to paper-on-ink for contrast against this dark
+          sidebar -- <Button>'s bg-primary doesn't know about that context. */}
       <div className="p-4">
-        <Link
-          href="/cases/search"
-          className="w-full flex items-center justify-center gap-2 h-10 rounded-lg border-none bg-primary text-white text-sm font-semibold hover:bg-primary-hover transition-colors"
-        >
+        <Link href="/cases/search" className="ci-btn ci-btn--solid w-full justify-center">
           <Plus className="h-4 w-4" />
           New Case
         </Link>
       </div>
 
-      {/* Navigation */}
+      {/* Navigation -- color/hover/active states come from .ci-sidebar a
+          in case-intel-theme.css (dim by default, brightens on hover, a
+          seal-red inset stripe for the current page via aria-current). */}
       <nav className="flex-1 px-3 py-1 flex flex-col gap-0.5">
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
@@ -82,18 +89,17 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              aria-current={isActive ? "page" : undefined}
               onMouseEnter={item.href === "/calendar" ? prefetchCalendar : undefined}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
-                isActive
-                  ? "bg-[#eef1fb] text-primary-hover font-semibold"
-                  : "text-gray-600 font-medium hover:bg-gray-50",
+                "flex items-center gap-3 px-3 py-2.5 rounded text-sm transition-colors",
+                isActive ? "font-semibold bg-[var(--ci-field-line)]" : "font-medium hover:bg-[var(--ci-field-line)]",
               )}
             >
               <Icon className="h-[18px] w-[18px]" strokeWidth={1.8} />
               <span className="flex-1">{item.label}</span>
               {item.badge && (
-                <span className="min-w-[18px] h-[18px] px-1.5 rounded-full bg-gray-100 text-[#4b5468] text-[11px] font-bold flex items-center justify-center">
+                <span className="min-w-[18px] h-[18px] px-1.5 rounded-full bg-[var(--ci-field-line)] text-[color:var(--ci-on-field)] text-[11px] font-mono font-bold flex items-center justify-center">
                   {item.badge}
                 </span>
               )}
@@ -103,9 +109,9 @@ export function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="px-5 py-4 border-t border-gray-100 text-meta text-gray-500 truncate">
+      <div className="px-5 py-4 border-t border-[var(--ci-field-line)] text-meta text-[color:var(--ci-on-field-dim)] truncate">
         Signed in as{" "}
-        <span className="text-gray-800 font-semibold">{username || "Advocate"}</span>
+        <span className="text-[color:var(--ci-on-field)] font-semibold">{username || "Advocate"}</span>
       </div>
     </div>
   );

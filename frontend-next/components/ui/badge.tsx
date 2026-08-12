@@ -1,19 +1,24 @@
 import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
 
-// Exact semantic badge colors from Design System.dc.html's "Semantic" swatch
-// (status & priority badges only, never buttons).
-const VARIANT_CLASSES = {
-  default: "bg-gray-100 text-[#4b5468]", // Neutral
-  success: "bg-[#e9f7f1] text-[#146349]",
-  warning: "bg-[#fdf3e0] text-[#92610f]",
-  attention: "bg-[#fdf0e4] text-[#9a4a12]",
-  critical: "bg-[#f3ecfb] text-[#6b3aa0]",
-  info: "bg-[#ebf3fb] text-[#2f6fb0]",
-  danger: "bg-[#fdecec] text-[#b32e26]", // Error
+// Every status/priority badge in the app resolves to one of the three chip
+// meanings case-intel-theme.css defines -- ok (listed/paid/cleared),
+// pending (awaiting), alert (failures/destructive) -- plus a neutral "none"
+// for states that don't carry urgency at all. Call sites keep their
+// original variant names (success/warning/critical/etc) so this map is the
+// single place that enforces "status color meaning stays consistent
+// everywhere, don't invent new status colors per screen."
+const VARIANT_CHIP = {
+  default: "none",
+  success: "ok",
+  warning: "pending",
+  attention: "pending",
+  critical: "alert",
+  info: "none",
+  danger: "alert",
 } as const;
 
-type BadgeVariant = keyof typeof VARIANT_CLASSES;
+type BadgeVariant = keyof typeof VARIANT_CHIP;
 
 interface BadgeProps {
   children: ReactNode;
@@ -31,12 +36,9 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center flex-shrink-0 whitespace-nowrap font-semibold rounded-full",
-        VARIANT_CLASSES[variant],
-        {
-          "h-[22px] px-2.5 text-xs": size === "sm",
-          "h-6 px-3 text-sm": size === "md",
-        },
+        "ci-chip inline-flex items-center flex-shrink-0",
+        `ci-chip--${VARIANT_CHIP[variant]}`,
+        size === "md" && "text-[11px] px-3 py-1",
         className,
       )}
     >

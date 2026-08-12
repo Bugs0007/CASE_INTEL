@@ -154,8 +154,8 @@ export function HearingDialog({ isOpen, onClose, caseId, hearing }: HearingDialo
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <CalendarPlus className="h-5 w-5 text-blue-600" />
+            <div className="p-2 bg-gray-100 rounded-lg">
+              <CalendarPlus className="h-5 w-5 text-gray-700" />
             </div>
             <h2 id="hearing-dialog-title" className="text-lg font-semibold text-gray-900">
               {isEditing ? "Edit Hearing" : "Add Hearing"}
@@ -173,7 +173,7 @@ export function HearingDialog({ isOpen, onClose, caseId, hearing }: HearingDialo
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
             <label htmlFor="hearing_date" className="block text-sm font-medium text-gray-700 mb-1">
-              Hearing Date &amp; Time <span className="text-red-500">*</span>
+              Hearing Date &amp; Time <span className="text-status-alert">*</span>
             </label>
             <Input
               id="hearing_date"
@@ -273,8 +273,8 @@ export function HearingDialog({ isOpen, onClose, caseId, hearing }: HearingDialo
           )}
 
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm text-red-600">{error}</p>
+            <div className="p-3 bg-status-alert-soft border border-status-alert-soft rounded-lg">
+              <p className="text-sm text-status-alert">{error}</p>
             </div>
           )}
 

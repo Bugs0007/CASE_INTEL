@@ -39,8 +39,8 @@ export function DocumentRow({
       document.processing_status === "failed");
 
   return (
-    <div className="bg-white border border-gray-100 rounded-[10px] px-[18px] py-4 flex items-center gap-4 flex-wrap transition-colors hover:bg-gray-50/60">
-      <div className="w-10 h-10 rounded-lg bg-[#eef1fb] flex items-center justify-center flex-shrink-0 text-lg">
+    <div className="bg-white border border-gray-100 rounded-lg px-[18px] py-4 flex items-center gap-4 flex-wrap transition-colors hover:bg-gray-50/60">
+      <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 text-lg">
         {fileIcon}
       </div>
 
@@ -55,7 +55,7 @@ export function DocumentRow({
             {document.filename}
           </button>
           {document.document_type === "court_order" ? (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 flex-shrink-0">
+            <span className="ci-chip ci-chip--none flex-shrink-0">
               From eCourts
             </span>
           ) : (
@@ -64,18 +64,18 @@ export function DocumentRow({
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2.5 text-xs text-gray-400 flex-wrap">
+        <div className="flex items-center gap-2.5 text-xs text-gray-400 flex-wrap font-mono">
           {document.case ? (
             <Link href={`/cases/${document.case.id}`} className="font-semibold text-primary hover:text-primary-hover">
               {document.case.case_number}
             </Link>
           ) : (
-            <span>No case</span>
+            <span className="font-sans">No case</span>
           )}
           {document.case && (
             <>
               <span>·</span>
-              <span className="truncate">{document.case.title}</span>
+              <span className="truncate font-sans">{document.case.title}</span>
             </>
           )}
           <span>·</span>
@@ -119,7 +119,7 @@ export function DocumentRow({
           View
         </button>
         <button
-          className="inline-flex items-center gap-1.5 h-11 md:h-8 px-3 rounded-md border border-[#fbdada] bg-white text-destructive text-xs font-semibold hover:bg-[#fdecec] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="inline-flex items-center gap-1.5 h-11 md:h-8 px-3 rounded-md border border-status-alert-soft bg-white text-destructive text-xs font-semibold hover:bg-status-alert-soft disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           onClick={() => onDelete(document.id)}
           disabled={isDeleting}
           title="Delete"
