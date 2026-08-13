@@ -56,17 +56,23 @@ def _error_response(exc: Exception) -> Response:
 
 def _validate_tracking_config(tracking_config: dict) -> str | None:
     """Returns an error message if tracking_config is invalid for either
-    the CNR-first shape ({court_type, cnr}) or the cascade fallback shape
-    (court hierarchy + case_type/case_number/year), else None."""
-    court_type = tracking_config.get("court_type")
-    if court_type not in ("district", "high_court"):
-        return "tracking_config.court_type must be 'district' or 'high_court'."
-
+    the CNR-first shape ({cnr}, court_type OPTIONAL -- auto-detected from
+    the CNR itself if omitted, see preview_case_tracking) or the cascade
+    fallback shape (court hierarchy + case_type/case_number/year,
+    court_type REQUIRED, since it picks which hierarchy fields apply),
+    else None."""
     cnr = tracking_config.get("cnr")
     if cnr:
         if not isinstance(cnr, str) or len(cnr) != 16 or not cnr.isalnum():
             return "cnr must be a 16-character alphanumeric CNR number."
+        court_type = tracking_config.get("court_type")
+        if court_type is not None and court_type not in ("district", "high_court"):
+            return "tracking_config.court_type must be 'district' or 'high_court' if provided."
         return None
+
+    court_type = tracking_config.get("court_type")
+    if court_type not in ("district", "high_court"):
+        return "tracking_config.court_type must be 'district' or 'high_court'."
 
     required = ["case_type", "case_number", "year"]
     required += (
@@ -219,13 +225,16 @@ class CaseTrackingPreviewView(APIView):
     """Fetch live court data WITHOUT persisting it -- the human-confirmation
     step. POST /api/cases/<id>/tracking/preview/
 
-    Body: either the CNR-first shape {"court_type": "district"|"high_court",
-    "cnr": "<16-char CNR>"}, or the cascade fallback shape (court hierarchy
-    + case_type/case_number/year -- same shape the old one-step setup
-    endpoint took). Returns the fetched case identity (title, parties, CNR,
-    court name, status) and a preview_token to pass to .../confirm/.
-    Nothing is written to the case; exempt from the per-case 1h rate limit
-    but subject to a per-user preview throttle.
+    Body: either the CNR-first shape {"cnr": "<16-char CNR>"} (court_type
+    optional -- omit it and the backend detects district vs. high_court
+    from the CNR itself, trying the other one automatically if the first
+    guess turns up a genuine not-found), or the cascade fallback shape
+    (court hierarchy + case_type/case_number/year + required court_type --
+    same shape the old one-step setup endpoint took). Returns the fetched
+    case identity (title, parties, CNR, court name, status, the resolved
+    court_type) and a preview_token to pass to .../confirm/. Nothing is
+    written to the case; exempt from the per-case 1h rate limit but
+    subject to a per-user preview throttle.
     """
 
     def post(self, request, pk):

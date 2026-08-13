@@ -4,13 +4,15 @@ Case views — CRUD operations on legal cases.
 
 from datetime import timedelta
 
+from django.db import IntegrityError
 from django.db.models import BooleanField, Count, Exists, OuterRef, Subquery, Value
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
-from rest_framework import generics
+from rest_framework import generics, status
+from rest_framework.response import Response
 
 from core.models import Case, Document, Hearing
-from core.serializers import CaseSerializer
+from core.serializers import CaseCreateSerializer, CaseSerializer
 from core.views.mixins import OwnerScopedMixin
 
 
@@ -54,8 +56,8 @@ def _annotate_next_hearing_date(qs):
     return qs.annotate(_next_hearing_date=Subquery(next_hearing))
 
 
-class CaseListView(OwnerScopedMixin, generics.ListAPIView):
-    """List cases.
+class CaseListView(OwnerScopedMixin, generics.ListCreateAPIView):
+    """List or create cases.
 
     GET  /api/cases/
     GET  /api/cases/?status=open
@@ -67,13 +69,47 @@ class CaseListView(OwnerScopedMixin, generics.ListAPIView):
         document. `since` should be the caller's last-visit timestamp;
         omitting it just drops the eCourts-update signal.
 
-    All results are scoped to request.user (OwnerScopedMixin). No POST here
-    -- a Case is only ever created via the advocate-search/import flow
-    (core/services/advocate_import.py), never directly from client input;
-    the old direct "Create Case" form/endpoint is retired.
+    POST /api/cases/
+        Manual case entry -- the alternative to the advocate-search/import
+        flow (core/services/advocate_import.py), for a case that search
+        doesn't turn up or when the advocate would rather type it in
+        directly. Validated by CaseCreateSerializer (a narrower field set:
+        no cnr_number/court_type/tracking_config -- those only ever get
+        set through the court-tracking preview/confirm flow, see
+        core/services/court_tracking.py, which works the same regardless
+        of how the case was created). The response re-serializes with the
+        full CaseSerializer so the caller gets the same shape as GET.
+
+    All results are scoped to request.user (OwnerScopedMixin); POST always
+    stamps the new case with owner=request.user regardless of any input
+    (OwnerScopedMixin.perform_create).
     """
 
     serializer_class = CaseSerializer
+
+    def get_serializer_class(self):
+        if self.request.method == "POST":
+            return CaseCreateSerializer
+        return CaseSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            self.perform_create(serializer)
+        except IntegrityError:
+            # Belt-and-braces alongside CaseCreateSerializer's automatic
+            # UniqueValidator on case_number (which catches this in the
+            # overwhelming majority of cases pre-save) -- closes the
+            # narrow race where two requests with the same case_number
+            # both pass validation before either commits.
+            return Response(
+                {"case_number": ["A case with this case number already exists."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        output = CaseSerializer(serializer.instance).data
+        headers = self.get_success_headers(output)
+        return Response(output, status=status.HTTP_201_CREATED, headers=headers)
 
     def get_base_queryset(self):
         qs = Case.objects.prefetch_related("client_contacts").annotate(

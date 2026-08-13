@@ -34,11 +34,7 @@ logger = logging.getLogger(__name__)
 # here (not only in settings.py) so the API can tell the user exactly
 # what to set -- see EMAIL_ENV_VARS_REQUIRED in the send result payload.
 EMAIL_ENV_VARS_REQUIRED = [
-    "EMAIL_HOST",
-    "EMAIL_PORT",
-    "EMAIL_HOST_USER",
-    "EMAIL_HOST_PASSWORD",
-    "EMAIL_USE_TLS",
+    "RESEND_API_KEY",
     "DEFAULT_FROM_EMAIL",
 ]
 
@@ -338,7 +334,7 @@ def get_billing_contact(case) -> ClientContact:
 
 
 def email_is_configured() -> bool:
-    """True when real SMTP credentials are present (see settings.py).
+    """True when a real RESEND_API_KEY is present (see settings.py).
 
     settings.INVOICE_EMAIL_CONFIGURED is computed once at startup from
     the env; read through this helper so tests can patch one place.
@@ -435,14 +431,17 @@ def send_invoice(fee: AppearanceFee) -> dict:
 def _missing_email_env_vars() -> list[str]:
     """The mail env vars that still need a value for real delivery.
 
-    Only the three that actually gate INVOICE_EMAIL_CONFIGURED can be
-    "missing" here. EMAIL_PORT, EMAIL_USE_TLS and DEFAULT_FROM_EMAIL all
-    have working defaults in settings.py, so they are never blank and
-    would never appear -- they're carried in EMAIL_ENV_VARS_REQUIRED
-    instead, which the API returns alongside this as the full checklist.
+    Derived from email_is_configured() (settings.INVOICE_EMAIL_CONFIGURED)
+    rather than re-inspecting settings.RESEND_API_KEY directly -- the two
+    normally agree, but tests patch INVOICE_EMAIL_CONFIGURED directly (see
+    email_is_configured()'s docstring), and this needs to stay consistent
+    with that single patch point rather than independently re-deriving
+    from the env var underneath it, which would go stale the moment a
+    real key is actually present in the environment a test runs in.
+
+    DEFAULT_FROM_EMAIL has a working default in settings.py, so it's never
+    blank and would never appear here -- it's carried in
+    EMAIL_ENV_VARS_REQUIRED instead, which the API returns alongside this
+    as the full checklist.
     """
-    return [
-        name
-        for name in ("EMAIL_HOST", "EMAIL_HOST_USER", "EMAIL_HOST_PASSWORD")
-        if not getattr(settings, name, "")
-    ]
+    return [] if email_is_configured() else ["RESEND_API_KEY"]
