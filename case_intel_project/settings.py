@@ -152,20 +152,57 @@ REST_FRAMEWORK = {
     ],
 }
 
-# CORS Configuration
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",  # Next.js default port
-    "http://127.0.0.1:3000",  # Next.js default port
-    "http://localhost:8080",  # Alternative frontend port
-    "http://127.0.0.1:8080",  # Alternative frontend port
-    "https://case-intel.vercel.app",  # Production Vercel deployment
-]
+# CORS / CSRF Configuration
+# ----------------------------------------------------------------------------
+# Both CORS_ALLOWED_ORIGINS and CSRF_TRUSTED_ORIGINS are env-driven via
+# config(), same as ALLOWED_HOSTS above -- per CLAUDE.md, environment-
+# dependent settings must not be hardcoded. Each default below reproduces
+# the value this project ran with before either var was env-driven
+# (localhost dev ports + the pre-migration Vercel/duckdns domains + the new
+# caseintel.in domains), so a deployment whose .env hasn't been updated
+# with these two vars yet (e.g. EC2 today) keeps working unchanged rather
+# than silently losing CORS/CSRF the moment this code ships. Set them
+# explicitly in .env to override -- and, later, to drop the old domains
+# once the caseintel.in migration is confirmed end-to-end.
+CORS_ALLOWED_ORIGINS = config(
+    "CORS_ALLOWED_ORIGINS",
+    default=(
+        "http://localhost:3000,http://127.0.0.1:3000,"
+        "http://localhost:8080,http://127.0.0.1:8080,"
+        "https://case-intel.vercel.app,"
+        "https://caseintel.in,https://www.caseintel.in"
+    ),
+    cast=Csv(),
+)
 
 # Vercel preview deployments get a fresh URL per build, e.g.
-# https://case-intel-<hash>-bhagath-personal-projects.vercel.app
+# https://case-intel-<hash>-bhagath-personal-projects.vercel.app -- a
+# structural naming pattern tied to the Vercel project/org slug, not a
+# secret and not a domain that changes with this migration, so (unlike the
+# origin lists above/below) this one stays a code-level constant rather
+# than an env var.
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https://case-intel-[a-zA-Z0-9-]+-bhagath-personal-projects\.vercel\.app$",
 ]
+
+# CSRF_TRUSTED_ORIGINS -- only matters for the Django admin (a plain,
+# session-cookie-authenticated Django view, still covered by
+# CsrfViewMiddleware). The DRF API views below do NOT need this: they use
+# TokenAuthentication only, and DRF exempts every APIView from Django's
+# CSRF middleware unless SessionAuthentication is in play (see
+# DEFAULT_AUTHENTICATION_CLASSES above), so a bearer-token POST is never
+# subject to this check regardless of Origin. Set anyway (and now
+# env-driven, same as CORS_ALLOWED_ORIGINS) since it's a cheap safeguard
+# and the admin's own domain is changing as part of this migration.
+CSRF_TRUSTED_ORIGINS = config(
+    "CSRF_TRUSTED_ORIGINS",
+    default=(
+        "https://caseintel.duckdns.org,https://api.caseintel.in,"
+        "https://case-intel.vercel.app,"
+        "https://caseintel.in,https://www.caseintel.in"
+    ),
+    cast=Csv(),
+)
 
 # Auth is via a manually-attached "Authorization: Token ..." header, not
 # cookies, so the browser never needs to send credentials cross-origin

@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 from django.utils import timezone
 
 from core.models import ActivityLog, Case, CourtFetchLog, CourtTrackingPreview, Hearing, ProcessingJob
-from core.services.court_data import CourtCaseData, CourtDataError, get_provider
+from core.services.court_data import CaseNotFoundError, CourtCaseData, CourtDataError, get_provider
 
 logger = logging.getLogger(__name__)
 
@@ -197,6 +197,76 @@ def _resolve_court_type(case: Case) -> dict:
     )
 
 
+def _guess_court_type_from_cnr(cnr: str) -> str | None:
+    """Best-effort court_type guess from the CNR's own structure.
+
+    Every eCourts CNR encodes a 4-letter prefix identifying the issuing
+    court. bharat_courts.infer_court_from_cnr() maps that prefix against a
+    table covering all 25 High Courts + the Supreme Court, verified by the
+    library against a real eCourts archive sample -- not a guess invented
+    here, and no new dependency (bharat-courts is already required).
+
+    A match against a High Court prefix is a strong signal -- return
+    "high_court". A match against the Supreme Court prefix ("ESCR") or no
+    match at all returns None: this app has no Supreme Court support, and
+    more importantly the table has no District Court entries to check
+    against (there are thousands of court-complex codes, not a fixed
+    enumerable set the way HCs are), so "no match" does NOT confirm
+    "district" -- it only means this CNR isn't a currently-known HC/SCI
+    prefix. Callers must treat None as "unknown", not "district
+    confirmed", and always fall back to the other type on a genuine
+    not-found regardless of what this function guessed.
+    """
+    from bharat_courts import infer_court_from_cnr
+
+    court = infer_court_from_cnr(cnr)
+    if court is not None and court.court_type == "high_court":
+        return "high_court"
+    return None
+
+
+def _fetch_by_cnr_auto(provider, cnr: str) -> tuple[CourtCaseData, str]:
+    """Fetch `cnr` with no known court_type: try whichever portal the
+    CNR's own prefix suggests first (see _guess_court_type_from_cnr), then
+    the other one -- but ONLY after a genuine CaseNotFoundError from the
+    first attempt.
+
+    CaptchaSolveError/CourtPortalError propagate immediately WITHOUT
+    falling back to the other portal: those mean "couldn't check", not
+    "not there". Falling back on a transient failure would both give a
+    misleading answer (a portal outage looks identical to "not filed
+    here") and double the CAPTCHA-gated request cost for nothing.
+
+    Returns (data, resolved_court_type) so the caller can persist the
+    winning court_type on the case (see confirm_case_tracking) --
+    everything after that call resolves court_type off the case directly
+    (see _resolve_court_type) and never re-runs this guesswork.
+
+    Raises CaseNotFoundError (with a message naming both portals) if
+    neither type has the case. Raises CaptchaSolveError/CourtPortalError
+    unchanged if either attempt fails for a reason other than "not found".
+    """
+    guess = _guess_court_type_from_cnr(cnr)
+    if guess:
+        other = next(t for t in VALID_COURT_TYPES if t != guess)
+        order = (guess, other)
+    else:
+        order = VALID_COURT_TYPES
+
+    try:
+        return provider.fetch_case_by_cnr(cnr, order[0]), order[0]
+    except CaseNotFoundError:
+        pass  # genuine not-found on the first portal -- try the other one
+
+    try:
+        return provider.fetch_case_by_cnr(cnr, order[1]), order[1]
+    except CaseNotFoundError:
+        raise CaseNotFoundError(
+            f"No case found with CNR {cnr!r} in either District Court or "
+            "High Court records."
+        ) from None
+
+
 def _enqueue_order_sync(case: Case) -> None:
     """Queue the Phase B order-sync step after a successful hearing sync.
 
@@ -271,9 +341,14 @@ def preview_case_tracking(case: Case, tracking_config: dict, *, user_id: int) ->
 
     tracking_config accepts either shape CourtDataProvider.fetch_case()
     understands: the cascade shape (state/dist/complex/case_type/
-    case_number/year, or the HC equivalent), or the CNR-first shape
-    ({"court_type": ..., "cnr": "..."}) -- EcourtsProvider.fetch_case()
-    dispatches between them, so this function doesn't need to know which.
+    case_number/year, or the HC equivalent, court_type required), or the
+    CNR-first shape ({"cnr": "...", "court_type": ...}) -- court_type is
+    OPTIONAL in the CNR-first shape: when omitted (or not a valid value),
+    it's auto-detected from the CNR itself (see _fetch_by_cnr_auto), which
+    tries the portal the CNR's own prefix suggests first and falls back to
+    the other one on a genuine not-found. An explicit court_type alongside
+    cnr is still honored as-is (no detection, no fallback) for callers
+    that already know it.
 
     The preview token is stored in CourtTrackingPreview (Postgres), not
     Django's cache -- it has to be visible to whichever gunicorn worker
@@ -288,7 +363,15 @@ def preview_case_tracking(case: Case, tracking_config: dict, *, user_id: int) ->
     _check_preview_throttle(user_id)
 
     provider = get_provider()
-    data = provider.fetch_case(tracking_config)
+
+    cnr = tracking_config.get("cnr")
+    court_type_detected = False
+    if cnr and tracking_config.get("court_type") not in VALID_COURT_TYPES:
+        data, resolved_court_type = _fetch_by_cnr_auto(provider, cnr)
+        tracking_config = {**tracking_config, "court_type": resolved_court_type}
+        court_type_detected = True
+    else:
+        data = provider.fetch_case(tracking_config)
 
     token = secrets.token_urlsafe(24)
     CourtTrackingPreview.objects.create(
@@ -313,6 +396,8 @@ def preview_case_tracking(case: Case, tracking_config: dict, *, user_id: int) ->
         "court_name": data.court_name,
         "case_status": data.case_status,
         "case_stage": data.case_stage,
+        "court_type": tracking_config.get("court_type"),
+        "court_type_detected": court_type_detected,
         "case_type": tracking_config.get("case_type"),
         "case_number": tracking_config.get("case_number"),
         "year": tracking_config.get("year"),
