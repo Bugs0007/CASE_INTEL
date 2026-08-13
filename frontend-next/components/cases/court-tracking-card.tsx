@@ -52,7 +52,6 @@ export function CourtTrackingCard({ caseItem, hearings }: CourtTrackingCardProps
 function TrackingSetupForm({ caseId }: { caseId: number }) {
   const [mode, setMode] = useState<"cnr" | "cascade">("cnr");
   const [cnr, setCnr] = useState("");
-  const [cnrCourtType, setCnrCourtType] = useState<CourtType>("district");
 
   const [courtType, setCourtType] = useState<CourtType>("district");
   const [stateCode, setStateCode] = useState("");
@@ -142,7 +141,7 @@ function TrackingSetupForm({ caseId }: { caseId: number }) {
 
     const config: TrackingConfig =
       mode === "cnr"
-        ? { court_type: cnrCourtType, cnr: cnr.trim().toUpperCase() }
+        ? { cnr: cnr.trim().toUpperCase() }
         : courtType === "district"
           ? {
               court_type: "district",
@@ -265,13 +264,6 @@ function TrackingSetupForm({ caseId }: { caseId: number }) {
           {mode === "cnr" ? (
             <>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Court</label>
-                <Select value={cnrCourtType} onChange={(e) => setCnrCourtType(e.target.value as CourtType)}>
-                  <option value="district">District Court</option>
-                  <option value="high_court">High Court</option>
-                </Select>
-              </div>
-              <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">CNR Number</label>
                 <Input
                   value={cnr}
@@ -283,6 +275,9 @@ function TrackingSetupForm({ caseId }: { caseId: number }) {
                 {cnr && !cnrValid && (
                   <p className="mt-1 text-xs text-gray-500">CNR must be exactly 16 letters/digits.</p>
                 )}
+                <p className="mt-1 text-xs text-gray-500">
+                  District Court vs. High Court is detected automatically from the CNR.
+                </p>
               </div>
             </>
           ) : (
@@ -489,6 +484,16 @@ function TrackingPreviewPanel({
           </Field>
           <Field label="Court">
             <span className="text-sm text-gray-900">{preview.court_name || "—"}</span>
+          </Field>
+          <Field label="Court Type">
+            <span className="text-sm text-gray-900">
+              {preview.court_type === "high_court" ? "High Court" : "District Court"}
+              {preview.court_type_detected && (
+                <span className="ml-1.5 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
+                  detected from CNR
+                </span>
+              )}
+            </span>
           </Field>
           <Field label="Next Hearing">
             <span className="text-sm text-gray-900">

@@ -104,6 +104,16 @@ ocrmypdf==17.8.1
 fpdf2==2.8.7
 
 # ============================================================================
+# OUTBOUND EMAIL (invoice delivery, core/services/invoice_service.py)
+# ============================================================================
+# Drop-in Django EMAIL_BACKEND for Resend's transactional email API --
+# invoice_service.py still calls django.core.mail.EmailMessage exactly as
+# before; only settings.py's backend selection changes. Needs a single
+# RESEND_API_KEY env var, no SMTP mailbox/app-password. See
+# ADMIN_EMAIL_SETUP.md for the one-time signup/setup steps.
+django-anymail[resend]==15.1
+
+# ============================================================================
 # FILE STORAGE (AWS S3 via django-storages -- used when USE_S3=true)
 # ============================================================================
 django-storages==1.14.4

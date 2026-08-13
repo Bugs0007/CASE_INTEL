@@ -187,6 +187,12 @@ export default function AdvocateSearchPage() {
           Pick a state and enter your advocate name or bar registration number. Case Intel searches
           district courts and gathers all your cases — then you choose which to add.
         </p>
+        <Link
+          href="/cases/new"
+          className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline mt-2"
+        >
+          Can&apos;t find it here, or would rather type it in? Add a case manually
+        </Link>
       </div>
 
       <Card className="mb-6">

@@ -138,6 +138,12 @@ export default function CasesPage() {
         </div>
         <div className="flex items-center gap-2">
           <Link
+            href="/cases/new"
+            className="inline-flex items-center justify-center gap-2 h-11 sm:h-10 px-4 rounded-lg border border-gray-200 bg-surface text-gray-800 text-sm font-semibold hover:bg-gray-50 transition-colors"
+          >
+            Add Manually
+          </Link>
+          <Link
             href="/cases/search"
             className="inline-flex items-center justify-center gap-2 h-11 sm:h-10 px-4 rounded-lg border-none bg-primary text-white text-sm font-semibold hover:bg-primary-hover transition-colors"
           >

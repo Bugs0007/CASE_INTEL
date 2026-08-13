@@ -15,7 +15,11 @@ export interface CourtStructureResponse {
 }
 
 export interface TrackingConfigCnr {
-  court_type: "district" | "high_court";
+  // Optional -- the backend detects district vs. high_court from the CNR
+  // itself when this is omitted (see preview_case_tracking), trying the
+  // other type automatically on a genuine not-found. Only set this
+  // explicitly if bypassing detection on purpose.
+  court_type?: "district" | "high_court";
   cnr: string;
 }
 
@@ -76,6 +80,11 @@ export interface TrackingPreview {
   court_name: string;
   case_status: string;
   case_stage: string;
+  // Resolved court type -- either what the CNR-first request explicitly
+  // passed, or what the backend auto-detected from the CNR when it
+  // wasn't. See court_type_detected to tell the two apart in the UI.
+  court_type: "district" | "high_court";
+  court_type_detected: boolean;
   case_type: string | null;
   case_number: string | null;
   year: string | null;

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { casesApi } from "@/lib/api/cases";
-import type { CaseUpdateInput, CaseStatus } from "@/types";
+import type { CaseCreateInput, CaseUpdateInput, CaseStatus } from "@/types";
 
 export const caseKeys = {
   all: ["cases"] as const,
@@ -25,6 +25,18 @@ export function useCase(id: number, enabled: boolean = true) {
     queryFn: () => casesApi.get(id),
     enabled: !!id && enabled,
     staleTime: 60 * 1000, // 1 minute
+  });
+}
+
+export function useCreateCase() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: CaseCreateInput) => casesApi.create(data),
+    onSuccess: (createdCase) => {
+      queryClient.setQueryData(caseKeys.detail(createdCase.id), createdCase);
+      queryClient.invalidateQueries({ queryKey: caseKeys.lists() });
+    },
   });
 }
 
