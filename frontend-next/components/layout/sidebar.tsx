@@ -11,6 +11,7 @@ import {
   Mail,
   Plus,
   Calendar,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { hearingKeys } from "@/hooks/use-hearings";
@@ -25,6 +26,7 @@ const NAV_ITEMS = [
   { href: "/documents", label: "Documents", icon: FileText },
   { href: "/calendar", label: "Calendar", icon: Calendar },
   { href: "/emails", label: "Emails", icon: Mail, badge: 12 },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function Sidebar() {

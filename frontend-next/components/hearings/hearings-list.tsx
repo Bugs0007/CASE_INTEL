@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CollapseToggle } from "@/components/ui/collapse-toggle";
 import { CauseListBadge } from "@/components/hearings/cause-list-badge";
+import { HearingBillingActions } from "@/components/hearings/hearing-billing-actions";
 import { Collapsible } from "@/components/ui/collapsible";
 import { formatDateTime, staggerDelay } from "@/lib/utils";
 import { groupOrdersByDate, hearingDateKey } from "@/hooks/use-court-orders";
@@ -131,6 +132,7 @@ export function HearingsList({
                   <HearingItem
                     key={hearing.id}
                     hearing={hearing}
+                    caseId={caseId}
                     index={i}
                     isUpcoming
                     onEdit={onEditHearing}
@@ -174,6 +176,7 @@ export function HearingsList({
                     <HearingItem
                       key={hearing.id}
                       hearing={hearing}
+                      caseId={caseId}
                       index={i}
                       onEdit={onEditHearing}
                       onDelete={onDeleteHearing}
@@ -217,6 +220,9 @@ export function HearingsList({
 
 interface HearingItemProps {
   hearing: Hearing;
+  /** Needed by the billing actions, which invalidate this case's detail
+      query (fee_summary lives on the Case, not the Hearing). */
+  caseId: number;
   isUpcoming?: boolean;
   onEdit?: (hearing: Hearing) => void;
   onDelete?: (id: number) => void;
@@ -232,6 +238,7 @@ interface HearingItemProps {
 
 function HearingItem({
   hearing,
+  caseId,
   isUpcoming,
   onEdit,
   onDelete,
@@ -306,6 +313,10 @@ function HearingItem({
             onViewOrder={onViewOrder}
             viewingOrderId={viewingOrderId}
           />
+
+          {/* Real fee lifecycle + travel upload. The badges above show
+              state; these are the controls that change it. */}
+          <HearingBillingActions hearing={hearing} caseId={caseId} />
         </div>
 
         {/* Actions -- eCourts-sourced hearings are edited via Court Tracking

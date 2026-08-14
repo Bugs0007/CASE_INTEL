@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, Calendar, LogOut, Upload, Plus, HelpCircle } from "lucide-react";
+import { Search, Calendar, LogOut, Upload, Plus, HelpCircle, Settings } from "lucide-react";
 import { clearToken, clearUsername } from "@/lib/auth";
 import { logout } from "@/lib/api/auth";
 import { useDialogs } from "@/providers/dialog-provider";
@@ -86,6 +86,18 @@ export function Header() {
         >
           <Upload className="h-[18px] w-[18px] lg:h-[15px] lg:w-[15px]" strokeWidth={1.8} />
           <span className="hidden lg:inline">Upload Document</span>
+        </button>
+
+        {/* lg:hidden -- the desktop Sidebar carries its own Settings entry,
+            and the bottom tab bar is already at its five-tab limit, so this
+            is the only way to reach Settings on mobile. */}
+        <button
+          onClick={() => router.push("/settings")}
+          aria-label="Settings"
+          title="Settings"
+          className="ci-btn ci-btn--line lg:hidden h-11 w-11 p-0 justify-center"
+        >
+          <Settings className="h-[18px] w-[18px]" strokeWidth={1.8} />
         </button>
 
         <button
