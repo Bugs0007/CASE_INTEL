@@ -1112,14 +1112,21 @@ class TestDistrictSearchByAdvocateRetryLogic:
 
 
 class TestTokenSeeding:
-    """_TokenSeedingDistrictClient must (a) pin the live 'delimeter' header
-    from components.js and (b) seed a real app_token from casestatus/index.
-    The vendored client did neither, so every District Courts POST got
-    "Invalid Request" (empty app_token + no delimeter header)."""
+    """_TokenSeedingDistrictClient must (a) establish the session cookie via
+    the bare home page, (b) pin BOTH live anti-scraping headers from
+    components.js -- the second header's KEY rotates same as its value, it
+    is never the static "abc" the 24 Jul fix assumed -- and (c) seed a real
+    app_token from casestatus/index. Re-root-caused live 14 Aug 2026 after
+    the 24 Jul fix (app_token + delimeter alone) turned out incomplete: the
+    session cookie was never being established at all, and "abc" was a
+    header key the server was never actually checking, silently equivalent
+    to not sending the second header. See the block comment above
+    _TokenSeedingDistrictClient for the full live-diff account."""
 
     def _client(self, *, delimeter_js="", casestatus_html=""):
         client = _TokenSeedingDistrictClient()
-        # _init_session GETs components.js first, then casestatus/index.
+        # _init_session GETs the home page first (session cookie), then
+        # components.js, then casestatus/index.
         def fake_get(url, **kw):
             r = MagicMock()
             r.text = delimeter_js if "components.js" in url else casestatus_html
@@ -1139,19 +1146,56 @@ class TestTokenSeeding:
         asyncio.run(client._init_session())
         assert client._app_token == "abc123def456"
 
-    def test_pins_live_delimeter_and_abc_headers(self):
+    def test_establishes_session_cookie_via_home_page_before_anything_else(self):
+        """Confirmed live 14 Aug 2026: SERVICES_SESSID/JSESSION are set ONLY
+        by the bare home page GET -- neither components.js nor
+        casestatus/index sets them. A fresh client's cookie jar is empty, so
+        skipping this means every later request in the session goes out
+        session-less."""
+        client = self._client(casestatus_html="id='app_token' value=\"deadbeef00\"")
+        asyncio.run(client._init_session())
+        first_url = client._http.get.call_args_list[0].args[0]
+        assert first_url.rstrip("/").endswith("ecourtindia_v6")
+        assert "components.js" not in first_url
+        assert "casestatus" not in first_url
+
+    def test_pins_live_delimeter_under_its_own_rotating_second_key(self):
+        """The second header's KEY is scraped live from the same
+        headers:{...} literal the delimeter value comes from -- e.g.
+        `"delimeter": delimeter, "Uweuyfhsj347": delimeter` -- never a
+        hardcoded "abc". Live 14 Aug 2026 the key was "Uweuyfhsj347", then
+        "Dyiguyqeghdf", then "Byiewufgj753" across three fetches minutes
+        apart -- as rotating as the value itself."""
         client = self._client(
-            delimeter_js='function ajaxCall(o){var delimeter="vmgasjnn98dsf846";}',
+            delimeter_js=(
+                'function ajaxCall(o){var delimeter="vmgasjnn98dsf846";'
+                '$.ajax({headers: {"delimeter": delimeter, "Uweuyfhsj347":delimeter}});}'
+            ),
             casestatus_html="id='app_token' value=\"deadbeef00\"",
         )
         asyncio.run(client._init_session())
         assert client._fake_httpx.headers["delimeter"] == "vmgasjnn98dsf846"
-        assert client._fake_httpx.headers["abc"] == "xyz"
+        assert client._fake_httpx.headers["Uweuyfhsj347"] == "vmgasjnn98dsf846"
+        assert "abc" not in client._fake_httpx.headers
+
+    def test_no_headers_pinned_when_second_header_pattern_not_found(self):
+        """A half-correct pin (delimeter alone, no second header, or a
+        second header under the wrong key) is silently equivalent to
+        sending neither -- confirmed live the portal rejects unless both
+        arrive together. Better to pin nothing and log a warning than pin
+        a value that looks right but the server was never checking."""
+        client = self._client(
+            delimeter_js='function ajaxCall(o){var delimeter="vmgasjnn98dsf846";}',  # no headers:{...} block
+            casestatus_html="id='app_token' value=\"deadbeef00\"",
+        )
+        asyncio.run(client._init_session())
+        assert client._fake_httpx.headers == {}
 
     def test_seeds_from_casestatus_index_url(self):
         client = self._client(casestatus_html="id='app_token' value=\"deadbeef00\"")
         asyncio.run(client._init_session())
-        # The LAST get is the casestatus page (components.js is fetched first).
+        # The LAST get is the casestatus page (home page + components.js
+        # are fetched first).
         assert "casestatus/index" in client._http.get.call_args.args[0]
 
     def test_falls_back_to_vendored_when_no_token(self):
