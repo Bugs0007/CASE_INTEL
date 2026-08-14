@@ -107,6 +107,25 @@ advocate-search results). It was never a WAF/IP/TLS-fingerprint block -- a
 byte-and-fingerprint-faithful replay confirmed the server rejects on the
 missing delimeter at the application layer, identically from two different
 source IPs.
+
+OPEN ISSUE, found 14 Aug 2026: list_districts()/list_complexes() (via
+fillDistrict) were re-confirmed to have the CORRECT client wiring
+(_TokenSeedingDistrictClient, same as search_by_advocate -- verified by
+reading the code, not assumed) and were still crashing requests/jobs with
+an unhandled exception -- fixed below via _run_hierarchy_call(), which
+converts any failure here into CourtPortalError/CaptchaSolveError instead
+of propagating raw. BUT a live re-test of list_districts('1') the same day
+showed the portal STILL rejecting fillDistrict with the identical "Invalid
+Request" message, despite a freshly-seeded real app_token and the correct
+live delimeter both confirmed present on the request. So the 24 Jul fix
+above is no longer (or was never fully) sufficient for THIS endpoint
+specifically -- district/complex listing now fails cleanly (CourtPortalError
+-> 502) instead of crashing, but does not yet actually return real data.
+Root-causing that is unstarted -- couldn't triangulate further without
+either an OCR captcha solver configured (to compare against a known-still-
+working captcha endpoint live) or a fresh byte-level diff against the
+portal's current session/JS behavior, comparable in effort to the original
+24 Jul spike. Flagged and deliberately deferred rather than guessed at.
 """
 
 from __future__ import annotations
@@ -139,7 +158,12 @@ from core.services.court_data.ecourts_parsing import (
     parse_case_history_html,
     split_bar_code,
 )
-from core.services.court_data.exceptions import CaptchaSolveError, CaseNotFoundError, CourtPortalError
+from core.services.court_data.exceptions import (
+    CaptchaSolveError,
+    CaseNotFoundError,
+    CourtDataError,
+    CourtPortalError,
+)
 from core.services.court_data.models import CourtCaseData, CourtOrderRecord
 
 logger = logging.getLogger(__name__)
@@ -948,11 +972,66 @@ class EcourtsProvider(CourtDataProvider):
         cache.set(key, value, HIERARCHY_CACHE_TTL)
         return value
 
+    def _run_hierarchy_call(self, coro):
+        """Run a captcha-free hierarchy-discovery coroutine (list_states/
+        list_districts/list_complexes/list_benches/list_case_types),
+        converting any bharat_courts/transport exception into the
+        CourtDataError taxonomy the rest of this module and its callers
+        (CourtStructureView, advocate_search's fan-out) already expect.
+
+        Until this existed, these 5 methods had NO exception handling at
+        all -- unlike every other portal-calling method in this file, a
+        bharat_courts ServerError (the "Invalid Request" shape, or any
+        other portal-side error message) or a raw transport failure
+        propagated straight out as an unhandled exception. Confirmed by
+        reading the code (not assumed) that the client wiring itself was
+        already correct -- list_districts/list_complexes/list_court_options
+        all already construct _TokenSeedingDistrictClient, same as
+        search_by_advocate -- so this was never a "wrong client" bug; it
+        was a missing try/except. Two concrete failure modes this fixes:
+          - CourtStructureView.get() only catches CourtDataError/ValueError
+            (see core/views/case_tracking.py); a raw DistrictServerError
+            matched neither and surfaced as an unhandled 500 on
+            GET /api/court-structure/.
+          - advocate_search.run_advocate_search()'s very first call is
+            provider.list_districts(state_code), deliberately unguarded
+            there because a failure listing the state's districts leaves
+            nothing to fan out over -- but it still deserves the same
+            typed, _classify_failure-able error every per-district/
+            per-complex failure downstream already gets, not a raw
+            exception with no error_type.
+
+        Deliberately a SINGLE attempt, not the MAX_RETRIES retry loop
+        fetch_case/search_by_advocate use elsewhere in this file:
+        advocate_search.py already retries list_complexes at the
+        per-district level with its own backoff (see _search_district's
+        caller), and CourtStructureView is a live form-load the user can
+        just retry -- a second retry layer here would only add latency
+        for both callers with no benefit.
+
+        ValueError (an invalid hc_court_code -- a caller/client mistake,
+        not a portal failure) and CourtDataError (nothing raises one from
+        inside these coroutines today, but a future addition shouldn't be
+        silently re-wrapped) pass through unchanged.
+        """
+        try:
+            return asyncio.run(coro)
+        except ValueError:
+            raise
+        except CourtDataError:
+            raise
+        except (DistrictCaptchaError, HCCaptchaError) as exc:
+            raise CaptchaSolveError(
+                f"The court portal's CAPTCHA rejected this request: {exc}"
+            ) from exc
+        except Exception as exc:  # noqa: BLE001 -- any bharat_courts/transport failure
+            raise CourtPortalError(f"The court portal could not be reached: {exc}") from exc
+
     def list_court_options(self, court_type: str) -> dict[str, str]:
         if court_type == "district":
             return self._cached(
                 ("district_states",),
-                lambda: asyncio.run(self._list_district_states()),
+                lambda: self._run_hierarchy_call(self._list_district_states()),
             )
         if court_type == "high_court":
             return self._cached(
@@ -968,7 +1047,7 @@ class EcourtsProvider(CourtDataProvider):
     def list_districts(self, state_code: str) -> dict[str, str]:
         return self._cached(
             ("districts", state_code),
-            lambda: asyncio.run(self._list_districts(state_code)),
+            lambda: self._run_hierarchy_call(self._list_districts(state_code)),
         )
 
     async def _list_districts(self, state_code: str) -> dict[str, str]:
@@ -978,7 +1057,7 @@ class EcourtsProvider(CourtDataProvider):
     def list_complexes(self, state_code: str, dist_code: str) -> dict[str, str]:
         return self._cached(
             ("complexes", state_code, dist_code),
-            lambda: asyncio.run(self._list_complexes(state_code, dist_code)),
+            lambda: self._run_hierarchy_call(self._list_complexes(state_code, dist_code)),
         )
 
     async def _list_complexes(self, state_code: str, dist_code: str) -> dict[str, str]:
@@ -988,7 +1067,7 @@ class EcourtsProvider(CourtDataProvider):
     def list_benches(self, hc_court_code: str) -> dict[str, str]:
         return self._cached(
             ("benches", hc_court_code),
-            lambda: asyncio.run(self._list_benches(hc_court_code)),
+            lambda: self._run_hierarchy_call(self._list_benches(hc_court_code)),
         )
 
     async def _list_benches(self, hc_court_code: str) -> dict[str, str]:
@@ -1002,10 +1081,14 @@ class EcourtsProvider(CourtDataProvider):
         if court_type == "district":
             key = ("district_case_types", hierarchy["state_code"], hierarchy["dist_code"],
                    hierarchy["court_complex_code"], hierarchy.get("est_code", ""))
-            return self._cached(key, lambda: asyncio.run(self._list_district_case_types(hierarchy)))
+            return self._cached(
+                key, lambda: self._run_hierarchy_call(self._list_district_case_types(hierarchy))
+            )
         if court_type == "high_court":
             key = ("hc_case_types", hierarchy["hc_court_code"], hierarchy.get("bench_code", "1"))
-            return self._cached(key, lambda: asyncio.run(self._list_hc_case_types(hierarchy)))
+            return self._cached(
+                key, lambda: self._run_hierarchy_call(self._list_hc_case_types(hierarchy))
+            )
         raise ValueError(f"Unknown court_type: {court_type!r}")
 
     async def _list_district_case_types(self, hierarchy: dict) -> dict[str, str]:
