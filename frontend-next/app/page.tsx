@@ -387,8 +387,12 @@ export default function Landing() {
             ) : (
               <Link className="ci-btn ci-btn--solid" href="/login">Log in</Link>
             )}
-            <a className="ci-btn ci-btn--line" href="mailto:bhagathsamalla0@gmail.com">Request access</a>
+            <a className="ci-btn ci-btn--line" href="mailto:samallabhagath@gmail.com">Request access</a>
           </div>
+          <p className="lp-cta-note">
+            Or email <a href="mailto:samallabhagath@gmail.com">samallabhagath@gmail.com</a> directly to
+            request access.
+          </p>
         </div>
       </section>
 
