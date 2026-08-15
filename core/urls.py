@@ -53,7 +53,6 @@ from core.views import (
     HearingListCreateView,
     LoginView,
     LogoutView,
-    RegisterView,
     TravelBookingDetailView,
     TravelBookingFileView,
     TravelBookingListCreateView,
@@ -64,8 +63,9 @@ from core.views import (
 app_name = "core"
 
 urlpatterns = [
-    # Auth
-    path("auth/register/", RegisterView.as_view(), name="auth-register"),
+    # Auth. Self-service registration is retired -- accounts are created
+    # manually via Django admin after an emailed access request (see
+    # core/views/auth.py's module docstring).
     path("auth/login/", LoginView.as_view(), name="auth-login"),
     path("auth/logout/", LogoutView.as_view(), name="auth-logout"),
 

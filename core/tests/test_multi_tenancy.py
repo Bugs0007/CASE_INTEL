@@ -297,22 +297,32 @@ class TestConversationIsolation:
 
 @pytest.mark.django_db
 class TestAuthEndpoints:
-    def test_register_login_logout_flow(self):
+    def test_register_endpoint_removed(self):
+        # Self-service registration is retired -- accounts are created
+        # manually via Django admin. Guard against it accidentally coming
+        # back unprotected.
         client = APIClient()
-
         resp = client.post(
             "/api/auth/register/",
             {"username": "newadvocate", "password": "S0meStrongPass!"},
             format="json",
         )
-        assert resp.status_code == 201
+        assert resp.status_code == 404
+        assert not User.objects.filter(username="newadvocate").exists()
+
+    def test_login_logout_flow(self, user_a):
+        client = APIClient()
+        resp = client.post(
+            "/api/auth/login/",
+            {"username": "alice", "password": "alice-pass-123"},
+            format="json",
+        )
+        assert resp.status_code == 200
         token = resp.data["token"]
-        assert User.objects.filter(username="newadvocate").exists()
 
         client.credentials(HTTP_AUTHORIZATION=f"Token {token}")
         resp = client.get("/api/cases/")
         assert resp.status_code == 200
-        assert resp.data == []
 
         resp = client.post("/api/auth/logout/")
         assert resp.status_code == 204
@@ -321,15 +331,6 @@ class TestAuthEndpoints:
         # The now-deleted token can no longer authenticate.
         resp = client.get("/api/cases/")
         assert resp.status_code == 401
-
-    def test_register_rejects_duplicate_username(self, user_a):
-        client = APIClient()
-        resp = client.post(
-            "/api/auth/register/",
-            {"username": user_a.username, "password": "S0meStrongPass!"},
-            format="json",
-        )
-        assert resp.status_code == 400
 
     def test_login_returns_token(self, user_a):
         client = APIClient()

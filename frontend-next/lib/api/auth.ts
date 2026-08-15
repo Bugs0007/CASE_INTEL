@@ -13,17 +13,6 @@ export function login(username: string, password: string): Promise<AuthResponse>
   });
 }
 
-export function register(
-  username: string,
-  password: string,
-  email?: string,
-): Promise<AuthResponse> {
-  return apiClient<AuthResponse>("/auth/register/", {
-    method: "POST",
-    body: JSON.stringify({ username, password, email: email || "" }),
-  });
-}
-
 export function logout(): Promise<void> {
   return apiClient<void>("/auth/logout/", { method: "POST" });
 }

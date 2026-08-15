@@ -50,6 +50,9 @@
 .lp-h1 em { font-style: italic; color: var(--ci-highlight); }
 .lp-lede { margin-top: 26px; max-width: 52ch; font-size: clamp(16px, 1.6vw, 18.5px); color: var(--ci-on-field-dim); line-height: 1.62; }
 .lp-cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 34px; }
+.lp-cta-note { margin-top: 14px; font-size: 13px; color: var(--ci-on-field-dim); }
+.lp-cta-note a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.lp-cta-note a:hover { color: var(--ci-paper); }
 
 .lp-record { margin-top: 64px; border: 1px solid var(--ci-field-line); background: rgba(241, 240, 234, .035); border-radius: var(--ci-radius-lg); overflow: hidden; }
 .lp-record-head {
