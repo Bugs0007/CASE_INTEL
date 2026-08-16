@@ -2,6 +2,7 @@
 Django admin configuration for all Case Intel models.
 """
 
+from django.conf import settings
 from django.contrib import admin
 
 from core.models import (
@@ -28,11 +29,44 @@ from core.models import (
     CourtTrackingPreview,
     GmailCredential,
     Hearing,
+    InviteToken,
     Message,
     ProcessingJob,
     Task,
     TravelBooking,
 )
+
+
+@admin.register(InviteToken)
+class InviteTokenAdmin(admin.ModelAdmin):
+    """Generate one of these per prospective advocate, then copy
+    ``invite_link`` into the reply email -- see the "Request access" flow
+    on the landing/login pages. ``token`` and ``expires_at`` are
+    pre-filled (7-day default) when you open "Add invite token"; just set
+    ``email`` (optional, only prefills the signup form) and save."""
+
+    list_display = ("token", "email", "status", "created_at", "expires_at", "used_at")
+    list_filter = ("used_at",)
+    search_fields = ("token", "email")
+    readonly_fields = ("created_at", "used_at", "used_by", "invite_link")
+    fields = ("token", "email", "expires_at", "invite_link", "created_at", "used_at", "used_by")
+
+    @admin.display(description="Status")
+    def status(self, obj: InviteToken) -> str:
+        return obj.status
+
+    @admin.display(description="Invite link (copy this into the email)")
+    def invite_link(self, obj: InviteToken) -> str:
+        if not obj.token:
+            return "(save to generate)"
+        return f"{settings.FRONTEND_URL}/register?token={obj.token}"
+
+    def get_readonly_fields(self, request, obj=None):
+        # Editing the token post-creation would silently break a link
+        # already emailed out.
+        if obj:
+            return self.readonly_fields + ("token",)
+        return self.readonly_fields
 
 
 @admin.register(Case)
