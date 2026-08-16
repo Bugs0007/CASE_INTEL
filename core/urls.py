@@ -51,8 +51,10 @@ from core.views import (
     GmailSyncView,
     HearingDetailView,
     HearingListCreateView,
+    InviteValidateView,
     LoginView,
     LogoutView,
+    RegisterView,
     TravelBookingDetailView,
     TravelBookingFileView,
     TravelBookingListCreateView,
@@ -63,9 +65,14 @@ from core.views import (
 app_name = "core"
 
 urlpatterns = [
-    # Auth. Self-service registration is retired -- accounts are created
-    # manually via Django admin after an emailed access request (see
-    # core/views/auth.py's module docstring).
+    # Auth. Registration requires a live InviteToken -- the owner generates
+    # one from Django admin and emails the link (see core/views/auth.py).
+    path("auth/register/", RegisterView.as_view(), name="auth-register"),
+    path(
+        "auth/invite/<str:token>/",
+        InviteValidateView.as_view(),
+        name="auth-invite-validate",
+    ),
     path("auth/login/", LoginView.as_view(), name="auth-login"),
     path("auth/logout/", LogoutView.as_view(), name="auth-logout"),
 

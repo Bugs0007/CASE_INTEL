@@ -8,10 +8,11 @@ never be able to list, retrieve, update, or delete anything owned by user B.
 import pytest
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
-from core.models import Case, ClientContact, Document, Hearing
+from core.models import Case, ClientContact, Document, Hearing, InviteToken
 
 
 @pytest.fixture
@@ -297,18 +298,92 @@ class TestConversationIsolation:
 
 @pytest.mark.django_db
 class TestAuthEndpoints:
-    def test_register_endpoint_removed(self):
-        # Self-service registration is retired -- accounts are created
-        # manually via Django admin. Guard against it accidentally coming
-        # back unprotected.
+    def test_register_without_token_rejected(self):
+        # Self-service signup with no invite is intentionally impossible.
         client = APIClient()
         resp = client.post(
             "/api/auth/register/",
             {"username": "newadvocate", "password": "S0meStrongPass!"},
             format="json",
         )
-        assert resp.status_code == 404
+        assert resp.status_code == 400
         assert not User.objects.filter(username="newadvocate").exists()
+
+    def test_register_with_unknown_token_rejected(self):
+        client = APIClient()
+        resp = client.post(
+            "/api/auth/register/",
+            {
+                "token": "not-a-real-token",
+                "username": "newadvocate",
+                "password": "S0meStrongPass!",
+            },
+            format="json",
+        )
+        assert resp.status_code == 400
+        assert not User.objects.filter(username="newadvocate").exists()
+
+    def test_register_with_valid_token_succeeds_and_consumes_it(self):
+        invite = InviteToken.objects.create(email="new@example.com")
+        client = APIClient()
+        resp = client.post(
+            "/api/auth/register/",
+            {
+                "token": invite.token,
+                "username": "newadvocate",
+                "password": "S0meStrongPass!",
+            },
+            format="json",
+        )
+        assert resp.status_code == 201
+        assert User.objects.filter(username="newadvocate").exists()
+
+        invite.refresh_from_db()
+        assert invite.used_at is not None
+        assert invite.used_by.username == "newadvocate"
+
+        # The now-used token can't mint a second account.
+        resp = client.post(
+            "/api/auth/register/",
+            {
+                "token": invite.token,
+                "username": "anotheradvocate",
+                "password": "An0therStrongPass!",
+            },
+            format="json",
+        )
+        assert resp.status_code == 400
+        assert not User.objects.filter(username="anotheradvocate").exists()
+
+    def test_register_with_expired_token_rejected(self):
+        invite = InviteToken.objects.create(
+            expires_at=timezone.now() - timezone.timedelta(hours=1)
+        )
+        client = APIClient()
+        resp = client.post(
+            "/api/auth/register/",
+            {
+                "token": invite.token,
+                "username": "newadvocate",
+                "password": "S0meStrongPass!",
+            },
+            format="json",
+        )
+        assert resp.status_code == 400
+        assert not User.objects.filter(username="newadvocate").exists()
+
+    def test_invite_validate_endpoint(self):
+        invite = InviteToken.objects.create(email="new@example.com")
+        client = APIClient()
+
+        resp = client.get(f"/api/auth/invite/{invite.token}/")
+        assert resp.status_code == 200
+        assert resp.data == {"valid": True, "reason": None, "email": "new@example.com"}
+
+        resp = client.get("/api/auth/invite/not-a-real-token/")
+        assert resp.status_code == 200
+        assert resp.data["valid"] is False
+        assert resp.data["reason"] == "not_found"
 
     def test_login_logout_flow(self, user_a):
         client = APIClient()
