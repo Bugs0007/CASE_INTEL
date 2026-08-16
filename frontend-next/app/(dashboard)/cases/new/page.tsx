@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, FileEdit, Search } from "lucide-react";
+import { AlertTriangle, ArrowLeft, FileEdit, Gavel, Loader2, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,12 +11,14 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { showToast } from "@/components/ui/toaster";
 import { useCreateCase } from "@/hooks/use-cases";
+import { useCnrLookup, useCreateCaseFromCnr } from "@/hooks/use-case-tracking";
 import { APIError } from "@/lib/api/client";
 import type {
   CaseCreateInput,
   CasePriority,
   CaseStatus,
   CaseType,
+  CnrLookupPreview,
   UserPartyRole,
 } from "@/types";
 
@@ -54,6 +56,16 @@ const PARTY_ROLES: { value: UserPartyRole; label: string }[] = [
 export default function NewCasePage() {
   const router = useRouter();
   const createCase = useCreateCase();
+  const cnrLookup = useCnrLookup();
+  const createCaseFromCnr = useCreateCaseFromCnr();
+
+  const [mode, setMode] = useState<"manual" | "cnr">("manual");
+  const [cnr, setCnr] = useState("");
+  const [cnrError, setCnrError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<CnrLookupPreview | null>(null);
+  const [duplicateCase, setDuplicateCase] = useState<{ id: number; case_number: string } | null>(
+    null,
+  );
 
   const [caseNumber, setCaseNumber] = useState("");
   const [title, setTitle] = useState("");
@@ -67,11 +79,104 @@ export default function NewCasePage() {
   const [formError, setFormError] = useState<string | null>(null);
 
   const canSubmit = caseNumber.trim().length > 0 && title.trim().length > 0;
+  const cnrValid = cnr.trim().length === 16 && /^[a-zA-Z0-9]+$/.test(cnr.trim());
+
+  function switchMode(next: "manual" | "cnr") {
+    setMode(next);
+    setPreview(null);
+    setCnrError(null);
+    setDuplicateCase(null);
+  }
+
+  function extractErrorDetail(error: unknown): {
+    detail: string;
+    duplicate: { id: number; case_number: string } | null;
+  } {
+    if (error instanceof APIError && error.data && typeof error.data === "object") {
+      const data = error.data as Record<string, unknown>;
+      if (data.code === "duplicate_cnr" && typeof data.case_id === "number") {
+        return {
+          detail: String(data.detail || "You're already tracking this CNR."),
+          duplicate: { id: data.case_id, case_number: String(data.case_number ?? "") },
+        };
+      }
+      if (typeof data.detail === "string") {
+        return { detail: data.detail, duplicate: null };
+      }
+      const firstField = Object.keys(data)[0];
+      const detail =
+        firstField && Array.isArray(data[firstField]) && data[firstField][0]
+          ? String(data[firstField][0])
+          : "Something went wrong. Please try again.";
+      return { detail, duplicate: null };
+    }
+    return { detail: "Could not reach the server. Please try again.", duplicate: null };
+  }
+
+  async function handleCnrFetch(e: React.FormEvent) {
+    e.preventDefault();
+    setCnrError(null);
+    setDuplicateCase(null);
+    if (!cnrValid) return;
+
+    try {
+      const result = await cnrLookup.mutateAsync({ cnr: cnr.trim().toUpperCase() });
+      setPreview(result);
+      setCaseNumber(result.case_number);
+      setTitle(result.title);
+      setUserPartyRole(result.user_party_role);
+      setOpposingParty(result.opposing_party || "");
+    } catch (error) {
+      const { detail, duplicate } = extractErrorDetail(error);
+      setCnrError(detail);
+      setDuplicateCase(duplicate);
+    }
+  }
+
+  function handleUseDifferentCnr() {
+    setPreview(null);
+    setCnrError(null);
+    setDuplicateCase(null);
+    setCaseNumber("");
+    setTitle("");
+    setOpposingParty("");
+    setUserPartyRole("unknown");
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
+    setDuplicateCase(null);
     if (!canSubmit) return;
+
+    if (mode === "cnr" && preview) {
+      try {
+        const created = await createCaseFromCnr.mutateAsync({
+          preview_token: preview.preview_token,
+          case_number: caseNumber.trim(),
+          title: title.trim(),
+          opposing_party: opposingParty.trim() || undefined,
+          user_party_role: userPartyRole,
+          case_type: caseType || undefined,
+          status,
+          priority,
+          filing_date: filingDate || undefined,
+          notes: notes.trim() || undefined,
+        });
+        showToast.success("Case added", "Fetched from eCourts and tracking is already set up.");
+        router.push(`/cases/${created.id}`);
+      } catch (error) {
+        const { detail, duplicate } = extractErrorDetail(error);
+        setFormError(detail);
+        setDuplicateCase(duplicate);
+        if (error instanceof APIError && error.status === 410) {
+          // Stale preview_token -- send the advocate back to the CNR step
+          // rather than leaving them stuck resubmitting a dead token.
+          setPreview(null);
+        }
+      }
+      return;
+    }
 
     const payload: CaseCreateInput = {
       case_number: caseNumber.trim(),
@@ -93,17 +198,9 @@ export default function NewCasePage() {
       );
       router.push(`/cases/${created.id}`);
     } catch (error) {
-      if (error instanceof APIError && error.data && typeof error.data === "object") {
-        const payloadErr = error.data as Record<string, unknown>;
-        const firstField = Object.keys(payloadErr)[0];
-        const detail =
-          firstField && Array.isArray(payloadErr[firstField]) && payloadErr[firstField][0]
-            ? String(payloadErr[firstField][0])
-            : "Could not add the case. Please check the fields and try again.";
-        setFormError(detail);
-      } else {
-        setFormError("Could not reach the server. Please try again.");
-      }
+      const { detail, duplicate } = extractErrorDetail(error);
+      setFormError(detail);
+      setDuplicateCase(duplicate);
     }
   }
 
@@ -133,6 +230,111 @@ export default function NewCasePage() {
         </Link>
       </div>
 
+      <div className="mb-4 flex gap-2 text-sm">
+        <button
+          type="button"
+          onClick={() => switchMode("manual")}
+          className={`rounded-full px-3 py-1 font-medium transition-colors ${
+            mode === "manual" ? "bg-primary text-page" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+          }`}
+        >
+          Enter Manually
+        </button>
+        <button
+          type="button"
+          onClick={() => switchMode("cnr")}
+          className={`rounded-full px-3 py-1 font-medium transition-colors ${
+            mode === "cnr" ? "bg-primary text-page" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+          }`}
+        >
+          Track by CNR
+        </button>
+      </div>
+
+      {mode === "cnr" && !preview && (
+        <Card className="mb-5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Gavel className="h-5 w-5 text-gray-500" />
+              Track by CNR
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-gray-600 mb-4">
+              Enter the case&apos;s CNR number to fetch its details from eCourts and pre-fill the
+              form below — faster than typing everything by hand. You&apos;ll still get to review
+              and edit before the case is created.
+            </p>
+            <form onSubmit={handleCnrFetch} className="space-y-4">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">CNR Number</label>
+                <Input
+                  value={cnr}
+                  onChange={(e) => setCnr(e.target.value.toUpperCase())}
+                  placeholder="e.g. MHAU019999992015"
+                  maxLength={16}
+                  className="font-mono"
+                />
+                {cnr && !cnrValid && (
+                  <p className="mt-1 text-xs text-gray-500">CNR must be exactly 16 letters/digits.</p>
+                )}
+                <p className="mt-1 text-xs text-gray-500">
+                  District Court vs. High Court is detected automatically from the CNR.
+                </p>
+              </div>
+
+              {cnrError && (
+                <div className="flex items-start gap-2 rounded-lg bg-status-alert-soft p-3 text-sm text-status-alert">
+                  <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <span>{cnrError}</span>
+                    {duplicateCase && (
+                      <>
+                        {" "}
+                        <Link href={`/cases/${duplicateCase.id}`} className="font-medium underline">
+                          View {duplicateCase.case_number}
+                        </Link>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <Button type="submit" disabled={!cnrValid || cnrLookup.isPending} className="w-full">
+                {cnrLookup.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Fetching from eCourts...
+                  </>
+                ) : (
+                  <>
+                    <Search className="h-4 w-4" />
+                    Fetch
+                  </>
+                )}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      {mode === "cnr" && preview && (
+        <div className="mb-5 rounded-lg bg-status-pending-soft border border-status-pending p-3 text-xs text-status-pending">
+          <div className="mb-1 font-medium">
+            Fetched from eCourts — not saved yet. Review the details below before adding the case.
+          </div>
+          <div>
+            {preview.petitioner || "—"} vs {preview.respondent || "—"} · {preview.court_name || "—"}
+            {preview.court_type_detected && (
+              <span className="ml-1.5 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
+                {preview.court_type === "high_court" ? "High Court" : "District Court"} detected from CNR
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {(mode === "manual" || (mode === "cnr" && preview)) && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -251,18 +453,38 @@ export default function NewCasePage() {
 
             {formError && (
               <div className="flex items-start gap-2 rounded-lg bg-status-alert-soft p-3 text-sm text-status-alert">
-                <span>{formError}</span>
+                <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                <div>
+                  <span>{formError}</span>
+                  {duplicateCase && (
+                    <>
+                      {" "}
+                      <Link href={`/cases/${duplicateCase.id}`} className="font-medium underline">
+                        View {duplicateCase.case_number}
+                      </Link>
+                    </>
+                  )}
+                </div>
               </div>
             )}
 
             <div className="flex justify-end gap-3 pt-2">
-              <Button type="submit" disabled={!canSubmit || createCase.isPending}>
-                {createCase.isPending ? "Adding Case…" : "Add Case"}
+              {mode === "cnr" && preview && (
+                <Button type="button" variant="secondary" onClick={handleUseDifferentCnr}>
+                  Use a Different CNR
+                </Button>
+              )}
+              <Button
+                type="submit"
+                disabled={!canSubmit || createCase.isPending || createCaseFromCnr.isPending}
+              >
+                {createCase.isPending || createCaseFromCnr.isPending ? "Adding Case…" : "Add Case"}
               </Button>
             </div>
           </form>
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }

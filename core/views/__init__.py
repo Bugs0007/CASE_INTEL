@@ -26,6 +26,8 @@ from .appearance_fee import (
 from .auth import InviteValidateView, LoginView, LogoutView, RegisterView
 from .case import CaseDetailView, CaseListView
 from .case_tracking import (
+    CaseCnrCreateView,
+    CaseCnrLookupView,
     CaseTrackingConfirmView,
     CaseTrackingPreviewView,
     CaseTrackingRefreshView,
@@ -84,6 +86,8 @@ __all__ = [
     "AdvocateSearchRetryFailedView",
     "AdvocateSearchStatusView",
     "AdvocateSearchView",
+    "CaseCnrCreateView",
+    "CaseCnrLookupView",
     "CaseDetailView",
     "CaseListView",
     "CaseOrdersView",
