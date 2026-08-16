@@ -208,7 +208,7 @@ CSRF_TRUSTED_ORIGINS = config(
 # shown in Django admin (core/admin.py's InviteTokenAdmin.invite_link), so
 # the owner can copy/paste it straight into an email. Override in .env if
 # this should point at a different frontend domain.
-FRONTEND_URL = config("FRONTEND_URL", default="https://case-intel.vercel.app")
+FRONTEND_URL = config("FRONTEND_URL", default="https://caseintel.in")
 
 # Auth is via a manually-attached "Authorization: Token ..." header, not
 # cookies, so the browser never needs to send credentials cross-origin
