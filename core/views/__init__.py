@@ -23,7 +23,7 @@ from .appearance_fee import (
     AppearanceFeeMarkPaidView,
     AppearanceFeeSendView,
 )
-from .auth import LoginView, LogoutView
+from .auth import InviteValidateView, LoginView, LogoutView, RegisterView
 from .case import CaseDetailView, CaseListView
 from .case_tracking import (
     CaseTrackingConfirmView,
@@ -115,7 +115,9 @@ __all__ = [
     "GmailSyncView",
     "HearingDetailView",
     "HearingListCreateView",
+    "InviteValidateView",
     "LoginView",
     "LogoutView",
+    "RegisterView",
     "UpcomingHearingsView",
 ]
