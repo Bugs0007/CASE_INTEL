@@ -46,6 +46,19 @@ def _clean(text: str | None) -> str:
     return re.sub(r"\s+", " ", text.strip())
 
 
+_LABEL_PUNCT_RE = re.compile(r"[.:]")
+
+
+def _normalize_label(text: str | None) -> str:
+    """_clean() plus lowercasing and stripping the punctuation eCourts'
+    detail-table labels are inconsistent about ("Registration No" vs a
+    hypothetical "Registration No." / "Registration No:") -- used ONLY
+    for matching against _DETAIL_LABELS, never for cell VALUES, which can
+    contain meaningful punctuation (case numbers, dates) that must not be
+    stripped."""
+    return _LABEL_PUNCT_RE.sub("", _clean(text)).lower()
+
+
 _ORDINAL_RE = re.compile(r"(\d+)(st|nd|rd|th)\b", re.I)
 
 
@@ -201,23 +214,31 @@ def parse_case_history_html(html: str) -> CourtCaseData | None:
 
     # Details table: HC Services renders label+value as <td>; District
     # Courts renders the label as <th scope='row'> -- both are checked.
+    # A row isn't always exactly one label/value pair: confirmed live
+    # against CNR HBHC010536082026 (Telangana HC), the Filing/Registration
+    # Number+Date rows each pack TWO pairs into one <tr> (4 cells: label,
+    # value, label, value) -- a plain "len(cells) != 2: skip" throws the
+    # whole row away before the label is ever read, which is why
+    # registration_number came back empty even though the label text
+    # itself ("Registration Number") matches _DETAIL_LABELS exactly. Walk
+    # the cells in (label, value) strides instead, so this also covers
+    # any row bundling 3+ pairs (6, 8... cells) the same way.
     for row in soup.find_all("tr"):
         cells = row.find_all(["th", "td"])
-        if len(cells) != 2:
-            continue
-        label = _clean(cells[0].get_text()).lower()
-        value = _clean(cells[1].get_text())
-        if not label or not value:
-            continue
-        for key, field_name in _DETAIL_LABELS.items():
-            if key in label:
-                if field_name in ("next_hearing_date", "first_hearing_date"):
-                    parsed = _parse_date(_normalize_ordinal_date(value))
-                    if parsed:
-                        setattr(data, field_name, parsed)
-                elif not getattr(data, field_name):
-                    setattr(data, field_name, value)
-                break
+        for i in range(0, len(cells) - 1, 2):
+            label = _normalize_label(cells[i].get_text())
+            value = _clean(cells[i + 1].get_text())
+            if not label or not value:
+                continue
+            for key, field_name in _DETAIL_LABELS.items():
+                if key in label:
+                    if field_name in ("next_hearing_date", "first_hearing_date"):
+                        parsed = _parse_date(_normalize_ordinal_date(value))
+                        if parsed:
+                            setattr(data, field_name, parsed)
+                    elif not getattr(data, field_name):
+                        setattr(data, field_name, value)
+                    break
 
     data.petitioner = _extract_first_party(soup, "Petitioner_Advocate_table")
     data.respondent = _extract_first_party(soup, "Respondent_Advocate_table")
