@@ -20,7 +20,7 @@ import { CollapseToggle } from "@/components/ui/collapse-toggle";
 import { Collapsible } from "@/components/ui/collapsible";
 import { showToast } from "@/components/ui/toaster";
 import { APIError } from "@/lib/api/client";
-import { formatDate, formatRelativeTime } from "@/lib/utils";
+import { formatDate, formatHearingDate, formatRelativeTime } from "@/lib/utils";
 import {
   useConfirmTracking,
   useCourtStructure,
@@ -662,7 +662,7 @@ function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hea
             {nextHearing ? (
               <span className="flex items-center gap-1 text-sm font-medium text-gray-900">
                 <CalendarClock className="h-3.5 w-3.5 text-primary" />
-                {formatDate(nextHearing.hearing_date)}
+                {formatHearingDate(nextHearing.hearing_date)}
               </span>
             ) : (
               <span className="text-sm text-gray-500">None scheduled</span>
@@ -705,7 +705,7 @@ function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hea
                   <tbody className="divide-y divide-gray-100">
                     {[...ecourtsHearings].reverse().map((h) => (
                       <tr key={h.id} className={h.hearing_date.slice(0, 10) >= today ? "bg-gray-100" : ""}>
-                        <td className="px-3 py-2 whitespace-nowrap">{formatDate(h.hearing_date)}</td>
+                        <td className="px-3 py-2 whitespace-nowrap">{formatHearingDate(h.hearing_date)}</td>
                         <td className="px-3 py-2 text-gray-600">{h.purpose || "—"}</td>
                         <td className="px-3 py-2 text-gray-600">{h.judge || "—"}</td>
                       </tr>

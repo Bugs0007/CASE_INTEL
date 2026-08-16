@@ -3,7 +3,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { CalendarClock, RefreshCw, FileWarning } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { formatDate, formatRelativeTime, staggerDelay } from "@/lib/utils";
+import { formatHearingDate, formatRelativeTime, staggerDelay } from "@/lib/utils";
 import type { UpcomingHearing, Document } from "@/types";
 
 interface NeedsAttentionProps {
@@ -58,7 +58,7 @@ export function NeedsAttention({
           {h.purpose ? ` — ${h.purpose}` : ""}
         </>
       ),
-      meta: `${formatDate(h.hearing_date, "MMM d, h:mm a")} · ${h.case_number}`,
+      meta: `${formatHearingDate(h.hearing_date)} · ${h.case_number}`,
     });
   }
 
@@ -76,7 +76,7 @@ export function NeedsAttention({
           a new hearing date since your last login
         </>
       ),
-      meta: `New date ${formatDate(h.hearing_date)} · ${h.case_number}`,
+      meta: `New date ${formatHearingDate(h.hearing_date)} · ${h.case_number}`,
     });
   }
 

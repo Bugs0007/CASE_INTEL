@@ -25,6 +25,45 @@ export function formatDate(
   }
 }
 
+/** hearing_date is always midnight UTC -- eCourts only ever provides a
+ * DATE for a hearing, never a time (Hearing.hearing_date is a
+ * DateTimeField for historical/DB reasons and serializes with a "Z" UTC
+ * suffix, but every row's time-of-day component is 00:00:00). Two
+ * distinct problems follow from formatting it the normal (formatDate/
+ * formatDateTime, i.e. parseISO + local-timezone format()) way:
+ *
+ *   1. A time component gets rendered at all -- fabricating one that
+ *      looks like real data (00:00 UTC always renders as 5:30 AM in
+ *      IST) when there never was one.
+ *   2. Because the string carries a real UTC "Z" marker, parseISO()
+ *      creates a Date representing that exact UTC instant, and format()
+ *      then converts it to whatever timezone the CODE HAPPENS TO RUN IN
+ *      (the browser's for a client render, the server process's for
+ *      Next.js SSR -- these can differ) before reading off the
+ *      calendar date. For any viewer/server west of UTC by enough to
+ *      cross a day boundary, that can silently shift the displayed DAY,
+ *      not just fabricate a time.
+ *
+ * Both are the same root mistake: treating a calendar date as if it
+ * were a real moment in time and round-tripping it through a timezone.
+ * This extracts the year/month/day directly from the stored string
+ * instead -- no Date-to-UTC-instant parsing, no local-timezone
+ * conversion, so the calendar date it displays can never depend on
+ * where the code happens to be running. No formatStr parameter, on
+ * purpose: always date-only, so a time-bearing override (the mistake
+ * that caused this bug the first time -- see needs-attention.tsx's git
+ * history) can't be reintroduced here. */
+export function formatHearingDate(dateString: string | null | undefined): string {
+  if (!dateString) return "";
+  try {
+    const [year, month, day] = dateString.slice(0, 10).split("-").map(Number);
+    if (!year || !month || !day) return "";
+    return format(new Date(year, month - 1, day), "MMM d, yyyy");
+  } catch {
+    return "";
+  }
+}
+
 export function formatDateTime(dateString: string | null | undefined): string {
   if (!dateString) return "";
   try {

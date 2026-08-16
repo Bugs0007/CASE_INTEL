@@ -287,3 +287,150 @@ class TestExistingFlowsUnchanged:
         )
         assert resp.status_code == 201
         assert "cnr_number" in resp.data
+
+
+REGISTRATION_NUMBER = "WP/23998/2026"
+
+
+@pytest.mark.django_db
+class TestRegistrationNumberUsedAsCaseNumber:
+    """Regression coverage for a live-verified bug: preview_case_creation_
+    from_cnr() was unconditionally setting case_number/title to the CNR
+    string, even when eCourts' case-history response actually carried a
+    real registration number (e.g. "WP /23998/2026") -- the CNR is not a
+    human-recognizable case number, and the cause-list matcher can't match
+    a case against real cause-list entries using a CNR where it expects a
+    parseable case-number format.
+
+    Root cause was two layers deep: CourtCaseData had no field to carry a
+    registration number at all, so _DETAIL_LABELS (core/services/
+    court_data/ecourts_parsing.py) never captured it out of the case-
+    history HTML in the first place -- it was discarded before
+    preview_case_creation_from_cnr ever saw it, not just mis-prioritized
+    there. Fixed by adding CourtCaseData.registration_number, mapping
+    "registration no" in _DETAIL_LABELS, and using
+    `data.registration_number or cnr` (CNR only as the last resort) when
+    building the preview response.
+    """
+
+    @patch("core.services.court_tracking.get_provider")
+    def test_lookup_uses_fetched_registration_number_not_cnr(self, get_provider, api):
+        provider = MagicMock()
+        provider.fetch_case_by_cnr.return_value = _fake_case_data(
+            registration_number=REGISTRATION_NUMBER
+        )
+        get_provider.return_value = provider
+
+        lookup = api.post("/api/cases/cnr-lookup/", {"cnr": CNR}, format="json")
+
+        assert lookup.status_code == 200
+        assert lookup.data["case_number"] == REGISTRATION_NUMBER
+        assert lookup.data["title"] == REGISTRATION_NUMBER
+        assert lookup.data["case_number"] != CNR
+
+    @patch("core.services.court_tracking.get_provider")
+    def test_create_persists_fetched_registration_number_as_case_number(self, get_provider, api):
+        provider = MagicMock()
+        provider.fetch_case_by_cnr.return_value = _fake_case_data(
+            registration_number=REGISTRATION_NUMBER
+        )
+        get_provider.return_value = provider
+
+        lookup = api.post("/api/cases/cnr-lookup/", {"cnr": CNR}, format="json")
+        assert lookup.status_code == 200
+
+        # Submit exactly what the form was pre-filled with -- the common
+        # path where the advocate doesn't touch case_number/title before
+        # confirming.
+        create = api.post(
+            "/api/cases/cnr-lookup/create/",
+            {
+                "preview_token": lookup.data["preview_token"],
+                "case_number": lookup.data["case_number"],
+                "title": lookup.data["title"],
+            },
+            format="json",
+        )
+
+        assert create.status_code == 201
+        assert create.data["case_number"] == REGISTRATION_NUMBER
+
+        case = Case.objects.get(cnr_number=CNR)
+        assert case.case_number == REGISTRATION_NUMBER
+        assert case.case_number != case.cnr_number
+
+    @patch("core.services.court_tracking.get_provider")
+    def test_lookup_falls_back_to_cnr_only_when_no_registration_number(self, get_provider, api):
+        """The CNR fallback is still correct for the rare record types
+        eCourts returns with no Registration Number row at all."""
+        provider = MagicMock()
+        provider.fetch_case_by_cnr.return_value = _fake_case_data(registration_number="")
+        get_provider.return_value = provider
+
+        lookup = api.post("/api/cases/cnr-lookup/", {"cnr": CNR}, format="json")
+
+        assert lookup.status_code == 200
+        assert lookup.data["case_number"] == CNR
+        assert lookup.data["title"] == CNR
+
+
+class TestParseCaseHistoryHtmlRegistrationNumber:
+    """Root-cause-layer coverage: the case-history HTML parser itself must
+    capture the Registration Number row -- see the module-level docstring
+    on TestRegistrationNumberUsedAsCaseNumber for why this matters."""
+
+    def test_registration_no_label_is_captured(self):
+        from core.services.court_data.ecourts_parsing import parse_case_history_html
+
+        html = """
+        <table>
+          <tr><th>Registration No</th><td>WP/23998/2026</td></tr>
+          <tr><th>Case Status</th><td>CASE PENDING</td></tr>
+        </table>
+        """
+        data = parse_case_history_html(html)
+
+        assert data is not None
+        assert data.registration_number == "WP/23998/2026"
+
+    def test_registration_number_label_variant_is_also_captured(self):
+        from core.services.court_data.ecourts_parsing import parse_case_history_html
+
+        html = """
+        <table>
+          <tr><th>Registration Number</th><td>OS/145/2025</td></tr>
+        </table>
+        """
+        data = parse_case_history_html(html)
+
+        assert data is not None
+        assert data.registration_number == "OS/145/2025"
+
+    def test_missing_registration_row_leaves_field_blank(self):
+        from core.services.court_data.ecourts_parsing import parse_case_history_html
+
+        html = """
+        <table>
+          <tr><th>Case Status</th><td>CASE PENDING</td></tr>
+        </table>
+        """
+        data = parse_case_history_html(html)
+
+        assert data is not None
+        assert data.registration_number == ""
+
+    def test_registration_date_row_is_not_mistaken_for_registration_number(self):
+        """eCourts case-history pages also have a separate "Registration
+        Date" row -- a bare "registration" prefix key would wrongly
+        capture a date string into this field."""
+        from core.services.court_data.ecourts_parsing import parse_case_history_html
+
+        html = """
+        <table>
+          <tr><th>Registration Date</th><td>12-03-2026</td></tr>
+        </table>
+        """
+        data = parse_case_history_html(html)
+
+        assert data is not None
+        assert data.registration_number == ""

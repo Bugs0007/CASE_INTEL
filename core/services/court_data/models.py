@@ -56,6 +56,14 @@ class CourtCaseData:
     case_stage: str = ""
     court_and_judge: str = ""
     court_name: str = ""
+    registration_number: str = ""
+    # The portal's own case/registration number (e.g. "WP/23998/2026"),
+    # distinct from `cnr` -- this is what a human (and the cause-list
+    # matcher, see core/services/cause_list/) actually recognizes as "the
+    # case number." Blank for the rare record types whose case-history
+    # page omits a Registration Number row entirely -- callers must treat
+    # blank as "unavailable," not fall back to displaying the CNR as if it
+    # were this field.
     petitioner: str = ""
     respondent: str = ""
     next_hearing_date: date | None = None
@@ -80,6 +88,7 @@ class CourtCaseData:
             "case_stage": self.case_stage,
             "court_and_judge": self.court_and_judge,
             "court_name": self.court_name,
+            "registration_number": self.registration_number,
             "petitioner": self.petitioner,
             "respondent": self.respondent,
             "next_hearing_date": self.next_hearing_date.isoformat() if self.next_hearing_date else None,
@@ -108,6 +117,7 @@ class CourtCaseData:
             case_stage=payload.get("case_stage", ""),
             court_and_judge=payload.get("court_and_judge", ""),
             court_name=payload.get("court_name", ""),
+            registration_number=payload.get("registration_number", ""),
             petitioner=payload.get("petitioner", ""),
             respondent=payload.get("respondent", ""),
             next_hearing_date=date.fromisoformat(payload["next_hearing_date"]) if payload.get("next_hearing_date") else None,

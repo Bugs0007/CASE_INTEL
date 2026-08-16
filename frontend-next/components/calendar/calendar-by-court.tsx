@@ -74,10 +74,15 @@ export function CalendarByCourt({ hearings, caseMeta }: CalendarByCourtProps) {
                         </span>
                         <CauseListBadge hearing={h} />
                       </div>
-                      <div className="text-xs font-mono text-gray-500">
-                        {format(parseISO(h.hearing_date), "h:mm a")}
-                        {meta ? ` · ${meta.documentCount} docs on file` : ""}
-                      </div>
+                      {/* No time shown here -- eCourts only ever gives a
+                          DATE, already rendered in the compact column to
+                          the left ("MMM d"); there's no real hearing time
+                          to add alongside it. */}
+                      {meta && (
+                        <div className="text-xs font-mono text-gray-500">
+                          {meta.documentCount} docs on file
+                        </div>
+                      )}
                     </div>
                   </div>
                   <Link href={`/cases/${h.case}`}>

@@ -164,9 +164,10 @@ export function CalendarMonth({ hearings, caseMeta }: CalendarMonthProps) {
               return (
                 <div key={h.id} className="border border-gray-100 rounded-lg p-3">
                   <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                    <span className="text-[13px] font-bold font-mono text-gray-900">
-                      {format(parseISO(h.hearing_date), "h:mm a")}
-                    </span>
+                    {/* No per-hearing time shown -- eCourts only ever gives a
+                        DATE, and this panel is already scoped to the single
+                        selected day (see the "EEEE, MMMM d" heading above),
+                        so there's nothing left to add here beyond the badges. */}
                     <span className="ci-chip ci-chip--none">
                       {h.source === "ecourts" ? "eCourts" : "Manual"}
                     </span>
