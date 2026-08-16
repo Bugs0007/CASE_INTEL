@@ -95,6 +95,16 @@ class Case(OwnedModel):
     class Meta:
         db_table = "cases"
         ordering = ["-created_at"]
+        constraints = [
+            # DB-level backstop for the same-user CNR duplicate check the
+            # "Track by CNR" quick-add flow does in application code (see
+            # create_case_from_cnr_preview in core/services/court_tracking.py).
+            # cnr_number is nullable, and Postgres treats NULLs as distinct
+            # in unique constraints, so cases with no CNR yet are unaffected.
+            models.UniqueConstraint(
+                fields=["owner", "cnr_number"], name="unique_case_owner_cnr_number"
+            )
+        ]
 
     def __str__(self):
         return f"{self.case_number} - {self.title}"

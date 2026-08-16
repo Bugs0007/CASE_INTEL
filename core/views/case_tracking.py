@@ -16,17 +16,21 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.models import Case, Hearing
-from core.serializers import CaseSerializer, HearingSerializer
+from core.serializers import CaseCnrCreateSerializer, CaseSerializer, HearingSerializer
 from core.services.court_data import CaptchaSolveError, CaseNotFoundError, CourtDataError, CourtPortalError, get_provider
 from core.services.court_data.ecourts_parsing import parse_complex_code
 from core.services.court_tracking import (
+    CaseNumberConflictError,
+    DuplicateCnrError,
     InvalidTrackingConfigError,
     MissingTrackingConfigError,
     PreviewExpiredError,
     PreviewThrottledError,
     TrackingNotEnabledError,
     confirm_case_tracking,
+    create_case_from_cnr_preview,
     latest_snapshot,
+    preview_case_creation_from_cnr,
     preview_case_tracking,
     refresh_case_tracking,
     untrack_case,
@@ -52,6 +56,21 @@ def _error_response(exc: Exception) -> Response:
     if isinstance(exc, CourtDataError):
         return Response({"detail": str(exc), "code": "court_data_error"}, status=status.HTTP_400_BAD_REQUEST)
     raise exc
+
+
+def _duplicate_cnr_response(exc: DuplicateCnrError) -> Response:
+    """Shared 409 shape for a same-user CNR duplicate, used by both
+    CaseCnrLookupView and CaseCnrCreateView -- carries the existing case's
+    id/case_number so the frontend can link straight to it."""
+    return Response(
+        {
+            "detail": str(exc),
+            "code": "duplicate_cnr",
+            "case_id": exc.case.id,
+            "case_number": exc.case.case_number,
+        },
+        status=status.HTTP_409_CONFLICT,
+    )
 
 
 def _validate_tracking_config(tracking_config: dict) -> str | None:
@@ -334,6 +353,15 @@ class CaseTrackingRefreshView(APIView):
             error_resp = _error_response(exc)
             error_resp.data["case"] = CaseSerializer(case).data
             return error_resp
+        except DuplicateCnrError as exc:
+            # This case had no CNR yet and the fetch resolved to one
+            # another of the same owner's cases already tracks -- two rows
+            # for the same real court case. Same 409 shape the "Track by
+            # CNR" quick-add flow uses for a same-user duplicate.
+            case.refresh_from_db()
+            error_resp = _duplicate_cnr_response(exc)
+            error_resp.data["case"] = CaseSerializer(case).data
+            return error_resp
         except Exception:  # noqa: BLE001
             # Anything unmapped (a provider ValueError, a parser bug, a
             # transport error) used to propagate out of the view. In
@@ -366,3 +394,86 @@ class CaseTrackingRefreshView(APIView):
         payload["rate_limited"] = False
         payload["new_hearing_dates"] = [d.isoformat() for d in result["new_hearing_dates"]]
         return Response(payload, status=status.HTTP_200_OK)
+
+
+class CaseCnrLookupView(APIView):
+    """Case-less CNR fetch for the "Track by CNR" quick-add flow on the
+    manual case entry page. POST /api/cases/cnr-lookup/
+
+    Unlike CaseTrackingPreviewView, no Case row needs to exist yet -- this
+    is the only entry point that fetches a CNR before a case is created.
+    Reuses the exact same fetch machinery (_fetch_by_cnr_auto, via
+    preview_case_creation_from_cnr) as the per-case preview/confirm flow
+    and advocate-import, including CNR-based court_type auto-detection and
+    party-role detection.
+
+    Body: {"cnr": "<16-char CNR>", "court_type": "district"|"high_court"}
+    -- court_type optional, auto-detected from the CNR when omitted (same
+    CNR-first shape/behavior as CaseTrackingPreviewView). Returns the
+    fetched case identity plus pre-fill suggestions (case_number, title,
+    user_party_role, opposing_party) and a preview_token to pass to
+    CaseCnrCreateView. Nothing is written to the database except the
+    preview row itself (and nothing at all if the CNR is a same-user
+    duplicate -- see the 409 below).
+    """
+
+    def post(self, request):
+        tracking_config = {"cnr": (request.data.get("cnr") or "").strip().upper()}
+        court_type = request.data.get("court_type")
+        if court_type:
+            tracking_config["court_type"] = court_type
+        error = _validate_tracking_config(tracking_config)
+        if error:
+            return Response({"detail": error}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            preview = preview_case_creation_from_cnr(
+                tracking_config["cnr"], tracking_config.get("court_type"), user=request.user
+            )
+        except DuplicateCnrError as exc:
+            return _duplicate_cnr_response(exc)
+        except PreviewThrottledError as exc:
+            return Response({"detail": str(exc), "code": "preview_throttled"}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+        except CourtDataError as exc:
+            return _error_response(exc)
+
+        return Response(preview, status=status.HTTP_200_OK)
+
+
+class CaseCnrCreateView(APIView):
+    """Persists a case-less CNR preview into a brand-new Case with
+    tracking already configured -- the confirm step of the "Track by CNR"
+    quick-add flow. POST /api/cases/cnr-lookup/create/
+
+    Body: {"preview_token": "...", plus the same field set as
+    CaseCreateSerializer (case_number, title, client_name, opposing_party,
+    user_party_role, case_type, status, priority, filing_date, notes)} --
+    whatever the advocate reviewed/edited in the pre-filled form after
+    CaseCnrLookupView. Never trusts client-supplied court data: only the
+    server-cached payload from that earlier call is applied to the case.
+
+    The existing fully-manual entry point (CaseListView.create(), POST
+    /api/cases/) is untouched by this -- this is an additional path, not a
+    replacement.
+    """
+
+    def post(self, request):
+        preview_token = request.data.get("preview_token")
+        if not preview_token:
+            return Response({"detail": "preview_token is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = CaseCnrCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            case = create_case_from_cnr_preview(
+                preview_token, serializer.validated_data, user=request.user
+            )
+        except PreviewExpiredError as exc:
+            return Response({"detail": str(exc), "code": "preview_expired"}, status=status.HTTP_410_GONE)
+        except DuplicateCnrError as exc:
+            return _duplicate_cnr_response(exc)
+        except CaseNumberConflictError as exc:
+            return Response({"case_number": [str(exc)]}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(CaseSerializer(case).data, status=status.HTTP_201_CREATED)

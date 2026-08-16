@@ -7,6 +7,7 @@ from decimal import Decimal
 from django.db.models import Count, Sum
 from django.utils import timezone
 from rest_framework import serializers
+from rest_framework.validators import UniqueValidator
 
 from core.models import AppearanceFee, Case
 
@@ -172,3 +173,28 @@ class CaseCreateSerializer(serializers.ModelSerializer):
             "opposing_party": {"required": False, "allow_blank": True, "allow_null": True},
             "notes": {"required": False, "allow_blank": True, "allow_null": True},
         }
+
+
+class CaseCnrCreateSerializer(CaseCreateSerializer):
+    """Same field set/validation as CaseCreateSerializer, for the confirm
+    step of the "Track by CNR" quick-add flow (core/views/case_tracking.py's
+    CaseCnrCreateView) -- minus the automatic UniqueValidator DRF attaches
+    to case_number for its unique=True model field.
+
+    A case_number collision here needs to reach
+    create_case_from_cnr_preview()'s IntegrityError handling (core/
+    services/court_tracking.py) so it can tell a same-user CNR duplicate
+    (DuplicateCnrError, a link to the existing case) apart from a
+    different owner's case_number collision (CaseNumberConflictError,
+    "already tracked by another user in the system") -- see that
+    function's docstring. DRF's UniqueValidator would otherwise
+    short-circuit validation before either check runs, with generic
+    wording that can't distinguish the two.
+    """
+
+    def get_fields(self):
+        fields = super().get_fields()
+        fields["case_number"].validators = [
+            v for v in fields["case_number"].validators if not isinstance(v, UniqueValidator)
+        ]
+        return fields

@@ -1,4 +1,4 @@
-import type { Case } from "./case";
+import type { Case, CaseCreateInput, UserPartyRole } from "./case";
 import type { Hearing } from "./hearing";
 
 export interface CourtStructureOption {
@@ -91,4 +91,48 @@ export interface TrackingPreview {
   next_hearing_date: string | null;
   first_hearing_date: string | null;
   hearing_count: number;
+}
+
+/** Response from POST /api/cases/cnr-lookup/ -- the "Track by CNR"
+ * quick-add flow's fetch step, on the manual case entry page. Unlike
+ * TrackingPreview, no Case exists yet: case_number/title/user_party_role/
+ * opposing_party are pre-fill SUGGESTIONS for the manual entry form, not
+ * a display of an already-tracked case. The advocate reviews/edits them,
+ * then submits via casesApi.createFromCnr() with this preview_token. */
+export interface CnrLookupPreview {
+  preview_token: string;
+  cnr: string;
+  case_number: string;
+  title: string;
+  user_party_role: UserPartyRole;
+  opposing_party: string | null;
+  petitioner: string;
+  respondent: string;
+  court_name: string;
+  case_status: string;
+  case_stage: string;
+  court_type: "district" | "high_court";
+  court_type_detected: boolean;
+  next_hearing_date: string | null;
+  first_hearing_date: string | null;
+  hearing_count: number;
+}
+
+/** Body for POST /api/cases/cnr-lookup/create/ -- confirms a
+ * CnrLookupPreview into a real Case (with tracking already configured),
+ * using whatever the advocate reviewed/edited in the pre-filled form. */
+export interface CaseCreateFromCnrInput extends CaseCreateInput {
+  preview_token: string;
+}
+
+/** A same-user CNR duplicate, returned as a 409 by both
+ * /cases/cnr-lookup/ and /cases/cnr-lookup/create/ (and by
+ * /cases/<id>/tracking/refresh/ when it uncovers two of the same owner's
+ * cases resolving to the same CNR). Carries enough to link straight to
+ * the existing case instead of just reporting the conflict. */
+export interface DuplicateCnrErrorData {
+  detail: string;
+  code: "duplicate_cnr";
+  case_id: number;
+  case_number: string;
 }

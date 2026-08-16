@@ -8,7 +8,7 @@ continue to work.
 
 from .advocate_profile import AdvocateProfileSerializer
 from .appearance_fee import AppearanceFeeSerializer, NestedAppearanceFeeSerializer
-from .case import CaseCreateSerializer, CaseSerializer
+from .case import CaseCnrCreateSerializer, CaseCreateSerializer, CaseSerializer
 from .chat import (
     ChatRequestSerializer,
     ChatResponseSerializer,
@@ -33,6 +33,7 @@ __all__ = [
     "NestedTravelBookingSerializer",
     "TravelBookingSerializer",
     "TravelBookingUploadSerializer",
+    "CaseCnrCreateSerializer",
     "CaseCreateSerializer",
     "CaseSerializer",
     "ChatRequestSerializer",

@@ -26,7 +26,18 @@ class CourtTrackingPreview(models.Model):
 
     token = models.CharField(max_length=64, unique=True, db_index=True)
     case = models.ForeignKey(
-        "core.Case", on_delete=models.CASCADE, related_name="tracking_previews"
+        "core.Case",
+        on_delete=models.CASCADE,
+        related_name="tracking_previews",
+        null=True,
+        blank=True,
+        help_text=(
+            "Null for a case-less preview: the 'Track by CNR' quick-add "
+            "flow on the manual case entry page fetches a CNR before any "
+            "Case row exists yet (see preview_case_creation_from_cnr in "
+            "core/services/court_tracking.py). Confirming that kind of "
+            "preview creates the Case itself rather than updating one."
+        ),
     )
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+"
