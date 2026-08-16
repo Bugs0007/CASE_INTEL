@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { caseTrackingApi } from "@/lib/api/case-tracking";
 import { caseKeys } from "@/hooks/use-cases";
 import { hearingKeys } from "@/hooks/use-hearings";
-import type { CourtType, TrackingConfig } from "@/types";
+import type { CaseCreateFromCnrInput, CourtType, TrackingConfig } from "@/types";
 
 export const courtStructureKeys = {
   all: ["court-structure"] as const,
@@ -61,6 +61,30 @@ export function useUntrackTracking(caseId: number) {
     mutationFn: () => caseTrackingApi.untrack(caseId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: caseKeys.detail(caseId) });
+      queryClient.invalidateQueries({ queryKey: hearingKeys.lists() });
+    },
+  });
+}
+
+/** "Track by CNR" quick-add (manual case entry page): fetches a CNR
+ * before any case exists. Doesn't invalidate any queries -- nothing
+ * changed on the server yet, same as usePreviewTracking. */
+export function useCnrLookup() {
+  return useMutation({
+    mutationFn: ({ cnr, courtType }: { cnr: string; courtType?: CourtType }) =>
+      caseTrackingApi.cnrLookup(cnr, courtType),
+  });
+}
+
+/** Confirms a CnrLookupPreview into a real, tracked Case. */
+export function useCreateCaseFromCnr() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: CaseCreateFromCnrInput) => caseTrackingApi.createFromCnr(data),
+    onSuccess: (createdCase) => {
+      queryClient.setQueryData(caseKeys.detail(createdCase.id), createdCase);
+      queryClient.invalidateQueries({ queryKey: caseKeys.lists() });
       queryClient.invalidateQueries({ queryKey: hearingKeys.lists() });
     },
   });

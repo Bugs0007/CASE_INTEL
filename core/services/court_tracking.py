@@ -12,10 +12,20 @@ import secrets
 import time
 from datetime import datetime, timedelta
 
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from core.models import ActivityLog, Case, CourtFetchLog, CourtTrackingPreview, Hearing, ProcessingJob
+from core.models import (
+    ActivityLog,
+    AdvocateProfile,
+    Case,
+    CourtFetchLog,
+    CourtTrackingPreview,
+    Hearing,
+    ProcessingJob,
+)
 from core.services.court_data import CaseNotFoundError, CourtCaseData, CourtDataError, get_provider
+from core.services.party_role import detect_party_role
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +62,39 @@ class PreviewThrottledError(Exception):
 class PreviewExpiredError(Exception):
     """Raised when a preview_token is unknown, expired, or doesn't belong
     to the requesting user/case."""
+
+
+class DuplicateCnrError(Exception):
+    """Raised when the requesting user already has a case tracking a given
+    CNR -- the same-user half of the "Track by CNR" quick-add flow's
+    duplicate prevention (see preview_case_creation_from_cnr and
+    create_case_from_cnr_preview below). Carries the existing Case so the
+    caller can link to it instead of just reporting the conflict."""
+
+    def __init__(self, case: Case):
+        self.case = case
+        super().__init__(
+            f"You already have a case tracking CNR {case.cnr_number} (case {case.case_number!r})."
+        )
+
+
+class CaseNumberConflictError(Exception):
+    """Raised when a case_number collides with another owner's case at the
+    database level -- the other half of the "Track by CNR" quick-add
+    flow's duplicate prevention. case_number is globally unique=True (not
+    scoped per owner, see core/models/case.py), a pre-existing schema
+    property advocate_import.py already has to handle the same way (see
+    its module docstring); create_case_from_cnr_preview mirrors that
+    IntegrityError-catch pattern rather than relying on
+    CaseCreateSerializer's automatic UniqueValidator, which would
+    otherwise intercept the collision earlier with generic DRF wording
+    that can't tell this case apart from a same-user CNR duplicate."""
+
+    def __init__(self, case_number: str):
+        self.case_number = case_number
+        super().__init__(
+            f"Case number {case_number!r} is already tracked by another user in the system."
+        )
 
 
 def refresh_case_tracking(case: Case, *, force: bool = False) -> dict:
@@ -117,6 +160,23 @@ def refresh_case_tracking(case: Case, *, force: bool = False) -> dict:
         error_message = str(exc)
         case.fetch_status = "failed"
         case.save(update_fields=["fetch_status"])
+        raise
+    except IntegrityError:
+        # The (owner, cnr_number) UniqueConstraint added for the "Track by
+        # CNR" quick-add flow (see create_case_from_cnr_preview) can fire
+        # here too: this case had no CNR yet (_apply_case_data only ever
+        # sets it once, on first successful fetch) and the fetch resolved
+        # to a CNR that another one of THIS SAME owner's cases already
+        # has -- two rows tracking the same real court case. Surface it
+        # the same way the quick-add flow does rather than letting a raw
+        # IntegrityError become a generic 500 (see CaseTrackingRefreshView).
+        success = False
+        existing = Case.objects.filter(owner=case.owner, cnr_number=data.cnr).exclude(pk=case.pk).first()
+        error_message = f"CNR {data.cnr} is already tracked by another case for this owner."
+        case.fetch_status = "failed"
+        case.save(update_fields=["fetch_status"])
+        if existing is not None:
+            raise DuplicateCnrError(existing) from None
         raise
     finally:
         duration_ms = int((time.monotonic() - start) * 1000)
@@ -443,6 +503,26 @@ def confirm_case_tracking(case: Case, preview_token: str, *, user_id: int) -> di
     case.tracking_enabled = True
     case.save(update_fields=["court_type", "tracking_config", "tracking_enabled"])
 
+    new_hearing_dates = _finalize_confirmed_fetch(case, data)
+
+    # One-time use -- a stale token can't be replayed to re-persist the
+    # same (or since-changed) payload after this.
+    preview.delete()
+
+    return {"case": case, "data": data, "new_hearing_dates": new_hearing_dates}
+
+
+def _finalize_confirmed_fetch(case: Case, data: CourtCaseData) -> list:
+    """Apply a confirmed fetch onto a case that already has
+    court_type/tracking_config/tracking_enabled set: CNR/party-advocate
+    fields, hearing upsert, fetch log, last_fetched_at/fetch_status, an
+    ActivityLog entry for new hearings, and order-sync enqueue.
+
+    Shared by confirm_case_tracking() (an existing case being tracked for
+    the first time) and create_case_from_cnr_preview() (a brand-new case
+    created directly from a case-less CNR preview, see below) so both end
+    up in byte-identical post-fetch state. Returns new_hearing_dates.
+    """
     _apply_case_data(case, data)
     new_hearing_dates = _upsert_hearings(case, data)
     log_payload = _build_snapshot(data, new_hearing_dates)
@@ -470,12 +550,169 @@ def confirm_case_tracking(case: Case, preview_token: str, *, user_id: int) -> di
         )
 
     _enqueue_order_sync(case)
+    return new_hearing_dates
 
-    # One-time use -- a stale token can't be replayed to re-persist the
-    # same (or since-changed) payload after this.
+
+def preview_case_creation_from_cnr(cnr: str, court_type: str | None, *, user) -> dict:
+    """Case-less variant of preview_case_tracking() for the "Track by CNR"
+    quick-add flow on the manual case entry page (see
+    core/views/case_tracking.py's CaseCnrLookupView) -- fetches a CNR
+    before any Case row exists yet, so the advocate can review/edit the
+    result before anything is created.
+
+    Reuses the exact same fetch machinery as the per-case preview
+    (_fetch_by_cnr_auto/get_provider) and the same party-role detection
+    advocate_import.py uses (detect_party_role), just sourced from the
+    requesting user's own AdvocateProfile instead of a searched advocate
+    identity -- a direct CNR entry has no "searched advocate" to compare
+    against. Degrades to "unknown" cleanly (same as advocate_import) when
+    the user has no AdvocateProfile yet, or its letterhead_name is blank.
+
+    case_number/title in the returned preview default to the CNR itself,
+    matching advocate_import.py's convention (eCourts has no case_number/
+    title of its own for a direct CNR-first lookup) -- the caller can
+    still edit either before confirming.
+
+    Raises DuplicateCnrError immediately, before touching the portal, if
+    the requesting user already has a case tracking this CNR -- a known
+    duplicate should never cost a CAPTCHA-gated fetch.
+    Raises PreviewThrottledError if the per-user preview throttle is
+    exceeded (shared with the per-case preview flow -- same table, same
+    counter, so this can't be used to bypass it as a separate free-fetch
+    endpoint).
+    Raises CourtDataError (or a subclass) if the fetch itself fails --
+    nothing is persisted in that case.
+    """
+    existing = Case.objects.filter(owner=user, cnr_number=cnr).first()
+    if existing is not None:
+        raise DuplicateCnrError(existing)
+
+    _cleanup_expired_previews()
+    _check_preview_throttle(user.id)
+
+    provider = get_provider()
+
+    court_type_detected = False
+    if court_type in VALID_COURT_TYPES:
+        data = provider.fetch_case_by_cnr(cnr, court_type)
+        resolved_court_type = court_type
+    else:
+        data, resolved_court_type = _fetch_by_cnr_auto(provider, cnr)
+        court_type_detected = True
+
+    tracking_config = {"cnr": cnr, "court_type": resolved_court_type}
+
+    advocate_profile = AdvocateProfile.objects.filter(owner=user).first()
+    user_party_role = "unknown"
+    if advocate_profile is not None:
+        user_party_role = detect_party_role(
+            advocate_profile.letterhead_name,
+            advocate_profile.bar_registration_number,
+            data.party_advocate_data,
+        )
+
+    opposing_party = None
+    if user_party_role == "petitioner":
+        opposing_party = data.respondent or None
+    elif user_party_role == "respondent":
+        opposing_party = data.petitioner or None
+
+    token = secrets.token_urlsafe(24)
+    CourtTrackingPreview.objects.create(
+        token=token,
+        case=None,
+        user_id=user.id,
+        payload={"tracking_config": dict(tracking_config), "data": data.to_dict()},
+        expires_at=timezone.now() + PREVIEW_TOKEN_TTL,
+    )
+
+    return {
+        "preview_token": token,
+        "cnr": data.cnr,
+        "case_number": cnr,
+        "title": cnr,
+        "user_party_role": user_party_role,
+        "opposing_party": opposing_party,
+        "petitioner": data.petitioner,
+        "respondent": data.respondent,
+        "court_name": data.court_name,
+        "case_status": data.case_status,
+        "case_stage": data.case_stage,
+        "court_type": resolved_court_type,
+        "court_type_detected": court_type_detected,
+        "next_hearing_date": data.next_hearing_date.isoformat() if data.next_hearing_date else None,
+        "first_hearing_date": data.first_hearing_date.isoformat() if data.first_hearing_date else None,
+        "hearing_count": len(data.hearing_history),
+    }
+
+
+def create_case_from_cnr_preview(preview_token: str, case_fields: dict, *, user) -> Case:
+    """Persists a case-less CNR preview (preview_case_creation_from_cnr)
+    into a brand-new Case with tracking already configured -- the confirm
+    step of the "Track by CNR" quick-add flow. Never trusts client-supplied
+    court data: loads ONLY the server-cached payload keyed by
+    preview_token, the same principle confirm_case_tracking() follows.
+
+    case_fields is the validated field set from CaseCnrCreateSerializer
+    (case_number, title, client_name, opposing_party, user_party_role,
+    case_type, status, priority, filing_date, notes) -- whatever the
+    advocate reviewed/edited in the pre-filled form.
+
+    Raises PreviewExpiredError if the token is unknown, expired, or
+    doesn't belong to this user -- including a per-case preview token from
+    the OTHER (CaseTrackingPreviewView) flow, since preview.case_id will
+    never be None there.
+    Raises DuplicateCnrError if the user already has a case tracking this
+    CNR (re-checked here to close the race with a second request between
+    preview and confirm; the DB-level UniqueConstraint on
+    (owner, cnr_number) is the final backstop for the same race).
+    Raises CaseNumberConflictError if case_number collides with another
+    owner's case at the database level.
+    """
+    try:
+        preview = CourtTrackingPreview.objects.get(token=preview_token)
+    except CourtTrackingPreview.DoesNotExist:
+        raise PreviewExpiredError("This preview has expired. Please fetch the CNR again.")
+
+    if preview.expires_at <= timezone.now():
+        preview.delete()
+        raise PreviewExpiredError("This preview has expired. Please fetch the CNR again.")
+
+    if preview.case_id is not None or preview.user_id != user.id:
+        raise PreviewExpiredError("This preview does not match. Please fetch the CNR again.")
+
+    data: CourtCaseData = CourtCaseData.from_dict(preview.payload["data"])
+    tracking_config: dict = preview.payload["tracking_config"]
+    cnr = tracking_config["cnr"]
+
+    existing = Case.objects.filter(owner=user, cnr_number=cnr).first()
+    if existing is not None:
+        raise DuplicateCnrError(existing)
+
+    try:
+        with transaction.atomic():
+            case = Case.objects.create(
+                owner=user,
+                court_type=tracking_config.get("court_type"),
+                tracking_config=tracking_config,
+                tracking_enabled=True,
+                **case_fields,
+            )
+    except IntegrityError:
+        # Disambiguate which of the two possible collisions fired: the new
+        # (owner, cnr_number) constraint (a genuine race with another
+        # request since the check above -- same-user duplicate) or the
+        # pre-existing global case_number uniqueness (another owner's
+        # case). Mirrors advocate_import.py's own two-distinct-outcomes
+        # handling for the identical ambiguity.
+        existing = Case.objects.filter(owner=user, cnr_number=cnr).first()
+        if existing is not None:
+            raise DuplicateCnrError(existing) from None
+        raise CaseNumberConflictError(case_fields["case_number"]) from None
+
+    _finalize_confirmed_fetch(case, data)
     preview.delete()
-
-    return {"case": case, "data": data, "new_hearing_dates": new_hearing_dates}
+    return case
 
 
 def untrack_case(case: Case) -> None:

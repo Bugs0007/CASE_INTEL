@@ -20,6 +20,8 @@ from core.views import (
     AppearanceFeeListCreateView,
     AppearanceFeeMarkPaidView,
     AppearanceFeeSendView,
+    CaseCnrCreateView,
+    CaseCnrLookupView,
     CaseDetailView,
     CaseListView,
     CaseOrdersView,
@@ -132,6 +134,21 @@ urlpatterns = [
         "cases/<int:pk>/tracking/refresh/",
         CaseTrackingRefreshView.as_view(),
         name="case-tracking-refresh",
+    ),
+
+    # "Track by CNR" quick-add (manual case entry page): a case-less CNR
+    # fetch/preview, then a confirm step that creates the Case itself --
+    # unlike the tracking/preview|confirm routes above, which require an
+    # already-existing case.
+    path(
+        "cases/cnr-lookup/",
+        CaseCnrLookupView.as_view(),
+        name="case-cnr-lookup",
+    ),
+    path(
+        "cases/cnr-lookup/create/",
+        CaseCnrCreateView.as_view(),
+        name="case-cnr-lookup-create",
     ),
 
     # Court structure (eCourts hierarchy discovery for the tracking form)

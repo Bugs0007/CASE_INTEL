@@ -83,6 +83,7 @@ export default function CasesPage() {
       (caseItem) =>
         caseItem.title.toLowerCase().includes(query) ||
         caseItem.case_number.toLowerCase().includes(query) ||
+        caseItem.cnr_number?.toLowerCase().includes(query) ||
         caseItem.client_contacts.some((c) => c.name.toLowerCase().includes(query)) ||
         caseItem.opposing_party?.toLowerCase().includes(query),
     );

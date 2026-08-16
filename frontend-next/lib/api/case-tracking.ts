@@ -1,6 +1,8 @@
 import { apiClient } from "./client";
 import type {
   Case,
+  CaseCreateFromCnrInput,
+  CnrLookupPreview,
   CourtStructureResponse,
   CourtType,
   TrackingConfig,
@@ -50,5 +52,23 @@ export const caseTrackingApi = {
   untrack: (caseId: number) =>
     apiClient<Case>(`/cases/${caseId}/tracking/`, {
       method: "DELETE",
+    }),
+
+  /** "Track by CNR" quick-add (manual case entry page): fetches a CNR
+   * BEFORE any case exists, returning pre-fill suggestions plus a
+   * preview_token. Nothing is created until createFromCnr() is called. */
+  cnrLookup: (cnr: string, courtType?: CourtType) =>
+    apiClient<CnrLookupPreview>("/cases/cnr-lookup/", {
+      method: "POST",
+      body: JSON.stringify(courtType ? { cnr, court_type: courtType } : { cnr }),
+    }),
+
+  /** Confirms a CnrLookupPreview into a real Case with tracking already
+   * configured, using whatever the advocate reviewed/edited in the
+   * pre-filled form. */
+  createFromCnr: (data: CaseCreateFromCnrInput) =>
+    apiClient<Case>("/cases/cnr-lookup/create/", {
+      method: "POST",
+      body: JSON.stringify(data),
     }),
 };
