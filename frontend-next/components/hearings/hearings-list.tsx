@@ -8,7 +8,7 @@ import { CollapseToggle } from "@/components/ui/collapse-toggle";
 import { CauseListBadge } from "@/components/hearings/cause-list-badge";
 import { HearingBillingActions } from "@/components/hearings/hearing-billing-actions";
 import { Collapsible } from "@/components/ui/collapsible";
-import { formatDateTime, staggerDelay } from "@/lib/utils";
+import { formatHearingDate, staggerDelay } from "@/lib/utils";
 import { groupOrdersByDate, hearingDateKey } from "@/hooks/use-court-orders";
 import {
   Calendar,
@@ -261,7 +261,7 @@ function HearingItem({
               breaks its pill shape. */}
           <div className="flex items-center gap-2 mb-2 flex-wrap">
             <div className="text-sm font-medium font-mono text-gray-900 flex-shrink-0">
-              {formatDateTime(hearing.hearing_date)}
+              {formatHearingDate(hearing.hearing_date)}
             </div>
             <span className="ci-chip ci-chip--none flex-shrink-0">
               {hearing.hearing_type_display}

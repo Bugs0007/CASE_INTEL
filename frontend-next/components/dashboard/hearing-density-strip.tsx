@@ -110,10 +110,12 @@ export function HearingDensityStrip({ hearings }: HearingDensityStripProps) {
                     <div className="text-sm font-semibold text-gray-900">
                       {h.case_title}
                     </div>
+                    {/* No time shown here -- eCourts only ever gives a
+                        DATE, and this list is already scoped to the single
+                        selected day (see the "EEEE, MMMM d" heading above). */}
                     <div className="text-xs text-gray-500">
                       {h.hearing_type}
-                      {h.judge ? ` · ${h.judge}` : ""} ·{" "}
-                      <span className="font-mono">{format(parseISO(h.hearing_date), "h:mm a")}</span>
+                      {h.judge ? ` · ${h.judge}` : ""}
                     </div>
                   </div>
                   <Link href={`/cases/${h.case_id}`}>
