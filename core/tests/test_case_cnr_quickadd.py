@@ -434,3 +434,126 @@ class TestParseCaseHistoryHtmlRegistrationNumber:
 
         assert data is not None
         assert data.registration_number == ""
+
+
+class TestParseCaseHistoryHtmlPairedCellRows:
+    """Regression coverage for a second, live-verified bug: CNR
+    HBHC010536082026 (WP/26147/2026, Telangana HC) still returned
+    registration_number="" after the fix above, even though its
+    case-history page clearly shows a populated "Registration Number"
+    row. Root cause was NOT a label-text mismatch (confirmed via
+    temporary debug logging run live against the real portal response --
+    the label text is exactly "Registration Number", matching
+    _DETAIL_LABELS as-is). It was a row-STRUCTURE mismatch: this page
+    packs the Filing Number/Date and Registration Number/Date rows as
+    TWO label/value pairs inside a single <tr> (4 cells: label, value,
+    label, value), and the parser's old "skip any row that isn't exactly
+    2 cells" logic threw the whole row away before the label was ever
+    read.
+
+    These are the exact label/value strings the live debug dump returned
+    for this CNR:
+        ['Filing Number', 'WP /38647/2026', 'Filing Date', ' 05-08-2026']
+        ['Registration Number', 'WP /26147/2026', 'Registration Date', '06-08-2026']
+    """
+
+    def test_registration_number_in_a_four_cell_paired_row_is_captured(self):
+        from core.services.court_data.ecourts_parsing import parse_case_history_html
+
+        html = """
+        <table>
+          <tr>
+            <td>Filing Number</td><td>WP /38647/2026</td>
+            <td>Filing Date</td><td>05-08-2026</td>
+          </tr>
+          <tr>
+            <td>Registration Number</td><td>WP /26147/2026</td>
+            <td>Registration Date</td><td>06-08-2026</td>
+          </tr>
+        </table>
+        """
+        data = parse_case_history_html(html)
+
+        assert data is not None
+        assert data.registration_number == "WP /26147/2026"
+
+    def test_filing_number_in_the_same_paired_row_is_not_mistaken_for_registration_number(self):
+        """Filing Number and Registration Number are genuinely different
+        eCourts fields (assigned at different points in a case's
+        lifecycle, and can be different values -- WP/38647/2026 filed vs
+        WP/26147/2026 registered, in the real case this was verified
+        against). Filing Number must never leak into registration_number
+        just because it now shares a row with it."""
+        from core.services.court_data.ecourts_parsing import parse_case_history_html
+
+        html = """
+        <table>
+          <tr>
+            <td>Filing Number</td><td>WP /38647/2026</td>
+            <td>Filing Date</td><td>05-08-2026</td>
+          </tr>
+        </table>
+        """
+        data = parse_case_history_html(html)
+
+        assert data is not None
+        assert data.registration_number == ""
+
+    def test_three_pairs_bundled_in_one_row_are_all_captured(self):
+        """Not just 4-cell rows -- any number of label/value pairs bundled
+        into a single <tr> should be walked, not just the first pair."""
+        from core.services.court_data.ecourts_parsing import parse_case_history_html
+
+        html = """
+        <table>
+          <tr>
+            <td>Case Stage</td><td>FOR PRONOUNCEMENT OF ORDERS</td>
+            <td>Registration Number</td><td>WP /26147/2026</td>
+            <td>Coram</td><td>APARESH KUMAR SINGH</td>
+          </tr>
+        </table>
+        """
+        data = parse_case_history_html(html)
+
+        assert data is not None
+        assert data.registration_number == "WP /26147/2026"
+        assert data.case_stage == "FOR PRONOUNCEMENT OF ORDERS"
+        assert data.court_and_judge == "APARESH KUMAR SINGH"
+
+    def test_ordinary_two_cell_rows_still_work_unchanged(self):
+        """Regression guard for the walk-in-strides rewrite: a plain
+        single label/value row (the common case) must behave exactly as
+        before."""
+        from core.services.court_data.ecourts_parsing import parse_case_history_html
+
+        html = """
+        <table>
+          <tr><th>Case Status</th><td>CASE PENDING</td></tr>
+        </table>
+        """
+        data = parse_case_history_html(html)
+
+        assert data is not None
+        assert data.case_status == "CASE PENDING"
+
+    def test_stray_period_in_the_middle_of_a_label_does_not_break_the_match(self):
+        """Defense-in-depth per the task's ask for robustness against
+        label-formatting noise generally: this isn't what broke
+        HBHC010536082026 (that was the row-structure issue above), but
+        the matching path should tolerate it too. A stray period splits
+        what would otherwise be a valid substring match ("registration
+        number" is not a substring of "registration. number") -- unless
+        the label is punctuation-normalized before comparing, which is
+        exactly what should happen instead of adding another guessed
+        label variant."""
+        from core.services.court_data.ecourts_parsing import parse_case_history_html
+
+        html = """
+        <table>
+          <tr><th>Registration. Number</th><td>WP/777/2026</td></tr>
+        </table>
+        """
+        data = parse_case_history_html(html)
+
+        assert data is not None
+        assert data.registration_number == "WP/777/2026"
