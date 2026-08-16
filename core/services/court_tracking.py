@@ -568,10 +568,14 @@ def preview_case_creation_from_cnr(cnr: str, court_type: str | None, *, user) ->
     against. Degrades to "unknown" cleanly (same as advocate_import) when
     the user has no AdvocateProfile yet, or its letterhead_name is blank.
 
-    case_number/title in the returned preview default to the CNR itself,
-    matching advocate_import.py's convention (eCourts has no case_number/
-    title of its own for a direct CNR-first lookup) -- the caller can
-    still edit either before confirming.
+    case_number/title in the returned preview use the fetched
+    registration_number (the portal's own case number, e.g.
+    "WP/23998/2026") when eCourts provides one -- that's what the cause-
+    list matcher and every other case_number consumer in this app expect
+    to see, not the CNR. Only falls back to the CNR itself, matching
+    advocate_import.py's convention, for the rare record types whose
+    case-history page has no Registration Number row at all. The caller
+    can still edit either before confirming.
 
     Raises DuplicateCnrError immediately, before touching the portal, if
     the requesting user already has a case tracking this CNR -- a known
@@ -617,6 +621,12 @@ def preview_case_creation_from_cnr(cnr: str, court_type: str | None, *, user) ->
     elif user_party_role == "respondent":
         opposing_party = data.petitioner or None
 
+    # The portal's own case number, not the CNR -- see
+    # CourtCaseData.registration_number's docstring. Only a handful of
+    # record types come back with no Registration Number row at all, and
+    # that's the only case the CNR fallback should ever cover.
+    case_number = data.registration_number or cnr
+
     token = secrets.token_urlsafe(24)
     CourtTrackingPreview.objects.create(
         token=token,
@@ -629,8 +639,8 @@ def preview_case_creation_from_cnr(cnr: str, court_type: str | None, *, user) ->
     return {
         "preview_token": token,
         "cnr": data.cnr,
-        "case_number": cnr,
-        "title": cnr,
+        "case_number": case_number,
+        "title": case_number,
         "user_party_role": user_party_role,
         "opposing_party": opposing_party,
         "petitioner": data.petitioner,

@@ -118,6 +118,17 @@ _DETAIL_LABELS = {
     "coram": "court_and_judge",
     "court number and judge": "court_and_judge",
     "case stage": "case_stage",
+    # e.g. "Registration Number" / "Registration No" / "Registration No." --
+    # two keys because "registration no" is NOT a substring of
+    # "registration number" ("number" starts with "nu", not "no").
+    # Deliberately NOT a bare "registration" key -- eCourts case-history
+    # pages also have a separate "Registration Date" row, which a bare
+    # prefix would wrongly capture into this field. This is the portal's
+    # own case number (e.g. "WP/23998/2026"), NOT the CNR -- see
+    # CourtCaseData.registration_number's docstring for why the two must
+    # never be conflated.
+    "registration number": "registration_number",
+    "registration no": "registration_number",
 }
 
 _PARTY_NUMBERING_RE = re.compile(r"^\d+\)\s*")
