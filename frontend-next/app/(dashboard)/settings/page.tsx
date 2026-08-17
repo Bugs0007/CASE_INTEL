@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Save } from "lucide-react";
+import { AlertTriangle, KeyRound, Loader2, Save, ShieldAlert, UserCog } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { showToast } from "@/components/ui/toaster";
 import { APIError } from "@/lib/api/client";
+import { changePassword, changeUsername } from "@/lib/api/auth";
+import { setToken, setUsername as storeUsername } from "@/lib/auth";
 import { useAdvocateProfile, useUpdateAdvocateProfile } from "@/hooks/use-billing";
 
 /** The billing identity that appears on every generated invoice.
@@ -184,6 +186,248 @@ export default function SettingsPage() {
           </form>
         </CardContent>
       </Card>
+
+      <div className="mt-6">
+        <ChangeUsernameCard />
+      </div>
+      <div className="mt-6">
+        <ChangePasswordCard />
+      </div>
+    </div>
+  );
+}
+
+/** Extracts a human-readable message from an auth-endpoint APIError.
+ * Handles the credentials_locked 403 (a fixed { detail, code } shape),
+ * ordinary DRF field errors ({ current_password: [...] } etc.), and a
+ * network/unknown fallback -- same shape family the rest of the app's
+ * auth pages already parse by hand (see app/login/page.tsx), just
+ * centralized here since this page has two forms doing it. */
+function extractAuthErrorDetail(error: unknown): string {
+  if (error instanceof APIError && error.data && typeof error.data === "object") {
+    const data = error.data as Record<string, unknown>;
+    if (typeof data.detail === "string") {
+      return data.detail;
+    }
+    const firstField = Object.keys(data)[0];
+    if (firstField && Array.isArray(data[firstField]) && data[firstField][0]) {
+      return String(data[firstField][0]);
+    }
+  }
+  return "Something went wrong. Please try again.";
+}
+
+function ChangeUsernameCard() {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newUsername, setNewUsername] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isLocked, setIsLocked] = useState(false);
+  const [isPending, setIsPending] = useState(false);
+
+  const canSubmit = currentPassword.trim().length > 0 && newUsername.trim().length > 0;
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!canSubmit) return;
+
+    setIsPending(true);
+    try {
+      const result = await changeUsername(currentPassword, newUsername.trim());
+      storeUsername(result.username);
+      showToast.success("Username changed", `You're now signed in as ${result.username}.`);
+      setCurrentPassword("");
+      setNewUsername("");
+    } catch (err) {
+      if (err instanceof APIError && err.data && typeof err.data === "object") {
+        const data = err.data as Record<string, unknown>;
+        if (data.code === "credentials_locked") setIsLocked(true);
+      }
+      setError(extractAuthErrorDetail(err));
+    } finally {
+      setIsPending(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <UserCog className="h-5 w-5 text-gray-500" />
+          Change Username
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {isLocked ? (
+          <LockedNotice />
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label htmlFor="username_current_password" className="mb-1 block text-sm font-medium text-gray-700">
+                Current Password
+              </label>
+              <Input
+                id="username_current_password"
+                type="password"
+                autoComplete="current-password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Confirm it's you"
+              />
+            </div>
+            <div>
+              <label htmlFor="new_username" className="mb-1 block text-sm font-medium text-gray-700">
+                New Username
+              </label>
+              <Input
+                id="new_username"
+                autoComplete="username"
+                value={newUsername}
+                onChange={(e) => setNewUsername(e.target.value)}
+                placeholder="e.g. s.bhagath"
+              />
+            </div>
+
+            {error && (
+              <div className="flex items-start gap-2 rounded-lg bg-status-alert-soft p-3 text-sm text-status-alert">
+                <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <Button type="submit" disabled={!canSubmit || isPending}>
+              {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {isPending ? "Saving..." : "Change Username"}
+            </Button>
+          </form>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ChangePasswordCard() {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isLocked, setIsLocked] = useState(false);
+  const [isPending, setIsPending] = useState(false);
+
+  const passwordsMatch = newPassword.length === 0 || newPassword === confirmPassword;
+  const canSubmit =
+    currentPassword.trim().length > 0 &&
+    newPassword.length > 0 &&
+    newPassword === confirmPassword;
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!canSubmit) return;
+
+    setIsPending(true);
+    try {
+      const result = await changePassword(currentPassword, newPassword);
+      // The server rotated the token on success -- swap to the new one
+      // immediately, or this session's very next request 401s.
+      setToken(result.token);
+      showToast.success("Password changed", "Your password has been updated.");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err) {
+      if (err instanceof APIError && err.data && typeof err.data === "object") {
+        const data = err.data as Record<string, unknown>;
+        if (data.code === "credentials_locked") setIsLocked(true);
+      }
+      setError(extractAuthErrorDetail(err));
+    } finally {
+      setIsPending(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <KeyRound className="h-5 w-5 text-gray-500" />
+          Change Password
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {isLocked ? (
+          <LockedNotice />
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label htmlFor="password_current_password" className="mb-1 block text-sm font-medium text-gray-700">
+                Current Password
+              </label>
+              <Input
+                id="password_current_password"
+                type="password"
+                autoComplete="current-password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Confirm it's you"
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="new_password" className="mb-1 block text-sm font-medium text-gray-700">
+                  New Password
+                </label>
+                <Input
+                  id="new_password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
+              </div>
+              <div>
+                <label htmlFor="confirm_new_password" className="mb-1 block text-sm font-medium text-gray-700">
+                  Confirm New Password
+                </label>
+                <Input
+                  id="confirm_new_password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+                {!passwordsMatch && (
+                  <p className="mt-1 text-xs text-status-alert">Passwords don&apos;t match.</p>
+                )}
+              </div>
+            </div>
+
+            {error && (
+              <div className="flex items-start gap-2 rounded-lg bg-status-alert-soft p-3 text-sm text-status-alert">
+                <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <Button type="submit" disabled={!canSubmit || isPending}>
+              {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {isPending ? "Saving..." : "Change Password"}
+            </Button>
+          </form>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function LockedNotice() {
+  return (
+    <div className="flex items-start gap-2.5 rounded-lg bg-status-alert-soft p-3.5 text-sm text-status-alert">
+      <ShieldAlert className="h-4.5 w-4.5 flex-shrink-0 mt-0.5" />
+      <span>
+        This account&apos;s credentials have been locked by an administrator and can&apos;t be
+        changed here. Contact your administrator if you believe this is a mistake.
+      </span>
     </div>
   );
 }

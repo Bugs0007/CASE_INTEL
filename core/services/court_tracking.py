@@ -568,14 +568,17 @@ def preview_case_creation_from_cnr(cnr: str, court_type: str | None, *, user) ->
     against. Degrades to "unknown" cleanly (same as advocate_import) when
     the user has no AdvocateProfile yet, or its letterhead_name is blank.
 
-    case_number/title in the returned preview use the fetched
+    case_number in the returned preview uses the fetched
     registration_number (the portal's own case number, e.g.
     "WP/23998/2026") when eCourts provides one -- that's what the cause-
     list matcher and every other case_number consumer in this app expect
     to see, not the CNR. Only falls back to the CNR itself, matching
     advocate_import.py's convention, for the rare record types whose
-    case-history page has no Registration Number row at all. The caller
-    can still edit either before confirming.
+    case-history page has no Registration Number row at all. title uses
+    "Petitioner vs Respondent" (same join convention as
+    preview_case_tracking's case_title), falling back to case_number only
+    when eCourts returns neither party name. The caller can still edit
+    either before confirming.
 
     Raises DuplicateCnrError immediately, before touching the portal, if
     the requesting user already has a case tracking this CNR -- a known
@@ -627,6 +630,15 @@ def preview_case_creation_from_cnr(cnr: str, court_type: str | None, *, user) ->
     # that's the only case the CNR fallback should ever cover.
     case_number = data.registration_number or cnr
 
+    # "Petitioner vs Respondent" is a human-recognizable case title;
+    # case_number/CNR are not. Same join convention preview_case_tracking
+    # already uses for its case_title field (joins whichever of the two
+    # names came back, so one-sided data still produces something rather
+    # than a lopsided "Name vs "), just falling back to case_number
+    # instead of None here, since this title is what gets pre-filled into
+    # the quick-add form, not a display-only preview value.
+    case_title = " vs ".join(p for p in (data.petitioner, data.respondent) if p) or case_number
+
     token = secrets.token_urlsafe(24)
     CourtTrackingPreview.objects.create(
         token=token,
@@ -640,7 +652,7 @@ def preview_case_creation_from_cnr(cnr: str, court_type: str | None, *, user) ->
         "preview_token": token,
         "cnr": data.cnr,
         "case_number": case_number,
-        "title": case_number,
+        "title": case_title,
         "user_party_role": user_party_role,
         "opposing_party": opposing_party,
         "petitioner": data.petitioner,

@@ -10,7 +10,7 @@ import { WALKTHROUGH_ENABLED } from "@/lib/feature-flags";
 
 export function Header() {
   const router = useRouter();
-  const { openUploadDocument } = useDialogs();
+  const { openUploadDocument, openNewCaseChooser } = useDialogs();
 
   async function handleLogout() {
     // Best-effort: invalidate the token server-side too, so it can't be
@@ -70,7 +70,7 @@ export function Header() {
         </button>
 
         <button
-          onClick={() => router.push("/cases/search")}
+          onClick={openNewCaseChooser}
           aria-label="New Case"
           title="New Case"
           className="ci-btn ci-btn--line lg:hidden h-11 w-11 p-0 justify-center"

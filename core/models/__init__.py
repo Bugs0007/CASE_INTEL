@@ -1,3 +1,4 @@
+from .account_lock import AccountLock
 from .advocate_profile import AdvocateProfile
 from .appearance_fee import AppearanceFee
 from .case import Case
@@ -26,6 +27,7 @@ from .advocate_search_preference import AdvocateSearchPreference
 from .invite_token import InviteToken
 
 __all__ = [
+    "AccountLock",
     "AdvocateProfile",
     "AppearanceFee",
     "Case",

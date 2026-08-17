@@ -4,8 +4,11 @@ Django admin configuration for all Case Intel models.
 
 from django.conf import settings
 from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.models import User
 
 from core.models import (
+    AccountLock,
     ActivityLog,
     AdvocateProfile,
     AdvocateSearchPreference,
@@ -301,3 +304,26 @@ class TravelBookingAdmin(admin.ModelAdmin):
         "filename", "file_path", "file_type", "file_size", "created_at", "updated_at",
     )
     date_hierarchy = "created_at"
+
+
+class AccountLockInline(admin.StackedInline):
+    """Lock/unlock an account's ability to change its own username or
+    password (core/models/account_lock.py) directly from the User admin
+    page -- the ONLY place this is toggle-able. Check "Credentials
+    locked" and Save; no row exists yet for a never-locked account, and
+    saving here creates one.
+    """
+
+    model = AccountLock
+    can_delete = False
+    verbose_name_plural = "Account Lock (blocks self-service username/password changes)"
+    fields = ("credentials_locked", "updated_at")
+    readonly_fields = ("updated_at",)
+
+
+class CaseIntelUserAdmin(UserAdmin):
+    inlines = (*UserAdmin.inlines, AccountLockInline)
+
+
+admin.site.unregister(User)
+admin.site.register(User, CaseIntelUserAdmin)

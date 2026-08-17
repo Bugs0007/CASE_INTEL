@@ -13,6 +13,13 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         <select
           className={cn(
             "flex h-10 w-full appearance-none rounded-lg border border-gray-200 bg-surface px-3 py-2 pr-8 text-sm",
+            // A selected option's label can be longer than the field is
+            // wide (e.g. a two-column layout on a narrow screen) --
+            // without this, the browser clips the raw text flush against
+            // the chevron with no ellipsis, which reads as cropped/
+            // misaligned. Truncate gracefully instead; the option list
+            // itself (native, browser-rendered) is unaffected.
+            "overflow-hidden text-ellipsis whitespace-nowrap",
             "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
             "disabled:cursor-not-allowed disabled:opacity-50",
             className,

@@ -21,6 +21,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.models import InviteToken
+from core.services.account_security import is_credentials_locked
 
 
 class LoginView(ObtainAuthToken):
@@ -174,3 +175,119 @@ class LogoutView(APIView):
     def post(self, request, *args, **kwargs):
         request.auth.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+def _credentials_locked_response() -> Response:
+    return Response(
+        {
+            "detail": (
+                "This account's credentials have been locked by an administrator "
+                "and cannot be changed. Contact your administrator if you believe "
+                "this is a mistake."
+            ),
+            "code": "credentials_locked",
+        },
+        status=status.HTTP_403_FORBIDDEN,
+    )
+
+
+class ChangeUsernameSerializer(serializers.Serializer):
+    """current_password is required to confirm the change -- standard
+    practice so a hijacked *session* (valid token, e.g. from a shared
+    machine or a leaked header) can't silently take over the account's
+    identity without also knowing the password."""
+
+    current_password = serializers.CharField(write_only=True)
+    new_username = serializers.CharField(max_length=150)
+
+    def validate_current_password(self, value):
+        user = self.context["request"].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("Current password is incorrect.")
+        return value
+
+    def validate_new_username(self, value):
+        user = self.context["request"].user
+        if User.objects.filter(username=value).exclude(pk=user.pk).exists():
+            raise serializers.ValidationError("That username is already taken.")
+        return value
+
+
+class ChangeUsernameView(APIView):
+    """Self-service username change.
+
+    POST /api/auth/change-username/
+    { "current_password": "...", "new_username": "..." }
+    Returns: { "username": "..." }
+
+    Rejected with a 403 if core/models/account_lock.py's AccountLock has
+    credentials_locked=True for this user -- checked BEFORE validating
+    anything else, so a locked account gets a clean, unconditional 403
+    rather than "your password was right but..." feedback. This check
+    can't be bypassed from the frontend: it's enforced here, server-side,
+    for every caller including a direct API request.
+    """
+
+    def post(self, request, *args, **kwargs):
+        if is_credentials_locked(request.user):
+            return _credentials_locked_response()
+
+        serializer = ChangeUsernameSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+
+        request.user.username = serializer.validated_data["new_username"]
+        request.user.save(update_fields=["username"])
+
+        return Response({"username": request.user.username})
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    current_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True)
+
+    def validate_current_password(self, value):
+        user = self.context["request"].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("Current password is incorrect.")
+        return value
+
+    def validate_new_password(self, value):
+        user = self.context["request"].user
+        try:
+            validate_password(value, user=user)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(list(exc.messages))
+        return value
+
+
+class ChangePasswordView(APIView):
+    """Self-service password change.
+
+    POST /api/auth/change-password/
+    { "current_password": "...", "new_password": "..." }
+    Returns: { "token": "..." }
+
+    Same credentials_locked check (and same reasoning) as
+    ChangeUsernameView -- see there. On success, also rotates the auth
+    token: deletes every existing token for this user and issues a fresh
+    one, so a leaked/stolen token stops authenticating the moment the
+    real owner changes their password, instead of quietly continuing to
+    work forever regardless of the password change. The caller must swap
+    to the returned token; the one that authenticated THIS request is
+    deleted too (harmless -- the response has already been built).
+    """
+
+    def post(self, request, *args, **kwargs):
+        if is_credentials_locked(request.user):
+            return _credentials_locked_response()
+
+        serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+
+        request.user.set_password(serializer.validated_data["new_password"])
+        request.user.save(update_fields=["password"])
+
+        Token.objects.filter(user=request.user).delete()
+        token = Token.objects.create(user=request.user)
+
+        return Response({"token": token.key})
