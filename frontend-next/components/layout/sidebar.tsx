@@ -8,10 +8,10 @@ import {
   LayoutDashboard,
   Briefcase,
   FileText,
-  Mail,
   Plus,
   Calendar,
   Settings,
+  type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { hearingKeys } from "@/hooks/use-hearings";
@@ -19,19 +19,33 @@ import { hearingsApi } from "@/lib/api/hearings";
 import { caseKeys } from "@/hooks/use-cases";
 import { casesApi } from "@/lib/api/cases";
 import { getUsername } from "@/lib/auth";
+import { useDialogs } from "@/providers/dialog-provider";
 
-const NAV_ITEMS = [
+interface NavItem {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  badge?: number;
+}
+
+// "Emails" is deliberately not in this list -- see Phase F: hidden from
+// nav only, the /emails route/page and all backend email code are
+// untouched and fully functional, so re-adding this one line is all it
+// takes to bring it back. The explicit NavItem[] annotation (rather than
+// a bare array literal) is what keeps `badge` a valid, type-checked
+// field below even while no current entry sets one.
+const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/cases", label: "Cases", icon: Briefcase },
   { href: "/documents", label: "Documents", icon: FileText },
   { href: "/calendar", label: "Calendar", icon: Calendar },
-  { href: "/emails", label: "Emails", icon: Mail, badge: 12 },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
   const queryClient = useQueryClient();
+  const { openNewCaseChooser } = useDialogs();
   const [username, setUsername] = useState<string | null>(null);
 
   // Read on mount only -- localStorage isn't available during SSR, and the
@@ -68,16 +82,20 @@ export function Sidebar() {
         </span>
       </div>
 
-      {/* New Case Button -- always the advocate-search flow; there's no
-          direct-entry form (see CaseListView). Uses the ci-btn primitive
+      {/* New Case Button -- opens the chooser between the three real entry
+          points (manual entry, Track by CNR, advocate search) rather than
+          jumping straight to one of them. Uses the ci-btn primitive
           directly (not the <Button> component) since .ci-on-field flips
           its solid variant to paper-on-ink for contrast against this dark
           sidebar -- <Button>'s bg-primary doesn't know about that context. */}
       <div className="p-4">
-        <Link href="/cases/search" className="ci-btn ci-btn--solid w-full justify-center">
+        <button
+          onClick={openNewCaseChooser}
+          className="ci-btn ci-btn--solid w-full justify-center"
+        >
           <Plus className="h-4 w-4" />
           New Case
-        </Link>
+        </button>
       </div>
 
       {/* Navigation -- color/hover/active states come from .ci-sidebar a

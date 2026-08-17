@@ -29,6 +29,8 @@ from core.views import (
     CaseTrackingPreviewView,
     CaseTrackingRefreshView,
     CaseTrackingView,
+    ChangePasswordView,
+    ChangeUsernameView,
     ChatView,
     ClientContactDetailView,
     ClientContactListCreateView,
@@ -77,6 +79,16 @@ urlpatterns = [
     ),
     path("auth/login/", LoginView.as_view(), name="auth-login"),
     path("auth/logout/", LogoutView.as_view(), name="auth-logout"),
+    path(
+        "auth/change-username/",
+        ChangeUsernameView.as_view(),
+        name="auth-change-username",
+    ),
+    path(
+        "auth/change-password/",
+        ChangePasswordView.as_view(),
+        name="auth-change-password",
+    ),
 
     # Dashboard
     path("dashboard/", DashboardView.as_view(), name="dashboard"),

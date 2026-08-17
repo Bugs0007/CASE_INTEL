@@ -183,7 +183,14 @@ export function HearingDialog({ isOpen, onClose, caseId, hearing }: HearingDialo
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          {/* grid-cols-1 sm:grid-cols-2 (not an unconditional grid-cols-2)
+              -- same responsive pattern the rest of the app's two-column
+              form rows already use (see e.g. app/(dashboard)/cases/new/
+              page.tsx). At sm:, the longest Type/Status labels
+              ("Preliminary Hearing", "Status Conference") were cropping
+              against the dropdown's chevron with no ellipsis; full width
+              on narrow screens gives them room instead. */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label htmlFor="hearing_type" className="block text-sm font-medium text-gray-700 mb-1">
                 Type

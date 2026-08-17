@@ -1,14 +1,25 @@
 "use client";
 
-import { LayoutDashboard, Briefcase, FileText, Mail, Calendar, Plus, Search, Upload, LogOut } from "lucide-react";
+import { LayoutDashboard, Briefcase, FileText, Calendar, Plus, Search, Upload, LogOut, type LucideIcon } from "lucide-react";
 import { mockAdvocateName } from "../mock-data";
 
-const NAV_ITEMS = [
+interface NavItem {
+  label: string;
+  icon: LucideIcon;
+  active: boolean;
+  badge?: number;
+}
+
+// Kept in sync with the real Sidebar's NAV_ITEMS (components/layout/
+// sidebar.tsx) -- "Emails" is deliberately absent there too (Phase F:
+// hidden from nav only, not removed). The explicit NavItem[] annotation
+// (rather than a bare array literal) is what keeps `badge` a valid,
+// type-checked field below even while no current entry sets one.
+const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", icon: LayoutDashboard, active: true },
   { label: "Cases", icon: Briefcase, active: false },
   { label: "Documents", icon: FileText, active: false },
   { label: "Calendar", icon: Calendar, active: false },
-  { label: "Emails", icon: Mail, active: false, badge: 12 },
 ];
 
 /** A visual replica of the real app's sidebar + header chrome, built from

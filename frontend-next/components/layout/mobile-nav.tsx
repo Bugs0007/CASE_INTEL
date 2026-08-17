@@ -2,15 +2,27 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Briefcase, FileText, Mail, Calendar } from "lucide-react";
+import { LayoutDashboard, Briefcase, FileText, Calendar, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const NAV_ITEMS = [
+interface NavItem {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  badge?: number;
+}
+
+// "Emails" is deliberately not in this list -- see Phase F: hidden from
+// nav only, the /emails route/page and all backend email code are
+// untouched and fully functional, so re-adding this one line is all it
+// takes to bring it back. The explicit NavItem[] annotation (rather than
+// a bare array literal) is what keeps `badge` a valid, type-checked
+// field below even while no current entry sets one.
+const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Home", icon: LayoutDashboard },
   { href: "/cases", label: "Cases", icon: Briefcase },
   { href: "/documents", label: "Docs", icon: FileText },
   { href: "/calendar", label: "Calendar", icon: Calendar },
-  { href: "/emails", label: "Emails", icon: Mail, badge: 12 },
 ];
 
 /** Bottom tab bar -- the mobile stand-in for the desktop Sidebar. Shown only
