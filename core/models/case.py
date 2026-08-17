@@ -46,7 +46,7 @@ class Case(OwnedModel):
         ("respondent", "Respondent"),
     ]
 
-    case_number = models.CharField(max_length=100, unique=True)
+    case_number = models.CharField(max_length=100)
     title = models.CharField(max_length=500)
     client_name = models.CharField(max_length=255)
     opposing_party = models.CharField(max_length=255, blank=True, null=True)
@@ -103,7 +103,15 @@ class Case(OwnedModel):
             # in unique constraints, so cases with no CNR yet are unaffected.
             models.UniqueConstraint(
                 fields=["owner", "cnr_number"], name="unique_case_owner_cnr_number"
-            )
+            ),
+            # Scoped per owner, not global: the same real court case is
+            # routinely tracked by more than one advocate (co-counsel,
+            # opposing counsel, different firms), each with their own
+            # independent row -- own fee status, notes, documents. Only
+            # one owner may hold a given case_number twice.
+            models.UniqueConstraint(
+                fields=["owner", "case_number"], name="unique_case_owner_case_number"
+            ),
         ]
 
     def __str__(self):

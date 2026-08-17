@@ -16,6 +16,7 @@ file.
 import itertools
 import logging
 from decimal import Decimal
+from email.utils import formataddr
 
 import pytest
 from django.contrib.auth.models import User
@@ -51,10 +52,10 @@ def advocate_b(db):
     return User.objects.create_user(username="advocate-b", password="pass-123")
 
 
-# Case.case_number is globally unique (not per-owner), so two advocates
-# can't both hold a "C-001" -- auto-number instead of defaulting to a
-# fixed string, or any test that builds a case for each of two advocates
-# dies on an IntegrityError that has nothing to do with what it's testing.
+# case_number only needs to be unique per owner, but several tests below
+# build multiple cases for the SAME advocate -- auto-number instead of
+# defaulting to a fixed string, or those dies on an IntegrityError that
+# has nothing to do with what they're testing.
 _case_counter = itertools.count(1)
 
 
@@ -361,9 +362,49 @@ class TestInvoiceSending:
         assert fee.invoice_number in message.subject
         assert len(message.attachments) == 1
         assert message.attachments[0][0] == f"{fee.invoice_number}.pdf"
+        # From is the fixed server sender, displayed under a fallback name
+        # since advocate_a never filled in a letterhead for this test.
+        assert message.from_email == f"Advocate <{settings.DEFAULT_FROM_EMAIL}>"
+        # advocate_a has no account email in this fixture -- no Reply-To
+        # header should be sent rather than an empty one.
+        assert message.reply_to == []
 
         fee.refresh_from_db()
         assert fee.send_status == AppearanceFee.SEND_SENT
+
+    def test_send_uses_letterhead_name_as_display_name_and_replies_to_the_advocate(
+        self, advocate_a, client_a, settings
+    ):
+        advocate_a.email = "advocate-a@example.com"
+        advocate_a.save(update_fields=["email"])
+        invoice_service.get_or_create_profile(advocate_a)
+        AdvocateProfile.objects.filter(owner=advocate_a).update(
+            letterhead_name="A. Advocate & Co."
+        )
+
+        case = _make_case(advocate_a)
+        ClientContact.objects.create(
+            owner=advocate_a,
+            case=case,
+            name="Billing Person",
+            email="billing@example.com",
+            is_billing_contact=True,
+        )
+        fee = invoice_service.generate_invoice(_make_fee(advocate_a, case))
+
+        settings.INVOICE_EMAIL_CONFIGURED = True
+        settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+        mail.outbox.clear()
+
+        response = client_a.post(f"/api/appearance-fees/{fee.id}/send/")
+
+        assert response.status_code == 200
+        message = mail.outbox[0]
+        # formataddr quotes the display name because it contains a "."
+        # (an RFC 2822 special) -- that quoting is correct, so the
+        # expected value is built the same way rather than hand-written.
+        assert message.from_email == formataddr(("A. Advocate & Co.", settings.DEFAULT_FROM_EMAIL))
+        assert message.reply_to == ["advocate-a@example.com"]
 
     def test_logs_instead_of_failing_when_email_is_not_configured(
         self, advocate_a, client_a, settings, caplog, capture_core_logs
