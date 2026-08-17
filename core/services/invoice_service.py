@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 from decimal import Decimal
+from email.utils import formataddr
 
 from django.conf import settings
 from django.core.files.base import ContentFile
@@ -360,6 +361,7 @@ def send_invoice(fee: AppearanceFee) -> dict:
         raise NotInvoicedError("Generate the invoice before sending it.")
 
     contact = get_billing_contact(fee.hearing.case)
+    profile = get_or_create_profile(fee.owner)
     subject = f"Invoice {fee.invoice_number} - {fee.hearing.case.title}"
     body = (
         f"Dear {contact.name},\n\n"
@@ -368,7 +370,7 @@ def send_invoice(fee: AppearanceFee) -> dict:
         f"in {fee.hearing.case.title} ({fee.hearing.case.case_number}).\n\n"
         f"Amount due: {_money(fee.amount)}\n\n"
         f"Regards,\n"
-        f"{get_or_create_profile(fee.owner).letterhead_name or 'Your advocate'}\n"
+        f"{profile.letterhead_name or 'Your advocate'}\n"
     )
 
     if not email_is_configured():
@@ -403,11 +405,21 @@ def send_invoice(fee: AppearanceFee) -> dict:
     with default_storage.open(fee.invoice_pdf_path, "rb") as handle:
         pdf_bytes = handle.read()
 
+    # Display name is the advocate's letterhead, address is the fixed
+    # server sender (must be on a Resend-verified domain -- see
+    # DEFAULT_FROM_EMAIL in settings.py). Reply-To is the advocate's own
+    # account email so a client hitting "reply" reaches the lawyer
+    # directly rather than the shared billing@ inbox; omitted entirely
+    # when the account has none on file (email was optional at signup).
+    from_email = formataddr((profile.letterhead_name or "Advocate", settings.DEFAULT_FROM_EMAIL))
+    reply_to = [fee.owner.email] if fee.owner.email else []
+
     message = EmailMessage(
         subject=subject,
         body=body,
-        from_email=settings.DEFAULT_FROM_EMAIL,
+        from_email=from_email,
         to=[contact.email],
+        reply_to=reply_to,
         connection=get_connection(),
     )
     message.attach(f"{fee.invoice_number}.pdf", pdf_bytes, "application/pdf")

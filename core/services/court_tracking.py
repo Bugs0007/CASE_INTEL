@@ -78,22 +78,26 @@ class DuplicateCnrError(Exception):
         )
 
 
-class CaseNumberConflictError(Exception):
-    """Raised when a case_number collides with another owner's case at the
-    database level -- the other half of the "Track by CNR" quick-add
-    flow's duplicate prevention. case_number is globally unique=True (not
-    scoped per owner, see core/models/case.py), a pre-existing schema
-    property advocate_import.py already has to handle the same way (see
-    its module docstring); create_case_from_cnr_preview mirrors that
-    IntegrityError-catch pattern rather than relying on
-    CaseCreateSerializer's automatic UniqueValidator, which would
-    otherwise intercept the collision earlier with generic DRF wording
-    that can't tell this case apart from a same-user CNR duplicate."""
+class DuplicateCaseNumberError(Exception):
+    """Raised when the requesting user already has a DIFFERENT case under
+    this exact case_number -- the case_number half of the "Track by CNR"
+    quick-add flow's duplicate prevention, mirroring DuplicateCnrError
+    above. case_number is scoped per owner (see the (owner, case_number)
+    UniqueConstraint on Case, core/models/case.py), so a DIFFERENT owner
+    using the same case_number is expected and allowed -- co-counsel and
+    opposing counsel each track their own independent row for the same
+    real court case -- and this can only fire for the SAME owner.
+    create_case_from_cnr_preview mirrors advocate_import.py's own
+    IntegrityError-catch pattern for the identical residual collision
+    (see its module docstring) rather than relying on an automatic DRF
+    UniqueValidator, which can't be generated here anyway since `owner`
+    isn't a client-writable field on the serializer (see
+    CaseCnrCreateSerializer)."""
 
     def __init__(self, case_number: str):
         self.case_number = case_number
         super().__init__(
-            f"Case number {case_number!r} is already tracked by another user in the system."
+            f"You already have a case numbered {case_number!r}. Case numbers must be unique within your own cases."
         )
 
 
@@ -688,8 +692,11 @@ def create_case_from_cnr_preview(preview_token: str, case_fields: dict, *, user)
     CNR (re-checked here to close the race with a second request between
     preview and confirm; the DB-level UniqueConstraint on
     (owner, cnr_number) is the final backstop for the same race).
-    Raises CaseNumberConflictError if case_number collides with another
-    owner's case at the database level.
+    Raises DuplicateCaseNumberError if the user already has a DIFFERENT
+    case under this exact case_number (the (owner, case_number)
+    UniqueConstraint's backstop) -- rare, since case_number here comes
+    from the fetched registration number, but the form lets the advocate
+    edit it before confirming.
     """
     try:
         preview = CourtTrackingPreview.objects.get(token=preview_token)
@@ -721,16 +728,17 @@ def create_case_from_cnr_preview(preview_token: str, case_fields: dict, *, user)
                 **case_fields,
             )
     except IntegrityError:
-        # Disambiguate which of the two possible collisions fired: the new
-        # (owner, cnr_number) constraint (a genuine race with another
-        # request since the check above -- same-user duplicate) or the
-        # pre-existing global case_number uniqueness (another owner's
-        # case). Mirrors advocate_import.py's own two-distinct-outcomes
-        # handling for the identical ambiguity.
+        # Disambiguate which of this owner's two UniqueConstraints fired:
+        # (owner, cnr_number) -- a genuine race with another request since
+        # the check above -- or (owner, case_number) -- the advocate edited
+        # case_number in the form to match one of their own existing
+        # cases. Both are scoped to THIS owner now, so there is no
+        # cross-owner case to consider here. Mirrors advocate_import.py's
+        # own IntegrityError-catch handling for the identical ambiguity.
         existing = Case.objects.filter(owner=user, cnr_number=cnr).first()
         if existing is not None:
             raise DuplicateCnrError(existing) from None
-        raise CaseNumberConflictError(case_fields["case_number"]) from None
+        raise DuplicateCaseNumberError(case_fields["case_number"]) from None
 
     _finalize_confirmed_fetch(case, data)
     preview.delete()

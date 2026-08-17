@@ -20,7 +20,7 @@ from core.serializers import CaseCnrCreateSerializer, CaseSerializer, HearingSer
 from core.services.court_data import CaptchaSolveError, CaseNotFoundError, CourtDataError, CourtPortalError, get_provider
 from core.services.court_data.ecourts_parsing import parse_complex_code
 from core.services.court_tracking import (
-    CaseNumberConflictError,
+    DuplicateCaseNumberError,
     DuplicateCnrError,
     InvalidTrackingConfigError,
     MissingTrackingConfigError,
@@ -473,7 +473,7 @@ class CaseCnrCreateView(APIView):
             return Response({"detail": str(exc), "code": "preview_expired"}, status=status.HTTP_410_GONE)
         except DuplicateCnrError as exc:
             return _duplicate_cnr_response(exc)
-        except CaseNumberConflictError as exc:
+        except DuplicateCaseNumberError as exc:
             return Response({"case_number": [str(exc)]}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(CaseSerializer(case).data, status=status.HTTP_201_CREATED)

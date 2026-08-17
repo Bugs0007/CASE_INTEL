@@ -812,9 +812,37 @@ class TestAdvocateImport:
         assert job.payload["created"] == []
         assert mock_get_provider.return_value.fetch_case.call_count == 0
 
-    def test_case_number_conflict_with_another_owner_is_skipped_not_500(self, user_a, user_b):
-        Case.objects.create(
+    def test_case_number_shared_with_another_owner_is_imported_independently(self, user_a, user_b):
+        """case_number is unique per owner, not globally -- Bob already
+        tracking "123/2024" must not stop Alice from importing her own
+        independent row for the same case_number (co-counsel, opposing
+        counsel, or simply a coincidence)."""
+        bobs_case = Case.objects.create(
             owner=user_b, case_number="123/2024", title="Bob's case", client_name="",
+        )
+        job = ProcessingJob.enqueue_advocate_import(
+            user_a, [{"cnr_number": "MHAU019999992024", "case_number": "123/2024"}]
+        )
+        with patch("core.services.court_tracking.get_provider") as mock_get_provider, \
+             patch("core.services.advocate_import.time.sleep"):
+            mock_get_provider.return_value.fetch_case.return_value = _fake_case_data("MHAU019999992024")
+            run_advocate_import(job)
+
+        job.refresh_from_db()
+        assert job.payload["skipped_conflict"] == []
+        assert len(job.payload["created"]) == 1
+        alices_case = Case.objects.get(id=job.payload["created"][0])
+        assert alices_case.case_number == "123/2024"
+        assert alices_case.owner_id == user_a.id
+        assert alices_case.id != bobs_case.id
+
+    def test_case_number_collision_with_own_existing_case_is_skipped_not_500(self, user_a):
+        """A DIFFERENT CNR whose case_number happens to match one this
+        SAME advocate already has is still a genuine collision -- the
+        residual, same-owner-only purpose of the (owner, case_number)
+        UniqueConstraint."""
+        Case.objects.create(
+            owner=user_a, case_number="123/2024", title="Alice's existing case", client_name="",
         )
         job = ProcessingJob.enqueue_advocate_import(
             user_a, [{"cnr_number": "MHAU019999992024", "case_number": "123/2024"}]

@@ -276,9 +276,9 @@ class Command(BaseCommand):
 
             for case_spec in CASES:
                 case, case_created = Case.objects.get_or_create(
+                    owner=user,
                     case_number=case_spec["case_number"],
                     defaults={
-                        "owner": user,
                         "title": case_spec["title"],
                         "client_name": case_spec["client_name"],
                         "opposing_party": case_spec["opposing_party"],
@@ -410,7 +410,7 @@ class Command(BaseCommand):
             "password will be (re)set to the given/default value.\n"
         )
 
-        self.stdout.write("Cases (matched by case_number, globally unique):")
+        self.stdout.write("Cases (matched by case_number within this demo user's own cases):")
         cases_to_create = 0
         hearings_to_create = 0
         documents_to_create = 0
