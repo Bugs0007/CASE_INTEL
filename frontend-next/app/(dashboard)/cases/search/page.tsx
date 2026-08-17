@@ -509,7 +509,7 @@ export default function AdvocateSearchPage() {
                 )}
                 {ij.skipped_conflict.length > 0 && (
                   <p className="text-gray-600">
-                    {ij.skipped_conflict.length} already tracked by another user, skipped.
+                    {ij.skipped_conflict.length} match a case number already in your account, skipped.
                   </p>
                 )}
                 {ij.failed.length > 0 && (

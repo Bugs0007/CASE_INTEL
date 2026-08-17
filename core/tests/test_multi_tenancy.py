@@ -110,12 +110,26 @@ class TestCaseIsolation:
         # must be silently ignored.
         assert case.owner_id != user_b.id
 
-    def test_create_duplicate_case_number_across_users_rejected(self, client_b, case_a):
-        # case_number is globally unique (not per-owner) -- the same
-        # constraint advocate-search import already has to handle.
+    def test_create_same_case_number_across_users_succeeds(self, client_b, case_a):
+        # case_number is unique per owner, not globally -- a real case is
+        # routinely tracked by more than one advocate (co-counsel,
+        # opposing counsel), each with their own independent row.
         resp = client_b.post(
             "/api/cases/",
-            {"case_number": case_a.case_number, "title": "Someone Else's Number"},
+            {"case_number": case_a.case_number, "title": "Someone Else's Version"},
+            format="json",
+        )
+        assert resp.status_code == 201
+        case_b_new = Case.objects.get(id=resp.data["id"])
+        assert case_b_new.case_number == case_a.case_number
+        assert case_b_new.owner_id != case_a.owner_id
+        # Both rows now legitimately exist, independently owned.
+        assert Case.objects.filter(case_number=case_a.case_number).count() == 2
+
+    def test_create_duplicate_case_number_for_same_user_rejected(self, client_a, case_a):
+        resp = client_a.post(
+            "/api/cases/",
+            {"case_number": case_a.case_number, "title": "My Own Duplicate"},
             format="json",
         )
         assert resp.status_code == 400

@@ -98,13 +98,16 @@ class CaseListView(OwnerScopedMixin, generics.ListCreateAPIView):
         try:
             self.perform_create(serializer)
         except IntegrityError:
-            # Belt-and-braces alongside CaseCreateSerializer's automatic
-            # UniqueValidator on case_number (which catches this in the
-            # overwhelming majority of cases pre-save) -- closes the
-            # narrow race where two requests with the same case_number
-            # both pass validation before either commits.
+            # case_number is unique per owner (see the (owner, case_number)
+            # UniqueConstraint on Case), not globally -- this is the sole
+            # enforcement point for that: DRF can't auto-generate a
+            # UniqueValidator for it since `owner` is stamped from
+            # request.user (OwnerScopedMixin.perform_create) rather than
+            # being a field on CaseCreateSerializer. A different owner
+            # using the same case_number succeeds normally; only a
+            # same-owner collision reaches here.
             return Response(
-                {"case_number": ["A case with this case number already exists."]},
+                {"case_number": ["You already have a case with this case number."]},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         output = CaseSerializer(serializer.instance).data

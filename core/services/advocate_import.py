@@ -14,15 +14,15 @@ court_order_sync.py:
   - strictly sequential, IMPORT_DELAY_SECONDS apart, never parallel;
   - per-case failure isolation: one bad fetch is recorded under "failed"
     and the batch continues;
-  - two distinct "already exists" outcomes, since Case.case_number is
-    GLOBALLY unique (not scoped per owner, see core/models/case.py): a
-    CNR this user already tracks is "skipped_duplicate"; a case_number
-    some OTHER user already created collides at the DB level and is
-    "skipped_conflict" instead of raising a 500 for the whole batch. This
-    is a pre-existing schema property (case_number unique=True predates
-    this feature) that becomes more likely to bite now that cases are
-    being bulk-added from a shared external source rather than typed in
-    by hand -- flagged, not changed, here.
+  - case_number is scoped per owner, not global (see the
+    (owner, case_number) UniqueConstraint on Case, core/models/case.py):
+    two different advocates importing the same real court case (co-counsel,
+    opposing counsel) each get their own independent row -- no conflict.
+    A CNR this user already tracks is "skipped_duplicate", checked before
+    the fetch even runs. The DB constraint still catches the rare residual
+    case of two DIFFERENT CNRs resolving to the same case_number string
+    for THIS SAME owner; that's recorded as "skipped_conflict" instead of
+    raising a 500 for the whole batch.
 """
 
 from __future__ import annotations
@@ -109,8 +109,13 @@ def run_advocate_import(job: ProcessingJob, progress_callback=None) -> None:
                     tracking_enabled=True,
                 )
         except IntegrityError:
+            # Only reachable now for a same-owner collision -- a different
+            # CNR whose case_number happens to match one this owner already
+            # has (see the module docstring). A different owner sharing this
+            # case_number is expected and no longer raises at all.
             logger.info(
-                "Advocate import: case_number %r already tracked by another owner -- skipping.",
+                "Advocate import: owner %s already has a case numbered %r under a different CNR -- skipping.",
+                job.owner_id,
                 case_number,
             )
             skipped_conflict.append(cnr)

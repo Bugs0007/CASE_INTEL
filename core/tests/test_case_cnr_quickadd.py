@@ -4,10 +4,12 @@ core/services/court_tracking.py's preview_case_creation_from_cnr/
 create_case_from_cnr_preview).
 
 Covers: successful fetch+create, same-user CNR duplicate blocked (both at
-lookup time and at create time), cross-user case_number collision handled
-gracefully (not a 500), and a regression check that the existing
-fully-manual entry path and the per-case "link CNR later" preview/confirm
-flow still work unchanged after the confirm_case_tracking() refactor.
+lookup time and at create time), a shared case_number with another owner
+succeeding as an independent row (case_number is unique per owner, not
+globally), a same-owner case_number collision still handled gracefully
+(not a 500), and a regression check that the existing fully-manual entry
+path and the per-case "link CNR later" preview/confirm flow still work
+unchanged after the confirm_case_tracking() refactor.
 """
 
 from unittest.mock import MagicMock, patch
@@ -202,12 +204,16 @@ class TestSameUserCnrDuplicate:
 
 
 @pytest.mark.django_db
-class TestCrossUserCaseNumberConflict:
+class TestCrossUserCaseNumberSharing:
     @patch("core.services.court_tracking.get_provider")
-    def test_case_number_collision_with_another_owner_is_graceful_not_500(
+    def test_case_number_shared_with_another_owner_succeeds(
         self, get_provider, api, advocate, other_advocate
     ):
-        Case.objects.create(
+        """case_number is unique per owner, not globally -- another
+        advocate (co-counsel, opposing counsel) already tracking the same
+        real case under this case_number must not block this advocate
+        from creating their own independent row for it."""
+        other_case = Case.objects.create(
             owner=other_advocate, case_number="SHARED-NUMBER", title="Other advocate's case", client_name="",
         )
         provider = MagicMock()
@@ -227,9 +233,47 @@ class TestCrossUserCaseNumberConflict:
             format="json",
         )
 
+        assert create.status_code == 201
+        assert create.data["case_number"] == "SHARED-NUMBER"
+        case = Case.objects.get(owner=advocate, cnr_number=CNR)
+        assert case.case_number == "SHARED-NUMBER"
+        assert case.id != other_case.id
+        assert case.owner_id != other_case.owner_id
+
+
+@pytest.mark.django_db
+class TestSameUserCaseNumberDuplicate:
+    @patch("core.services.court_tracking.get_provider")
+    def test_case_number_collision_with_own_existing_case_is_graceful_not_500(
+        self, get_provider, api, advocate
+    ):
+        """A different CNR whose case_number happens to match one this
+        SAME advocate already has (e.g. they retyped it in the pre-filled
+        form) must still be blocked -- the (owner, case_number)
+        UniqueConstraint's residual, same-owner-only purpose."""
+        Case.objects.create(
+            owner=advocate, case_number="MY-EXISTING-NUMBER", title="My existing case", client_name="",
+        )
+        provider = MagicMock()
+        provider.fetch_case_by_cnr.return_value = _fake_case_data()
+        get_provider.return_value = provider
+
+        lookup = api.post("/api/cases/cnr-lookup/", {"cnr": CNR}, format="json")
+        assert lookup.status_code == 200
+
+        create = api.post(
+            "/api/cases/cnr-lookup/create/",
+            {
+                "preview_token": lookup.data["preview_token"],
+                "case_number": "MY-EXISTING-NUMBER",
+                "title": "A different case, mistyped number",
+            },
+            format="json",
+        )
+
         assert create.status_code == 400
         assert "case_number" in create.data
-        assert "already tracked by another user in the system" in create.data["case_number"][0]
+        assert "already have a case numbered" in create.data["case_number"][0]
         # Nothing was created under this owner for this CNR -- a failed
         # create must not leave a half-applied row behind.
         assert not Case.objects.filter(owner=advocate, cnr_number=CNR).exists()
