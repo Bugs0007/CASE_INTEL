@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AlertTriangle, ArrowLeft, FileEdit, Gavel, Loader2, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -55,11 +55,20 @@ const PARTY_ROLES: { value: UserPartyRole; label: string }[] = [
 
 export default function NewCasePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const createCase = useCreateCase();
   const cnrLookup = useCnrLookup();
   const createCaseFromCnr = useCreateCaseFromCnr();
 
-  const [mode, setMode] = useState<"manual" | "cnr">("manual");
+  // ?mode=cnr lands directly in the Track-by-CNR toggle state -- the New
+  // Case chooser (components/cases/new-case-chooser-dialog.tsx) links
+  // here with it so picking "Track by CNR" doesn't dump the advocate on
+  // the manual form with one more click to make. Read once at mount;
+  // the toggle buttons take over from here (no need to keep syncing the
+  // URL as the user clicks between modes).
+  const [mode, setMode] = useState<"manual" | "cnr">(() =>
+    searchParams.get("mode") === "cnr" ? "cnr" : "manual",
+  );
   const [cnr, setCnr] = useState("");
   const [cnrError, setCnrError] = useState<string | null>(null);
   const [preview, setPreview] = useState<CnrLookupPreview | null>(null);

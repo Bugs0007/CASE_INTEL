@@ -81,7 +81,7 @@ class TestCnrLookupAndCreateSuccess:
         lookup = api.post("/api/cases/cnr-lookup/", {"cnr": CNR}, format="json")
         assert lookup.status_code == 200
         assert lookup.data["case_number"] == CNR
-        assert lookup.data["title"] == CNR
+        assert lookup.data["title"] == "Ramesh Kumar vs TSSPDCL"
         assert lookup.data["petitioner"] == "Ramesh Kumar"
         assert lookup.data["respondent"] == "TSSPDCL"
         assert "preview_token" in lookup.data
@@ -325,7 +325,6 @@ class TestRegistrationNumberUsedAsCaseNumber:
 
         assert lookup.status_code == 200
         assert lookup.data["case_number"] == REGISTRATION_NUMBER
-        assert lookup.data["title"] == REGISTRATION_NUMBER
         assert lookup.data["case_number"] != CNR
 
     @patch("core.services.court_tracking.get_provider")
@@ -371,7 +370,100 @@ class TestRegistrationNumberUsedAsCaseNumber:
 
         assert lookup.status_code == 200
         assert lookup.data["case_number"] == CNR
+
+
+@pytest.mark.django_db
+class TestTitleFromPartyNames:
+    """Regression coverage for Phase A: Case.title on the CNR quick-add
+    flow must default to "Petitioner vs Respondent" (a human-recognizable
+    title), not the case number/CNR -- title only falls back to the case
+    number when eCourts returns neither party name at all. Uses the same
+    " vs " join convention preview_case_tracking's case_title already
+    uses (core/services/court_tracking.py), not a new one."""
+
+    @patch("core.services.court_tracking.get_provider")
+    def test_title_defaults_to_petitioner_vs_respondent(self, get_provider, api):
+        provider = MagicMock()
+        provider.fetch_case_by_cnr.return_value = _fake_case_data(
+            petitioner="Ramesh Kumar", respondent="TSSPDCL"
+        )
+        get_provider.return_value = provider
+
+        lookup = api.post("/api/cases/cnr-lookup/", {"cnr": CNR}, format="json")
+
+        assert lookup.status_code == 200
+        assert lookup.data["title"] == "Ramesh Kumar vs TSSPDCL"
+
+    @patch("core.services.court_tracking.get_provider")
+    def test_title_uses_only_petitioner_when_respondent_missing(self, get_provider, api):
+        provider = MagicMock()
+        provider.fetch_case_by_cnr.return_value = _fake_case_data(
+            petitioner="Ramesh Kumar", respondent=""
+        )
+        get_provider.return_value = provider
+
+        lookup = api.post("/api/cases/cnr-lookup/", {"cnr": CNR}, format="json")
+
+        assert lookup.status_code == 200
+        assert lookup.data["title"] == "Ramesh Kumar"
+
+    @patch("core.services.court_tracking.get_provider")
+    def test_title_falls_back_to_case_number_when_both_party_names_missing(
+        self, get_provider, api
+    ):
+        provider = MagicMock()
+        provider.fetch_case_by_cnr.return_value = _fake_case_data(
+            petitioner="", respondent="", registration_number=REGISTRATION_NUMBER
+        )
+        get_provider.return_value = provider
+
+        lookup = api.post("/api/cases/cnr-lookup/", {"cnr": CNR}, format="json")
+
+        assert lookup.status_code == 200
+        assert lookup.data["case_number"] == REGISTRATION_NUMBER
+        assert lookup.data["title"] == REGISTRATION_NUMBER
+
+    @patch("core.services.court_tracking.get_provider")
+    def test_title_falls_back_to_cnr_when_neither_party_names_nor_registration_number(
+        self, get_provider, api
+    ):
+        provider = MagicMock()
+        provider.fetch_case_by_cnr.return_value = _fake_case_data(
+            petitioner="", respondent="", registration_number=""
+        )
+        get_provider.return_value = provider
+
+        lookup = api.post("/api/cases/cnr-lookup/", {"cnr": CNR}, format="json")
+
+        assert lookup.status_code == 200
+        assert lookup.data["case_number"] == CNR
         assert lookup.data["title"] == CNR
+
+    @patch("core.services.court_tracking.get_provider")
+    def test_created_case_persists_the_party_names_title(self, get_provider, api):
+        provider = MagicMock()
+        provider.fetch_case_by_cnr.return_value = _fake_case_data(
+            petitioner="Ramesh Kumar", respondent="TSSPDCL"
+        )
+        get_provider.return_value = provider
+
+        lookup = api.post("/api/cases/cnr-lookup/", {"cnr": CNR}, format="json")
+        assert lookup.status_code == 200
+
+        create = api.post(
+            "/api/cases/cnr-lookup/create/",
+            {
+                "preview_token": lookup.data["preview_token"],
+                "case_number": lookup.data["case_number"],
+                "title": lookup.data["title"],
+            },
+            format="json",
+        )
+
+        assert create.status_code == 201
+        assert create.data["title"] == "Ramesh Kumar vs TSSPDCL"
+        case = Case.objects.get(cnr_number=CNR)
+        assert case.title == "Ramesh Kumar vs TSSPDCL"
 
 
 class TestParseCaseHistoryHtmlRegistrationNumber:
