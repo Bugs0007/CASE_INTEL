@@ -78,6 +78,9 @@ export interface AdvocateProfile {
   letterhead_name: string;
   address: string;
   bar_registration_number: string;
+  /** Billing/contact email -- separate from the account's login email.
+   * Used as Reply-To and Cc on invoice emails; empty is a valid state. */
+  contact_email: string;
   default_fee_amount: string;
   invoice_prefix: string;
   last_invoice_sequence: number;
@@ -89,6 +92,7 @@ export interface AdvocateProfileUpdateInput {
   letterhead_name?: string;
   address?: string;
   bar_registration_number?: string;
+  contact_email?: string;
   default_fee_amount?: string;
   invoice_prefix?: string;
 }

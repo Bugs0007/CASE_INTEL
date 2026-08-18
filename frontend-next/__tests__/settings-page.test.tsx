@@ -50,6 +50,7 @@ function makeProfile(overrides: Partial<AdvocateProfile> = {}): AdvocateProfile 
     letterhead_name: "",
     address: "",
     bar_registration_number: "",
+    contact_email: "",
     default_fee_amount: "0.00",
     invoice_prefix: "INV",
     last_invoice_sequence: 0,
@@ -109,6 +110,80 @@ describe("SettingsPage", () => {
       "Billing profile saved",
       expect.any(String),
     );
+  });
+
+  it("loads and pre-fills an existing contact email", async () => {
+    vi.mocked(advocateProfileApi.get).mockResolvedValue(
+      makeProfile({ contact_email: "advocate@example.com" }),
+    );
+
+    renderWithClient(<SettingsPage />);
+
+    expect(await screen.findByDisplayValue("advocate@example.com")).toBeInTheDocument();
+  });
+
+  it("saves a contact email edit, separate from the account login email", async () => {
+    const user = userEvent.setup();
+    vi.mocked(advocateProfileApi.get).mockResolvedValue(makeProfile());
+    vi.mocked(advocateProfileApi.update).mockResolvedValue(
+      makeProfile({ contact_email: "advocate@example.com" }),
+    );
+
+    renderWithClient(<SettingsPage />);
+
+    const emailInput = await screen.findByLabelText(/contact email/i);
+    await user.type(emailInput, "advocate@example.com");
+    await user.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(advocateProfileApi.update).toHaveBeenCalledWith(
+        expect.objectContaining({ contact_email: "advocate@example.com" }),
+      );
+    });
+    expect(showToast.success).toHaveBeenCalledWith(
+      "Billing profile saved",
+      expect.any(String),
+    );
+  });
+
+  it("saves cleanly with the contact email left blank", async () => {
+    const user = userEvent.setup();
+    vi.mocked(advocateProfileApi.get).mockResolvedValue(makeProfile());
+    vi.mocked(advocateProfileApi.update).mockResolvedValue(makeProfile());
+
+    renderWithClient(<SettingsPage />);
+
+    await screen.findByLabelText(/contact email/i);
+    await user.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(advocateProfileApi.update).toHaveBeenCalledWith(
+        expect.objectContaining({ contact_email: "" }),
+      );
+    });
+    expect(showToast.error).not.toHaveBeenCalled();
+  });
+
+  it("surfaces the server's validation message for a malformed contact email", async () => {
+    const user = userEvent.setup();
+    vi.mocked(advocateProfileApi.get).mockResolvedValue(makeProfile());
+    const { APIError } = await import("@/lib/api/client");
+    vi.mocked(advocateProfileApi.update).mockRejectedValue(
+      new APIError(400, { contact_email: ["Enter a valid email address."] }),
+    );
+
+    renderWithClient(<SettingsPage />);
+
+    const emailInput = await screen.findByLabelText(/contact email/i);
+    await user.type(emailInput, "not-an-email");
+    await user.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(showToast.error).toHaveBeenCalledWith(
+        "Could not save",
+        expect.stringContaining("Enter a valid email address."),
+      );
+    });
   });
 
   it("warns instead of blocking when a save fails, surfacing the server's message", async () => {

@@ -32,6 +32,7 @@ export default function SettingsPage() {
   const [letterheadName, setLetterheadName] = useState("");
   const [address, setAddress] = useState("");
   const [barNumber, setBarNumber] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
   const [defaultFee, setDefaultFee] = useState("");
   const [invoicePrefix, setInvoicePrefix] = useState("");
 
@@ -42,6 +43,7 @@ export default function SettingsPage() {
     setLetterheadName(profile.letterhead_name);
     setAddress(profile.address);
     setBarNumber(profile.bar_registration_number);
+    setContactEmail(profile.contact_email);
     setDefaultFee(profile.default_fee_amount);
     setInvoicePrefix(profile.invoice_prefix);
   }, [profile]);
@@ -53,6 +55,7 @@ export default function SettingsPage() {
         letterhead_name: letterheadName,
         address,
         bar_registration_number: barNumber,
+        contact_email: contactEmail,
         default_fee_amount: defaultFee,
         invoice_prefix: invoicePrefix,
       });
@@ -92,7 +95,12 @@ export default function SettingsPage() {
           <CardTitle>Invoice Letterhead</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          {/* noValidate: contact_email uses type="email" for the mobile
+              keyboard/autofill hint, but validation errors -- including a
+              malformed email -- should surface through the same
+              server-round-trip toast every other field here uses, not a
+              native browser tooltip that silently blocks submission. */}
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <div>
               <label htmlFor="letterhead_name" className="mb-1 block text-sm font-medium text-gray-700">
                 Name / Firm
@@ -132,6 +140,23 @@ export default function SettingsPage() {
                 onChange={(e) => setBarNumber(e.target.value)}
                 placeholder="e.g. AP/1234/2015"
               />
+            </div>
+
+            <div>
+              <label htmlFor="contact_email" className="mb-1 block text-sm font-medium text-gray-700">
+                Contact Email
+              </label>
+              <Input
+                id="contact_email"
+                type="email"
+                value={contactEmail}
+                onChange={(e) => setContactEmail(e.target.value)}
+                placeholder="e.g. advocate@example.com"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Your own billing email, not your login email. Client replies to invoices go
+                here, and you&apos;re Cc&apos;d on every invoice sent. Leave blank to skip both.
+              </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
