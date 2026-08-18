@@ -365,21 +365,22 @@ class TestInvoiceSending:
         # From is the fixed server sender, displayed under a fallback name
         # since advocate_a never filled in a letterhead for this test.
         assert message.from_email == f"Advocate <{settings.DEFAULT_FROM_EMAIL}>"
-        # advocate_a has no account email in this fixture -- no Reply-To
-        # header should be sent rather than an empty one.
+        # advocate_a has no contact email set on their profile in this
+        # fixture -- no Reply-To or Cc header should be sent rather than
+        # an empty one.
         assert message.reply_to == []
+        assert message.cc == []
 
         fee.refresh_from_db()
         assert fee.send_status == AppearanceFee.SEND_SENT
 
-    def test_send_uses_letterhead_name_as_display_name_and_replies_to_the_advocate(
+    def test_send_uses_letterhead_name_as_display_name_and_replies_to_and_ccs_the_advocate(
         self, advocate_a, client_a, settings
     ):
-        advocate_a.email = "advocate-a@example.com"
-        advocate_a.save(update_fields=["email"])
         invoice_service.get_or_create_profile(advocate_a)
         AdvocateProfile.objects.filter(owner=advocate_a).update(
-            letterhead_name="A. Advocate & Co."
+            letterhead_name="A. Advocate & Co.",
+            contact_email="advocate-a@example.com",
         )
 
         case = _make_case(advocate_a)
@@ -404,7 +405,72 @@ class TestInvoiceSending:
         # (an RFC 2822 special) -- that quoting is correct, so the
         # expected value is built the same way rather than hand-written.
         assert message.from_email == formataddr(("A. Advocate & Co.", settings.DEFAULT_FROM_EMAIL))
+        # Reply-To/Cc come from AdvocateProfile.contact_email, not the
+        # Django User's login email -- the two are deliberately separate.
         assert message.reply_to == ["advocate-a@example.com"]
+        assert message.cc == ["advocate-a@example.com"]
+
+    def test_send_ignores_the_account_login_email_for_reply_to_and_cc(
+        self, advocate_a, client_a, settings
+    ):
+        """The advocate's Django account email must never be repurposed
+        as the billing contact address -- only AdvocateProfile.contact_email
+        (set on the Settings page) is used."""
+        advocate_a.email = "login-only@example.com"
+        advocate_a.save(update_fields=["email"])
+        invoice_service.get_or_create_profile(advocate_a)
+
+        case = _make_case(advocate_a)
+        ClientContact.objects.create(
+            owner=advocate_a,
+            case=case,
+            name="Billing Person",
+            email="billing@example.com",
+            is_billing_contact=True,
+        )
+        fee = invoice_service.generate_invoice(_make_fee(advocate_a, case))
+
+        settings.INVOICE_EMAIL_CONFIGURED = True
+        settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+        mail.outbox.clear()
+
+        response = client_a.post(f"/api/appearance-fees/{fee.id}/send/")
+
+        assert response.status_code == 200
+        message = mail.outbox[0]
+        assert message.reply_to == []
+        assert message.cc == []
+
+    def test_send_logs_and_still_succeeds_when_contact_email_is_unset(
+        self, advocate_a, client_a, settings, caplog, capture_core_logs
+    ):
+        invoice_service.get_or_create_profile(advocate_a)
+
+        case = _make_case(advocate_a)
+        ClientContact.objects.create(
+            owner=advocate_a,
+            case=case,
+            name="Billing Person",
+            email="billing@example.com",
+            is_billing_contact=True,
+        )
+        fee = invoice_service.generate_invoice(_make_fee(advocate_a, case))
+
+        settings.INVOICE_EMAIL_CONFIGURED = True
+        settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+        mail.outbox.clear()
+
+        with caplog.at_level("INFO"):
+            response = client_a.post(f"/api/appearance-fees/{fee.id}/send/")
+
+        assert response.status_code == 200
+        assert response.data["sent"] is True
+        assert len(mail.outbox) == 1
+        message = mail.outbox[0]
+        assert message.to == ["billing@example.com"]
+        assert message.reply_to == []
+        assert message.cc == []
+        assert "no contact email" in caplog.text
 
     def test_logs_instead_of_failing_when_email_is_not_configured(
         self, advocate_a, client_a, settings, caplog, capture_core_logs
@@ -855,3 +921,62 @@ class TestAdvocateProfile:
         )
         response = client_b.get("/api/advocate-profile/")
         assert response.data["letterhead_name"] == ""
+
+    def test_contact_email_defaults_to_blank(self, advocate_a, client_a):
+        """Blank is a valid, existing state -- nothing backfills this
+        field, and send_invoice must tolerate it (see TestInvoiceSending)."""
+        response = client_a.get("/api/advocate-profile/")
+        assert response.data["contact_email"] == ""
+
+    def test_contact_email_round_trips(self, advocate_a, client_a):
+        response = client_a.patch(
+            "/api/advocate-profile/",
+            {"contact_email": "advocate@example.com"},
+            format="json",
+        )
+        assert response.status_code == 200
+        assert response.data["contact_email"] == "advocate@example.com"
+
+        profile = AdvocateProfile.objects.get(owner=advocate_a)
+        assert profile.contact_email == "advocate@example.com"
+
+    def test_contact_email_rejects_malformed_input(self, advocate_a, client_a):
+        response = client_a.patch(
+            "/api/advocate-profile/", {"contact_email": "not-an-email"}, format="json"
+        )
+        assert response.status_code == 400
+        assert "contact_email" in response.data
+
+        profile = AdvocateProfile.objects.get(owner=advocate_a)
+        assert profile.contact_email == ""
+
+    def test_contact_email_can_be_cleared_back_to_blank(self, advocate_a, client_a):
+        client_a.patch(
+            "/api/advocate-profile/",
+            {"contact_email": "advocate@example.com"},
+            format="json",
+        )
+        response = client_a.patch(
+            "/api/advocate-profile/", {"contact_email": ""}, format="json"
+        )
+        assert response.status_code == 200
+        assert response.data["contact_email"] == ""
+
+    def test_contact_email_is_independent_of_the_account_login_email(
+        self, advocate_a, client_a
+    ):
+        """Phase A is deliberately a separate field from the Django User's
+        login email -- setting one must not touch the other."""
+        advocate_a.email = "login@example.com"
+        advocate_a.save(update_fields=["email"])
+
+        client_a.patch(
+            "/api/advocate-profile/",
+            {"contact_email": "billing-contact@example.com"},
+            format="json",
+        )
+
+        advocate_a.refresh_from_db()
+        assert advocate_a.email == "login@example.com"
+        profile = AdvocateProfile.objects.get(owner=advocate_a)
+        assert profile.contact_email == "billing-contact@example.com"

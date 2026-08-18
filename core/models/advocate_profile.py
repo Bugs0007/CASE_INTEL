@@ -34,6 +34,15 @@ class AdvocateProfile(OwnedModel):
     bar_registration_number = models.CharField(
         max_length=100, blank=True, default="", help_text="Bar Council registration number."
     )
+    contact_email = models.EmailField(
+        blank=True,
+        default="",
+        help_text=(
+            "The advocate's own billing/contact email -- separate from their "
+            "login email. Used as Reply-To and Cc on invoice emails sent to "
+            "clients; left blank, invoices send without either."
+        ),
+    )
     default_fee_amount = models.DecimalField(
         max_digits=12,
         decimal_places=2,

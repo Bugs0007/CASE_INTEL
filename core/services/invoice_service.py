@@ -407,18 +407,33 @@ def send_invoice(fee: AppearanceFee) -> dict:
 
     # Display name is the advocate's letterhead, address is the fixed
     # server sender (must be on a Resend-verified domain -- see
-    # DEFAULT_FROM_EMAIL in settings.py). Reply-To is the advocate's own
-    # account email so a client hitting "reply" reaches the lawyer
-    # directly rather than the shared billing@ inbox; omitted entirely
-    # when the account has none on file (email was optional at signup).
+    # DEFAULT_FROM_EMAIL in settings.py). Reply-To and Cc use the
+    # advocate's own contact email (AdvocateProfile.contact_email, set on
+    # the Settings page -- deliberately separate from the User's login
+    # email) so a client hitting "reply" reaches the lawyer directly
+    # rather than the shared billing@ inbox, and the advocate keeps a
+    # copy of exactly what was sent. Both are omitted, not sent empty,
+    # when the advocate hasn't set a contact email -- that's a valid,
+    # unconfigured state, not an error.
     from_email = formataddr((profile.letterhead_name or "Advocate", settings.DEFAULT_FROM_EMAIL))
-    reply_to = [fee.owner.email] if fee.owner.email else []
+    if profile.contact_email:
+        reply_to = [profile.contact_email]
+        cc = [profile.contact_email]
+    else:
+        reply_to = []
+        cc = []
+        logger.info(
+            "Invoice %s: advocate %d has no contact email set, sending without Reply-To/Cc.",
+            fee.invoice_number,
+            fee.owner_id,
+        )
 
     message = EmailMessage(
         subject=subject,
         body=body,
         from_email=from_email,
         to=[contact.email],
+        cc=cc,
         reply_to=reply_to,
         connection=get_connection(),
     )

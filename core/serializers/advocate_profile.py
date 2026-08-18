@@ -13,6 +13,7 @@ class AdvocateProfileSerializer(serializers.ModelSerializer):
             "letterhead_name",
             "address",
             "bar_registration_number",
+            "contact_email",
             "default_fee_amount",
             "invoice_prefix",
             "last_invoice_sequence",
