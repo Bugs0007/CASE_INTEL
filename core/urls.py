@@ -8,6 +8,8 @@ from django.urls import path
 
 from core.views import (
     AdvocateProfileView,
+    AdvocateSearchActiveListView,
+    AdvocateSearchCancelView,
     AdvocateSearchImportStatusView,
     AdvocateSearchImportView,
     AdvocateSearchPreferenceView,
@@ -184,9 +186,14 @@ urlpatterns = [
         AdvocateSearchPreferenceView.as_view(),
         name="advocate-search-preference",
     ),
+    path(
+        "cases/search-advocate/active/",
+        AdvocateSearchActiveListView.as_view(),
+        name="advocate-search-active",
+    ),
     # Status poll for a state-wide search job. Placed after the literal
-    # "import/"/"preference/" routes above; <int:job_id> can't match those
-    # strings anyway, but order keeps it unambiguous.
+    # "import/"/"preference/"/"active/" routes above; <int:job_id> can't
+    # match those strings anyway, but order keeps it unambiguous.
     path(
         "cases/search-advocate/<int:job_id>/",
         AdvocateSearchStatusView.as_view(),
@@ -196,6 +203,11 @@ urlpatterns = [
         "cases/search-advocate/<int:job_id>/retry-failed/",
         AdvocateSearchRetryFailedView.as_view(),
         name="advocate-search-retry-failed",
+    ),
+    path(
+        "cases/search-advocate/<int:job_id>/cancel/",
+        AdvocateSearchCancelView.as_view(),
+        name="advocate-search-cancel",
     ),
 
     # Hearings

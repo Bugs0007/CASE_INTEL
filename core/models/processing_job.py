@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 
 from .mixins import OwnedModel
 
@@ -32,6 +33,7 @@ class ProcessingJob(OwnedModel):
         ("running", "Running"),
         ("succeeded", "Succeeded"),
         ("failed", "Failed"),
+        ("cancelled", "Cancelled"),
     ]
 
     JOB_TYPE_CHOICES = [
@@ -81,6 +83,14 @@ class ProcessingJob(OwnedModel):
     # loop: a job that keeps killing the worker is failed permanently
     # after MAX_ATTEMPTS (see process_jobs) instead of requeueing forever.
     attempts = models.IntegerField(default=0)
+    # Cooperative cancellation flag for the advocate_search fan-out (see
+    # request_cancel() below). The worker holds the row while "running",
+    # so cancelling a running job can only raise this flag -- the fan-out
+    # itself polls it at its per-district checkpoint (the same one used
+    # for incremental payload persistence) and finishes the job as
+    # "cancelled" from inside run_advocate_search. Unused by other job
+    # types for now.
+    cancel_requested = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -135,6 +145,53 @@ class ProcessingJob(OwnedModel):
         (not scoped to an owner). Used to enforce the single-in-flight cap
         on the advocate_* portal jobs."""
         return cls.objects.filter(job_type=job_type, status__in=["queued", "running"]).exists()
+
+    @classmethod
+    def active_of_type_for_owner(cls, job_type: str, owner):
+        """Queued/running jobs of this type belonging to `owner`, newest
+        first. Owner-scoped (not system-wide like active_of_type_exists)
+        because this backs a caller-facing "your in-progress searches"
+        list -- another owner's job payload (search terms, partial
+        results) must never be visible here, same posture as every other
+        view in this module."""
+        return cls.objects.filter(
+            job_type=job_type, owner=owner, status__in=["queued", "running"]
+        ).order_by("-created_at")
+
+    def request_cancel(self) -> "ProcessingJob":
+        """Cancel this job if it's queued or running; no-op (job returned
+        unchanged) if it has already reached a terminal state.
+
+        A queued job (the worker hasn't claimed it yet) is finished
+        directly here via a conditional update, same tiny-race tolerance
+        as enqueue_advocate_import's note above -- worst case the worker
+        claims it in the same instant and the update below matches zero
+        rows, which just falls through to the running-job branch.
+
+        A running job can't be finished from here -- the worker owns the
+        row while it's mid-fan-out -- so this only raises
+        cancel_requested; run_advocate_search polls it at its
+        per-district checkpoint and finishes the job as "cancelled" from
+        inside the worker itself (see AdvocateSearchCancelled in
+        core/services/advocate_search.py).
+        """
+        updated = ProcessingJob.objects.filter(pk=self.pk, status="queued").update(
+            status="cancelled", cancel_requested=True, finished_at=timezone.now()
+        )
+        if updated:
+            self.status = "cancelled"
+            self.cancel_requested = True
+            self.finished_at = timezone.now()
+            return self
+
+        updated = ProcessingJob.objects.filter(pk=self.pk, status="running").update(
+            cancel_requested=True
+        )
+        if updated:
+            self.cancel_requested = True
+        else:
+            self.refresh_from_db()
+        return self
 
     @classmethod
     def enqueue_advocate_import(
