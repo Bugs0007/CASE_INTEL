@@ -33,7 +33,7 @@ from django.utils import timezone
 
 from core.models import Case, Document, ProcessingJob
 from core.services.advocate_import import run_advocate_import
-from core.services.advocate_search import run_advocate_search
+from core.services.advocate_search import AdvocateSearchCancelled, run_advocate_search
 from core.services.court_order_sync import sync_case_orders
 from core.services.document_processor import DocumentProcessor
 
@@ -189,6 +189,9 @@ class Command(BaseCommand):
             self._finish(job, "failed", error=f"Document {job.document_id} no longer exists.")
         except Case.DoesNotExist:
             self._finish(job, "failed", error=f"Case {job.case_id} no longer exists.")
+        except AdvocateSearchCancelled:
+            self._finish(job, "cancelled")
+            self.stdout.write(f"Job {job.id} cancelled.")
         except Exception as exc:
             # DocumentProcessor already marked the document itself failed.
             logger.exception("Job %d failed", job.id)

@@ -334,6 +334,11 @@ class TestInvoiceSending:
     def test_sends_to_the_billing_contact_when_email_is_configured(
         self, advocate_a, client_a, settings, monkeypatch
     ):
+        invoice_service.get_or_create_profile(advocate_a)
+        AdvocateProfile.objects.filter(owner=advocate_a).update(
+            contact_email="advocate-a@example.com"
+        )
+
         case = _make_case(advocate_a)
         ClientContact.objects.create(
             owner=advocate_a, case=case, name="Assistant", email="assistant@example.com"
@@ -365,11 +370,8 @@ class TestInvoiceSending:
         # From is the fixed server sender, displayed under a fallback name
         # since advocate_a never filled in a letterhead for this test.
         assert message.from_email == f"Advocate <{settings.DEFAULT_FROM_EMAIL}>"
-        # advocate_a has no contact email set on their profile in this
-        # fixture -- no Reply-To or Cc header should be sent rather than
-        # an empty one.
-        assert message.reply_to == []
-        assert message.cc == []
+        assert message.reply_to == ["advocate-a@example.com"]
+        assert message.cc == ["advocate-a@example.com"]
 
         fee.refresh_from_db()
         assert fee.send_status == AppearanceFee.SEND_SENT
@@ -419,6 +421,9 @@ class TestInvoiceSending:
         advocate_a.email = "login-only@example.com"
         advocate_a.save(update_fields=["email"])
         invoice_service.get_or_create_profile(advocate_a)
+        AdvocateProfile.objects.filter(owner=advocate_a).update(
+            contact_email="advocate-a@example.com"
+        )
 
         case = _make_case(advocate_a)
         ClientContact.objects.create(
@@ -438,12 +443,16 @@ class TestInvoiceSending:
 
         assert response.status_code == 200
         message = mail.outbox[0]
-        assert message.reply_to == []
-        assert message.cc == []
+        assert message.reply_to == ["advocate-a@example.com"]
+        assert message.cc == ["advocate-a@example.com"]
 
-    def test_send_logs_and_still_succeeds_when_contact_email_is_unset(
+    def test_send_is_blocked_when_contact_email_is_unset(
         self, advocate_a, client_a, settings, caplog, capture_core_logs
     ):
+        """A hard gate, not a degrade: a client-facing invoice email with
+        no way to reply to the actual advocate is a bad default, so the
+        send is rejected outright rather than going out without Reply-To/
+        Cc (the previous behavior)."""
         invoice_service.get_or_create_profile(advocate_a)
 
         case = _make_case(advocate_a)
@@ -460,21 +469,23 @@ class TestInvoiceSending:
         settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
         mail.outbox.clear()
 
-        with caplog.at_level("INFO"):
-            response = client_a.post(f"/api/appearance-fees/{fee.id}/send/")
+        response = client_a.post(f"/api/appearance-fees/{fee.id}/send/")
 
-        assert response.status_code == 200
-        assert response.data["sent"] is True
-        assert len(mail.outbox) == 1
-        message = mail.outbox[0]
-        assert message.to == ["billing@example.com"]
-        assert message.reply_to == []
-        assert message.cc == []
-        assert "no contact email" in caplog.text
+        assert response.status_code == 400
+        assert "contact email" in response.data["detail"].lower()
+        assert len(mail.outbox) == 0
+
+        fee.refresh_from_db()
+        assert fee.send_status == AppearanceFee.SEND_NOT_SENT
 
     def test_logs_instead_of_failing_when_email_is_not_configured(
         self, advocate_a, client_a, settings, caplog, capture_core_logs
     ):
+        invoice_service.get_or_create_profile(advocate_a)
+        AdvocateProfile.objects.filter(owner=advocate_a).update(
+            contact_email="advocate-a@example.com"
+        )
+
         case = _make_case(advocate_a)
         ClientContact.objects.create(
             owner=advocate_a,

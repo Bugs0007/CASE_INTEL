@@ -8,6 +8,8 @@ continue to work.
 
 from .advocate_profile import AdvocateProfileView
 from .advocate_search import (
+    AdvocateSearchActiveListView,
+    AdvocateSearchCancelView,
     AdvocateSearchImportStatusView,
     AdvocateSearchImportView,
     AdvocateSearchPreferenceView,
@@ -87,6 +89,8 @@ __all__ = [
     "TravelBookingFileView",
     "TravelBookingListCreateView",
     "TravelBookingUploadView",
+    "AdvocateSearchActiveListView",
+    "AdvocateSearchCancelView",
     "AdvocateSearchImportStatusView",
     "AdvocateSearchImportView",
     "AdvocateSearchPreferenceView",

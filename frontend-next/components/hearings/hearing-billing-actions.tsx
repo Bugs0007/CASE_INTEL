@@ -1,13 +1,15 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { FileText, Loader2, Plane, Send, Upload } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, FileText, Loader2, Plane, Send, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { showToast } from "@/components/ui/toaster";
 import { APIError } from "@/lib/api/client";
 import {
+  useAdvocateProfile,
   useCreateFee,
   useGenerateInvoice,
   useMarkPaid,
@@ -45,6 +47,12 @@ export function HearingBillingActions({ hearing, caseId }: HearingBillingActions
   const [amount, setAmount] = useState("");
   const [bookingType, setBookingType] = useState<BookingType>("travel");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const { data: advocateProfile } = useAdvocateProfile();
+  // Undefined while the profile is still loading -- don't flash the
+  // warning before we actually know it's missing.
+  const contactEmailMissing =
+    advocateProfile !== undefined && !advocateProfile.contact_email;
 
   const createFee = useCreateFee(caseId);
   const generateInvoice = useGenerateInvoice(caseId);
@@ -187,14 +195,27 @@ export function HearingBillingActions({ hearing, caseId }: HearingBillingActions
 
       {fee?.status === "invoiced" && (
         <>
-          <Button size="sm" onClick={handleSend} disabled={sendInvoice.isPending}>
-            {sendInvoice.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-            Send to Billing Contact
-          </Button>
+          {contactEmailMissing ? (
+            <div
+              className="flex items-center gap-1.5 rounded-md bg-status-alert-soft px-2.5 py-1.5 text-sm text-status-alert"
+              title="Set a contact email in Settings so clients can reply directly to you."
+            >
+              <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+              <span>No contact email set.</span>
+              <Link href="/settings" className="font-medium underline">
+                Add it in Settings
+              </Link>
+            </div>
+          ) : (
+            <Button size="sm" onClick={handleSend} disabled={sendInvoice.isPending}>
+              {sendInvoice.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+              Send to Billing Contact
+            </Button>
+          )}
           <Button
             variant="secondary"
             size="sm"
