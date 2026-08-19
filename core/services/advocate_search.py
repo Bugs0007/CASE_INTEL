@@ -85,6 +85,13 @@ DISTRICT_RETRY_BACKOFF_SECONDS = 20
 MAX_DISTRICT_ATTEMPTS = 2
 
 
+class AdvocateSearchCancelled(Exception):
+    """Raised internally when a cancellation was requested mid-run (see
+    ProcessingJob.request_cancel) -- caught by process_jobs.py, which
+    finishes the job as "cancelled" instead of "succeeded". Everything
+    persisted before the raise (results, districts_status) is kept."""
+
+
 def _classify_failure(error_text: str) -> str:
     """Classify a district/complex failure for reporting + the district-
     level retry decision below.
@@ -362,6 +369,27 @@ def run_advocate_search(job: ProcessingJob, progress_callback=None) -> None:
         _persist()
         if progress_callback:
             progress_callback(i + 1, total_districts)
+
+        # Cancellation checkpoint -- the only point in the run where we
+        # cheaply know results are fully persisted for everything done so
+        # far. A running job can only be flagged (not finished) from the
+        # cancel endpoint since the worker holds this row, so we poll for
+        # that flag here, between districts, rather than mid-district
+        # (interrupting a district's own captcha-retry loop isn't worth
+        # the complexity for what's already the natural checkpoint
+        # granularity this fan-out already persists at).
+        job.refresh_from_db(fields=["cancel_requested"])
+        if job.cancel_requested:
+            ActivityLog.objects.create(
+                owner=job.owner,
+                case=None,
+                activity_type="advocate_search",
+                description=(
+                    f"Advocate search cancelled after {i + 1} of {total_districts} "
+                    f"district(s): {len(results_by_cnr)} case(s) found so far."
+                ),
+            )
+            raise AdvocateSearchCancelled()
 
     results = list(results_by_cnr.values())
     succeeded = sum(1 for d in districts_status.values() if d["status"] == "success")

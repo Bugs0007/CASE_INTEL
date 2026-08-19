@@ -25,7 +25,7 @@ from rest_framework.test import APIClient
 
 from core.models import AdvocateSearchPreference, Case, JobAlreadyRunningError, ProcessingJob
 from core.services.advocate_import import run_advocate_import
-from core.services.advocate_search import run_advocate_search
+from core.services.advocate_search import AdvocateSearchCancelled, run_advocate_search
 from core.services.court_data import CaptchaSolveError, CourtPortalError
 from bharat_courts.districtcourts.parser import ServerError as DistrictServerError
 from core.services.court_data.ecourts_parsing import split_bar_code
@@ -363,6 +363,130 @@ class TestAdvocateSearchRetryFailedView:
         ProcessingJob.objects.create(owner=user_a, job_type="advocate_search", status="running", payload={})
         resp = client_a.post(f"/api/cases/search-advocate/{original.id}/retry-failed/")
         assert resp.status_code == 409
+
+
+# ---------------------------------------------------------------------------
+# AdvocateSearchCancelView / AdvocateSearchActiveListView
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+class TestAdvocateSearchCancelView:
+    def test_cancel_queued_job_is_immediate(self, client_a, user_a):
+        job = ProcessingJob.objects.create(
+            owner=user_a, job_type="advocate_search", status="queued", payload={"state_code": "1"},
+        )
+        resp = client_a.post(f"/api/cases/search-advocate/{job.id}/cancel/")
+        assert resp.status_code == 200
+        assert resp.data["status"] == "cancelled"
+        job.refresh_from_db()
+        assert job.status == "cancelled"
+        assert job.finished_at is not None
+
+    def test_cancel_running_job_flags_but_does_not_finish_it(self, client_a, user_a):
+        job = ProcessingJob.objects.create(
+            owner=user_a, job_type="advocate_search", status="running", payload={"state_code": "1"},
+        )
+        resp = client_a.post(f"/api/cases/search-advocate/{job.id}/cancel/")
+        assert resp.status_code == 200
+        assert resp.data["status"] == "running"
+        assert resp.data["cancel_requested"] is True
+        job.refresh_from_db()
+        assert job.status == "running"
+        assert job.cancel_requested is True
+
+    def test_cancelling_a_queued_job_clears_the_concurrency_cap(self, client_a, user_a):
+        job = ProcessingJob.objects.create(
+            owner=user_a, job_type="advocate_search", status="queued", payload={"state_code": "1"},
+        )
+        client_a.post(f"/api/cases/search-advocate/{job.id}/cancel/")
+        # A cancelled job must not still count as "active" for the
+        # system-wide single-in-flight cap -- otherwise cancelling would
+        # be a no-op from the user's perspective (still blocked).
+        resp = client_a.post("/api/cases/search-advocate/", _SEARCH_BODY, format="json")
+        assert resp.status_code == 202
+
+    def test_cancel_already_finished_job_rejected(self, client_a, user_a):
+        job = ProcessingJob.objects.create(
+            owner=user_a, job_type="advocate_search", status="succeeded", payload={},
+        )
+        resp = client_a.post(f"/api/cases/search-advocate/{job.id}/cancel/")
+        assert resp.status_code == 400
+        job.refresh_from_db()
+        assert job.status == "succeeded"
+
+    def test_cannot_cancel_other_users_job(self, client_a, user_b):
+        job = ProcessingJob.objects.create(
+            owner=user_b, job_type="advocate_search", status="running", payload={},
+        )
+        resp = client_a.post(f"/api/cases/search-advocate/{job.id}/cancel/")
+        assert resp.status_code == 404
+        job.refresh_from_db()
+        assert job.cancel_requested is False
+
+    def test_cannot_cancel_an_import_job_via_this_endpoint(self, client_a, user_a):
+        job = ProcessingJob.objects.create(
+            owner=user_a, job_type="advocate_import", status="running", payload={},
+        )
+        resp = client_a.post(f"/api/cases/search-advocate/{job.id}/cancel/")
+        assert resp.status_code == 404
+
+    def test_cancel_nonexistent_job_404(self, client_a):
+        resp = client_a.post("/api/cases/search-advocate/999999/cancel/")
+        assert resp.status_code == 404
+
+    def test_requires_authentication(self):
+        anon = APIClient()
+        resp = anon.post("/api/cases/search-advocate/1/cancel/")
+        assert resp.status_code == 401
+
+
+@pytest.mark.django_db
+class TestAdvocateSearchActiveListView:
+    def test_lists_own_queued_and_running_searches(self, client_a, user_a):
+        running = ProcessingJob.objects.create(
+            owner=user_a, job_type="advocate_search", status="running",
+            progress_current=2, progress_total=10,
+            payload={"state_code": "1", "advocate_name": "Suresh", "results": [{"cnr_number": "X1"}]},
+        )
+        queued = ProcessingJob.objects.create(
+            owner=user_a, job_type="advocate_search", status="queued", payload={"state_code": "2"},
+        )
+        resp = client_a.get("/api/cases/search-advocate/active/")
+        assert resp.status_code == 200
+        ids = {row["job_id"] for row in resp.data}
+        assert ids == {running.id, queued.id}
+        running_row = next(row for row in resp.data if row["job_id"] == running.id)
+        assert running_row["progress_current"] == 2
+        assert running_row["progress_total"] == 10
+        assert running_row["advocate_name"] == "Suresh"
+        assert running_row["results_total"] == 1
+
+    def test_excludes_terminal_jobs(self, client_a, user_a):
+        for terminal_status in ("succeeded", "failed", "cancelled"):
+            ProcessingJob.objects.create(
+                owner=user_a, job_type="advocate_search", status=terminal_status, payload={},
+            )
+        resp = client_a.get("/api/cases/search-advocate/active/")
+        assert resp.status_code == 200
+        assert resp.data == []
+
+    def test_excludes_other_users_searches(self, client_a, user_b):
+        ProcessingJob.objects.create(owner=user_b, job_type="advocate_search", status="running", payload={})
+        resp = client_a.get("/api/cases/search-advocate/active/")
+        assert resp.status_code == 200
+        assert resp.data == []
+
+    def test_excludes_other_job_types(self, client_a, user_a):
+        ProcessingJob.objects.create(owner=user_a, job_type="advocate_import", status="running", payload={})
+        resp = client_a.get("/api/cases/search-advocate/active/")
+        assert resp.status_code == 200
+        assert resp.data == []
+
+    def test_requires_authentication(self):
+        anon = APIClient()
+        resp = anon.get("/api/cases/search-advocate/active/")
+        assert resp.status_code == 401
 
 
 # ---------------------------------------------------------------------------

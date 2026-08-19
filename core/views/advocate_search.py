@@ -167,6 +167,7 @@ class AdvocateSearchStatusView(APIView):
         return Response(
             {
                 "status": job.status,
+                "cancel_requested": job.cancel_requested,
                 "progress_current": job.progress_current,
                 "progress_total": job.progress_total,
                 "error": job.error,
@@ -181,6 +182,78 @@ class AdvocateSearchStatusView(APIView):
                 "districts_status": payload.get("districts_status", {}),
                 "complexes_searched": payload.get("complexes_searched"),
             },
+            status=status.HTTP_200_OK,
+        )
+
+
+class AdvocateSearchActiveListView(APIView):
+    """List the caller's own in-progress (queued/running) advocate
+    searches, so a lost/refreshed page (or a 409 from the concurrency cap)
+    can show what's actually running instead of a dead end.
+
+    GET /api/cases/search-advocate/active/
+
+    Owner-scoped, not system-wide -- the concurrency cap in
+    ProcessingJob.enqueue_advocate_search is global across every user, but
+    exposing another owner's search terms/results here would be the exact
+    cross-tenant leak OwnerScopedMixin exists to prevent elsewhere. In
+    practice this means a 409 caused by a DIFFERENT owner's job won't show
+    up in this list -- only your own stuck/running searches do.
+    """
+
+    def get(self, request):
+        jobs = ProcessingJob.active_of_type_for_owner("advocate_search", request.user)
+        return Response(
+            [
+                {
+                    "job_id": job.id,
+                    "status": job.status,
+                    "cancel_requested": job.cancel_requested,
+                    "created_at": job.created_at,
+                    "started_at": job.started_at,
+                    "progress_current": job.progress_current,
+                    "progress_total": job.progress_total,
+                    "state_code": (job.payload or {}).get("state_code", ""),
+                    "advocate_name": (job.payload or {}).get("advocate_name", ""),
+                    "bar_code": (job.payload or {}).get("bar_code", ""),
+                    "results_total": len((job.payload or {}).get("results", [])),
+                }
+                for job in jobs
+            ],
+            status=status.HTTP_200_OK,
+        )
+
+
+class AdvocateSearchCancelView(APIView):
+    """Cancel one of the caller's own advocate search jobs.
+
+    POST /api/cases/search-advocate/<job_id>/cancel/
+
+    A queued job is cancelled immediately. A running job can't be stopped
+    mid-district-batch -- the worker owns the row -- so this only flags
+    it; run_advocate_search notices at its per-district checkpoint and
+    finishes the job as "cancelled" itself (results found so far are kept,
+    same as any other terminal state). Poll AdvocateSearchStatusView same
+    as before to see it land.
+    """
+
+    def post(self, request, job_id):
+        try:
+            job = ProcessingJob.objects.get(
+                pk=job_id, owner=request.user, job_type="advocate_search"
+            )
+        except ProcessingJob.DoesNotExist:
+            return Response({"detail": "Search job not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if job.status not in ("queued", "running"):
+            return Response(
+                {"detail": "This search has already finished; nothing to cancel."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        job = job.request_cancel()
+        return Response(
+            {"status": job.status, "cancel_requested": job.cancel_requested},
             status=status.HTTP_200_OK,
         )
 

@@ -12,6 +12,7 @@ import { formatHearingDate, staggerDelay } from "@/lib/utils";
 import { groupOrdersByDate, hearingDateKey } from "@/hooks/use-court-orders";
 import {
   Calendar,
+  ClipboardList,
   MapPin,
   User,
   Plus,
@@ -283,6 +284,17 @@ function HearingItem({
               <div className="flex items-center gap-2 text-sm text-gray-600">
                 <User className="h-4 w-4" />
                 <span>{hearing.judge}</span>
+              </div>
+            )}
+            {/* eCourts' "Purpose of hearing" -- for district-court cases
+                this is the ONLY per-hearing signal available at all (those
+                courts generally don't publish order PDFs the way High
+                Courts do), so it's shown directly on the card rather than
+                tucked inside the Court Tracking history table. */}
+            {hearing.purpose && (
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <ClipboardList className="h-4 w-4" />
+                <span>{hearing.purpose}</span>
               </div>
             )}
           </div>
