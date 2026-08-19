@@ -40,10 +40,27 @@ vi.mock("@/components/ui/toaster", () => ({
   },
 }));
 
-import { appearanceFeesApi, travelBookingsApi } from "@/lib/api/billing";
+import { advocateProfileApi, appearanceFeesApi, travelBookingsApi } from "@/lib/api/billing";
 import { showToast } from "@/components/ui/toaster";
+import type { AdvocateProfile } from "@/types";
 
 const CASE_ID = 42;
+
+function makeProfile(overrides: Partial<AdvocateProfile> = {}): AdvocateProfile {
+  return {
+    id: 1,
+    letterhead_name: "",
+    address: "",
+    bar_registration_number: "",
+    contact_email: "",
+    default_fee_amount: "0.00",
+    invoice_prefix: "INV",
+    last_invoice_sequence: 0,
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+    ...overrides,
+  };
+}
 
 function makeHearing(overrides: Partial<Hearing> = {}): Hearing {
   return {
@@ -103,6 +120,12 @@ function renderWithClient(ui: React.ReactElement) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Default: a contact email is already set, so the gate this suite isn't
+  // specifically testing stays out of the way. The two tests that ARE
+  // about the gate override this per-test.
+  vi.mocked(advocateProfileApi.get).mockResolvedValue(
+    makeProfile({ contact_email: "advocate@example.com" }),
+  );
 });
 
 describe("HearingBillingActions", () => {
@@ -208,6 +231,41 @@ describe("HearingBillingActions", () => {
       expect.stringContaining("client@example.com"),
     );
     expect(showToast.warning).not.toHaveBeenCalled();
+  });
+
+  it("shows guidance instead of the Send button when the advocate has no contact email set", async () => {
+    vi.mocked(advocateProfileApi.get).mockResolvedValue(makeProfile({ contact_email: "" }));
+    const fee = makeFee({ status: "invoiced", invoice_number: "INV-0004" });
+
+    renderWithClient(
+      <HearingBillingActions hearing={makeHearing({ appearance_fee: fee })} caseId={CASE_ID} />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/no contact email set/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("button", { name: /send to billing contact/i })).not.toBeInTheDocument();
+    const settingsLink = screen.getByRole("link", { name: /add it in settings/i });
+    expect(settingsLink).toHaveAttribute("href", "/settings");
+    // Mark Paid is unrelated to the contact-email gate and must still work.
+    expect(screen.getByRole("button", { name: /mark paid/i })).toBeInTheDocument();
+    expect(appearanceFeesApi.send).not.toHaveBeenCalled();
+  });
+
+  it("shows the normal Send button once the advocate has a contact email set", async () => {
+    vi.mocked(advocateProfileApi.get).mockResolvedValue(
+      makeProfile({ contact_email: "advocate@example.com" }),
+    );
+    const fee = makeFee({ status: "invoiced", invoice_number: "INV-0005" });
+
+    renderWithClient(
+      <HearingBillingActions hearing={makeHearing({ appearance_fee: fee })} caseId={CASE_ID} />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /send to billing contact/i })).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/no contact email set/i)).not.toBeInTheDocument();
   });
 
   it("shows a distinct warning (not success) when the server only LOGGED the send", async () => {

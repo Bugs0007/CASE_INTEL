@@ -53,6 +53,13 @@ class MissingBillingContactError(InvoiceError):
     (or one with no email address)."""
 
 
+class MissingContactEmailError(InvoiceError):
+    """Raised when the sending advocate has no contact email set. A
+    client-facing invoice email with no way to reply to the actual
+    advocate is a bad default, so this blocks the send entirely rather
+    than degrading to no Reply-To/Cc."""
+
+
 class NotInvoicedError(InvoiceError):
     """Raised when an action needs an invoice PDF that doesn't exist yet."""
 
@@ -362,6 +369,11 @@ def send_invoice(fee: AppearanceFee) -> dict:
 
     contact = get_billing_contact(fee.hearing.case)
     profile = get_or_create_profile(fee.owner)
+    if not profile.contact_email:
+        raise MissingContactEmailError(
+            "Set your contact email in Settings before sending invoices, "
+            "so the client can reply directly to you."
+        )
     subject = f"Invoice {fee.invoice_number} - {fee.hearing.case.title}"
     body = (
         f"Dear {contact.name},\n\n"
@@ -412,21 +424,11 @@ def send_invoice(fee: AppearanceFee) -> dict:
     # the Settings page -- deliberately separate from the User's login
     # email) so a client hitting "reply" reaches the lawyer directly
     # rather than the shared billing@ inbox, and the advocate keeps a
-    # copy of exactly what was sent. Both are omitted, not sent empty,
-    # when the advocate hasn't set a contact email -- that's a valid,
-    # unconfigured state, not an error.
+    # copy of exactly what was sent. Guaranteed set at this point -- the
+    # gate above blocks the whole send otherwise.
     from_email = formataddr((profile.letterhead_name or "Advocate", settings.DEFAULT_FROM_EMAIL))
-    if profile.contact_email:
-        reply_to = [profile.contact_email]
-        cc = [profile.contact_email]
-    else:
-        reply_to = []
-        cc = []
-        logger.info(
-            "Invoice %s: advocate %d has no contact email set, sending without Reply-To/Cc.",
-            fee.invoice_number,
-            fee.owner_id,
-        )
+    reply_to = [profile.contact_email]
+    cc = [profile.contact_email]
 
     message = EmailMessage(
         subject=subject,
