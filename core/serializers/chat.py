@@ -45,18 +45,3 @@ class MessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Message
         fields = ["id", "role", "content", "created_at", "citations"]
-
-
-class ChatResponseSerializer(serializers.Serializer):
-    """Serializes AI workflow responses."""
-
-    answer = serializers.CharField(allow_blank=True, required=False)
-    confidence = serializers.FloatField()
-    query_type = serializers.CharField()
-    requires_clarification = serializers.BooleanField()
-    clarification_question = serializers.CharField(
-        allow_null=True, allow_blank=True
-    )
-    message_id = serializers.IntegerField(allow_null=True)
-    conversation_id = serializers.IntegerField(allow_null=True)
-    citations = serializers.ListField(child=serializers.DictField())
