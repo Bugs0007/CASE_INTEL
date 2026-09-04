@@ -277,9 +277,17 @@ class VectorSearchService:
         # Fetch more candidates than needed so RRF and reranker have room to work
         candidate_k = top_k * 3
 
-        # --- Stage 1a: vector search ---
-        query_embedding = self._embedding_service.embed_text(query)
-        vector_hits = self._vector_search(query_embedding, case_id, candidate_k)
+        # --- Stage 1a: vector search (best-effort; embedding provider may be down) ---
+        try:
+            query_embedding = self._embedding_service.embed_text(query)
+            vector_hits = self._vector_search(query_embedding, case_id, candidate_k)
+        except Exception:
+            logger.warning(
+                "Vector search leg failed for query='%s...' — using keyword-only results.",
+                query[:50],
+                exc_info=True,
+            )
+            vector_hits = []
 
         # --- Stage 1b: keyword search ---
         keyword_hits = self._keyword_search(keyword_query, case_id, candidate_k)

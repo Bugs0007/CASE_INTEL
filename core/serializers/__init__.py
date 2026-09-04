@@ -11,7 +11,6 @@ from .appearance_fee import AppearanceFeeSerializer, NestedAppearanceFeeSerializ
 from .case import CaseCnrCreateSerializer, CaseCreateSerializer, CaseSerializer
 from .chat import (
     ChatRequestSerializer,
-    ChatResponseSerializer,
     CitationSerializer,
     MessageSerializer,
 )
@@ -37,7 +36,6 @@ __all__ = [
     "CaseCreateSerializer",
     "CaseSerializer",
     "ChatRequestSerializer",
-    "ChatResponseSerializer",
     "CitationSerializer",
     "ClientContactSerializer",
     "ConversationDetailSerializer",

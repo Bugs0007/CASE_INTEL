@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.models import Case, Conversation, Message
-from core.serializers import ChatRequestSerializer, ChatResponseSerializer
+from core.serializers import ChatRequestSerializer
 from core.services.ai_workflow import AIWorkflowService
 
 logger = logging.getLogger(__name__)
@@ -97,7 +97,4 @@ class ChatView(APIView):
             "citations": ai_response.citations,
         }
 
-        response_serializer = ChatResponseSerializer(data=response_data)
-        response_serializer.is_valid(raise_exception=True)
-
-        return Response(response_serializer.validated_data, status=status.HTTP_200_OK)
+        return Response(response_data, status=status.HTTP_200_OK)
