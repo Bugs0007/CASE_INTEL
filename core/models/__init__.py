@@ -2,6 +2,7 @@ from .account_lock import AccountLock
 from .advocate_profile import AdvocateProfile
 from .appearance_fee import AppearanceFee
 from .case import Case
+from .case_briefing import CaseBriefing
 from .case_tag import CaseTag, CaseTagMap
 from .client_contact import ClientContact
 from .travel_booking import TravelBooking
@@ -31,6 +32,7 @@ __all__ = [
     "AdvocateProfile",
     "AppearanceFee",
     "Case",
+    "CaseBriefing",
     "CaseTag",
     "CaseTagMap",
     "ClientContact",

@@ -41,6 +41,7 @@ class ProcessingJob(OwnedModel):
         ("order_sync", "Court Order Sync"),
         ("advocate_import", "Advocate Case Import"),
         ("advocate_search", "Advocate Search (state-wide fan-out)"),
+        ("case_briefing", "Case Briefing (hearing prep sheet)"),
     ]
 
     # Explicit pk so this model doesn't add to the pre-existing W042
@@ -138,6 +139,21 @@ class ProcessingJob(OwnedModel):
         if existing is not None:
             return existing, False
         return cls.objects.create(owner=case.owner, case=case, job_type="order_sync"), True
+
+    @classmethod
+    def enqueue_case_briefing(cls, case) -> tuple["ProcessingJob", bool]:
+        """Enqueue the hearing prep sheet's briefing paragraph for a case
+        (core/services/hearing_digest/briefing.py), deduplicating active
+        jobs the same way enqueue_order_sync() does."""
+        existing = (
+            cls.objects
+            .filter(case=case, job_type="case_briefing", status__in=["queued", "running"])
+            .order_by("created_at")
+            .first()
+        )
+        if existing is not None:
+            return existing, False
+        return cls.objects.create(owner=case.owner, case=case, job_type="case_briefing"), True
 
     @classmethod
     def active_of_type_exists(cls, job_type: str) -> bool:

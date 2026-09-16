@@ -103,6 +103,11 @@ ocrmypdf==17.8.1
 # out-of-range characters rather than letting them raise.
 fpdf2==2.8.7
 
+# Calendar-month arithmetic for due dates ("within 2 months" of an order --
+# core/services/tasks/direction_deadlines.py). Was only a transitive
+# dependency; pinned here since the code now imports it directly.
+python-dateutil==2.9.0.post0
+
 # ============================================================================
 # OUTBOUND EMAIL (invoice delivery, core/services/invoice_service.py)
 # ============================================================================

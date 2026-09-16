@@ -1,0 +1,36 @@
+# Case Intel cause-list fetch (manage.py fetch_cause_lists --court %i).
+#
+# Instance unit: %i is a court registry key
+# (core/services/cause_list/registry.py), e.g.
+#   systemctl start case-intel-causelist@telangana_hc.service
+#
+# Reference copy with the default paths (DEPLOY_USER=ubuntu,
+# PROJECT_DIR=/home/ubuntu/CASE_INTEL), matching deploy/case-intel-worker.service.
+# Adjust User/Group/WorkingDirectory/ExecStart if the box uses other paths.
+#
+# Triggered by case-intel-causelist@.timer (do not add a cron line). Type=oneshot:
+# it fetches today+tomorrow's list, stamps item numbers onto tracked hearings,
+# and exits. Idempotent -- safe to run repeatedly, which the timer does (twice
+# a day, plus catch-up on boot via Persistent=true).
+#
+# This does NOT need Ollama, the embedding provider, or the process_jobs
+# worker -- it only talks to the eCourts hcservices portal and the DB.
+
+[Unit]
+Description=Case Intel cause-list fetch (%i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/CASE_INTEL
+ExecStart=/home/ubuntu/CASE_INTEL/.venv/bin/python manage.py fetch_cause_lists --court %i
+# The portal fetch is CAPTCHA-gated and downloads ~58 PDFs; give it room
+# but don't let a hung run block the next timer firing.
+TimeoutStartSec=1800
+Nice=10
+
+# No [Install] section on purpose: this unit is started by
+# case-intel-causelist@.timer, never enabled directly. Enable the .timer.

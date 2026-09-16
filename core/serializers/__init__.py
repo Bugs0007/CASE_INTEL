@@ -19,6 +19,7 @@ from .conversation import ConversationDetailSerializer, ConversationListSerializ
 from .court_order import CourtOrderSerializer
 from .document import DocumentSerializer, DocumentUploadSerializer
 from .hearing import HearingSerializer
+from .task import TaskSerializer
 from .travel_booking import (
     NestedTravelBookingSerializer,
     TravelBookingSerializer,
@@ -45,4 +46,5 @@ __all__ = [
     "DocumentUploadSerializer",
     "HearingSerializer",
     "MessageSerializer",
+    "TaskSerializer",
 ]

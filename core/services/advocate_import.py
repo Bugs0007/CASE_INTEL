@@ -34,6 +34,7 @@ from django.db import IntegrityError, transaction
 
 from core.models import ActivityLog, Case, ProcessingJob
 from core.services.court_data import CourtDataError
+from core.services.conflict_check import find_conflicts, record_flagged
 from core.services.court_tracking import refresh_case_tracking
 from core.services.party_role import detect_party_role
 
@@ -67,6 +68,7 @@ def run_advocate_import(job: ProcessingJob, progress_callback=None) -> None:
     skipped_duplicate: list[str] = []
     skipped_conflict: list[str] = []
     failed: list[dict] = []
+    conflicts: dict[str, list[dict]] = {}
 
     if progress_callback:
         progress_callback(0, total)
@@ -153,6 +155,23 @@ def run_advocate_import(job: ProcessingJob, progress_callback=None) -> None:
             case.user_party_role = role
             case.save(update_fields=["user_party_role"])
 
+        # Nobody is there to confirm in a background import, so possible
+        # conflicts never block it: they're recorded for the results screen
+        # and on the case's activity log.
+        try:
+            hits = find_conflicts(
+                job.owner,
+                petitioner=case.petitioner_name,
+                respondent=case.respondent_name,
+                user_party_role=case.user_party_role,
+                exclude_case_id=case.id,
+            )
+            if hits:
+                conflicts[cnr] = [hit.to_dict() for hit in hits]
+                record_flagged(case, hits)
+        except Exception:  # noqa: BLE001 -- a check failure must not fail the import
+            logger.exception("Advocate import: conflict check failed for CNR %s", cnr)
+
         created.append(case.id)
         if progress_callback:
             progress_callback(i + 1, total)
@@ -164,6 +183,7 @@ def run_advocate_import(job: ProcessingJob, progress_callback=None) -> None:
             "skipped_duplicate": skipped_duplicate,
             "skipped_conflict": skipped_conflict,
             "failed": failed,
+            "conflicts": conflicts,
         }
     )
 

@@ -1,0 +1,29 @@
+# Schedules case-intel-causelist@%i.service.
+#
+# Instance unit: enable one per configured court, e.g.
+#   systemctl enable --now case-intel-causelist@telangana_hc.timer
+#
+# Two firings a day, matching the crontab pair this replaces:
+#   19:00  -- evening before a hearing (list often published late afternoon)
+#   06:30  -- morning of, to catch anything published overnight / repair a
+#             missed evening run
+# Both runs check today AND tomorrow and are idempotent, so the redundancy
+# is deliberate: a missed run is fully repaired by the next one.
+#
+# Adding a court never touches this file -- it is instance-templated on the
+# court key. Just `systemctl enable --now case-intel-causelist@<newkey>.timer`.
+
+[Unit]
+Description=Case Intel cause-list fetch schedule (%i)
+
+[Timer]
+OnCalendar=*-*-* 19:00:00
+OnCalendar=*-*-* 06:30:00
+# Fire on boot if the box was down through a scheduled time.
+Persistent=true
+# Spread the two firings a little so a restart storm doesn't stack them.
+RandomizedDelaySec=120
+Unit=case-intel-causelist@%i.service
+
+[Install]
+WantedBy=timers.target

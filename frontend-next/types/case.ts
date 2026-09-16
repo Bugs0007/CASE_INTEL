@@ -93,4 +93,7 @@ export interface CaseCreateInput {
   priority?: CasePriority;
   filing_date?: string;
   notes?: string;
+  /** Confirms creation despite possible conflicts of interest (the API
+   * answers 409 with code "conflict_check" until this is sent). */
+  acknowledge_conflicts?: boolean;
 }

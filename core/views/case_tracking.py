@@ -17,6 +17,11 @@ from rest_framework.views import APIView
 
 from core.models import Case, Hearing
 from core.serializers import CaseCnrCreateSerializer, CaseSerializer, HearingSerializer
+from core.services.conflict_check import (
+    ConflictCheckRequired,
+    conflict_response_body,
+    is_acknowledged,
+)
 from core.services.court_data import CaptchaSolveError, CaseNotFoundError, CourtDataError, CourtPortalError, get_provider
 from core.services.court_data.ecourts_parsing import parse_complex_code
 from core.services.court_tracking import (
@@ -467,8 +472,13 @@ class CaseCnrCreateView(APIView):
 
         try:
             case = create_case_from_cnr_preview(
-                preview_token, serializer.validated_data, user=request.user
+                preview_token,
+                serializer.validated_data,
+                user=request.user,
+                acknowledge_conflicts=is_acknowledged(request.data),
             )
+        except ConflictCheckRequired as exc:
+            return Response(conflict_response_body(exc.hits), status=status.HTTP_409_CONFLICT)
         except PreviewExpiredError as exc:
             return Response({"detail": str(exc), "code": "preview_expired"}, status=status.HTTP_410_GONE)
         except DuplicateCnrError as exc:

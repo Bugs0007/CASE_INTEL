@@ -28,6 +28,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from core.models import AdvocateProfile, AppearanceFee, ClientContact
+from core.services.pdf_utils import pdf_safe as _pdf_safe
 
 logger = logging.getLogger(__name__)
 
@@ -111,18 +112,6 @@ def allocate_invoice_number(user) -> tuple[str, int]:
 # ---------------------------------------------------------------------------
 # PDF rendering
 # ---------------------------------------------------------------------------
-
-# fpdf2's built-in (core) fonts are Latin-1 only and raise on characters
-# outside it. Indian party names routinely carry characters that aren't
-# (curly quotes, en-dashes, Devanagari). Substituting instead of raising
-# keeps a rendering detail from failing the whole invoice -- the number,
-# amount and case reference, which is what the document is actually for,
-# are unaffected.
-def _pdf_safe(text) -> str:
-    if text is None:
-        return ""
-    return str(text).encode("latin-1", "replace").decode("latin-1")
-
 
 def _money(amount: Decimal) -> str:
     """Rs. 1234.50 -- 'Rs.' not the rupee sign, which is not Latin-1 and

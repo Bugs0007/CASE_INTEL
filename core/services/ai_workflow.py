@@ -210,6 +210,12 @@ class AIWorkflowService:
         # AgentState for the new 3-node pipeline
         initial_state: AgentState = {
             "user_query": user_query,
+            # Row-level tenant boundary for retrieval -- hybrid_search
+            # filters DocumentChunk by this owner whether or not case_id
+            # is set. `user` is the authenticated caller (ChatView) and is
+            # the same identity every Conversation/Message/Citation row
+            # here is stamped with.
+            "owner_id": user.id,
             "case_id": case_id,
             "conversation_id": conversation.id,
             "conversation_history": history,

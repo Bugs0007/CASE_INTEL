@@ -7,11 +7,13 @@ import { Button } from "@/components/ui/button";
 import { CollapseToggle } from "@/components/ui/collapse-toggle";
 import { CauseListBadge } from "@/components/hearings/cause-list-badge";
 import { HearingBillingActions } from "@/components/hearings/hearing-billing-actions";
+import { HearingDigestDialog } from "@/components/hearings/hearing-digest-dialog";
 import { Collapsible } from "@/components/ui/collapsible";
 import { formatHearingDate, staggerDelay } from "@/lib/utils";
 import { groupOrdersByDate, hearingDateKey } from "@/hooks/use-court-orders";
 import {
   Calendar,
+  ClipboardCheck,
   ClipboardList,
   MapPin,
   User,
@@ -66,6 +68,7 @@ export function HearingsList({
   // user opened the page to see, so this subsection defaults collapsed.
   const [pastOpen, setPastOpen] = useState(false);
   const [pastShowAll, setPastShowAll] = useState(false);
+  const [prepHearingId, setPrepHearingId] = useState<number | null>(null);
 
   const now = new Date();
   // Hearing model default ordering is ascending by hearing_date, so this is
@@ -136,6 +139,7 @@ export function HearingsList({
                     caseId={caseId}
                     index={i}
                     isUpcoming
+                    onPrepare={setPrepHearingId}
                     onEdit={onEditHearing}
                     onDelete={onDeleteHearing}
                     isDeleting={deletingId === hearing.id}
@@ -215,6 +219,8 @@ export function HearingsList({
           )}
         </CardContent>
       </Collapsible>
+
+      <HearingDigestDialog hearingId={prepHearingId} onClose={() => setPrepHearingId(null)} />
     </Card>
   );
 }
@@ -225,6 +231,8 @@ interface HearingItemProps {
       query (fee_summary lives on the Case, not the Hearing). */
   caseId: number;
   isUpcoming?: boolean;
+  /** Opens the hearing prep sheet (upcoming hearings only). */
+  onPrepare?: (hearingId: number) => void;
   onEdit?: (hearing: Hearing) => void;
   onDelete?: (id: number) => void;
   isDeleting?: boolean;
@@ -241,6 +249,7 @@ function HearingItem({
   hearing,
   caseId,
   isUpcoming,
+  onPrepare,
   onEdit,
   onDelete,
   isDeleting,
@@ -329,6 +338,18 @@ function HearingItem({
           {/* Real fee lifecycle + travel upload. The badges above show
               state; these are the controls that change it. */}
           <HearingBillingActions hearing={hearing} caseId={caseId} />
+
+          {isUpcoming && onPrepare && (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="mt-3"
+              onClick={() => onPrepare(hearing.id)}
+            >
+              <ClipboardCheck className="h-4 w-4 mr-1" />
+              Prep sheet
+            </Button>
+          )}
         </div>
 
         {/* Actions -- eCourts-sourced hearings are edited via Court Tracking

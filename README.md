@@ -130,14 +130,17 @@ Production runs on a single EC2 instance behind Nginx (gunicorn + a separate `pr
 
 - **First-time provisioning** (fresh AWS account → live app): [PROVISIONING.md](PROVISIONING.md) — mostly automated by `deploy/provision.sh`, with the genuinely manual steps (RDS creation, DNS, TLS cert, GitHub Actions secrets) called out explicitly.
 - **Ongoing deploys**: push to `main` triggers [.github/workflows/deploy.yml](.github/workflows/deploy.yml) — pulls, migrates, `collectstatic`, restarts both the web and worker systemd units. Assumes provisioning already happened.
-- **Cron**: `manage.py fetch_cause_lists` has no scheduler wired into any deploy config — there's deliberately no Celery/Redis in this project. An operator needs to add two lines to the box's crontab (or an equivalent pair of systemd timers):
+- **Cause-list schedule**: `manage.py fetch_cause_lists` runs on a **systemd timer** (no Celery/Redis — same mechanism as the `process_jobs` worker). The units are instance-templated on a court registry key (`core/services/cause_list/registry.py`), so adding a court never touches the timer. One-time install:
 
-  ```cron
-  0 19 * * *   cd /home/ubuntu/CASE_INTEL && .venv/bin/python manage.py fetch_cause_lists   # evening before
-  30 6 * * *   cd /home/ubuntu/CASE_INTEL && .venv/bin/python manage.py fetch_cause_lists   # morning of
+  ```bash
+  cd /home/ubuntu/CASE_INTEL
+  sudo cp deploy/systemd/case-intel-causelist@.* /etc/systemd/system/
+  sudo systemctl daemon-reload
+  .venv/bin/python manage.py fetch_cause_lists --check          # no-network preflight
+  sudo systemctl enable --now case-intel-causelist@telangana_hc.timer
   ```
 
-  Two runs a day is intentional, not redundant — a missed evening run is fully repaired by the next morning's.
+  Full instructions (including **removing the old crontab lines** this replaces) in [deploy/systemd/README.md](deploy/systemd/README.md). The timer fires at 19:00 and 06:30 daily; two runs a day is intentional — each is idempotent and a missed run is repaired by the next.
 
 ## Documentation
 
