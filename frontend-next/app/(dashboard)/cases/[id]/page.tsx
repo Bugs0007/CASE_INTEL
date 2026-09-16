@@ -14,6 +14,7 @@ import { OrderOverviewCard } from "@/components/cases/order-overview";
 import { CaseDetailSkeleton } from "@/components/cases/case-detail-skeleton";
 import { CourtTrackingCard } from "@/components/cases/court-tracking-card";
 import { HearingsList } from "@/components/hearings/hearings-list";
+import { TasksCard } from "@/components/tasks/tasks-card";
 import { HearingDialog } from "@/components/hearings/hearing-dialog";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { UploadDocumentDialog } from "@/components/documents/upload-document-dialog";
@@ -62,6 +63,15 @@ export default function CaseDetailPage() {
   // Fetched once for the whole case and bucketed by date inside
   // HearingsList, rather than one request per hearing card.
   const { data: courtOrders = [] } = useCaseOrders(caseId);
+
+  // Most recent dated order: the default start for a limitation deadline.
+  const latestDatedOrder = courtOrders.reduce<{ id: number; order_date: string } | null>(
+    (latest, order) =>
+      order.order_date && (!latest || order.order_date > latest.order_date)
+        ? { id: order.id, order_date: order.order_date }
+        : latest,
+    null,
+  );
 
   const processDocument = useProcessDocument();
   const deleteDocument = useDeleteDocument();
@@ -178,6 +188,14 @@ export default function CaseDetailPage() {
               orders={courtOrders}
               onViewOrder={handleViewOrder}
               viewingOrderId={viewOrder.isPending ? viewOrder.variables : undefined}
+            />
+
+            {/* Tasks & deadlines -- what the advocate has to do next,
+                right under what just happened. */}
+            <TasksCard
+              caseId={caseId}
+              courtType={caseItem.court_type}
+              latestOrder={latestDatedOrder}
             />
 
             {/* Case Overview */}

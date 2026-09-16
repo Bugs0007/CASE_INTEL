@@ -432,6 +432,9 @@ class AdvocateSearchImportStatusView(APIView):
                 "skipped_duplicate": payload.get("skipped_duplicate", []),
                 "skipped_conflict": payload.get("skipped_conflict", []),
                 "failed": payload.get("failed", []),
+                # {cnr: [conflict hit, ...]} -- possible conflicts of
+                # interest, flagged but never blocking (conflict_check.py).
+                "conflicts": payload.get("conflicts", {}),
             },
             status=status.HTTP_200_OK,
         )

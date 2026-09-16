@@ -24,6 +24,11 @@ from core.models import (
     Hearing,
     ProcessingJob,
 )
+from core.services.conflict_check import (
+    ConflictCheckRequired,
+    find_conflicts,
+    record_acknowledgement,
+)
 from core.services.court_data import CaseNotFoundError, CourtCaseData, CourtDataError, get_provider
 from core.services.party_role import detect_party_role
 
@@ -643,6 +648,15 @@ def preview_case_creation_from_cnr(cnr: str, court_type: str | None, *, user) ->
     # the quick-add form, not a display-only preview value.
     case_title = " vs ".join(p for p in (data.petitioner, data.respondent) if p) or case_number
 
+    # Warn before the advocate confirms: the court record's parties against
+    # the other side of their existing cases. No extra portal call.
+    conflicts = find_conflicts(
+        user,
+        petitioner=data.petitioner,
+        respondent=data.respondent,
+        user_party_role=user_party_role,
+    )
+
     token = secrets.token_urlsafe(24)
     CourtTrackingPreview.objects.create(
         token=token,
@@ -669,10 +683,13 @@ def preview_case_creation_from_cnr(cnr: str, court_type: str | None, *, user) ->
         "next_hearing_date": data.next_hearing_date.isoformat() if data.next_hearing_date else None,
         "first_hearing_date": data.first_hearing_date.isoformat() if data.first_hearing_date else None,
         "hearing_count": len(data.hearing_history),
+        "conflicts": [hit.to_dict() for hit in conflicts],
     }
 
 
-def create_case_from_cnr_preview(preview_token: str, case_fields: dict, *, user) -> Case:
+def create_case_from_cnr_preview(
+    preview_token: str, case_fields: dict, *, user, acknowledge_conflicts: bool = False
+) -> Case:
     """Persists a case-less CNR preview (preview_case_creation_from_cnr)
     into a brand-new Case with tracking already configured -- the confirm
     step of the "Track by CNR" quick-add flow. Never trusts client-supplied
@@ -697,6 +714,10 @@ def create_case_from_cnr_preview(preview_token: str, case_fields: dict, *, user)
     UniqueConstraint's backstop) -- rare, since case_number here comes
     from the fetched registration number, but the form lets the advocate
     edit it before confirming.
+    Raises ConflictCheckRequired if the matter's parties resemble parties on
+    the other side of the user's existing cases and acknowledge_conflicts
+    is False (core/services/conflict_check.py). Re-checked here, not just
+    trusted from the preview: cases may have been added since.
     """
     try:
         preview = CourtTrackingPreview.objects.get(token=preview_token)
@@ -717,6 +738,17 @@ def create_case_from_cnr_preview(preview_token: str, case_fields: dict, *, user)
     existing = Case.objects.filter(owner=user, cnr_number=cnr).first()
     if existing is not None:
         raise DuplicateCnrError(existing)
+
+    conflicts = find_conflicts(
+        user,
+        petitioner=data.petitioner,
+        respondent=data.respondent,
+        client_name=case_fields.get("client_name") or "",
+        opposing_party=case_fields.get("opposing_party") or "",
+        user_party_role=case_fields.get("user_party_role") or "unknown",
+    )
+    if conflicts and not acknowledge_conflicts:
+        raise ConflictCheckRequired(conflicts)
 
     try:
         with transaction.atomic():
@@ -741,6 +773,8 @@ def create_case_from_cnr_preview(preview_token: str, case_fields: dict, *, user)
         raise DuplicateCaseNumberError(case_fields["case_number"]) from None
 
     _finalize_confirmed_fetch(case, data)
+    if conflicts:
+        record_acknowledgement(case, conflicts)
     preview.delete()
     return case
 
@@ -798,6 +832,11 @@ def _apply_case_data(case: Case, data: CourtCaseData) -> None:
     if data.party_advocate_data and case.party_advocate_data != data.party_advocate_data:
         case.party_advocate_data = data.party_advocate_data
         update_fields.append("party_advocate_data")
+    for field, value in (("petitioner_name", data.petitioner), ("respondent_name", data.respondent)):
+        value = (value or "").strip()
+        if value and getattr(case, field) != value:
+            setattr(case, field, value)
+            update_fields.append(field)
     if update_fields:
         case.save(update_fields=update_fields)
 

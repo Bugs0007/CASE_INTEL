@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
-import { CalendarClock, RefreshCw, FileWarning } from "lucide-react";
+import { CalendarClock, RefreshCw, FileWarning, AlarmClock } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatHearingDate, formatRelativeTime, staggerDelay } from "@/lib/utils";
-import type { UpcomingHearing, Document } from "@/types";
+import { daysUntilDate, dueLabel } from "@/lib/tasks";
+import type { UpcomingHearing, Document, Task } from "@/types";
 
 interface NeedsAttentionProps {
   /** Hearings happening within the next 48 hours, across all cases. */
@@ -13,6 +14,8 @@ interface NeedsAttentionProps {
   ecourtsUpdates: UpcomingHearing[];
   /** Documents that failed processing. */
   failedDocuments: Document[];
+  /** Open tasks past their due date. */
+  overdueTasks?: Task[];
 }
 
 type AttentionItem = {
@@ -29,6 +32,7 @@ export function NeedsAttention({
   hearingsSoon,
   ecourtsUpdates,
   failedDocuments,
+  overdueTasks = [],
 }: NeedsAttentionProps) {
   // "Updated just now" -> relative time, refreshed on an interval so it
   // reads naturally as the section ages on screen (matches the design's
@@ -77,6 +81,24 @@ export function NeedsAttention({
         </>
       ),
       meta: `New date ${formatHearingDate(h.hearing_date)} · ${h.case_number}`,
+    });
+  }
+
+  for (const t of overdueTasks) {
+    if (!t.case || !t.due_date) continue; // the Due Soon card still lists it
+    items.push({
+      key: `task-${t.id}`,
+      href: `/cases/${t.case}`,
+      iconBg: "bg-status-alert-soft",
+      iconColor: "text-status-alert",
+      icon: AlarmClock,
+      message: (
+        <>
+          <span className="font-semibold">{t.case_title}</span>: {t.title} —{" "}
+          {dueLabel(daysUntilDate(t.due_date)).toLowerCase()}
+        </>
+      ),
+      meta: `Due ${formatHearingDate(t.due_date)} · ${t.case_number}`,
     });
   }
 

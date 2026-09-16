@@ -1,4 +1,5 @@
 import type { CourtType } from "./case";
+import type { ConflictHit } from "./conflict";
 
 /** One eCourts search result -- a subset of bharat_courts' CaseInfo.to_dict()
  * shape, as returned by POST /api/cases/search-advocate/. */
@@ -111,4 +112,6 @@ export interface AdvocateImportJobResult {
   skipped_duplicate: string[];
   skipped_conflict: string[];
   failed: { cnr: string; error: string }[];
+  /** CNR -> possible conflicts of interest found for that imported case. */
+  conflicts: Record<string, ConflictHit[]>;
 }

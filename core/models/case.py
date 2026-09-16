@@ -91,6 +91,13 @@ class Case(OwnedModel):
     user_party_role = models.CharField(
         max_length=20, choices=USER_PARTY_ROLE_CHOICES, default="unknown"
     )
+    # Party names as the court record gives them, kept current on every
+    # successful fetch (court_tracking._apply_case_data). Record-absolute --
+    # which side is the advocate's comes from user_party_role -- unlike
+    # client_name/opposing_party, which the advocate edits. Read by the
+    # intake conflict check (core/services/conflict_check.py).
+    petitioner_name = models.TextField(blank=True, default="")
+    respondent_name = models.TextField(blank=True, default="")
 
     class Meta:
         db_table = "cases"

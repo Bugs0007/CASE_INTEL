@@ -13,18 +13,7 @@ manually the rest of the time.
 
 from __future__ import annotations
 
-import re
-
-_HONORIFIC_RE = re.compile(r"\b(adv|advocate|sr|jr|shri|smt|mr|mrs|ms|dr)\b\.?", re.I)
-_PUNCT_RE = re.compile(r"[.,]")
-_WS_RE = re.compile(r"\s+")
-
-
-def _normalize(name: str) -> str:
-    name = name.lower()
-    name = _HONORIFIC_RE.sub(" ", name)
-    name = _PUNCT_RE.sub(" ", name)
-    return _WS_RE.sub(" ", name).strip()
+from core.services.name_matching import normalize_name as _normalize
 
 
 def _matches_any(search_name: str, candidates: list[str]) -> bool:

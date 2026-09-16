@@ -1,0 +1,30 @@
+{
+  "_comment": "Labelled party-name pairs for core/services/conflict_check.py. 'likely' and 'possible' are the band each pair must land in; 'no_match' pairs must score below the possible threshold. Add real near-misses here when tuning the thresholds -- a change that breaks this file is a behaviour change.",
+  "likely": [
+    ["K. Srinivas", "K Srinivasa"],
+    ["M/s Venkateswara Constructions Pvt Ltd", "Venkateswara Constructions"],
+    ["K. Ramesh", "Ramesh K"],
+    ["Mohd Saleem", "Mohammed Saleem"],
+    ["Venkata Ramana Reddy", "V. Ramana Reddy"],
+    ["Suresh Babu & 3 Ors", "Suresh Babu"],
+    ["Ramesh Kumar S/o Venkat Rao, aged 45 years, R/o Hyderabad", "Ramesh Kumar"],
+    ["Infosys Limited", "Infosys Ltd."],
+    ["Kumari Priya Verma", "Priya Verma"],
+    ["Rajesh Goud", "Rajeesh Goud"]
+  ],
+  "possible": [
+    ["Sreenivas Rao", "Srinivas Rao"],
+    ["Ramesh Krishna", "Ramesh K."],
+    ["Ramesh", "Ramesh Kumar"]
+  ],
+  "no_match": [
+    ["Ramesh Kumar", "Ramesh Kumari"],
+    ["Anil Kumar", "Sunil Kumar"],
+    ["Sri Lakshmi Traders", "Sri Lakshmi Textiles"],
+    ["Reddy", "Suresh Reddy"],
+    ["Suresh Kumar", "Ramesh Kumar"],
+    ["Priya Sharma", "Priyanka Sharma"],
+    ["State of Telangana rep by its Principal Secretary", "State of Telangana"],
+    ["The Station House Officer, Banjara Hills PS", "Station House Officer"]
+  ]
+}

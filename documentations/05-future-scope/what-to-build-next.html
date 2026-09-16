@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What Case Intel Builds Next</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ============ tokens ============ */
+:root{
+  --ink:#14202c;
+  --ink-80:rgba(20,32,44,.80);
+  --ink-62:rgba(20,32,44,.62);
+  --ink-42:rgba(20,32,44,.42);
+  --line:rgba(20,32,44,.14);
+  --line-soft:rgba(20,32,44,.08);
+  --paper:#f1f0ea;
+  --paper-sunk:#e7e5db;
+  --surface:#fbfaf6;
+  --surface-2:#f6f4ee;
+
+  --seal:#a5372b;          /* accent + "fix now" */
+  --seal-ink:#a5372b;
+  --good:#2c6650;          /* strength / high / shipped */
+  --good-wash:rgba(44,102,80,.10);
+  --mid:#a96e1c;           /* partial / medium */
+  --mid-wash:rgba(169,110,28,.12);
+  --cool:#3f6079;          /* cause-list area */
+  --cool-wash:rgba(63,96,121,.12);
+  --dim:#61707c;           /* low / deferred / missing */
+
+  --serif:"Newsreader",Georgia,"Times New Roman",serif;
+  --sans:"Public Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+
+  --maxw:1200px;
+  --gut:clamp(18px,4vw,52px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ink:#e9e7de;
+    --ink-80:rgba(233,231,222,.82);
+    --ink-62:rgba(233,231,222,.60);
+    --ink-42:rgba(233,231,222,.40);
+    --line:rgba(233,231,222,.16);
+    --line-soft:rgba(233,231,222,.09);
+    --paper:#131b23;
+    --paper-sunk:#0e151c;
+    --surface:#1a232c;
+    --surface-2:#1e2831;
+
+    --seal:#e2795a;
+    --seal-ink:#e2795a;
+    --good:#7fd3ac;
+    --good-wash:rgba(127,211,172,.13);
+    --mid:#e6c79f;
+    --mid-wash:rgba(230,199,159,.13);
+    --cool:#8fb2ca;
+    --cool-wash:rgba(143,178,202,.14);
+    --dim:#8c95a0;
+  }
+}
+:root[data-theme="dark"]{
+  --ink:#e9e7de;
+  --ink-80:rgba(233,231,222,.82);
+  --ink-62:rgba(233,231,222,.60);
+  --ink-42:rgba(233,231,222,.40);
+  --line:rgba(233,231,222,.16);
+  --line-soft:rgba(233,231,222,.09);
+  --paper:#131b23;
+  --paper-sunk:#0e151c;
+  --surface:#1a232c;
+  --surface-2:#1e2831;
+  --seal:#e2795a;
+  --seal-ink:#e2795a;
+  --good:#7fd3ac;
+  --good-wash:rgba(127,211,172,.13);
+  --mid:#e6c79f;
+  --mid-wash:rgba(230,199,159,.13);
+  --cool:#8fb2ca;
+  --cool-wash:rgba(143,178,202,.14);
+  --dim:#8c95a0;
+}
+
+/* ============ base ============ */
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;background:var(--paper);color:var(--ink);
+  font-family:var(--sans);font-size:15px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{margin:0;font-family:var(--serif);font-weight:400;letter-spacing:-.012em;line-height:1.14;text-wrap:balance}
+p{margin:0}
+a{color:var(--seal-ink);text-underline-offset:2px}
+code,.m{font-family:var(--mono);font-size:.88em}
+:focus-visible{outline:2px solid var(--seal);outline-offset:2px;border-radius:1px}
+.wrap{max-width:var(--maxw);margin:0 auto;padding-inline:var(--gut)}
+.eyebrow{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink-42);display:flex;align-items:center;gap:11px;
+}
+.eyebrow::after{content:"";flex:1;height:1px;background:var(--line)}
+
+/* ============ masthead ============ */
+.mast{border-bottom:1px solid var(--line);background:var(--surface-2)}
+.mast .wrap{padding-block:30px 0}
+.mast-top{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}
+.mark{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-62)}
+.mark b{color:var(--ink);font-weight:500}
+.themed{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+  border:1px solid var(--line);background:transparent;color:var(--ink-62);
+  padding:6px 11px;border-radius:2px;cursor:pointer;
+}
+.themed:hover{border-color:var(--ink-42);color:var(--ink)}
+.mast h1{font-size:clamp(30px,4.4vw,50px);margin-top:20px;max-width:20ch}
+.mast .lede{margin-top:16px;max-width:66ch;color:var(--ink-80);font-size:16.5px}
+.mast .lede b{font-weight:600;color:var(--ink)}
+
+/* scoring legend */
+.legend{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:0 34px;margin:26px 0 30px;border-top:1px solid var(--line);padding-top:18px;
+}
+.legend div{padding:8px 0;font-size:13px;color:var(--ink-62)}
+.legend .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink);display:block;margin-bottom:3px}
+.legend .k b{color:var(--seal-ink);font-weight:500}
+
+/* ============ tabs ============ */
+.tabs{position:sticky;top:0;z-index:20;background:var(--paper);border-bottom:1px solid var(--line)}
+.tabs .wrap{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.tabs .wrap::-webkit-scrollbar{display:none}
+.tab{
+  appearance:none;border:0;background:transparent;cursor:pointer;white-space:nowrap;
+  font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--ink-42);padding:15px 15px 13px;border-bottom:2px solid transparent;
+}
+.tab:hover{color:var(--ink-80)}
+.tab[aria-current="true"]{color:var(--ink);border-bottom-color:var(--seal)}
+.tab .n{color:var(--ink-42);margin-right:7px}
+.tab[aria-current="true"] .n{color:var(--seal-ink)}
+
+/* ============ panel scaffold ============ */
+.panel{padding:38px 0 76px}
+.panel[hidden]{display:none}
+.panel-head{max-width:70ch;margin-bottom:30px}
+.panel-head h2{font-size:clamp(23px,3vw,32px)}
+.panel-head p{margin-top:12px;color:var(--ink-80);font-size:15.5px}
+.panel-head .note{margin-top:14px;font-size:13.5px;color:var(--ink-62)}
+
+.bar-actions{display:flex;gap:8px;margin:0 0 16px}
+.mini{
+  appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--ink-62);
+  font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+  padding:6px 10px;border-radius:2px;cursor:pointer;
+}
+.mini:hover{border-color:var(--ink-42);color:var(--ink)}
+
+/* ============ at-a-glance strip ============ */
+.glance{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:3px;overflow:hidden;margin-bottom:34px}
+.glance > div{background:var(--surface);padding:18px 18px 20px}
+.glance h3{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-42);font-weight:400}
+.glance h3 i{font-style:normal;color:var(--ink);display:block;font-size:13px;letter-spacing:0;font-family:var(--sans);margin-top:2px}
+.glance ul{margin:12px 0 0;padding:0;list-style:none;display:grid;gap:7px}
+.glance li{position:relative;padding-left:15px;font-size:13px;color:var(--ink-80)}
+.glance li::before{content:"";position:absolute;left:0;top:9px;width:6px;height:1px;background:var(--ink-42)}
+.glance .m{font-size:11.5px;color:var(--ink-62)}
+@media(max-width:820px){.glance{grid-template-columns:1fr}}
+
+/* ============ callout ============ */
+.callout{border:1px solid var(--seal);border-radius:3px;background:color-mix(in srgb,var(--seal) 6%,transparent);padding:16px 18px;margin-bottom:8px}
+.callout .k{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--seal-ink)}
+.callout h3{font-size:17px;margin-top:6px}
+.callout ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13.5px;color:var(--ink-80)}
+.callout code{color:var(--ink)}
+
+/* ============ data table ============ */
+.tbl-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:3px;background:var(--surface)}
+table.data{border-collapse:collapse;width:100%;min-width:720px;font-size:13px}
+table.data th,table.data td{text-align:left;padding:11px 14px;vertical-align:top;border-bottom:1px solid var(--line-soft)}
+table.data thead th{
+  font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink-42);font-weight:400;background:var(--surface-2);position:sticky;top:0;
+}
+table.data tbody tr:last-child td{border-bottom:0}
+table.data .who{font-weight:600;color:var(--ink);white-space:nowrap}
+table.data .m{color:var(--ink-62)}
+.rowtoggle{width:100%;background:none;border:0;text-align:left;cursor:pointer;font:inherit;color:inherit;padding:11px 14px;display:flex;gap:10px;align-items:baseline}
+.rowtoggle .caret{color:var(--ink-42);transition:transform .15s;font-family:var(--mono);font-size:11px}
+details[open] .rowtoggle .caret{transform:rotate(90deg)}
+.rowdetail{padding:2px 16px 16px 40px;font-size:13px;color:var(--ink-80);background:var(--surface-2);border-bottom:1px solid var(--line-soft)}
+.rowdetail p+p{margin-top:9px}
+.rowdetail dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 16px;margin:10px 0 0}
+.rowdetail dt{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-42)}
+.rowdetail dd{margin:0;color:var(--ink-80)}
+
+/* ============ chips ============ */
+.chip{
+  display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);
+  font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;
+  padding:3px 7px;border-radius:2px;border:1px solid;white-space:nowrap;
+}
+.chip.good{color:var(--good);border-color:color-mix(in srgb,var(--good) 40%,transparent);background:var(--good-wash)}
+.chip.mid{color:var(--mid);border-color:color-mix(in srgb,var(--mid) 40%,transparent);background:var(--mid-wash)}
+.chip.dim{color:var(--dim);border-color:color-mix(in srgb,var(--dim) 40%,transparent);background:color-mix(in srgb,var(--dim) 8%,transparent)}
+.chip.seal{color:var(--seal-ink);border-color:color-mix(in srgb,var(--seal) 40%,transparent);background:color-mix(in srgb,var(--seal) 8%,transparent)}
+.chip.cool{color:var(--cool);border-color:color-mix(in srgb,var(--cool) 40%,transparent);background:var(--cool-wash)}
+
+/* ============ opportunity cards ============ */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+.opp{border:1px solid var(--line);border-radius:3px;background:var(--surface);overflow:hidden}
+.opp > summary{list-style:none;cursor:pointer;padding:16px 17px;display:block}
+.opp > summary::-webkit-details-marker{display:none}
+.opp-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.opp-id{font-family:var(--mono);font-size:10.5px;color:var(--ink-42);letter-spacing:.06em}
+.opp h3{font-size:17px;margin:8px 0 0;line-height:1.2}
+.opp .replaces{margin-top:7px;font-size:12.5px;color:var(--ink-62)}
+.opp .scorebars{display:grid;gap:6px;margin-top:13px}
+.sb{display:grid;grid-template-columns:58px 1fr max-content;gap:9px;align-items:center;font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-42)}
+.sb .track{height:4px;border-radius:2px;background:var(--line-soft);overflow:hidden}
+.sb .fill{height:100%;border-radius:2px}
+.sb .fill.lev{background:var(--good)}
+.sb .fill.val{background:var(--seal)}
+.sb .fill.inf{background:var(--dim)}
+.sb .num{color:var(--ink-62)}
+.opp-body{padding:0 17px 17px;font-size:13px;color:var(--ink-80);border-top:1px solid var(--line-soft);margin-top:4px;padding-top:13px}
+.opp-body p+p{margin-top:9px}
+.opp-body .hooks{margin-top:11px;display:flex;flex-wrap:wrap;gap:5px}
+.opp-body .hooks .chip{background:var(--surface-2)}
+
+/* ============ competitive ============ */
+.vend-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:13px;margin-bottom:14px}
+.vend{border:1px solid var(--line);border-radius:3px;background:var(--surface);padding:15px 16px}
+.vend h4{font-family:var(--sans);font-size:14.5px;font-weight:600}
+.vend .tag{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-42)}
+.vend p{margin-top:8px;font-size:12.5px;color:var(--ink-80)}
+.diff{border:1px solid var(--line);border-left:3px solid var(--good);border-radius:3px;background:var(--surface);padding:16px 18px;margin:20px 0}
+.diff h3{font-size:16px}
+.diff ul{margin:10px 0 0;padding-left:18px;display:grid;gap:7px;font-size:13px;color:var(--ink-80)}
+.diff b{color:var(--ink)}
+
+.mtx-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:3px;background:var(--surface)}
+table.mtx{border-collapse:collapse;width:100%;min-width:640px;font-size:12.5px}
+table.mtx th,table.mtx td{padding:9px 10px;border-bottom:1px solid var(--line-soft);text-align:center}
+table.mtx thead th{font-family:var(--mono);font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-42);font-weight:400;background:var(--surface-2)}
+table.mtx tbody th{text-align:left;font-weight:400;color:var(--ink-80);font-family:var(--sans);white-space:nowrap}
+table.mtx td.ci{background:var(--surface-2)}
+.mk{font-family:var(--mono);font-weight:500}
+.mk.y{color:var(--good)}
+.mk.p{color:var(--mid)}
+.mk.n{color:var(--ink-42)}
+
+/* ============ ranking ============ */
+.rank-layout{display:grid;grid-template-columns:1fr;gap:26px}
+@media(min-width:1000px){.rank-layout{grid-template-columns:minmax(0,1fr) 430px}}
+.filters{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:18px;align-items:flex-start}
+.fgroup{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.fgroup > span{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-42);margin-right:3px}
+.fchip{
+  appearance:none;cursor:pointer;font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;
+  padding:4px 9px;border-radius:2px;border:1px solid var(--line);background:var(--surface);color:var(--ink-62);
+}
+.fchip[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.tier{margin-bottom:22px}
+.tier > h3{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-42);font-weight:400;padding-bottom:8px;border-bottom:1px solid var(--line);margin-bottom:10px;display:flex;justify-content:space-between;align-items:baseline}
+.tier > h3 em{font-style:normal;font-family:var(--sans);font-size:12px;letter-spacing:0;color:var(--ink-62);text-transform:none}
+.ritem{border:1px solid var(--line);border-radius:3px;background:var(--surface);margin-bottom:8px;overflow:hidden}
+.ritem[hidden]{display:none}
+.ritem > summary{list-style:none;cursor:pointer;padding:12px 14px;display:flex;gap:12px;align-items:baseline}
+.ritem > summary::-webkit-details-marker{display:none}
+.ritem .rank{font-family:var(--mono);font-size:12px;color:var(--seal-ink);min-width:20px;font-weight:500}
+.ritem .rt{flex:1}
+.ritem .rt b{font-weight:600;font-size:14px;color:var(--ink);display:block;line-height:1.25}
+.ritem .rt .meta{margin-top:5px;display:flex;flex-wrap:wrap;gap:5px}
+.ritem .rbody{padding:0 14px 14px 46px;font-size:12.5px;color:var(--ink-80)}
+.ritem .rbody dl{display:grid;grid-template-columns:max-content 1fr;gap:3px 14px;margin:0}
+.ritem .rbody dt{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-42);padding-top:2px}
+.ritem .rbody dd{margin:0}
+
+.mtxbox{position:sticky;top:60px}
+.mtxbox h3{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-42);font-weight:400;margin-bottom:4px}
+.mtxbox p{font-size:12px;color:var(--ink-62);margin-bottom:10px}
+.scatter{width:100%;height:auto;border:1px solid var(--line);border-radius:3px;background:var(--surface);display:block}
+.scatter text{font-family:var(--mono);fill:var(--ink-62)}
+.scatter .axl{font-size:9px;letter-spacing:.08em;text-transform:uppercase;fill:var(--ink-42)}
+.scatter .grid{stroke:var(--line-soft)}
+.scatter .frame{stroke:var(--line)}
+.dot{cursor:pointer;transition:opacity .15s}
+.dot text{fill:#fbfaf6;font-size:9px;font-weight:500}
+.dot.off{opacity:.12}
+.dot.off text{opacity:0}
+@media(prefers-reduced-motion:reduce){.dot{transition:none}}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .dot text{fill:#121a22}}
+:root[data-theme="dark"] .dot text{fill:#121a22}
+:root[data-theme="light"] .dot text{fill:#fbfaf6}
+.mtx-legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-62)}
+.mtx-legend span{display:inline-flex;align-items:center;gap:5px}
+.mtx-legend i{width:9px;height:9px;border-radius:50%;display:inline-block}
+#tip{
+  position:fixed;z-index:60;pointer-events:none;opacity:0;transition:opacity .12s;
+  background:var(--ink);color:var(--paper);font-size:11.5px;line-height:1.45;
+  padding:8px 10px;border-radius:3px;max-width:230px;font-family:var(--sans);
+}
+#tip b{display:block;font-size:12px;margin-bottom:2px}
+#tip .m{font-family:var(--mono);font-size:10px;color:var(--paper);opacity:.7}
+
+/* ============ footer ============ */
+.foot{border-top:1px solid var(--line);background:var(--surface-2)}
+.foot .wrap{padding-block:22px 30px;font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;color:var(--ink-42);display:flex;flex-wrap:wrap;gap:8px 20px;justify-content:space-between}
+
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<header class="mast">
+  <div class="wrap">
+    <div class="mast-top">
+      <span class="mark"><b>Case Intel</b> &nbsp;/&nbsp; product direction</span>
+      <button class="themed" id="themeBtn" type="button">Theme</button>
+    </div>
+    <div class="eyebrow" style="margin-top:22px">Decision aid, not a spec</div>
+    <h1>What Case Intel builds next</h1>
+    <p class="lede">Case Intel already carries a matter from <b>advocate-name search</b> through <b>eCourts tracking</b>, <b>Telangana HC cause lists</b>, <b>order sync with AI overviews</b>, and <b>appearance-fee invoicing</b>. This console weighs the candidates for what comes after, against one test: how much of the existing machinery a feature reuses, set against how much a solo litigator would actually feel it.</p>
+
+    <div class="legend">
+      <div><span class="k">Leverage</span>How much of what is already built (services, worker, LLM factory, eCourts layer, RAG pipeline) the feature reuses rather than adds.</div>
+      <div><span class="k">Value</span>How directly a solo or small-firm advocate practising in Indian courts would feel it, week to week.</div>
+      <div><span class="k">New infra</span>The size of what has to be built from nothing: a new model, a new integration, a new parser family.</div>
+      <div><span class="k">Score</span><b>leverage &times; value &minus; new infra</b>. Tier order follows it. Effort is sized S / M / L, not broken into tasks.</div>
+    </div>
+  </div>
+</header>
+
+<nav class="tabs">
+  <div class="wrap">
+    <button class="tab" data-tab="overview" aria-current="true"><span class="n">00</span>Overview</button>
+    <button class="tab" data-tab="ranking"><span class="n">01</span>Ranking</button>
+    <button class="tab" data-tab="causelists"><span class="n">02</span>Cause-list expansion</button>
+    <button class="tab" data-tab="workflow"><span class="n">03</span>Workflow automation</button>
+    <button class="tab" data-tab="competitive"><span class="n">04</span>Competitive</button>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<!-- ================= OVERVIEW ================= -->
+<section class="panel" id="panel-overview">
+  <div class="panel-head">
+    <h2>Where the product stands</h2>
+    <p>Every claim below was checked against the code, not the docs. Three states: shipped and working, built but switched off, and absent.</p>
+  </div>
+
+  <div class="glance">
+    <div>
+      <h3>Shipped <i>working in production</i></h3>
+      <ul>
+        <li>Advocate-name / bar-code search, state-wide fan-out, bulk import</li>
+        <li>eCourts case tracking, CNR auto-detect across District + High Court</li>
+        <li>Hearing history with per-hearing <span class="m">purpose</span></li>
+        <li>Telangana HC cause lists (coordinate-parsed PDFs, 4 hearing states)</li>
+        <li>Court-order sync + AI Order Overview with party-attributed directions</li>
+        <li>Appearance-fee invoicing: <span class="m">PENDING &rarr; INVOICED &rarr; PAID</span>, numbered PDF, Resend email</li>
+        <li>Case Bot: hybrid RAG (pgvector + tsvector + RRF + cross-encoder)</li>
+        <li>Calendar (month + by-court), dashboard "needs attention"</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Dormant <i>built, not wired</i></h3>
+      <ul>
+        <li>Gmail sync: models, <span class="m">gmail_service.py</span>, views all exist; <span class="m">GMAIL_INTEGRATION_ENABLED = false</span>, OAuth callback unfinished, hidden from nav</li>
+        <li><span class="m">Citation.email</span> FK exists; nothing ingests email text into the chunk store</li>
+        <li><span class="m">Task</span> and <span class="m">DocumentVersion</span> models: admin-registered, zero code paths</li>
+        <li>Cause-list fetch: idempotent command, but no scheduler; depends on the operator adding two cron lines</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Absent <i>no code at all</i></h3>
+      <ul>
+        <li>Limitation / deadline calculation of any kind</li>
+        <li>Conflict checking at intake</li>
+        <li>Client-facing communication (email or WhatsApp updates)</li>
+        <li>Document drafting or assembly</li>
+        <li>Cause lists beyond Telangana HC (no SCI, no District, no other HC)</li>
+        <li>Supreme Court support: <span class="m">ESCR</span> CNR prefix is dropped, no <span class="m">supreme_court</span> court_type</li>
+        <li>Time tracking, trust / retainer ledger, recurring invoices</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout">
+    <span class="k">Tier 0 / fix, not feature</span>
+    <h3>Two things that should not wait for a roadmap slot</h3>
+    <ul>
+      <li><b>Cross-tenant Case Bot retrieval.</b> When <code>POST /api/chat/</code> is called with no <code>case_id</code>, <code>VectorSearchService</code> applies no <code>owner</code> filter. Retrieval then spans every <code>DocumentChunk</code> row across all tenants, and the answer can quote another advocate's documents. <code>DocumentChunk</code> carries <code>owner</code>; the search path never uses it.</li>
+      <li><b>A real cause-list scheduler.</b> <code>manage.py fetch_cause_lists</code> runs only if an operator hand-adds two cron lines. Any cause-list expansion multiplies that gap. A systemd timer or a cron-type <code>ProcessingJob</code> should land before, or with, the first new court.</li>
+    </ul>
+  </div>
+
+  <p class="panel-head note" style="margin-top:26px">Read the <b>Ranking</b> tab for the ordered answer. The other three tabs hold the working behind each part: how far cause lists can be pushed, what manual work the existing infrastructure could absorb, and how the product sits against Provakil, Clio, MyCase and Filevine.</p>
+</section>
+
+<!-- ================= RANKING ================= -->
+<section class="panel" id="panel-ranking" hidden>
+  <div class="panel-head">
+    <h2>Prioritised: what to build next</h2>
+    <p>Ordered by <b>leverage &times; value &minus; new infra</b>. Filter by area, tier or effort; the matrix on the right dims to match. Open any item for why it sits where it does.</p>
+  </div>
+
+  <div class="filters" id="filters">
+    <div class="fgroup"><span>Area</span>
+      <button class="fchip" data-f="area" data-v="fix" aria-pressed="false">Fix</button>
+      <button class="fchip" data-f="area" data-v="workflow" aria-pressed="false">Workflow</button>
+      <button class="fchip" data-f="area" data-v="causelist" aria-pressed="false">Cause-list</button>
+    </div>
+    <div class="fgroup"><span>Tier</span>
+      <button class="fchip" data-f="tier" data-v="0" aria-pressed="false">0</button>
+      <button class="fchip" data-f="tier" data-v="1" aria-pressed="false">1</button>
+      <button class="fchip" data-f="tier" data-v="2" aria-pressed="false">2</button>
+      <button class="fchip" data-f="tier" data-v="3" aria-pressed="false">3</button>
+      <button class="fchip" data-f="tier" data-v="4" aria-pressed="false">4</button>
+    </div>
+    <div class="fgroup"><span>Effort</span>
+      <button class="fchip" data-f="effort" data-v="S" aria-pressed="false">S</button>
+      <button class="fchip" data-f="effort" data-v="M" aria-pressed="false">M</button>
+      <button class="fchip" data-f="effort" data-v="L" aria-pressed="false">L</button>
+    </div>
+    <button class="mini" id="clearF" type="button">Clear</button>
+  </div>
+
+  <div class="rank-layout">
+    <div id="rankList">
+      <!-- tiers injected by JS -->
+    </div>
+
+    <div class="mtxbox">
+      <h3>Leverage &times; value</h3>
+      <p>Bubble size is new infra. Colour is area. Hover for detail; click to open the item.</p>
+      <svg class="scatter" id="scatter" viewBox="0 0 460 380" role="img" aria-label="Scatter plot of build candidates by leverage against lawyer value">
+        <!-- frame -->
+        <rect class="frame" x="52" y="16" width="388" height="300" fill="none"/>
+        <!-- gridlines -->
+        <line class="grid" x1="149" y1="16" x2="149" y2="316"/>
+        <line class="grid" x1="246" y1="16" x2="246" y2="316"/>
+        <line class="grid" x1="343" y1="16" x2="343" y2="316"/>
+        <line class="grid" x1="52" y1="91" x2="440" y2="91"/>
+        <line class="grid" x1="52" y1="166" x2="440" y2="166"/>
+        <line class="grid" x1="52" y1="241" x2="440" y2="241"/>
+        <!-- axis labels -->
+        <text class="axl" x="246" y="342" text-anchor="middle">Leverage &rarr;</text>
+        <text class="axl" x="60" y="14" text-anchor="start">&uarr; Lawyer value</text>
+        <text class="axl" x="52" y="332" text-anchor="middle">low</text>
+        <text class="axl" x="440" y="332" text-anchor="middle">high</text>
+        <g id="dots"></g>
+      </svg>
+      <div class="mtx-legend">
+        <span><i style="background:var(--seal)"></i>Fix</span>
+        <span><i style="background:var(--good)"></i>Workflow</span>
+        <span><i style="background:var(--cool)"></i>Cause-list</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CAUSE-LISTS ================= -->
+<section class="panel" id="panel-causelists" hidden>
+  <div class="panel-head">
+    <h2>How far cause lists can be pushed</h2>
+    <p>Today: Telangana High Court only, one Principal Bench at Hyderabad. One CAPTCHA-gated <code>POST&nbsp;showCauseList</code> with <code>flag=civ_t</code> returns an HTML meta-table of about 58 per-judge PDFs; each PDF is parsed by <b>character coordinate</b>, not text order, with column offsets detected per document because the real lists ship at least three layouts.</p>
+    <p class="note">The fetch is reusable; the parser is not. <code>core/services/cause_list/__init__.py</code> says it plainly: a second court means "a sibling module with its own fetcher and parser", not a generalisation of this one.</p>
+  </div>
+
+  <svg viewBox="0 0 900 150" style="width:100%;height:auto;border:1px solid var(--line);border-radius:3px;background:var(--surface);margin-bottom:8px" role="img" aria-label="Current Telangana HC cause-list pipeline">
+    <style>
+      .fl-box{fill:var(--surface-2);stroke:var(--line)}
+      .fl-t{font-family:var(--mono);font-size:10px;fill:var(--ink-80)}
+      .fl-s{font-family:var(--mono);font-size:8px;fill:var(--ink-42)}
+      .fl-a{stroke:var(--ink-42);fill:none}
+      .fl-x{font-family:var(--mono);font-size:8px;fill:var(--seal)}
+    </style>
+    <rect class="fl-box" x="14" y="46" width="118" height="44" rx="2"/>
+    <text class="fl-t" x="73" y="64" text-anchor="middle">POST</text>
+    <text class="fl-s" x="73" y="78" text-anchor="middle">showCauseList</text>
+    <path class="fl-a" d="M132 68 H176"/><path class="fl-a" d="M170 64 l6 4 -6 4"/>
+    <rect class="fl-box" x="178" y="46" width="126" height="44" rx="2"/>
+    <text class="fl-t" x="241" y="64" text-anchor="middle">meta-table</text>
+    <text class="fl-s" x="241" y="78" text-anchor="middle">~58 bench rows</text>
+    <path class="fl-a" d="M304 68 H348"/><path class="fl-a" d="M342 64 l6 4 -6 4"/>
+    <rect class="fl-box" x="350" y="46" width="118" height="44" rx="2"/>
+    <text class="fl-t" x="409" y="64" text-anchor="middle">N PDFs</text>
+    <text class="fl-s" x="409" y="78" text-anchor="middle">1 per judge</text>
+    <path class="fl-a" d="M468 68 H512"/><path class="fl-a" d="M506 64 l6 4 -6 4"/>
+    <rect class="fl-box" x="514" y="46" width="140" height="44" rx="2"/>
+    <text class="fl-t" x="584" y="64" text-anchor="middle">coordinate parse</text>
+    <text class="fl-s" x="584" y="78" text-anchor="middle">pdfminer, per-doc cols</text>
+    <path class="fl-a" d="M654 68 H698"/><path class="fl-a" d="M692 64 l6 4 -6 4"/>
+    <rect class="fl-box" x="700" y="46" width="186" height="44" rx="2"/>
+    <text class="fl-t" x="793" y="64" text-anchor="middle">Hearing.cause_list_*</text>
+    <text class="fl-s" x="793" y="78" text-anchor="middle">not_checked / not_published</text>
+    <text class="fl-s" x="793" y="88" text-anchor="middle">listed / not_listed</text>
+    <text class="fl-x" x="14" y="112" text-anchor="start">reuse: HCServicesClient + captcha OCR</text>
+    <text class="fl-x" x="584" y="112" text-anchor="middle">rebuild per court</text>
+    <text class="fl-x" x="886" y="112" text-anchor="end">new matcher for District codes</text>
+  </svg>
+
+  <div class="bar-actions">
+    <button class="mini" data-expand="panel-causelists" type="button">Expand all</button>
+    <button class="mini" data-collapse="panel-causelists" type="button">Collapse all</button>
+  </div>
+
+  <div class="tbl-scroll">
+    <table class="data">
+      <thead><tr><th>Target</th><th>Portal / mechanism</th><th>CAPTCHA</th><th>Format delta</th><th>Effort</th></tr></thead>
+      <tbody>
+
+        <tr><td class="who">Other TS benches</td><td class="m">Not applicable</td><td class="m">n/a</td><td class="m">TS HC has one seat. The single submit already covers it.</td><td><span class="chip dim">none</span></td></tr>
+        <tr><td colspan="5" style="padding:0">
+          <details><summary class="rowtoggle"><span class="caret">&rsaquo;</span><span>Why this is a non-target, and what to read it as instead</span></summary>
+          <div class="rowdetail">
+            <p>The "benches" in the meta-table are judge combinations, not seats. Telangana High Court sits only at Hyderabad, so one POST with <code>court_code=1</code> pulls the whole court. There is nothing to add here.</p>
+            <p>Read the request as <b>Telangana District Courts</b> instead (row below): that is the adjacent surface, and it is where the advocate-search import users actually practise.</p>
+          </div></details>
+        </td></tr>
+
+        <tr><td class="who">AP High Court</td><td class="m">Same <code>hcservices</code> portal, same <code>index_qry.php</code> / <code>showCauseList</code>, different <code>state_code</code></td><td class="m">Identical (Securimage, existing retry loop)</td><td class="m">Small. Bifurcated sibling of TS HC, 2019, shared registry lineage</td><td><span class="chip good">Low</span></td></tr>
+        <tr><td colspan="5" style="padding:0">
+          <details><summary class="rowtoggle"><span class="caret">&rsaquo;</span><span>The cheapest court to add, and the thinnest payoff</span></summary>
+          <div class="rowdetail">
+            <p><code>bharat_courts.HCServicesClient.cause_list()</code> is already generic over bench and date. AP HC also sits at a single seat (Amaravati). The TS parser's column-offset detection should transfer with minor tuning, since both courts descend from the pre-2019 High Court of Judicature at Hyderabad and print on the same templates.</p>
+            <dl>
+              <dt>New code</dt><dd>A sibling module, an AP court key, a re-run of the offset detector against real AP PDFs.</dd>
+              <dt>Audience</dt><dd>Small for a Telangana-first product. Worth doing mainly as the proof that "add a court" is a bounded job.</dd>
+            </dl>
+          </div></details>
+        </td></tr>
+
+        <tr><td class="who">Supreme Court cause lists</td><td class="m">Predictable PDF URLs: <code>api.sci.gov.in/jonew/cl/YYYY-MM-DD/*.pdf</code> and <code>/cl/advance/</code>. Scrape the index page for the day's court-wise links, download, parse</td><td class="m"><b>None</b> on the PDF fetch</td><td class="m">New fetcher + new coordinate parser (item / diary+case no / petitioner v respondent / AOR name). New matcher on diary or case number</td><td><span class="chip mid">Medium</span></td></tr>
+        <tr><td colspan="5" style="padding:0">
+          <details><summary class="rowtoggle"><span class="caret">&rsaquo;</span><span>Self-contained, no CAPTCHA, and it closes half the ESCR gap</span></summary>
+          <div class="rowdetail">
+            <p>The SCI serves daily lists as static PDFs on a dated path. No token seeding, no CAPTCHA on the download, about 15 to 20 court PDFs a day against Telangana HC's 58. <code>bharat_courts.SCIClient</code> has no cause-list method and its case searches raise <code>NotImplementedError</code>, so this is first-party, but it is a small, bounded first-party job.</p>
+            <p>SCI lists carry the <b>Advocate-on-Record name</b> in a column, which is a stronger match key than a bare case number. The parser is new but the SCI layout is more stable than the HC template zoo.</p>
+            <dl>
+              <dt>Also unlocks</dt><dd>The scaffolding for an <code>ESCR</code> / <code>supreme_court</code> court_type, even before SCI case tracking (a separate, harder job) is attempted.</dd>
+            </dl>
+          </div></details>
+        </td></tr>
+
+        <tr><td class="who">District Courts (TS first)</td><td class="m"><code>ecourtindia_v6</code>, <code>DistrictCourtClient.cause_list()</code> with <code>court_no</code>, <code>list_cause_list_courts()</code>. Reuses the existing <code>_TokenSeedingDistrictClient</code> session dance</td><td class="m">On the cause-list call. Token seeding already solved</td><td class="m">v6 returns HTML tables (structured, likely easier than the PDFs) but needs a new matcher and establishment-scoped fetching</td><td><span class="chip mid">Med&ndash;High</span></td></tr>
+        <tr><td colspan="5" style="padding:0">
+          <details><summary class="rowtoggle"><span class="caret">&rsaquo;</span><span>Where the import users actually are, and the two real obstacles</span></summary>
+          <div class="rowdetail">
+            <p>The hardest part, the District portal session (real <code>app_token</code>, rotating <code>delimeter</code> value, rotating second-header key, session cookie), is already built and reverified live. The cause-list call rides on top of it.</p>
+            <dl>
+              <dt>Obstacle 1</dt><dd><b>Matching.</b> District cases carry portal codes like <code>"2^2"</code> that <code>normalize_case_token</code> deliberately rejects. Cause-list matching for District would key on the case type / number / year already stored in <code>tracking_config</code>, not the printed token. A new code path, parallel to the HC one.</dd>
+              <dt>Obstacle 2</dt><dd><b>Scope.</b> There is no state-wide District cause list. You fetch per establishment, per court number. The tractable version only pulls lists for the establishments where the advocate has a hearing that day, driven off tracked <code>Hearing</code> rows.</dd>
+              <dt>State to add</dt><dd>The current <code>tracked_hearings_on()</code> is scoped <code>court_type="high_court"</code>. District needs its own scope and matcher.</dd>
+            </dl>
+          </div></details>
+        </td></tr>
+
+        <tr><td class="who">Other major HCs<br><span class="m">Delhi, Bombay, Karnataka, Madras</span></td><td class="m">Same eCourts <code>showCauseList</code> fetch; Delhi and Bombay also publish richer lists on their own sites</td><td class="m">Same</td><td class="m"><b>One bespoke parser module per court</b>, plus multi-bench fan-out (Bombay: Bombay / Nagpur / Aurangabad / Goa; Karnataka: 3 benches)</td><td><span class="chip dim">High / court</span></td></tr>
+        <tr><td colspan="5" style="padding:0">
+          <details><summary class="rowtoggle"><span class="caret">&rsaquo;</span><span>The path to national coverage, and why it stays expensive</span></summary>
+          <div class="rowdetail">
+            <p>This is what Provakil sells: SC, every HC, every District court, consumer forums, the tribunals. Each High Court's cause list is its own PDF layout, and several HCs sit at multiple benches so the single-submit shortcut does not hold. The fetch generalises; every parser is new.</p>
+            <p>Sequencing: pick HCs by where the user base actually files. There is no leverage shortcut across courts, only a repeatable process (fetch, capture real fixtures, write the coordinate parser, verify it never returns a silent empty).</p>
+          </div></details>
+        </td></tr>
+
+        <tr><td class="who">SCI case tracking<br><span class="m">the ESCR CNR gap</span></td><td class="m">Separate from SCI cause lists. Needs the CAPTCHA-gated case-status form on <code>sci.gov.in</code> (diary no / case no / CNR)</td><td class="m">CAPTCHA, and no prior art in <code>bharat_courts</code></td><td class="m">First-party reverse-engineering like the District/HC CNR work. Add a <code>supreme_court</code> court_type and a third branch to <code>_fetch_by_cnr_auto</code></td><td><span class="chip dim">High</span></td></tr>
+        <tr><td colspan="5" style="padding:0">
+          <details><summary class="rowtoggle"><span class="caret">&rsaquo;</span><span>Fully closes the named gap, lowest audience per unit of effort</span></summary>
+          <div class="rowdetail">
+            <p>Right now <code>_guess_court_type_from_cnr</code> recognises an <code>ESCR</code> prefix through <code>bharat_courts.infer_court_from_cnr</code>, then explicitly returns <code>None</code> ("this app has no Supreme Court support"). <code>_fetch_by_cnr_auto</code> only ever tries <code>("district", "high_court")</code>, so a genuine SC CNR is queried against both portals and returned as "not found in either".</p>
+            <p>Closing it means: the CAPTCHA-gated case-status form (its own reverse-engineering spike), a new provider branch, a <code>supreme_court</code> value threaded through <code>VALID_COURT_TYPES</code>, the models, the views and the frontend validation. Worth it if SC matters become common in the user base; today they are rare for a District/HC advocate.</p>
+          </div></details>
+        </td></tr>
+
+      </tbody>
+    </table>
+  </div>
+
+  <p class="panel-head note" style="margin-top:24px"><b>Order within cause-list work:</b> SCI cause lists and Telangana District together (one self-contained, one on the real user base), then AP HC (cheap proof), then other HCs (expensive, national), then SCI case tracking (completes the gap, niche here). All of it sits behind the Tier-0 scheduler.</p>
+</section>
+
+<!-- ================= WORKFLOW ================= -->
+<section class="panel" id="panel-workflow" hidden>
+  <div class="panel-head">
+    <h2>Manual work the existing infrastructure could absorb</h2>
+    <p>The reusable parts: the <code>ProcessingJob</code> Postgres worker, <code>get_llm_client()</code> (Groq / Ollama / OpenAI), the document pipeline, the eCourts provider, the order-summary marker system, <code>fpdf2</code>, the Resend send path, and the hybrid RAG store. Each card names what it reuses and the manual task it replaces.</p>
+  </div>
+
+  <div class="bar-actions">
+    <button class="mini" data-expand="panel-workflow" type="button">Expand all</button>
+    <button class="mini" data-collapse="panel-workflow" type="button">Collapse all</button>
+  </div>
+
+  <div class="cards" id="oppCards"><!-- injected --></div>
+</section>
+
+<!-- ================= COMPETITIVE ================= -->
+<section class="panel" id="panel-competitive" hidden>
+  <div class="panel-head">
+    <h2>Where the product sits</h2>
+    <p>The US-market leaders do not touch Indian courts. The real comparison set is Provakil and the newer Indian advocate apps. The eCourts-native integration is a genuine differentiator; it is also the only one that is hard to copy.</p>
+  </div>
+
+  <div class="eyebrow" style="margin-bottom:14px">India-native</div>
+  <div class="vend-grid">
+    <div class="vend"><h4>Provakil</h4><div class="tag">the benchmark</div><p>19,000+ courts and tribunals: SC, all HCs, all District, consumer forums, NCLT / NGT / RERA / DRT / CESTAT / APTEL. Real-time updates to dashboard, app, email and WhatsApp. Personalised daily causelists to email and WhatsApp. Client alerts, invoice templates, contract and IP modules. Enterprise pricing, iOS + Android.</p></div>
+    <div class="vend"><h4>Nowlez</h4><div class="tag">closest positioning</div><p>"AI Munshi" for advocates. CNR auto-sync, hearing reminders, order downloads (District + participating HCs), cause-list auto-import matched to the matter portfolio, matter-wise documents.</p></div>
+    <div class="vend"><h4>Peshi</h4><div class="tag">mobile-first</div><p>Today / upcoming / past hearing dashboards with court number and judge, case status states, WhatsApp + SMS reminders, multilingual onboarding, OTP auth. Free to start.</p></div>
+    <div class="vend"><h4>Vakalat 2.0</h4><div class="tag">drafting-forward</div><p>Cases, courts, billing, plus AI "Case Drafts": writes a court document from the matter, auto-filled, in the forum's format, e-sign ready. National legal community.</p></div>
+    <div class="vend"><h4>LegalKart</h4><div class="tag">client acquisition</div><p>Lawyer app plus consumer marketplace. Leads, in-app calls, payment links, consultation scheduling, client chat. 10,000+ lawyers. More acquisition than practice management.</p></div>
+    <div class="vend"><h4>Legodesk / CaseFox / MikeLegal</h4><div class="tag">adjacent</div><p>Notice automation and collections / billing-first with LEDES and trust accounting / enterprise IP and AI document review.</p></div>
+  </div>
+
+  <div class="eyebrow" style="margin:26px 0 14px">US practice-management (no Indian court data)</div>
+  <div class="vend-grid">
+    <div class="vend"><h4>Clio</h4><div class="tag">global leader</div><p>Matter management, time tracking, trust accounting with 3-way reconciliation, document automation, <b>rules-based court calendaring across 2,200 US jurisdictions</b>: pick a trigger event, every downstream deadline lands on the calendar. Intake CRM, client portal, e-sign, Clio Duo AI, 200+ integrations. Does not track Indian courts at all.</p></div>
+    <div class="vend"><h4>MyCase</h4><div class="tag">all-in-one</div><p>Strong built-in client portal (status, secure messaging, document exchange, invoice payment). Built-in SMS / MMS stored to the case file. Automated calendaring via LawToolBox. Passive time tracking, 3-way reconciliation.</p></div>
+    <div class="vend"><h4>PracticePanther</h4><div class="tag">customisable</div><p>Configurable workflows and automation, billing, intake. Lighter client portal, leans on integrations for the rest.</p></div>
+    <div class="vend"><h4>Filevine</h4><div class="tag">plaintiff / PI</div><p>Case and project management, ".vine" living-document assembly with variables bound to the case database, FilevineAI ("chat with your case", summaries, notes and tasks), DemandsAI.</p></div>
+  </div>
+
+  <div class="diff">
+    <h3>What Case Intel has that the field does not</h3>
+    <ul>
+      <li><b>eCourts-native scraping integration.</b> A real moat against Clio, MyCase, PracticePanther and Filevine, none of which track Indian courts. The first-party work (token seeding, rotating anti-scrape headers, CNR auto-detect across District and HC, CAPTCHA OCR) is hard and, outside Provakil, largely un-replicated.</li>
+      <li><b>CNR auto-detection.</b> Prefix to court type, auto-tries both portals. Smoother than the portal-code cascade the other tools expose.</li>
+      <li><b>AI Order Overview with the routing / marker system.</b> Skips the LLM entirely for routine adjournments; extracts directions attributed to petitioner vs respondent. More considered than "summarise this PDF".</li>
+      <li><b>Advocate-search fan-out</b> with transparent per-district retry and resume. Bootstraps a whole practice's case list from a bar code.</li>
+      <li><b>Coordinate-based cause-list parsing that refuses a silent empty.</b> "None of your cases are listed" must never be a parser bug; the code enforces that.</li>
+      <li><b>Hybrid RAG and a self-hostable AI path.</b> pgvector + tsvector + RRF + cross-encoder, with an Ollama option and no per-seat SaaS lock-in.</li>
+    </ul>
+  </div>
+
+  <div class="eyebrow" style="margin:26px 0 12px">Feature matrix</div>
+  <div class="mtx-scroll">
+    <table class="mtx">
+      <thead><tr><th>&nbsp;</th><th>Case Intel</th><th>Provakil</th><th>Clio</th><th>MyCase</th><th>Filevine</th></tr></thead>
+      <tbody>
+        <tr><th>eCourts case tracking (CNR / portal)</th><td class="ci"><span class="mk y">yes</span></td><td><span class="mk y">yes</span></td><td><span class="mk n">no</span></td><td><span class="mk n">no</span></td><td><span class="mk n">no</span></td></tr>
+        <tr><th>Multi-court cause lists</th><td class="ci"><span class="mk p">TS HC only</span></td><td><span class="mk y">yes</span></td><td><span class="mk n">no</span></td><td><span class="mk n">no</span></td><td><span class="mk n">no</span></td></tr>
+        <tr><th>AI order summaries</th><td class="ci"><span class="mk y">yes</span></td><td><span class="mk p">partial</span></td><td><span class="mk n">no</span></td><td><span class="mk n">no</span></td><td><span class="mk p">partial</span></td></tr>
+        <tr><th>AI chat over case documents</th><td class="ci"><span class="mk y">yes</span></td><td><span class="mk y">yes</span></td><td><span class="mk y">Duo</span></td><td><span class="mk p">partial</span></td><td><span class="mk y">yes</span></td></tr>
+        <tr><th>Rules-based limitation / deadline calendaring</th><td class="ci"><span class="mk n">no</span></td><td><span class="mk p">partial</span></td><td><span class="mk y">US</span></td><td><span class="mk y">US</span></td><td><span class="mk y">yes</span></td></tr>
+        <tr><th>Document assembly / drafting</th><td class="ci"><span class="mk n">no</span></td><td><span class="mk y">yes</span></td><td><span class="mk y">yes</span></td><td><span class="mk y">yes</span></td><td><span class="mk y">yes</span></td></tr>
+        <tr><th>Client portal</th><td class="ci"><span class="mk n">no</span></td><td><span class="mk p">alerts</span></td><td><span class="mk y">yes</span></td><td><span class="mk y">yes</span></td><td><span class="mk y">yes</span></td></tr>
+        <tr><th>WhatsApp / SMS client alerts</th><td class="ci"><span class="mk n">no</span></td><td><span class="mk y">yes</span></td><td><span class="mk p">SMS</span></td><td><span class="mk y">SMS</span></td><td><span class="mk p">partial</span></td></tr>
+        <tr><th>Email linked to matters</th><td class="ci"><span class="mk p">built, off</span></td><td><span class="mk y">yes</span></td><td><span class="mk y">yes</span></td><td><span class="mk y">yes</span></td><td><span class="mk y">yes</span></td></tr>
+        <tr><th>Conflict checking at intake</th><td class="ci"><span class="mk n">no</span></td><td><span class="mk n">no</span></td><td><span class="mk y">yes</span></td><td><span class="mk y">yes</span></td><td><span class="mk n">no</span></td></tr>
+        <tr><th>Appearance-fee invoicing (India)</th><td class="ci"><span class="mk y">yes</span></td><td><span class="mk y">yes</span></td><td><span class="mk p">generic</span></td><td><span class="mk p">generic</span></td><td><span class="mk p">generic</span></td></tr>
+        <tr><th>Time tracking / trust accounting</th><td class="ci"><span class="mk n">no</span></td><td><span class="mk y">yes</span></td><td><span class="mk y">yes</span></td><td><span class="mk y">yes</span></td><td><span class="mk y">yes</span></td></tr>
+        <tr><th>Native mobile app</th><td class="ci"><span class="mk n">web</span></td><td><span class="mk y">yes</span></td><td><span class="mk y">yes</span></td><td><span class="mk y">yes</span></td><td><span class="mk y">yes</span></td></tr>
+        <tr><th>Self-host / no per-seat lock-in</th><td class="ci"><span class="mk y">yes</span></td><td><span class="mk n">no</span></td><td><span class="mk n">no</span></td><td><span class="mk n">no</span></td><td><span class="mk n">no</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="panel-head note" style="margin-top:16px">Trust accounting and hourly time are lower-priority gaps than the US column implies. Indian litigators bill appearance fees and lump-sum briefs; the appearance-fee model Case Intel already has fits the target user better than a US trust ledger would.</p>
+</section>
+
+</main>
+
+<div id="tip"></div>
+
+<footer class="foot">
+  <div class="wrap">
+    <span>Case Intel / product direction</span>
+    <span>leverage &times; value &minus; new infra</span>
+    <span>research current to Sep 2026</span>
+  </div>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- data ---------- */
+  var OPPS = [
+    { id:"W1", rank:1, tier:1, area:"workflow", effort:"S", lev:5, val:4, inf:1,
+      title:"Hearing-prep digest",
+      replaces:"The evening-before scramble: cause-list item, last order, what is still owed, file pulled.",
+      body:"Per upcoming hearing, assemble the cause-list item number and court hall (already on <code>Hearing</code>), the last order's <code>summary_what_happened</code> and directions, still-open directions from earlier <code>CourtOrder.summary_*_directions</code>, the documents on file, <code>next_date_purpose</code>, and one Case-Bot paragraph on the state of the matter. Almost pure composition plus one LLM call; an optional <code>fpdf2</code> packet.",
+      hooks:["Hearing.cause_list_*","CourtOrder.summary_*","Case Bot","fpdf2"] },
+
+    { id:"W2", rank:2, tier:1, area:"workflow", effort:"M", lev:3.5, val:5, inf:3,
+      title:"Limitation &amp; deadline engine",
+      replaces:"Tracking appeal, SLP, review and execution windows by memory and a paper diary.",
+      body:"The Limitation Act 1963 is table-driven: appeal 30 or 90 days, SLP 90 days, civil review 30 days, execution 12 years, each from a trigger date, with a section 5 condonation note and the section 4 next-working-day rule. Trigger off the order-summary disposal markers (the router already classifies \"disposed of\", \"allowed\", \"dismissed\") and <code>summary_next_date</code>. Needs a static rules table, a court-holiday calendar, a <code>Deadline</code> model (or the dormant <code>Task</code>), a nightly <code>ProcessingJob</code> sweep, and a dashboard surface. The biggest competitive gap that is genuinely buildable, and no Indian small-firm tool does it.",
+      hooks:["order_summary/routing.py markers","CourtOrder.summary_next_date","ProcessingJob","dashboard needs-attention"] },
+
+    { id:"W3", rank:3, tier:1, area:"workflow", effort:"S", lev:5, val:3.5, inf:0.5,
+      title:"Conflict check at intake",
+      replaces:"Remembering, unaided, whether the firm already acts against this party.",
+      body:"At case creation or CNR import, fuzzy-match the new matter's parties against every existing <code>client_name</code>, <code>opposing_party</code>, <code>ClientContact</code> name and imported <code>party_advocate_data</code>. <code>pg_trgm</code> or a Python ratio over data already held. Near-zero new infra, Bar-Council-relevant, and unique among the Indian solo tools. Best effort-to-value ratio in the set.",
+      hooks:["Case.client_name / opposing_party","ClientContact","party_advocate_data","pg_trgm"] },
+
+    { id:"W4", rank:4, tier:1, area:"workflow", effort:"S", lev:4.5, val:3.5, inf:1,
+      title:"Auto-tasks from order directions",
+      replaces:"Re-reading every order to remember what your side has to file, and by when.",
+      body:"The order summary already extracts directions attributed to a party (\"file counter within 4 weeks\"). Revive <code>Task</code>, generate one per direction addressed to the user's party, with a due date parsed from \"within N weeks\" plus the order date (fallback: the next hearing). Pairs with the digest and the deadline engine.",
+      hooks:["CourtOrder.summary_petitioner/respondent_directions","Case.user_party_role","Task model"] },
+
+    { id:"W5", rank:5, tier:2, area:"workflow", effort:"S", lev:4, val:4, inf:2,
+      title:"Client update drafts (email)",
+      replaces:"Typing the same \"heard today, next date is\" message to every client after every hearing.",
+      body:"After an order syncs or a date changes, draft a plain-language update to the case's <code>ClientContact</code>: \"Your matter was heard on X. The court [what_happened]. Next date Y, for Z.\" <code>summary_what_happened</code> is already written for a lay reader. Copy the <code>send_invoice</code> Resend path verbatim, including its degrade-to-logged behaviour. WhatsApp is a real new integration (Meta WABA or a provider) and a fast-follow, not a prerequisite.",
+      hooks:["CourtOrder.summary_what_happened","ClientContact.email","invoice_service send path","Resend"] },
+
+    { id:"W6", rank:6, tier:2, area:"workflow", effort:"M", lev:4.5, val:3.5, inf:2.5,
+      title:"Finish Gmail integration",
+      replaces:"Case correspondence living in a separate inbox, unsearchable alongside the file.",
+      body:"About 80% built. Wire the OAuth callback, auto-link emails to cases by party name or case number in the subject, add a thread view on the case page, and ingest email body text into <code>DocumentChunk</code> so Case Bot can cite it. <code>Citation.email</code> already exists for exactly this.",
+      hooks:["gmail_service.py","Email / EmailAttachment models","Citation.email","document_processor chunking"] },
+
+    { id:"W7", rank:7, tier:2, area:"workflow", effort:"S", lev:4, val:3, inf:1.5,
+      title:"Billing portfolio view + reminders",
+      replaces:"Losing track of which invoices went unpaid, and which hearings never got billed.",
+      body:"Invoicing today is per-hearing with a manual lifecycle and no aging. Add a portfolio view: invoiced-over-N-days-unpaid, auto follow-up emails, per-client outstanding statements, an \"uninvoiced hearings this month\" prompt, and a GST / RCM line (\"GST payable by recipient under RCM\") for business clients. The per-case aggregation is already computed; Resend is wired.",
+      hooks:["AppearanceFee aggregation","invoice_service","ProcessingJob sweep","Resend"] },
+
+    { id:"W8", rank:8, tier:2, area:"workflow", effort:"M", lev:4, val:3.5, inf:2.5,
+      title:"Mechanical document generator",
+      replaces:"Hand-typing a vakalatnama, memo of appearance and cause-title for every new matter.",
+      body:"Template merge from <code>Case</code> plus <code>AdvocateProfile</code> (bar registration, letterhead, address). No LLM. <code>fpdf2</code> or <code>python-docx</code> output into <code>Document</code> storage. Every new case needs these. LLM-assisted substantive drafting (replies, applications) is a separate, larger, riskier bet, tracked in Tier 4.",
+      hooks:["Case metadata","AdvocateProfile","fpdf2","Document storage"] },
+
+    { id:"C1", rank:9, tier:3, area:"causelist", effort:"M", lev:3, val:3, inf:3,
+      title:"Supreme Court cause lists",
+      replaces:"Checking the SCI board by hand for any matter that reached the top court.",
+      body:"Daily lists are static PDFs at <code>api.sci.gov.in/jonew/cl/YYYY-MM-DD/</code>. No CAPTCHA on the download, about 15 to 20 court PDFs a day. New fetcher and a new coordinate parser (the SCI layout carries the AOR name, a strong match key), plus a matcher on diary or case number. Also lays the <code>supreme_court</code> court_type scaffolding.",
+      hooks:["api.sci.gov.in PDF paths","pdfminer coordinate parsing","new SCI matcher"] },
+
+    { id:"C2", rank:10, tier:3, area:"causelist", effort:"L", lev:3, val:4, inf:4,
+      title:"Telangana District cause lists",
+      replaces:"The District-court advocate checking each establishment's board separately every morning.",
+      body:"Rides on the existing <code>_TokenSeedingDistrictClient</code> session work. Two obstacles: matching (District cases carry portal codes the current normaliser rejects, so match on <code>tracking_config</code> type / number / year instead) and scope (no state-wide list; fetch per establishment, only where the advocate has a hearing that day). Where the advocate-search import users actually practise.",
+      hooks:["_TokenSeedingDistrictClient","DistrictCourtClient.cause_list()","tracking_config","new District matcher"] },
+
+    { id:"C3", rank:11, tier:3, area:"causelist", effort:"M", lev:4, val:2, inf:2.5,
+      title:"AP High Court cause lists",
+      replaces:"Nothing yet; it is the cheapest proof that \"add a court\" is a bounded job.",
+      body:"Same <code>hcservices</code> portal, same submit, different <code>state_code</code>. Bifurcated sibling of TS HC (2019), so the parser's column-offset detection should transfer with light tuning. Single seat at Amaravati. Thin audience for a Telangana-first product; real value is the repeatable process.",
+      hooks:["HCServicesClient.cause_list()","TS HC parser (adapted)","new AP court key"] },
+
+    { id:"C4", rank:12, tier:3, area:"causelist", effort:"L", lev:2.5, val:3.5, inf:4,
+      title:"Other major HCs (Delhi / Bombay / Karnataka / Madras)",
+      replaces:"The gap between a Telangana tool and national coverage.",
+      body:"The fetch generalises; every parser is new, and several of these courts sit at multiple benches so the single-submit shortcut does not hold. No leverage shortcut across courts, only a repeatable process: fetch, capture real fixtures, write the coordinate parser, verify it never returns a silent empty. Sequence by where the user base files.",
+      hooks:["showCauseList fetch","one parser module per court","multi-bench fan-out"] },
+
+    { id:"C5", rank:13, tier:3, area:"causelist", effort:"L", lev:2, val:2.5, inf:4.5,
+      title:"SCI case tracking (ESCR CNR)",
+      replaces:"The one court_type the CNR auto-detector knows about but cannot act on.",
+      body:"Separate from SCI cause lists. <code>_guess_court_type_from_cnr</code> recognises <code>ESCR</code> then returns <code>None</code>; <code>_fetch_by_cnr_auto</code> only tries District and HC. Closing it means the CAPTCHA-gated case-status form (its own spike), a new provider branch, and threading <code>supreme_court</code> through <code>VALID_COURT_TYPES</code>, the models, the views and the frontend. Completes the gap; niche for a District/HC advocate today.",
+      hooks:["_guess_court_type_from_cnr","VALID_COURT_TYPES","_fetch_by_cnr_auto","new SCI provider"] },
+
+    { id:"T0a", rank:0, tier:0, area:"fix", effort:"S", lev:5, val:5, inf:0.5,
+      title:"Fix cross-tenant Case Bot retrieval",
+      replaces:"A data-isolation defect, not a feature.",
+      body:"When <code>POST /api/chat/</code> is called with no <code>case_id</code>, <code>VectorSearchService._vector_search</code> and <code>._keyword_search</code> apply no <code>owner</code> filter. Retrieval spans every <code>DocumentChunk</code> across all tenants and the answer can quote another advocate's documents. <code>DocumentChunk.owner</code> exists; add it to both query paths, and decide whether a no-case chat is even allowed.",
+      hooks:["vector_search_service.py","DocumentChunk.owner","ChatView"] },
+
+    { id:"T0b", rank:0, tier:0, area:"fix", effort:"S", lev:4, val:3, inf:1,
+      title:"Wire a cause-list scheduler",
+      replaces:"Depending on an operator to hand-add two cron lines after every deploy.",
+      body:"<code>manage.py fetch_cause_lists</code> is idempotent and ready, but nothing runs it. A systemd timer (7pm and 6:30am, per the command's own docstring) or a cron-type <code>ProcessingJob</code>. Prerequisite for any cause-list expansion; otherwise every new court inherits the same gap.",
+      hooks:["fetch_cause_lists command","deploy config or ProcessingJob"] },
+
+    { id:"X1", rank:14, tier:4, area:"workflow", effort:"L", lev:2.5, val:4, inf:4.5,
+      title:"LLM-assisted substantive drafting",
+      replaces:"First drafts of replies, rejoinders and interlocutory applications.",
+      body:"High value, real infrastructure: a prompt and template library, a citation-grounded retrieval pass over the case file, and a review workflow the advocate cannot skip. Higher risk than the mechanical generator. A deliberate bet, not a quick win.",
+      hooks:["get_llm_client()","Case Bot retrieval","new template + review system"] },
+
+    { id:"X2", rank:15, tier:4, area:"workflow", effort:"L", lev:2, val:3, inf:4.5,
+      title:"Client portal",
+      replaces:"Clients phoning to ask what happened and when the next date is.",
+      body:"Every competitor has one. Large build: authentication for a second user class, a scoped read model, secure messaging, document sharing. Unclear the solo advocate's client wants a login rather than a WhatsApp message; that is what makes the client-update drafts (Tier 2) the cheaper first move.",
+      hooks:["ClientContact","new auth surface","scoped serializers"] },
+
+    { id:"X3", rank:16, tier:4, area:"workflow", effort:"L", lev:1.5, val:2, inf:4.5,
+      title:"Time tracking / trust accounting",
+      replaces:"Nothing the target user does today.",
+      body:"Matters for corporate and advisory practice, less for the appearance-fee litigation model Case Intel is built around. Lower priority than the US competitive column suggests. Revisit only if the user base shifts toward retainer work.",
+      hooks:["AppearanceFee (would need a parallel model)","new ledger"] },
+
+    { id:"X4", rank:17, tier:4, area:"workflow", effort:"L", lev:1.5, val:3.5, inf:5,
+      title:"Native mobile app",
+      replaces:"Pinch-zooming the responsive web app in the corridor outside court.",
+      body:"Provakil, Peshi and the rest all have one. Responsive web is the stopgap. A large, separate effort (React Native or similar, its own release pipeline, push notifications). Worth it once the web product is clearly the one people want in their pocket.",
+      hooks:["existing REST API","new client app"] },
+
+    { id:"X5", rank:18, tier:4, area:"workflow", effort:"M", lev:4, val:3, inf:2.5,
+      title:"Portfolio-scoped Case Bot",
+      replaces:"Asking the same question across ten case files by hand.",
+      body:"\"Which of my matters have a counter due?\" Currently the graph is per-case and synchronous. A portfolio mode needs cross-case retrieval, a safe owner scope (see Tier 0), and probably an async job since it fans out. Reuses the whole pipeline.",
+      hooks:["graph/ pipeline","VectorSearchService","ProcessingJob"] },
+  ];
+
+  var TIERS = [
+    { n:0, label:"Tier 0", note:"fix now, not a feature" },
+    { n:1, label:"Tier 1", note:"high leverage and high value, mostly composition of what exists" },
+    { n:2, label:"Tier 2", note:"high value, moderate new infrastructure" },
+    { n:3, label:"Tier 3", note:"cause-list expansion, in order" },
+    { n:4, label:"Tier 4", note:"bigger bets or weaker fit for the target user" },
+  ];
+
+  var AREA_COLOR = { fix:"var(--seal)", workflow:"var(--good)", causelist:"var(--cool)" };
+
+  /* ---------- tabs ---------- */
+  var tabs = Array.prototype.slice.call(document.querySelectorAll(".tab"));
+  var panels = {
+    overview: document.getElementById("panel-overview"),
+    ranking: document.getElementById("panel-ranking"),
+    causelists: document.getElementById("panel-causelists"),
+    workflow: document.getElementById("panel-workflow"),
+    competitive: document.getElementById("panel-competitive"),
+  };
+  function showTab(name, push){
+    if(!panels[name]) name = "overview";
+    tabs.forEach(function(t){ t.setAttribute("aria-current", t.dataset.tab === name ? "true" : "false"); });
+    Object.keys(panels).forEach(function(k){ panels[k].hidden = (k !== name); });
+    if(push && history.replaceState) history.replaceState(null, "", "#" + name);
+    window.scrollTo({ top:0, behavior:"auto" });
+  }
+  tabs.forEach(function(t){ t.addEventListener("click", function(){ showTab(t.dataset.tab, true); }); });
+  window.addEventListener("hashchange", function(){ showTab(location.hash.replace("#",""), false); });
+
+  /* ---------- expand / collapse all ---------- */
+  document.querySelectorAll("[data-expand]").forEach(function(b){
+    b.addEventListener("click", function(){
+      document.getElementById(b.dataset.expand).querySelectorAll("details").forEach(function(d){ d.open = true; });
+    });
+  });
+  document.querySelectorAll("[data-collapse]").forEach(function(b){
+    b.addEventListener("click", function(){
+      document.getElementById(b.dataset.collapse).querySelectorAll("details").forEach(function(d){ d.open = false; });
+    });
+  });
+
+  /* ---------- opportunity cards (workflow tab) ---------- */
+  function bar(label, cls, v){
+    var pct = Math.round((v/5)*100);
+    return '<div class="sb"><span>'+label+'</span><span class="track"><span class="fill '+cls+'" style="width:'+pct+'%"></span></span><span class="num">'+v+'</span></div>';
+  }
+  function hookChips(hooks){
+    return hooks.map(function(h){ return '<span class="chip dim">'+h+'</span>'; }).join("");
+  }
+  var oppWrap = document.getElementById("oppCards");
+  OPPS.filter(function(o){ return o.area === "workflow" && o.tier >= 1 && o.tier <= 2; })
+      .sort(function(a,b){ return a.rank - b.rank; })
+      .forEach(function(o){
+    var d = document.createElement("details");
+    d.className = "opp";
+    d.innerHTML =
+      '<summary><div class="opp-top"><span class="opp-id">'+o.id+'</span>'+
+        '<span class="chip '+(o.effort==="S"?"good":o.effort==="M"?"mid":"dim")+'">'+o.effort+'</span></div>'+
+        '<h3>'+o.title+'</h3><p class="replaces"><b>Replaces:</b> '+o.replaces+'</p>'+
+        '<div class="scorebars">'+bar("Leverage","lev",o.lev)+bar("Value","val",o.val)+bar("New infra","inf",o.inf)+'</div>'+
+      '</summary>'+
+      '<div class="opp-body"><p>'+o.body+'</p><div class="hooks">'+hookChips(o.hooks)+'</div></div>';
+    oppWrap.appendChild(d);
+  });
+
+  /* ---------- ranking list ---------- */
+  var listWrap = document.getElementById("rankList");
+  TIERS.forEach(function(t){
+    var sec = document.createElement("div");
+    sec.className = "tier";
+    sec.dataset.tier = t.n;
+    var items = OPPS.filter(function(o){ return o.tier === t.n; }).sort(function(a,b){ return a.rank - b.rank; });
+    var html = '<h3>'+t.label+' <em>'+t.note+'</em></h3>';
+    items.forEach(function(o){
+      html +=
+        '<details class="ritem" id="r-'+o.id+'" data-area="'+o.area+'" data-tier="'+o.tier+'" data-effort="'+o.effort+'">'+
+          '<summary><span class="rank">'+(o.tier===0?"!":o.rank)+'</span>'+
+            '<span class="rt"><b>'+o.title+'</b>'+
+              '<span class="meta">'+
+                '<span class="chip '+(o.area==="fix"?"seal":o.area==="workflow"?"good":"cool")+'">'+o.area+'</span>'+
+                '<span class="chip dim">'+o.effort+'</span>'+
+                '<span class="chip dim">lev '+o.lev+'</span>'+
+                '<span class="chip dim">val '+o.val+'</span>'+
+              '</span>'+
+            '</span></summary>'+
+          '<div class="rbody"><dl>'+
+            '<dt>Why here</dt><dd>'+o.body+'</dd>'+
+            '<dt>Reuses</dt><dd>'+o.hooks.join(", ")+'</dd>'+
+          '</dl></div>'+
+        '</details>';
+    });
+    sec.innerHTML = html;
+    listWrap.appendChild(sec);
+  });
+
+  /* ---------- scatter ---------- */
+  var dotsG = document.getElementById("dots");
+  var PX = { x0:52, x1:440, y0:16, y1:316 };
+  function sx(v){ return PX.x0 + ((v-1)/4) * (PX.x1 - PX.x0); }
+  function sy(v){ return PX.y1 - ((v-1)/4) * (PX.y1 - PX.y0); }
+  function rad(inf){ return inf <= 1 ? 6 : inf <= 2.5 ? 9 : inf <= 4 ? 12 : 15; }
+  OPPS.forEach(function(o){
+    var g = document.createElementNS("http://www.w3.org/2000/svg","g");
+    g.setAttribute("class","dot");
+    g.setAttribute("data-id", o.id);
+    g.setAttribute("transform","translate("+sx(o.lev).toFixed(1)+","+sy(o.val).toFixed(1)+")");
+    var c = document.createElementNS("http://www.w3.org/2000/svg","circle");
+    c.setAttribute("r", rad(o.inf));
+    c.style.fill = AREA_COLOR[o.area];
+    c.style.fillOpacity = "0.85";
+    var tx = document.createElementNS("http://www.w3.org/2000/svg","text");
+    tx.setAttribute("text-anchor","middle");
+    tx.setAttribute("dy","3");
+    tx.textContent = o.tier === 0 ? "!" : o.rank;
+    g.appendChild(c); g.appendChild(tx);
+    dotsG.appendChild(g);
+
+    g.addEventListener("mouseenter", function(e){ showTip(e, o); });
+    g.addEventListener("mousemove", moveTip);
+    g.addEventListener("mouseleave", hideTip);
+    g.addEventListener("click", function(){
+      var d = document.getElementById("r-"+o.id);
+      if(d){ d.open = true; d.scrollIntoView({ behavior:"smooth", block:"center" }); }
+    });
+  });
+
+  var tip = document.getElementById("tip");
+  function showTip(e, o){
+    tip.innerHTML = '<b>'+(o.tier===0?"Tier 0: ":"#"+o.rank+"  ")+o.title+'</b>'+
+      '<span class="m">leverage '+o.lev+' &nbsp;/&nbsp; value '+o.val+' &nbsp;/&nbsp; new infra '+o.inf+' &nbsp;/&nbsp; '+o.effort+'</span>';
+    tip.style.opacity = "1";
+    moveTip(e);
+  }
+  function moveTip(e){
+    var pad = 14;
+    var w = tip.offsetWidth, h = tip.offsetHeight;
+    var x = e.clientX + pad, y = e.clientY + pad;
+    if(x + w > window.innerWidth - 8) x = e.clientX - w - pad;
+    if(y + h > window.innerHeight - 8) y = e.clientY - h - pad;
+    tip.style.left = x + "px"; tip.style.top = y + "px";
+  }
+  function hideTip(){ tip.style.opacity = "0"; }
+
+  /* ---------- filters ---------- */
+  var active = { area:[], tier:[], effort:[] };
+  var fchips = Array.prototype.slice.call(document.querySelectorAll(".fchip"));
+  function applyFilters(){
+    var anyArea = active.area.length, anyTier = active.tier.length, anyEffort = active.effort.length;
+    OPPS.forEach(function(o){
+      var ok = (!anyArea || active.area.indexOf(o.area) > -1) &&
+               (!anyTier || active.tier.indexOf(String(o.tier)) > -1) &&
+               (!anyEffort || active.effort.indexOf(o.effort) > -1);
+      var d = document.getElementById("r-"+o.id);
+      if(d) d.hidden = !ok;
+      var dot = dotsG.querySelector('[data-id="'+o.id+'"]');
+      if(dot) dot.classList.toggle("off", !ok);
+    });
+    document.querySelectorAll(".tier").forEach(function(sec){
+      var vis = sec.querySelectorAll(".ritem:not([hidden])").length;
+      sec.style.display = vis ? "" : "none";
+    });
+  }
+  fchips.forEach(function(ch){
+    ch.addEventListener("click", function(){
+      var f = ch.dataset.f, v = ch.dataset.v;
+      var i = active[f].indexOf(v);
+      if(i > -1){ active[f].splice(i,1); ch.setAttribute("aria-pressed","false"); }
+      else { active[f].push(v); ch.setAttribute("aria-pressed","true"); }
+      applyFilters();
+    });
+  });
+  document.getElementById("clearF").addEventListener("click", function(){
+    active = { area:[], tier:[], effort:[] };
+    fchips.forEach(function(c){ c.setAttribute("aria-pressed","false"); });
+    applyFilters();
+  });
+
+  /* ---------- theme toggle ---------- */
+  var root = document.documentElement;
+  document.getElementById("themeBtn").addEventListener("click", function(){
+    var cur = root.getAttribute("data-theme");
+    var next = cur === "dark" ? "light" : cur === "light" ? "dark" :
+      (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark");
+    root.setAttribute("data-theme", next);
+  });
+
+  /* ---------- init ---------- */
+  showTab(location.hash.replace("#","") || "overview", false);
+})();
+</script>
+</body>
+</html>

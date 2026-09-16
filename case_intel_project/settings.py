@@ -251,7 +251,12 @@ USE_GROQ = config("USE_GROQ", default=False, cast=bool)
 
 # Groq Configuration (used when USE_GROQ=true)
 GROQ_API_KEY = config("GROQ_API_KEY", default="")
-GROQ_MODEL = config("GROQ_MODEL", default="llama-3.3-70b-versatile")
+# llama-3.3-70b-versatile (the previous default) was retired by Groq --
+# every generate() call 404'd with model_not_found. openai/gpt-oss-120b is
+# the closest currently-available equivalent (120B, 131k context) on this
+# account; verified directly against the Groq API for both plain chat and
+# response_format=json_object (used by order_summary's generate_with_json).
+GROQ_MODEL = config("GROQ_MODEL", default="openai/gpt-oss-120b")
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 
 # Gemini Configuration (used when USE_GEMINI_EMBEDDINGS=true)
@@ -363,6 +368,15 @@ else:
 #     visible on the portal are rows in the RESULT table, not benches.
 TELANGANA_HC_COURT_KEY = config("TELANGANA_HC_COURT_KEY", default="telangana")
 TELANGANA_HC_BENCH_CODE = config("TELANGANA_HC_BENCH_CODE", default="1")
+
+# Which courts the scheduled cause-list fetch covers. Comma-separated
+# registry keys (see core/services/cause_list/registry.py). Each key also
+# names a systemd timer instance -- deploy/systemd/case-intel-causelist@.timer
+# -- so switching a court on is: add its key here + write a fetcher module +
+# register it + `systemctl enable --now case-intel-causelist@<key>.timer`.
+# Empty/unset falls back to just "telangana_hc" so existing deploys are
+# unaffected.
+CAUSE_LIST_COURTS = config("CAUSE_LIST_COURTS", default="telangana_hc", cast=Csv())
 
 # ============================================================================
 # Outbound email (invoice delivery to a case's billing contact)

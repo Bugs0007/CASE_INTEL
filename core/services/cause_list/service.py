@@ -25,10 +25,10 @@ from .exceptions import (
     CauseListNotPublishedError,
     CauseListParseError,
 )
+from .registry import CauseListCourt, get_cause_list_court
 from .telangana_hc import (
     COURT_KEY,
     CauseListDay,
-    fetch_cause_list_day,
     normalize_case_token,
 )
 
@@ -213,13 +213,14 @@ def _save(hearings: list[Hearing]) -> None:
     )
 
 
-def tracked_hearings_on(target_date: date) -> list[Hearing]:
-    """Scheduled hearings on `target_date` for cases tracked at the court
-    this module handles.
+def tracked_hearings_on(
+    target_date: date, court: CauseListCourt
+) -> list[Hearing]:
+    """Scheduled hearings on `target_date` that `court`'s cause list can cover.
 
-    Scoped to high_court cases with tracking enabled -- a district-court
-    case would never appear in this list, and checking it against the
-    High Court's list would produce a false "not listed".
+    `court.hearing_filter` scopes this (e.g. High Court cases with tracking
+    enabled) -- a district-court case would never appear in the Telangana
+    HC list, and checking it there would produce a false "not listed".
 
     Not owner-scoped: this runs as a system job across every advocate's
     cases, exactly like the order-sync worker. The results are written to
@@ -230,17 +231,23 @@ def tracked_hearings_on(target_date: date) -> list[Hearing]:
         .filter(
             hearing_date__date=target_date,
             status="scheduled",
-            case__tracking_enabled=True,
-            case__court_type="high_court",
+            **court.hearing_filter,
         )
         .order_by("id")
     )
 
 
 def check_cause_list_for_date(
-    target_date: date, *, cause_list_day: CauseListDay | None = None
+    target_date: date,
+    *,
+    court_key: str = COURT_KEY,
+    cause_list_day: CauseListDay | None = None,
 ) -> dict:
-    """Fetch (or accept) every list for `target_date` and apply it.
+    """Fetch (or accept) every list for `target_date` at `court_key` and apply it.
+
+    `court_key` selects a registered court (see
+    `core/services/cause_list/registry.py`); it defaults to Telangana HC,
+    the only court wired up today.
 
     `cause_list_day` is an injection point for tests and for re-running
     against saved documents; when given, nothing is downloaded.
@@ -248,19 +255,22 @@ def check_cause_list_for_date(
     Returns a result dict; never raises for the ordinary
     "not published yet" case, which is recorded and reported instead.
     """
-    hearings = tracked_hearings_on(target_date)
+    court = get_cause_list_court(court_key)
+    hearings = tracked_hearings_on(target_date, court)
     if not hearings:
-        logger.info("Cause list: no tracked High Court hearings on %s.", target_date)
-        return {"date": target_date, "hearings": 0, "status": "no_hearings"}
+        logger.info(
+            "Cause list %s: no tracked hearings on %s.", court.key, target_date
+        )
+        return {"date": target_date, "hearings": 0, "status": "no_hearings", "court": court.key}
 
     try:
         cause_list = (
             cause_list_day
             if cause_list_day is not None
-            else fetch_cause_list_day(target_date)
+            else court.fetch_day(target_date)
         )
     except CauseListNotPublishedError as exc:
-        count = mark_not_published(hearings)
+        count = mark_not_published(hearings, court_key=court.key)
         logger.info(
             "Cause list for %s not published yet (%s) -- %d hearing(s) marked "
             "'not yet listed'.",
@@ -273,6 +283,7 @@ def check_cause_list_for_date(
             "hearings": len(hearings),
             "status": "not_published",
             "marked": count,
+            "court": court.key,
         }
     except CauseListNotConfiguredError:
         # An operator problem, not a court one -- do NOT record these
@@ -290,6 +301,7 @@ def check_cause_list_for_date(
             "date": target_date,
             "hearings": len(hearings),
             "status": "parse_error",
+            "court": court.key,
         }
 
     # A published list is for one specific date; if the document's own
@@ -308,8 +320,16 @@ def check_cause_list_for_date(
             "hearings": len(hearings),
             "status": "date_mismatch",
             "document_date": cause_list.list_date,
+            "court": court.key,
         }
 
-    result = apply_cause_list(cause_list, hearings)
-    result.update({"date": target_date, "hearings": len(hearings), "status": "applied"})
+    result = apply_cause_list(cause_list, hearings, court_key=court.key)
+    result.update(
+        {
+            "date": target_date,
+            "hearings": len(hearings),
+            "status": "applied",
+            "court": court.key,
+        }
+    )
     return result

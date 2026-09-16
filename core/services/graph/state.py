@@ -39,6 +39,11 @@ class AgentState(TypedDict):
 
     # --- Input ---
     user_query: str
+    # The requesting user's id. REQUIRED -- hybrid_search filters every
+    # retrieval leg by this owner, with or without a case_id, so the Case
+    # Bot can never surface another advocate's document chunks. Set by
+    # AIWorkflowService.process_query() from the authenticated user.
+    owner_id: int
     case_id: Optional[int]
     conversation_id: Optional[int]
     conversation_history: list[dict]   # [{"role": "user"|"assistant", "content": str}]

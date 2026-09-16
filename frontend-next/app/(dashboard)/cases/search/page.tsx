@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, RotateCcw, Search, XCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ConflictWarning } from "@/components/cases/conflict-warning";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { showToast } from "@/components/ui/toaster";
@@ -511,6 +512,12 @@ export default function AdvocateSearchPage() {
                   <p className="text-gray-600">
                     {ij.skipped_conflict.length} match a case number already in your account, skipped.
                   </p>
+                )}
+                {Object.keys(ij.conflicts ?? {}).length > 0 && (
+                  <ConflictWarning
+                    conflicts={Object.values(ij.conflicts).flat()}
+                    title={`${Object.keys(ij.conflicts).length} imported case(s) may conflict with cases you already have. They were added, and each is noted on its activity log.`}
+                  />
                 )}
                 {ij.failed.length > 0 && (
                   <div className="flex items-start gap-2 rounded-lg bg-status-alert-soft p-3 text-status-alert">

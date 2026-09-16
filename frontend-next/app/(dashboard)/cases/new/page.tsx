@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { showToast } from "@/components/ui/toaster";
+import { ConflictWarning } from "@/components/cases/conflict-warning";
 import { useCreateCase } from "@/hooks/use-cases";
 import { useCnrLookup, useCreateCaseFromCnr } from "@/hooks/use-case-tracking";
 import { APIError } from "@/lib/api/client";
@@ -19,6 +20,7 @@ import type {
   CaseStatus,
   CaseType,
   CnrLookupPreview,
+  ConflictHit,
   UserPartyRole,
 } from "@/types";
 
@@ -86,6 +88,9 @@ export default function NewCasePage() {
   const [filingDate, setFilingDate] = useState("");
   const [notes, setNotes] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+  // Possible conflicts of interest the API asked to be acknowledged (409
+  // "conflict_check"). Shown with an "Add case anyway" confirmation.
+  const [conflicts, setConflicts] = useState<ConflictHit[] | null>(null);
 
   const canSubmit = caseNumber.trim().length > 0 && title.trim().length > 0;
   const cnrValid = cnr.trim().length === 16 && /^[a-zA-Z0-9]+$/.test(cnr.trim());
@@ -100,9 +105,17 @@ export default function NewCasePage() {
   function extractErrorDetail(error: unknown): {
     detail: string;
     duplicate: { id: number; case_number: string } | null;
+    conflicts?: ConflictHit[];
   } {
     if (error instanceof APIError && error.data && typeof error.data === "object") {
       const data = error.data as Record<string, unknown>;
+      if (data.code === "conflict_check" && Array.isArray(data.conflicts)) {
+        return {
+          detail: String(data.detail || ""),
+          duplicate: null,
+          conflicts: data.conflicts as ConflictHit[],
+        };
+      }
       if (data.code === "duplicate_cnr" && typeof data.case_id === "number") {
         return {
           detail: String(data.detail || "You're already tracking this CNR."),
@@ -143,6 +156,7 @@ export default function NewCasePage() {
   }
 
   function handleUseDifferentCnr() {
+    setConflicts(null);
     setPreview(null);
     setCnrError(null);
     setDuplicateCase(null);
@@ -152,15 +166,32 @@ export default function NewCasePage() {
     setUserPartyRole("unknown");
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    void submitCase(false);
+  }
+
+  function showSubmitError(error: unknown) {
+    const { detail, duplicate, conflicts: found } = extractErrorDetail(error);
+    if (found) {
+      setConflicts(found);
+      return;
+    }
+    setFormError(detail);
+    setDuplicateCase(duplicate);
+  }
+
+  async function submitCase(acknowledgeConflicts: boolean) {
     setFormError(null);
     setDuplicateCase(null);
+    setConflicts(null);
     if (!canSubmit) return;
+    const acknowledge = acknowledgeConflicts || undefined;
 
     if (mode === "cnr" && preview) {
       try {
         const created = await createCaseFromCnr.mutateAsync({
+          acknowledge_conflicts: acknowledge,
           preview_token: preview.preview_token,
           case_number: caseNumber.trim(),
           title: title.trim(),
@@ -175,9 +206,7 @@ export default function NewCasePage() {
         showToast.success("Case added", "Fetched from eCourts and tracking is already set up.");
         router.push(`/cases/${created.id}`);
       } catch (error) {
-        const { detail, duplicate } = extractErrorDetail(error);
-        setFormError(detail);
-        setDuplicateCase(duplicate);
+        showSubmitError(error);
         if (error instanceof APIError && error.status === 410) {
           // Stale preview_token -- send the advocate back to the CNR step
           // rather than leaving them stuck resubmitting a dead token.
@@ -197,6 +226,7 @@ export default function NewCasePage() {
       priority,
       filing_date: filingDate || undefined,
       notes: notes.trim() || undefined,
+      acknowledge_conflicts: acknowledge,
     };
 
     try {
@@ -207,9 +237,7 @@ export default function NewCasePage() {
       );
       router.push(`/cases/${created.id}`);
     } catch (error) {
-      const { detail, duplicate } = extractErrorDetail(error);
-      setFormError(detail);
-      setDuplicateCase(duplicate);
+      showSubmitError(error);
     }
   }
 
@@ -340,6 +368,15 @@ export default function NewCasePage() {
               </span>
             )}
           </div>
+        </div>
+      )}
+
+      {mode === "cnr" && preview && !conflicts && preview.conflicts.length > 0 && (
+        <div className="mb-5">
+          <ConflictWarning
+            conflicts={preview.conflicts}
+            title="Possible conflict of interest with your existing cases"
+          />
         </div>
       )}
 
@@ -475,6 +512,27 @@ export default function NewCasePage() {
                   )}
                 </div>
               </div>
+            )}
+
+            {conflicts && (
+              <ConflictWarning
+                conflicts={conflicts}
+                title="This matter may conflict with cases you already have"
+              >
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => void submitCase(true)}
+                    disabled={createCase.isPending || createCaseFromCnr.isPending}
+                  >
+                    Add case anyway
+                  </Button>
+                  <Button type="button" variant="secondary" size="sm" onClick={() => setConflicts(null)}>
+                    Review first
+                  </Button>
+                </div>
+              </ConflictWarning>
             )}
 
             <div className="flex justify-end gap-3 pt-2">

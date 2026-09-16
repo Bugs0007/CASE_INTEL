@@ -8,3 +8,7 @@ export * from "./email";
 export * from "./dashboard";
 export * from "./case-tracking";
 export * from "./advocate-search";
+export * from "./task";
+export * from "./hearing-digest";
+export * from "./conflict";
+export * from "./limitation";
