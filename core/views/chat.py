@@ -64,6 +64,12 @@ class ChatView(APIView):
                     {"detail": "The selected conversation does not belong to this case."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+            # Continuing a case's conversation without restating case_id
+            # keeps that case's scope. Without this, retrieval silently
+            # widened to every document the advocate owns and the case's
+            # live tracking context was dropped from the prompt.
+            if case_id is None:
+                case_id = conversation.case_id
 
         logger.info(
             "Chat request: case=%s, conversation=%s, query='%s...'",

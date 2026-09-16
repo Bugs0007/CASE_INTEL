@@ -13,6 +13,13 @@ from rest_framework.response import Response
 
 from core.models import Case, Document, Hearing
 from core.serializers import CaseCreateSerializer, CaseSerializer
+from core.services.conflict_check import (
+    conflict_response_body,
+    find_conflicts,
+    is_acknowledged,
+    record_acknowledgement,
+)
+from core.services.tasks.from_orders import sync_order_tasks_for_case
 from core.views.mixins import OwnerScopedMixin
 
 
@@ -95,6 +102,21 @@ class CaseListView(OwnerScopedMixin, generics.ListCreateAPIView):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+
+        # Conflict check at intake -- warns, never blocks outright: a hit
+        # needs acknowledge_conflicts=true to proceed, and the
+        # acknowledgement is logged on the new case.
+        fields = serializer.validated_data
+        conflicts = find_conflicts(
+            request.user,
+            client_name=fields.get("client_name") or "",
+            opposing_party=fields.get("opposing_party") or "",
+            user_party_role=fields.get("user_party_role") or "unknown",
+            title=fields.get("title") or "",
+        )
+        if conflicts and not is_acknowledged(request.data):
+            return Response(conflict_response_body(conflicts), status=status.HTTP_409_CONFLICT)
+
         try:
             self.perform_create(serializer)
         except IntegrityError:
@@ -110,6 +132,8 @@ class CaseListView(OwnerScopedMixin, generics.ListCreateAPIView):
                 {"case_number": ["You already have a case with this case number."]},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        if conflicts:
+            record_acknowledgement(serializer.instance, conflicts)
         output = CaseSerializer(serializer.instance).data
         headers = self.get_success_headers(output)
         return Response(output, status=status.HTTP_201_CREATED, headers=headers)
@@ -160,3 +184,11 @@ class CaseDetailView(OwnerScopedMixin, generics.RetrieveUpdateDestroyAPIView):
             conversation_count=Count("conversations", distinct=True),
         )
         return _annotate_next_hearing_date(qs)
+
+    def perform_update(self, serializer):
+        previous_role = serializer.instance.user_party_role
+        super().perform_update(serializer)
+        if serializer.instance.user_party_role != previous_role:
+            # Which order directions are "yours" just changed: drop untouched
+            # tasks from the other side, create them for this one. DB-only.
+            sync_order_tasks_for_case(serializer.instance)

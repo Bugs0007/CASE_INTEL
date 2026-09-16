@@ -75,7 +75,18 @@ class VectorSearchService:
     Usage::
 
         service = VectorSearchService()
-        results = service.search("what was the settlement amount?", case_id=3)
+        results = service.search(
+            "what was the settlement amount?", owner_id=request.user.id, case_id=3
+        )
+
+    ``owner_id`` is REQUIRED and is applied to every retrieval leg (vector
+    and keyword) regardless of whether ``case_id`` is given. ``DocumentChunk``
+    is an ``OwnedModel`` and chunks always inherit their document's owner at
+    ingestion time (see ``DocumentProcessor``), so this is the row-level
+    tenant boundary for Case Bot retrieval -- without it, a chat with no
+    ``case_id`` would retrieve across every advocate's documents. ``case_id``
+    only ever *narrows* within the owner's own rows; it never substitutes
+    for the owner filter.
     """
 
     def __init__(self, embedding_service=None, use_reranker: bool = True) -> None:
@@ -113,14 +124,15 @@ class VectorSearchService:
     def _vector_search(
         self,
         query_embedding: list[float],
+        owner_id: int,
         case_id: Optional[int],
         top_k: int,
     ) -> list[DocumentChunk]:
-        """Return top_k chunks by cosine similarity."""
+        """Return top_k chunks by cosine similarity, scoped to one owner."""
         qs = (
             DocumentChunk.objects
             .select_related("document")
-            .filter(embedding__isnull=False)
+            .filter(embedding__isnull=False, owner_id=owner_id)
         )
         if case_id is not None:
             qs = qs.filter(document__case_id=case_id)
@@ -153,14 +165,15 @@ class VectorSearchService:
     def _keyword_search(
         self,
         query: str,
+        owner_id: int,
         case_id: Optional[int],
         top_k: int,
     ) -> list[DocumentChunk]:
-        """Return top_k chunks by full-text (tsvector) ranking."""
+        """Return top_k chunks by full-text (tsvector) ranking, scoped to one owner."""
         qs = (
             DocumentChunk.objects
             .select_related("document")
-            .filter(search_vector__isnull=False)
+            .filter(search_vector__isnull=False, owner_id=owner_id)
         )
         if case_id is not None:
             qs = qs.filter(document__case_id=case_id)
@@ -256,6 +269,8 @@ class VectorSearchService:
     def search(
         self,
         query: str,
+        *,
+        owner_id: int,
         keyword_query: Optional[str] = None,
         case_id: Optional[int] = None,
         document_types: Optional[list[str]] = None,  # kept for API compatibility
@@ -265,13 +280,21 @@ class VectorSearchService:
 
         Args:
             query: Natural-language question from the user.
-            case_id: Scope the search to a specific case.
+            owner_id: REQUIRED. The requesting user's id -- every retrieval
+                leg is filtered to this owner's chunks. Keyword-only and has
+                no default so no call site can silently run an unscoped,
+                cross-tenant search.
+            case_id: Further narrow to a single case *within* this owner's
+                rows. Never widens scope.
             document_types: Ignored (kept for backwards compatibility).
             top_k: How many results to return.
 
         Returns:
             List of VectorSearchResult sorted by descending relevance.
         """
+        if owner_id is None:
+            raise ValueError("VectorSearchService.search() requires owner_id.")
+
         top_k = top_k or settings.AI_SEARCH_TOP_K
         keyword_query = keyword_query or query
         # Fetch more candidates than needed so RRF and reranker have room to work
@@ -280,7 +303,9 @@ class VectorSearchService:
         # --- Stage 1a: vector search (best-effort; embedding provider may be down) ---
         try:
             query_embedding = self._embedding_service.embed_text(query)
-            vector_hits = self._vector_search(query_embedding, case_id, candidate_k)
+            vector_hits = self._vector_search(
+                query_embedding, owner_id, case_id, candidate_k
+            )
         except Exception:
             logger.warning(
                 "Vector search leg failed for query='%s...' — using keyword-only results.",
@@ -290,7 +315,9 @@ class VectorSearchService:
             vector_hits = []
 
         # --- Stage 1b: keyword search ---
-        keyword_hits = self._keyword_search(keyword_query, case_id, candidate_k)
+        keyword_hits = self._keyword_search(
+            keyword_query, owner_id, case_id, candidate_k
+        )
 
         # --- Stage 2: RRF fusion ---
         fused = self._rrf_fuse(vector_hits, keyword_hits, candidate_k)
@@ -304,9 +331,10 @@ class VectorSearchService:
         ]
 
         logger.info(
-            "Hybrid search: query='%s...', case_id=%s, "
+            "Hybrid search: query='%s...', owner_id=%s, case_id=%s, "
             "vector_hits=%d, keyword_hits=%d, final=%d, top_score=%.4f",
             query[:50],
+            owner_id,
             case_id,
             len(vector_hits),
             len(keyword_hits),

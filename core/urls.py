@@ -56,11 +56,19 @@ from core.views import (
     GmailStatusView,
     GmailSyncView,
     HearingDetailView,
+    HearingDigestBriefingView,
+    HearingDigestPdfView,
+    HearingDigestView,
     HearingListCreateView,
     InviteValidateView,
+    CaseLimitationDeadlineView,
+    LimitationComputeView,
+    LimitationRulesView,
     LoginView,
     LogoutView,
     RegisterView,
+    TaskDetailView,
+    TaskListCreateView,
     TravelBookingDetailView,
     TravelBookingFileView,
     TravelBookingListCreateView,
@@ -213,6 +221,14 @@ urlpatterns = [
     # Hearings
     path("hearings/", HearingListCreateView.as_view(), name="hearing-list"),
     path("hearings/<int:pk>/", HearingDetailView.as_view(), name="hearing-detail"),
+    # Hearing prep sheet (core/services/hearing_digest/)
+    path("hearings/<int:pk>/digest/", HearingDigestView.as_view(), name="hearing-digest"),
+    path("hearings/<int:pk>/digest/pdf/", HearingDigestPdfView.as_view(), name="hearing-digest-pdf"),
+    path(
+        "hearings/<int:pk>/digest/briefing/",
+        HearingDigestBriefingView.as_view(),
+        name="hearing-digest-briefing",
+    ),
 
     # Advocate billing profile (invoice letterhead + default fee). A
     # singleton per user -- no id in the path, see AdvocateProfileView.
@@ -282,6 +298,20 @@ urlpatterns = [
         ClientContactDetailView.as_view(),
         name="client-contact-detail",
     ),
+
+    # Limitation deadlines (core/services/limitation/) -- recorded as Tasks
+    path("limitation/rules/", LimitationRulesView.as_view(), name="limitation-rules"),
+    path("limitation/compute/", LimitationComputeView.as_view(), name="limitation-compute"),
+    path(
+        "cases/<int:pk>/limitation-deadlines/",
+        CaseLimitationDeadlineView.as_view(),
+        name="case-limitation-deadlines",
+    ),
+
+    # Tasks -- manual to-dos, court-order directions and limitation
+    # deadlines in one list (see core/models/task.py)
+    path("tasks/", TaskListCreateView.as_view(), name="task-list"),
+    path("tasks/<int:pk>/", TaskDetailView.as_view(), name="task-detail"),
 
     # Documents
     path("documents/", DocumentListView.as_view(), name="document-list"),

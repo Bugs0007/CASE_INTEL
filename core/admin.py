@@ -14,6 +14,7 @@ from core.models import (
     AdvocateSearchPreference,
     AppearanceFee,
     Case,
+    CaseBriefing,
     CaseTag,
     CaseTagMap,
     Citation,
@@ -203,12 +204,19 @@ class CitationAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at",)
 
 
+@admin.register(CaseBriefing)
+class CaseBriefingAdmin(admin.ModelAdmin):
+    list_display = ("case", "status", "generated_at", "llm_calls")
+    list_filter = ("status",)
+    readonly_fields = ("input_fingerprint", "generated_at", "created_at", "updated_at")
+
+
 @admin.register(Task)
 class TaskAdmin(admin.ModelAdmin):
-    list_display = ("title", "case", "status", "due_date", "created_at")
-    list_filter = ("status",)
-    search_fields = ("title", "description")
-    readonly_fields = ("created_at",)
+    list_display = ("title", "case", "kind", "status", "due_date", "needs_review", "created_at")
+    list_filter = ("kind", "status", "needs_review", "user_modified")
+    search_fields = ("title", "description", "source_text", "dedup_key")
+    readonly_fields = ("created_at", "updated_at", "completed_at")
 
 
 @admin.register(Hearing)

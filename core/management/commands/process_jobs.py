@@ -36,6 +36,7 @@ from core.services.advocate_import import run_advocate_import
 from core.services.advocate_search import AdvocateSearchCancelled, run_advocate_search
 from core.services.court_order_sync import sync_case_orders
 from core.services.document_processor import DocumentProcessor
+from core.services.hearing_digest import generate_case_briefing
 
 logger = logging.getLogger(__name__)
 
@@ -178,6 +179,8 @@ class Command(BaseCommand):
                 run_advocate_import(job, progress_callback=report_progress)
             elif job.job_type == "advocate_search":
                 run_advocate_search(job, progress_callback=report_progress)
+            elif job.job_type == "case_briefing":
+                generate_case_briefing(Case.objects.get(id=job.case_id))
             else:
                 processor.process_document(job.document_id, progress_callback=report_progress)
                 # Order Overview runs here and ONLY here: the text (and
@@ -235,6 +238,22 @@ class Command(BaseCommand):
                 "Order Overview failed for document %d (document itself is fine).",
                 document_id,
             )
+            return
+
+        # Tasks from the order's directions -- DB-only, no LLM. Separate
+        # from the summary above so a failure here can't be mistaken for a
+        # summary failure, and like it, never fails the document job.
+        try:
+            from core.services.tasks.from_orders import generate_tasks_for_order
+
+            result = generate_tasks_for_order(order)
+            if result.created or result.updated or result.pruned:
+                self.stdout.write(
+                    f"Order {order.id} tasks: {result.created} created, "
+                    f"{result.updated} updated, {result.pruned} pruned"
+                )
+        except Exception:  # noqa: BLE001
+            logger.exception("Direction tasks failed for order %d.", order.id)
 
     def _run_order_sync(self, job: ProcessingJob, report_progress) -> None:
         """Fetch new court-order PDFs for the job's case. Each downloaded

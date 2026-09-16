@@ -1,3 +1,4 @@
+import type { ConflictHit } from "./conflict";
 import type { Case, CaseCreateInput, UserPartyRole } from "./case";
 import type { Hearing } from "./hearing";
 
@@ -116,6 +117,8 @@ export interface CnrLookupPreview {
   next_hearing_date: string | null;
   first_hearing_date: string | null;
   hearing_count: number;
+  /** Possible conflicts of interest with existing cases -- a warning only. */
+  conflicts: ConflictHit[];
 }
 
 /** Body for POST /api/cases/cnr-lookup/create/ -- confirms a

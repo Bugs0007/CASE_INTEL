@@ -476,7 +476,7 @@ class TestNotPublished:
         assert hearing.cause_list_status == Hearing.CAUSE_LIST_LISTED
         assert hearing.cause_list_item_number == "1"
 
-    @patch("core.services.cause_list.service.fetch_cause_list_day")
+    @patch("core.services.cause_list.telangana_hc.fetch_cause_list_day")
     def test_unpublished_date_records_not_yet_listed(self, fetch, advocate):
         fetch.side_effect = CauseListNotPublishedError("nothing for that date")
         hearing = make_hearing(advocate, "WA/102/2026")
@@ -487,7 +487,7 @@ class TestNotPublished:
         hearing.refresh_from_db()
         assert hearing.cause_list_status == Hearing.CAUSE_LIST_NOT_PUBLISHED
 
-    @patch("core.services.cause_list.service.fetch_cause_list_day")
+    @patch("core.services.cause_list.telangana_hc.fetch_cause_list_day")
     def test_parse_failure_leaves_hearings_untouched(self, fetch, advocate):
         """A parser break must NOT read as 'your case isn't listed'."""
         fetch.side_effect = CauseListParseError("layout changed")
@@ -542,3 +542,76 @@ class TestNotPublished:
         assert listed.cause_list_court_hall == "1"
         assert absent.cause_list_status == Hearing.CAUSE_LIST_NOT_LISTED
         assert unmatchable.cause_list_status == Hearing.CAUSE_LIST_NOT_CHECKED
+
+
+# ---------------------------------------------------------------------------
+# The scheduled fetch: court registry + `manage.py fetch_cause_lists`
+#
+# The systemd timer (deploy/systemd/case-intel-causelist@.timer) fires
+# `manage.py fetch_cause_lists --court <key>` twice a day. These tests
+# stand in for "did the timer's target command stay wired up" -- especially
+# `--check`, which is the no-network preflight a deploy smoke test runs.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+class TestScheduledFetchCommand:
+    def test_check_flag_passes_for_the_default_configured_court(self, capsys):
+        from django.core.management import call_command
+
+        call_command("fetch_cause_lists", "--check")
+
+        out = capsys.readouterr().out
+        assert "telangana_hc" in out
+        assert "OK" in out
+
+    def test_check_flag_passes_for_every_configured_court(self, settings, capsys):
+        from django.core.management import call_command
+
+        settings.CAUSE_LIST_COURTS = ["telangana_hc"]
+        call_command("fetch_cause_lists", "--check", "--court", "telangana_hc")
+
+        assert "OK    telangana_hc" in capsys.readouterr().out
+
+    def test_check_flag_fails_for_an_unregistered_court(self):
+        from django.core.management import call_command
+        from django.core.management.base import CommandError
+
+        with pytest.raises(CommandError):
+            call_command("fetch_cause_lists", "--check", "--court", "not_a_real_court")
+
+    def test_unknown_configured_court_is_a_loud_command_error(self, settings):
+        from django.core.management import call_command
+        from django.core.management.base import CommandError
+
+        settings.CAUSE_LIST_COURTS = ["telangana_hc", "bogus_hc"]
+        with pytest.raises(CommandError):
+            call_command("fetch_cause_lists", "--check")
+
+    @patch("core.services.cause_list.telangana_hc.fetch_cause_list_day")
+    def test_command_runs_end_to_end_for_an_explicit_court(self, fetch, advocate):
+        """The timer's actual invocation form -- `--court <key> --date <d>` --
+        resolves and runs without error (portal 'not published yet' path)."""
+        from django.core.management import call_command
+
+        fetch.side_effect = CauseListNotPublishedError("not up yet")
+        hearing = make_hearing(advocate, "WA/102/2026")
+
+        call_command(
+            "fetch_cause_lists", "--court", "telangana_hc", "--date", "2026-08-03"
+        )
+
+        hearing.refresh_from_db()
+        assert hearing.cause_list_status == Hearing.CAUSE_LIST_NOT_PUBLISHED
+
+    def test_registry_default_matches_settings_default(self):
+        from core.services.cause_list.registry import (
+            configured_court_keys,
+            get_cause_list_court,
+        )
+
+        keys = configured_court_keys()
+        assert "telangana_hc" in keys
+        for key in keys:
+            # Every configured key must resolve to a real registry entry.
+            assert get_cause_list_court(key).key == key

@@ -69,11 +69,19 @@ def _make_case(owner, number=None):
     )
 
 
+_hearing_counter = itertools.count(1)
+
+
 def _make_hearing(owner, case):
+    # A distinct time per hearing: Hearing is unique on (case, hearing_date,
+    # source), and back-to-back timezone.now() calls can return the same
+    # microsecond (notably on Windows), which made tests creating several
+    # hearings on one case fail intermittently.
     return Hearing.objects.create(
         owner=owner,
         case=case,
-        hearing_date=timezone.now() + timezone.timedelta(days=7),
+        hearing_date=timezone.now()
+        + timezone.timedelta(days=7, minutes=next(_hearing_counter)),
         hearing_type="motion",
         location="High Court for the State of Telangana",
         judge="Justice A. Rao",

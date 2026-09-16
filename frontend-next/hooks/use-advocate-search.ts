@@ -50,6 +50,12 @@ export function useAdvocateSearchJob(jobId: number | null) {
       }
       return ACTIVE_POLL_MS;
     },
+    // A state-wide search runs for minutes -- if the advocate tabs away
+    // mid-search, react-query's default pause-when-hidden would otherwise
+    // make the progress bar look frozen (and, under Chrome's intensive
+    // timer throttling, stay silent for a full minute+ even after
+    // switching back) even though the job is running fine server-side.
+    refetchIntervalInBackground: true,
     refetchOnWindowFocus: false,
   });
 }

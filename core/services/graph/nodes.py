@@ -159,6 +159,53 @@ def _extract_citations_from_answer(
     return citations
 
 
+def _build_ungenerated_fallback(
+    chunks: list[ChunkData],
+    tracking_block: str | None,
+) -> str:
+    """Fallback answer when the LLM call itself fails (provider outage,
+    retired/invalid model, rate limit, etc.) instead of a bare error string.
+
+    Only reached with chunks and/or tracking_block present -- the
+    zero-chunks-and-no-tracking case is already handled earlier in
+    generate_answer() without ever calling the LLM.
+    """
+    intro = (
+        "I found potentially relevant material below, but couldn't generate "
+        "a summarized answer right now (the AI service is temporarily "
+        "unavailable). Please review these directly, or try again shortly."
+    )
+    parts = [intro]
+    if chunks:
+        parts.append(_build_context(chunks))
+    if tracking_block:
+        parts.append(tracking_block)
+    return "\n\n---\n\n".join(parts)
+
+
+def _citations_from_chunks(chunks: list[ChunkData]) -> list[dict]:
+    """Cite every retrieved chunk directly.
+
+    Used only by the ungenerated-answer fallback, where there's no LLM
+    output to regex-match [Doc N] markers against (see
+    _extract_citations_from_answer for the normal path).
+    """
+    seen_chunk_ids: set[int] = set()
+    citations = []
+    for chunk in chunks:
+        chunk_id = chunk["chunk_id"]
+        if chunk_id in seen_chunk_ids:
+            continue
+        seen_chunk_ids.add(chunk_id)
+        citations.append({
+            "chunk_id": chunk_id,
+            "document_id": chunk["document_id"],
+            "citation_text": chunk["text"][:200].strip(),
+            "source_type": "chunk",
+        })
+    return citations
+
+
 def _format_sources_section(
     answer: str,
     citations: list[dict],
@@ -270,13 +317,21 @@ def hybrid_search(state: AgentState, search_service: VectorSearchService) -> Age
     hyde_passage = state.get("hyde_passage") or state["user_query"]
     raw_query = state["user_query"]
     case_id = state.get("case_id")
+    owner_id = state.get("owner_id")
+
+    # Fail closed: retrieval MUST be scoped to the requesting advocate. A
+    # state with no owner_id is a wiring bug, not something to paper over
+    # with an unscoped (cross-tenant) search.
+    if owner_id is None:
+        raise ValueError("hybrid_search: state is missing owner_id — refusing to search unscoped.")
 
     # Pass HyDE passage as the query — VectorSearchService will embed it
     # for the vector leg and use raw_query for the keyword leg internally.
-    # We monkey-patch by passing both via a composite string; alternatively
-    # expose a separate parameter.  Here we use the hybrid method directly.
+    # owner_id scopes both legs to this advocate's chunks; case_id (when
+    # present) only narrows further within them.
     results = search_service.search(
         query=hyde_passage,              # vector leg uses HyDE embedding
+        owner_id=owner_id,
         keyword_query=raw_query,         # keyword leg uses the original user query
         case_id=case_id,
         top_k=config.SEARCH_TOP_K,
@@ -287,6 +342,7 @@ def hybrid_search(state: AgentState, search_service: VectorSearchService) -> Age
         logger.info("HyDE search returned 0 results — retrying with raw query.")
         results = search_service.search(
             query=raw_query,
+            owner_id=owner_id,
             case_id=case_id,
             top_k=config.SEARCH_TOP_K,
         )
@@ -386,11 +442,27 @@ def generate_answer(state: AgentState, llm) -> AgentState:
         messages.append({"role": msg["role"], "content": msg["content"]})
     messages.append({"role": "user", "content": user_content})
 
-    answer = llm.generate(
-        messages,
-        temperature=config.LLM_TEMPERATURE,
-        max_tokens=config.LLM_MAX_TOKENS,
-    )
+    try:
+        answer = llm.generate(
+            messages,
+            temperature=config.LLM_TEMPERATURE,
+            max_tokens=config.LLM_MAX_TOKENS,
+        )
+    except Exception:
+        # Same pattern as hyde_expand() above: don't let a provider failure
+        # (outage, retired/invalid model, rate limit) surface as the
+        # generic top-level "I encountered an error" in ai_workflow.py --
+        # degrade to what retrieval already found instead.
+        logger.warning(
+            "Answer generation LLM call failed — falling back to raw retrieved excerpts.",
+            exc_info=True,
+        )
+        state["answer"] = _build_ungenerated_fallback(chunks, tracking_block)
+        state["citations"] = _citations_from_chunks(chunks)
+        state["answer_confidence"] = 0.0
+        state["requires_clarification"] = False
+        state["clarification_question"] = None
+        return state
 
     # --- Inline citation extraction (no LLM call) ---
     citations = _extract_citations_from_answer(answer, chunks)
