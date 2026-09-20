@@ -4,14 +4,19 @@ from .mixins import OwnedModel
 
 
 class AppearanceFee(OwnedModel):
-    """What the advocate charges for appearing at one hearing, and where
+    """One billable charge attached to a hearing -- the advocate's
+    appearance fee, a hotel bill, a flight, or anything else -- and where
     that charge has got to: PENDING -> INVOICED -> PAID.
 
-    One fee per hearing (OneToOne). The lifecycle is deliberately
-    forward-only and is enforced in core/services/invoice_service.py, not
-    here -- the model stores state, the service owns the legal
-    transitions, so every caller (API, admin, management command) goes
-    through the same rules.
+    A hearing can carry several charges (ForeignKey, not OneToOne), each
+    with its own `category`, amount, invoice number and lifecycle. The
+    class keeps its original name because "appearance" is still the
+    default category; `category` says what a given row is actually for.
+
+    The lifecycle is deliberately forward-only and is enforced in
+    core/services/invoice_service.py, not here -- the model stores state,
+    the service owns the legal transitions, so every caller (API, admin,
+    management command) goes through the same rules.
 
     `invoice_number` is assigned once, at generation, from the owner's
     AdvocateProfile counter and never reissued: regenerating the PDF for
@@ -19,6 +24,18 @@ class AppearanceFee(OwnedModel):
     number that has been sent to a client can't silently come to mean a
     different document.
     """
+
+    CATEGORY_APPEARANCE = "appearance"
+    CATEGORY_HOTEL = "hotel"
+    CATEGORY_FLIGHT = "flight"
+    CATEGORY_OTHER = "other"
+
+    CATEGORY_CHOICES = [
+        (CATEGORY_APPEARANCE, "Appearance Fee"),
+        (CATEGORY_HOTEL, "Hotel"),
+        (CATEGORY_FLIGHT, "Flight"),
+        (CATEGORY_OTHER, "Other"),
+    ]
 
     STATUS_PENDING = "pending"
     STATUS_INVOICED = "invoiced"
@@ -44,8 +61,11 @@ class AppearanceFee(OwnedModel):
         (SEND_LOGGED, "Logged only (email not configured)"),
     ]
 
-    hearing = models.OneToOneField(
-        "core.Hearing", on_delete=models.CASCADE, related_name="appearance_fee"
+    hearing = models.ForeignKey(
+        "core.Hearing", on_delete=models.CASCADE, related_name="appearance_fees"
+    )
+    category = models.CharField(
+        max_length=20, choices=CATEGORY_CHOICES, default=CATEGORY_APPEARANCE
     )
     amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
@@ -87,4 +107,7 @@ class AppearanceFee(OwnedModel):
 
     def __str__(self):
         label = self.invoice_number or "no invoice"
-        return f"Fee {self.amount} [{self.status}] hearing={self.hearing_id} ({label})"
+        return (
+            f"{self.get_category_display()} {self.amount} [{self.status}] "
+            f"hearing={self.hearing_id} ({label})"
+        )

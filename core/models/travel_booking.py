@@ -8,7 +8,9 @@ class TravelBooking(OwnedModel):
     uploads the ticket/confirmation PDF and the row records it.
 
     Several per hearing is normal (a flight AND a hotel AND a return
-    leg), so this is a plain FK, not a OneToOne like AppearanceFee.
+    leg), so this is a plain FK -- as is AppearanceFee.hearing, which
+    carries the billable AMOUNT for a hotel/flight; this model only holds
+    the uploaded confirmation document, not what it cost.
 
     A row can exist before its file does (status PENDING -- "I still need
     to book this"); attaching a file flips it to BOOKED. That transition

@@ -198,6 +198,19 @@ def name_similarity(a: tuple[str, ...], b: tuple[str, ...]) -> int:
     return round(100 * (total / len(shorter)) * (0.75 + 0.25 * coverage))
 
 
+def advocate_tokens(name: str) -> tuple[str, ...]:
+    """Tokens for a free-text advocate-of-record string (e.g. "APP G.
+    Ramesh Kumar" from a District Courts "Search by Advocate" results
+    grid), for use with name_similarity.
+
+    Deliberately built on normalize_name (already used for advocate-name
+    comparison in party_role.py's substring check) rather than
+    party_tokens: party_tokens strips PARTY-shaped noise ("S/o Venkat
+    Rao", "aged 45 years", "rep. by its Secretary") that doesn't occur in
+    an advocate field and isn't needed here."""
+    return tuple(normalize_name(name).split())
+
+
 def could_match(a: tuple[str, ...], b: tuple[str, ...]) -> bool:
     """Cheap pre-filter before name_similarity: do the names share the
     first two letters of any distinctive token? Two letters, not three, so

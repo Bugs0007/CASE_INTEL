@@ -677,10 +677,11 @@ class TestHearingOrderSummary:
         magic number, which is the property that actually matters and
         won't break on unrelated query churn.
 
-        Regression: the embedded appearance_fee is a reverse OneToOne,
-        which Django does not fetch with the row -- before
-        select_related("appearance_fee") this was 8 queries for 5
-        hearings and 28 for 25.
+        Regression: the embedded appearance_fees are a reverse FK, which
+        Django does not fetch with the row -- before
+        prefetch_related("appearance_fees") (previously
+        select_related("appearance_fee"), back when it was a OneToOne)
+        this was 8 queries for 5 hearings and 28 for 25.
         """
         from datetime import datetime, timedelta
 

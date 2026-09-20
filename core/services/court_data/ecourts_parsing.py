@@ -20,7 +20,18 @@ from bs4 import BeautifulSoup
 
 from bharat_courts.districtcourts.parser import parse_complex_value
 
-from core.services.court_data.models import CourtCaseData, CourtOrderRecord, HearingRecord
+# _extract_cnr/_extract_parties are underscore-prefixed vendored internals,
+# not bharat_courts' public API -- reused here deliberately, same posture
+# as _TokenSeedingDistrictClient reaching into DistrictCourtClient's own
+# private _http/_post_ajax/_init_session elsewhere in this integration
+# (see ecourts_provider.py's module docstring). Both already correctly
+# handle the live portal's HTML quirks (malformed "<br>Vs</br>", onclick-
+# embedded CNRs) -- reimplementing them here would just risk silently
+# drifting from behavior already verified live.
+from bharat_courts.districtcourts.parser import _extract_cnr, _extract_parties
+
+from core.services.court_data.models import AdvocateSearchHit, CourtCaseData, CourtOrderRecord, HearingRecord
+from core.services.name_matching import advocate_tokens, name_similarity
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +131,130 @@ def _district_advocate_search_form(
         "est_code": est_code,
         "case_type": "",
     }
+
+
+_ADVOCATE_HEADER_RE = re.compile(r"\badvocate\b", re.I)
+
+
+def parse_advocate_search_html(
+    html: str, *, advocate_name: str = "",
+) -> list[AdvocateSearchHit]:
+    """Parse casestatus/submitAdvName's "adv_data" HTML, dropping rows
+    that don't actually match the search and flagging the rest as
+    verified or not.
+
+    advocate_name blank means this was a bar_code search -- there is
+    nothing here to match a bar code against (see the docstring below),
+    so every row is kept unverified regardless of whether an Advocate
+    column exists.
+
+    Why this exists instead of reusing bharat_courts' generic
+    parse_case_status_html (which every OTHER search on this file still
+    uses for case-number/party-name grids): confirmed live 17 Sep 2026
+    against two real Rangareddy (Telangana) court complexes that the
+    "Search by Advocate" grid is its own, THIRD column layout --
+    Sr No | Case Number | Parties | Advocate Name | View -- not either of
+    parse_case_status_html's documented 4- or 7+-column shapes. Both live
+    samples had a real, populated "Advocate Name" <th>, and the portal
+    DOES filter server-side on it: a nonsense name returned zero rows in
+    the same complex that returned real matches for a real name. So this
+    was never "the portal isn't filtering." It was that
+    parse_case_status_html's generic >4-column branch reads fixed
+    offsets built for a different grid (Filing Date/Reg Date/Status) and
+    never looks at the Advocate column at all, so nothing downstream
+    could tell a genuine match from a same-surname stranger -- confirmed
+    live: searching "Ramesh Kumar" matched "APPG.Ramesh kumar" (a
+    government Assistant Public Prosecutor appearing on unrelated
+    criminal matters), "B. Ramesh Kumar", and a plain "Ramesh kumar" all
+    in one complex. eCourts' own name matching is a loose, real
+    token/substring match -- not broken, just unable to distinguish two
+    different people who share a name fragment -- which is exactly what
+    name_similarity below is for.
+
+    The Advocate column is located by HEADER TEXT ("Advocate" in a <th>),
+    not a hardcoded index or column count: eCourts is not consistent
+    about this shape across every complex/state (same reasoning as
+    core/services/cause_list/telangana_hc.py's per-document column
+    detection), so a complex that genuinely has no such column must fall
+    back cleanly instead of misreading some other field as if it were
+    the advocate name.
+
+    Rows are DROPPED when an Advocate column exists, advocate_name was
+    given, and name_similarity(...) scores 0 -- no real, non-generic name
+    token in common, i.e. eCourts matched on something our own filter
+    can't defend. Rows are KEPT with advocate_match_verified=False
+    (never dropped) when there's nothing to check them against: no
+    Advocate column in this response shape, a blank cell, or a bar_code
+    search (eCourts never exposes bar codes in this grid -- see
+    party_role.py's docstring for the same gap). Pretending those are
+    verified would be worse than admitting they aren't.
+    """
+    soup = BeautifulSoup(html, "lxml")
+    table = soup.find("table")
+    if not table:
+        return []
+
+    header_cells = []
+    thead = table.find("thead")
+    header_row = thead.find("tr") if thead else table.find("tr")
+    if header_row is not None:
+        header_cells = header_row.find_all("th")
+
+    advocate_col_index = None
+    for index, cell in enumerate(header_cells):
+        if _ADVOCATE_HEADER_RE.search(_clean(cell.get_text())):
+            advocate_col_index = index
+            break
+
+    can_check_name = bool(advocate_name) and advocate_col_index is not None
+    query_tokens = advocate_tokens(advocate_name) if advocate_name else ()
+    # A common name can yield tens of thousands of rows (one live response
+    # was 25.7MB) that repeat the same few advocate strings -- score each
+    # distinct string once, not once per row.
+    matches_by_text: dict[str, bool] = {}
+
+    hits: list[AdvocateSearchHit] = []
+    for row in table.find_all("tr"):
+        if row.find("th"):
+            continue  # header row, or a court-name group separator row
+        cols = row.find_all("td")
+        if len(cols) < 3:
+            continue
+
+        case_number = _clean(cols[1].get_text())
+        petitioner, respondent = _extract_parties(cols[2])
+        cnr = _extract_cnr(row)
+
+        advocate_text = None
+        if advocate_col_index is not None and advocate_col_index < len(cols):
+            # Space-joined: the live markup is "APP<br>G.Ramesh kumar", and a
+            # bare get_text() fuses that to "APPG.Ramesh kumar" -- worse, a
+            # cell listing two advocates on separate lines would fuse their
+            # tokens together and defeat the name match.
+            advocate_text = _clean(cols[advocate_col_index].get_text(" ")) or None
+
+        verified = False
+        if can_check_name and advocate_text:
+            if advocate_text not in matches_by_text:
+                matches_by_text[advocate_text] = (
+                    name_similarity(query_tokens, advocate_tokens(advocate_text)) > 0
+                )
+            if not matches_by_text[advocate_text]:
+                continue  # portal matched something the Advocate field doesn't back up
+            verified = True
+
+        hits.append(
+            AdvocateSearchHit(
+                case_number=case_number,
+                case_type=case_number.split("/")[0] if "/" in case_number else "",
+                cnr_number=cnr,
+                petitioner=petitioner,
+                respondent=respondent,
+                advocate_match_verified=verified,
+                matched_advocate_text=advocate_text,
+            )
+        )
+    return hits
 
 
 _DETAIL_LABELS = {

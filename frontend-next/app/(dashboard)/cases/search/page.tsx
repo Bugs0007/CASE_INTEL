@@ -167,6 +167,7 @@ export default function AdvocateSearchPage() {
   // Fall back to results.length so an older backend still reads correctly.
   const resultsTotal = sj?.results_total ?? results.length;
   const resultsTruncated = sj?.results_truncated ?? false;
+  const unverifiedCount = results.filter((r) => !r.advocate_match_verified).length;
   const districtEntries = Object.entries(sj?.districts_status ?? {});
   const failedDistrictCount = districtEntries.filter(([, d]) => d.status !== "success").length;
   const canRetryFailed = sj?.status !== undefined && !searchRunning && failedDistrictCount > 0;
@@ -428,6 +429,21 @@ export default function AdvocateSearchPage() {
 
             {results.length > 0 && (
               <>
+                <p className="mb-2 text-xs text-gray-500">
+                  The court matches by advocate name only, so a different advocate with a similar
+                  name can appear here. Check the Advocate column before adding a case.
+                </p>
+                {unverifiedCount > 0 && (
+                  <div className="mb-3 flex items-start gap-2 rounded-lg border border-status-pending bg-status-pending-soft px-3.5 py-3 text-sm text-status-pending">
+                    <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                    <span>
+                      {unverifiedCount.toLocaleString()} of {results.length.toLocaleString()} listing(s)
+                      below could not be checked against your search — the court didn&apos;t report an
+                      advocate for them (or you searched by bar code, which courts don&apos;t publish).
+                      Review these yourself before adding them.
+                    </span>
+                  </div>
+                )}
                 <div className="max-h-[480px] overflow-auto rounded-lg border border-gray-100 mb-4">
                   <table className="w-full text-sm">
                     <thead className="sticky top-0 bg-gray-50 text-left text-xs text-gray-500">
@@ -435,6 +451,7 @@ export default function AdvocateSearchPage() {
                         <th className="px-3 py-2 w-8"></th>
                         <th className="px-3 py-2 font-medium">Case Number</th>
                         <th className="px-3 py-2 font-medium">Parties</th>
+                        <th className="px-3 py-2 font-medium">Advocate</th>
                         <th className="px-3 py-2 font-medium">Court</th>
                         <th className="px-3 py-2 font-medium">Status</th>
                       </tr>
@@ -452,6 +469,26 @@ export default function AdvocateSearchPage() {
                           <td className="px-3 py-2 font-mono whitespace-nowrap">{r.case_number}</td>
                           <td className="px-3 py-2 text-gray-700">
                             {r.petitioner || "—"} vs {r.respondent || "—"}
+                          </td>
+                          <td className="px-3 py-2 text-xs">
+                            {r.advocate_match_verified ? (
+                              <span className="inline-flex items-center gap-1 font-medium text-status-ok">
+                                <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0" />
+                                Matches
+                              </span>
+                            ) : (
+                              <span
+                                className="inline-flex items-center gap-1 font-medium text-status-pending"
+                                title="Not verified: this listing couldn't be checked against your search."
+                              >
+                                <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
+                                Not verified
+                              </span>
+                            )}
+                            <div className="mt-0.5 text-gray-600">
+                              {r.matched_advocate_text ||
+                                "Court didn't report an advocate for this listing"}
+                            </div>
                           </td>
                           <td className="px-3 py-2 text-gray-600">{r.court_name || "—"}</td>
                           <td className="px-3 py-2 text-gray-600">{r.status || "—"}</td>
