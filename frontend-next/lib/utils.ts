@@ -107,6 +107,23 @@ export function formatFileSize(bytes: number | null | undefined): string {
   return `${size.toFixed(1)} ${units[unitIndex]}`;
 }
 
+/** A charge amount for display: "₹15,000", or "₹4,250.50" when there are
+ * paise to show. Amounts come off the API as decimal strings so money never
+ * round-trips through a float -- parse for display only. Whole rupees drop
+ * the ".00", but a hotel or flight bill with paise is never rounded away.
+ * Falls back to the raw string if it isn't a number. */
+export function formatFeeAmount(value: string): string {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return value;
+  const digits = Number.isInteger(amount) ? 0 : 2;
+  return amount.toLocaleString("en-IN", {
+    style: "currency",
+    currency: "INR",
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+}
+
 /** The `download/` endpoint returns a storage-relative URL on local disk
  * (e.g. "/media/documents/foo.pdf", same-origin to the Django backend --
  * NOT the Next.js frontend) or an absolute presigned S3 URL in production

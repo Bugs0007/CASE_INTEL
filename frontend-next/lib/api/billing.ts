@@ -5,6 +5,7 @@ import type {
   AppearanceFee,
   AppearanceFeeCreateInput,
   BookingType,
+  FeeCategory,
   FeeStatus,
   SendInvoiceResult,
   TravelBooking,
@@ -36,7 +37,7 @@ export const appearanceFeesApi = {
       body: JSON.stringify(data),
     }),
 
-  update: (id: number, data: { amount?: string; notes?: string }) =>
+  update: (id: number, data: { amount?: string; notes?: string; category?: FeeCategory }) =>
     apiClient<AppearanceFee>(`/appearance-fees/${id}/`, {
       method: "PATCH",
       body: JSON.stringify(data),

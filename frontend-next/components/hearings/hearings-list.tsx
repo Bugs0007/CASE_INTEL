@@ -9,7 +9,7 @@ import { CauseListBadge } from "@/components/hearings/cause-list-badge";
 import { HearingBillingActions } from "@/components/hearings/hearing-billing-actions";
 import { HearingDigestDialog } from "@/components/hearings/hearing-digest-dialog";
 import { Collapsible } from "@/components/ui/collapsible";
-import { formatHearingDate, staggerDelay } from "@/lib/utils";
+import { formatFeeAmount, formatHearingDate, staggerDelay } from "@/lib/utils";
 import { groupOrdersByDate, hearingDateKey } from "@/hooks/use-court-orders";
 import {
   Calendar,
@@ -308,11 +308,11 @@ function HearingItem({
             )}
           </div>
 
-          {/* Status, fee badge and travel state */}
+          {/* Status, one badge per charge, and travel state */}
           <div className="mt-2 flex items-center gap-2 flex-wrap">
             <StatusBadge status={hearing.status} />
             <CauseListBadge hearing={hearing} />
-            <FeeBadge fee={hearing.appearance_fee} />
+            <FeeBadges fees={hearing.appearance_fees} />
             <TravelBadge bookings={hearing.travel_bookings} />
           </div>
 
@@ -335,8 +335,9 @@ function HearingItem({
             viewingOrderId={viewingOrderId}
           />
 
-          {/* Real fee lifecycle + travel upload. The badges above show
-              state; these are the controls that change it. */}
+          {/* Add charges, run each one's invoice lifecycle, upload travel
+              documents. The badges above show state; these are the
+              controls that change it. */}
           <HearingBillingActions hearing={hearing} caseId={caseId} />
 
           {isUpcoming && onPrepare && (
@@ -394,26 +395,27 @@ const FEE_BADGE_CHIP: Record<FeeStatus, "ok" | "pending"> = {
   paid: "ok",
 };
 
-/** The fee state for this hearing, at a glance.
+/** The charges on this hearing, at a glance: one badge per charge, each
+ * prefixed with what it is for ("Hotel · ₹4,200 · Pending").
  *
- * Renders nothing when no fee has been recorded -- an absent fee is not
- * the same as a zero one, and a badge on every hearing whether or not
- * the advocate uses invoicing would just be noise. */
-function FeeBadge({ fee }: { fee: NestedAppearanceFee | null }) {
-  if (!fee) return null;
+ * Renders nothing when none has been recorded -- an absent charge is not
+ * the same as a zero one, and a badge on every hearing whether or not the
+ * advocate uses invoicing would just be noise. A fragment, so each badge
+ * flows as a direct child of the card's wrapping badge row. */
+function FeeBadges({ fees }: { fees: NestedAppearanceFee[] }) {
+  if (!fees || fees.length === 0) return null;
 
-  // Amounts arrive as decimal strings so money never round-trips
-  // through a float; format for display only.
-  const amount = Number(fee.amount);
-  const formatted = Number.isFinite(amount)
-    ? amount.toLocaleString("en-IN", {
-        style: "currency",
-        currency: "INR",
-        maximumFractionDigits: 0,
-      })
-    : fee.amount;
+  return (
+    <>
+      {fees.map((fee) => (
+        <FeeBadge key={fee.id} fee={fee} />
+      ))}
+    </>
+  );
+}
 
-  const title =
+function FeeBadge({ fee }: { fee: NestedAppearanceFee }) {
+  const detail =
     fee.status === "paid"
       ? `Paid${fee.invoice_number ? ` (invoice ${fee.invoice_number})` : ""}`
       : fee.status === "invoiced"
@@ -426,14 +428,14 @@ function FeeBadge({ fee }: { fee: NestedAppearanceFee | null }) {
                 ? ", logged only (email not configured on the server)"
                 : ", not yet sent"
           }`
-        : "Fee recorded, not yet invoiced";
+        : "Recorded, not yet invoiced";
 
   return (
     <span
-      title={title}
+      title={`${fee.category_display}: ${detail}`}
       className={`ci-chip ci-chip--${FEE_BADGE_CHIP[fee.status]} flex-shrink-0`}
     >
-      {formatted} · {fee.status_display}
+      {fee.category_display} · {formatFeeAmount(fee.amount)} · {fee.status_display}
     </span>
   );
 }

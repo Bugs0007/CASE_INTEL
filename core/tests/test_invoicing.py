@@ -96,6 +96,14 @@ def _make_fee(owner, case=None, amount="5000.00"):
     )
 
 
+def _make_charge(owner, hearing, category=AppearanceFee.CATEGORY_APPEARANCE, amount="1000.00"):
+    """Another charge on an EXISTING hearing -- _make_fee always starts a
+    fresh hearing, which is exactly what a several-charges test can't use."""
+    return AppearanceFee.objects.create(
+        owner=owner, hearing=hearing, category=category, amount=Decimal(amount)
+    )
+
+
 def _client_for(user):
     client = APIClient()
     client.force_authenticate(user=user)
@@ -596,6 +604,25 @@ class TestCaseFeeSummary:
         assert Decimal(summary["total_amount"]) == Decimal("6000.00")
         assert summary["pending_count"] == 1
 
+    def test_summary_totals_every_charge_on_a_single_hearing(self, advocate_a, client_a):
+        """With one fee per hearing the counts were effectively counts of
+        hearings; now that a hearing carries several charges they count
+        charges, and every one of them reaches the totals."""
+        case = _make_case(advocate_a)
+        hearing = _make_hearing(advocate_a, case)
+        _make_charge(advocate_a, hearing, "appearance", "15000.00")
+        _make_charge(advocate_a, hearing, "hotel", "4000.00")
+        flight = _make_charge(advocate_a, hearing, "flight", "6000.00")
+        invoice_service.mark_paid(invoice_service.generate_invoice(flight))
+
+        summary = client_a.get(f"/api/cases/{case.id}/").data["fee_summary"]
+
+        assert Decimal(summary["pending_amount"]) == Decimal("19000.00")
+        assert summary["pending_count"] == 2
+        assert Decimal(summary["paid_amount"]) == Decimal("6000.00")
+        assert summary["paid_count"] == 1
+        assert Decimal(summary["total_amount"]) == Decimal("25000.00")
+
     def test_summary_is_zeroed_for_a_case_with_no_fees(self, advocate_a, client_a):
         case = _make_case(advocate_a)
         response = client_a.get(f"/api/cases/{case.id}/")
@@ -644,15 +671,364 @@ class TestHearingFeeBadge:
 
         response = client_a.get(f"/api/hearings/{hearing.id}/")
         assert response.status_code == 200
-        assert response.data["appearance_fee"]["status"] == "pending"
-        assert Decimal(response.data["appearance_fee"]["amount"]) == Decimal("2500.00")
+        fees = response.data["appearance_fees"]
+        assert len(fees) == 1
+        assert fees[0]["status"] == "pending"
+        assert fees[0]["category"] == "appearance"
+        assert fees[0]["category_display"] == "Appearance Fee"
+        assert Decimal(fees[0]["amount"]) == Decimal("2500.00")
         assert len(response.data["travel_bookings"]) == 1
 
-    def test_hearing_without_a_fee_returns_null(self, advocate_a, client_a):
+    def test_hearing_without_a_fee_returns_an_empty_list(self, advocate_a, client_a):
         hearing = _make_hearing(advocate_a, _make_case(advocate_a))
         response = client_a.get(f"/api/hearings/{hearing.id}/")
-        assert response.data["appearance_fee"] is None
+        assert response.data["appearance_fees"] == []
         assert response.data["travel_bookings"] == []
+        # The old single-object key is gone, not merely emptied.
+        assert "appearance_fee" not in response.data
+
+    def test_hearing_embeds_every_charge_with_its_category(self, advocate_a, client_a):
+        hearing = _make_hearing(advocate_a, _make_case(advocate_a))
+        _make_charge(advocate_a, hearing, "appearance", "15000.00")
+        _make_charge(advocate_a, hearing, "hotel", "4200.00")
+        _make_charge(advocate_a, hearing, "flight", "6800.00")
+
+        response = client_a.get(f"/api/hearings/{hearing.id}/")
+
+        fees = response.data["appearance_fees"]
+        assert [f["category"] for f in fees] == ["appearance", "hotel", "flight"]
+        assert [f["category_display"] for f in fees] == ["Appearance Fee", "Hotel", "Flight"]
+        assert [Decimal(f["amount"]) for f in fees] == [
+            Decimal("15000.00"),
+            Decimal("4200.00"),
+            Decimal("6800.00"),
+        ]
+
+    def test_charges_come_back_oldest_first_on_the_list_endpoint_too(
+        self, advocate_a, client_a
+    ):
+        """AppearanceFee.Meta orders newest-first; the hearing views
+        override that so a card reads in the order charges were added and
+        a new one appends rather than jumping to the top. Both the detail
+        and the list view carry the override."""
+        hearing = _make_hearing(advocate_a, _make_case(advocate_a))
+        first = _make_charge(advocate_a, hearing, "appearance")
+        second = _make_charge(advocate_a, hearing, "hotel")
+        third = _make_charge(advocate_a, hearing, "other")
+
+        listed = client_a.get("/api/hearings/").data
+        assert [f["id"] for f in listed[0]["appearance_fees"]] == [first.id, second.id, third.id]
+
+        detail = client_a.get(f"/api/hearings/{hearing.id}/").data
+        assert [f["id"] for f in detail["appearance_fees"]] == [first.id, second.id, third.id]
+
+    def test_hearing_list_query_count_is_flat_however_many_charges_there_are(
+        self, advocate_a, client_a
+    ):
+        """The calendar loads every hearing at once. The charges are a
+        reverse FK, so without the prefetch each hearing card would cost a
+        query of its own -- assert the count doesn't move as hearings AND
+        charges-per-hearing both grow."""
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        case = _make_case(advocate_a)
+
+        def queries_with(hearing_count: int, charges_each: int) -> int:
+            Hearing.objects.filter(case=case).delete()
+            for _ in range(hearing_count):
+                hearing = _make_hearing(advocate_a, case)
+                for _ in range(charges_each):
+                    _make_charge(advocate_a, hearing)
+            with CaptureQueriesContext(connection) as ctx:
+                response = client_a.get("/api/hearings/")
+            assert response.status_code == 200
+            assert len(response.data) == hearing_count
+            assert all(len(h["appearance_fees"]) == charges_each for h in response.data)
+            return len(ctx)
+
+        assert queries_with(2, 1) == queries_with(10, 4)
+
+    def test_another_advocates_charges_never_appear_on_my_hearing_list(
+        self, advocate_a, advocate_b, client_a
+    ):
+        mine = _make_hearing(advocate_a, _make_case(advocate_a))
+        theirs = _make_hearing(advocate_b, _make_case(advocate_b, "C-B-9"))
+        _make_charge(advocate_a, mine, "appearance", "100.00")
+        _make_charge(advocate_b, theirs, "hotel", "999.00")
+
+        listed = client_a.get("/api/hearings/").data
+
+        assert [h["id"] for h in listed] == [mine.id]
+        assert [f["category"] for f in listed[0]["appearance_fees"]] == ["appearance"]
+
+
+# ---------------------------------------------------------------------------
+# Several charges per hearing, each with a category
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+class TestMultipleChargesPerHearing:
+    def test_a_new_fee_defaults_to_the_appearance_category(self, advocate_a):
+        assert _make_fee(advocate_a).category == AppearanceFee.CATEGORY_APPEARANCE
+
+    def test_a_hearing_can_carry_more_than_one_fee(self, advocate_a):
+        """The point of dropping the OneToOne: a second row against the
+        same hearing is no longer an IntegrityError."""
+        hearing = _make_hearing(advocate_a, _make_case(advocate_a))
+        _make_charge(advocate_a, hearing, "appearance")
+        _make_charge(advocate_a, hearing, "hotel")
+        _make_charge(advocate_a, hearing, "hotel")  # even the same category twice
+
+        assert hearing.appearance_fees.count() == 3
+
+    def test_deleting_a_hearing_removes_all_of_its_charges(self, advocate_a):
+        hearing = _make_hearing(advocate_a, _make_case(advocate_a))
+        _make_charge(advocate_a, hearing, "appearance")
+        _make_charge(advocate_a, hearing, "flight")
+
+        hearing.delete()
+
+        assert AppearanceFee.objects.filter(owner=advocate_a).count() == 0
+
+    def test_post_accepts_a_category(self, advocate_a, client_a):
+        hearing = _make_hearing(advocate_a, _make_case(advocate_a))
+
+        response = client_a.post(
+            "/api/appearance-fees/",
+            {"hearing": hearing.id, "category": "hotel", "amount": "4200.00"},
+            format="json",
+        )
+
+        assert response.status_code == 201
+        assert response.data["category"] == "hotel"
+        assert response.data["category_display"] == "Hotel"
+        assert Decimal(response.data["amount"]) == Decimal("4200.00")
+        assert AppearanceFee.objects.get(id=response.data["id"]).category == "hotel"
+
+    def test_post_without_a_category_is_an_appearance_fee(self, advocate_a, client_a):
+        hearing = _make_hearing(advocate_a, _make_case(advocate_a))
+
+        response = client_a.post(
+            "/api/appearance-fees/",
+            {"hearing": hearing.id, "amount": "3000.00"},
+            format="json",
+        )
+
+        assert response.status_code == 201
+        assert response.data["category"] == "appearance"
+
+    def test_post_can_add_a_second_charge_to_the_same_hearing(self, advocate_a, client_a):
+        hearing = _make_hearing(advocate_a, _make_case(advocate_a))
+        for category, amount in (("appearance", "15000.00"), ("flight", "6800.00")):
+            response = client_a.post(
+                "/api/appearance-fees/",
+                {"hearing": hearing.id, "category": category, "amount": amount},
+                format="json",
+            )
+            assert response.status_code == 201, response.data
+
+        assert hearing.appearance_fees.count() == 2
+        listed = client_a.get(f"/api/appearance-fees/?hearing_id={hearing.id}")
+        assert {f["category"] for f in listed.data} == {"appearance", "flight"}
+
+    def test_post_rejects_an_unknown_category(self, advocate_a, client_a):
+        hearing = _make_hearing(advocate_a, _make_case(advocate_a))
+
+        response = client_a.post(
+            "/api/appearance-fees/",
+            {"hearing": hearing.id, "category": "spa-day", "amount": "100.00"},
+            format="json",
+        )
+
+        assert response.status_code == 400
+        assert "category" in response.data
+        assert hearing.appearance_fees.count() == 0
+
+    def test_category_can_be_corrected_over_patch(self, advocate_a, client_a):
+        fee = _make_fee(advocate_a)
+
+        response = client_a.patch(
+            f"/api/appearance-fees/{fee.id}/", {"category": "other"}, format="json"
+        )
+
+        assert response.status_code == 200
+        assert response.data["category_display"] == "Other"
+        fee.refresh_from_db()
+        assert fee.category == "other"
+
+    def test_each_charge_has_its_own_invoice_number_and_lifecycle(
+        self, advocate_a, client_a
+    ):
+        """Independent per charge: invoicing and paying the hotel bill
+        leaves the appearance fee on the same hearing untouched."""
+        hearing = _make_hearing(advocate_a, _make_case(advocate_a))
+        appearance = _make_charge(advocate_a, hearing, "appearance", "15000.00")
+        hotel = _make_charge(advocate_a, hearing, "hotel", "4200.00")
+
+        client_a.post(f"/api/appearance-fees/{hotel.id}/invoice/")
+        paid = client_a.post(f"/api/appearance-fees/{hotel.id}/mark-paid/")
+
+        assert paid.status_code == 200
+        hotel.refresh_from_db()
+        appearance.refresh_from_db()
+        assert hotel.status == AppearanceFee.STATUS_PAID
+        assert appearance.status == AppearanceFee.STATUS_PENDING
+        assert appearance.invoice_number == ""
+
+        # The appearance fee is then invoiced on its own: the next number.
+        invoiced = client_a.post(f"/api/appearance-fees/{appearance.id}/invoice/")
+        assert invoiced.data["invoice_number"] == "INV-0002"
+        assert hotel.invoice_number == "INV-0001"
+
+
+@pytest.mark.django_db
+class TestDefaultAmountFallback:
+    """AdvocateProfile.default_fee_amount is what the advocate charges to
+    APPEAR -- so it backfills a missing amount for an appearance fee and for
+    nothing else."""
+
+    @pytest.fixture
+    def with_default_fee(self, advocate_a):
+        invoice_service.get_or_create_profile(advocate_a)
+        AdvocateProfile.objects.filter(owner=advocate_a).update(
+            default_fee_amount=Decimal("7500.00")
+        )
+
+    def _post(self, client, hearing, **fields):
+        return client.post(
+            "/api/appearance-fees/", {"hearing": hearing.id, **fields}, format="json"
+        )
+
+    def test_appearance_fee_with_no_amount_uses_the_default(
+        self, advocate_a, client_a, with_default_fee
+    ):
+        hearing = _make_hearing(advocate_a, _make_case(advocate_a))
+
+        response = self._post(client_a, hearing, category="appearance")
+
+        assert response.status_code == 201
+        assert Decimal(response.data["amount"]) == Decimal("7500.00")
+
+    def test_omitting_the_category_still_uses_the_default(
+        self, advocate_a, client_a, with_default_fee
+    ):
+        """Clients that predate categories send no category at all -- they
+        get exactly what they always got."""
+        hearing = _make_hearing(advocate_a, _make_case(advocate_a))
+
+        response = self._post(client_a, hearing)
+
+        assert response.status_code == 201
+        assert response.data["category"] == "appearance"
+        assert Decimal(response.data["amount"]) == Decimal("7500.00")
+
+    @pytest.mark.parametrize("category", ["hotel", "flight", "other"])
+    def test_other_categories_never_pick_up_the_default(
+        self, advocate_a, client_a, with_default_fee, category
+    ):
+        """Billing a hotel bill at the appearance rate would be silently
+        wrong money, so a blank amount is refused instead of defaulted --
+        and nothing is saved."""
+        hearing = _make_hearing(advocate_a, _make_case(advocate_a))
+
+        response = self._post(client_a, hearing, category=category)
+
+        assert response.status_code == 400
+        assert "amount" in response.data
+        assert hearing.appearance_fees.count() == 0
+
+    def test_a_zero_amount_counts_as_blank_for_the_other_categories(
+        self, advocate_a, client_a, with_default_fee
+    ):
+        hearing = _make_hearing(advocate_a, _make_case(advocate_a))
+
+        response = self._post(client_a, hearing, category="hotel", amount="0")
+
+        assert response.status_code == 400
+        assert hearing.appearance_fees.count() == 0
+
+    def test_an_explicit_amount_is_never_overridden(
+        self, advocate_a, client_a, with_default_fee
+    ):
+        hearing = _make_hearing(advocate_a, _make_case(advocate_a))
+
+        appearance = self._post(client_a, hearing, category="appearance", amount="9000.00")
+        hotel = self._post(client_a, hearing, category="hotel", amount="4200.00")
+
+        assert Decimal(appearance.data["amount"]) == Decimal("9000.00")
+        assert Decimal(hotel.data["amount"]) == Decimal("4200.00")
+
+
+@pytest.mark.django_db
+class TestChargeCategoryOnInvoice:
+    def test_pdf_line_item_names_the_category(self, advocate_a):
+        """The invoice used to say "Appearance Fee" unconditionally; a
+        hotel bill going out under that label would be wrong."""
+        from io import BytesIO
+
+        from pdfminer.high_level import extract_text
+
+        hearing = _make_hearing(advocate_a, _make_case(advocate_a))
+        profile = invoice_service.get_or_create_profile(advocate_a)
+
+        texts = {}
+        for category in ("appearance", "hotel", "flight", "other"):
+            fee = _make_charge(advocate_a, hearing, category, "4200.00")
+            fee.invoice_number = "INV-0001"
+            pdf_bytes = invoice_service.render_invoice_pdf(fee, profile)
+            assert pdf_bytes.startswith(b"%PDF")
+            texts[category] = extract_text(BytesIO(pdf_bytes))
+
+        assert "Appearance Fee" in texts["appearance"]
+        for category, label in (("hotel", "Hotel"), ("flight", "Flight"), ("other", "Other")):
+            assert label in texts[category]
+            assert "Appearance Fee" not in texts[category]
+
+    def test_generating_an_invoice_for_a_non_appearance_charge_works_end_to_end(
+        self, advocate_a, client_a
+    ):
+        hearing = _make_hearing(advocate_a, _make_case(advocate_a))
+        fee = _make_charge(advocate_a, hearing, "flight", "6800.00")
+
+        response = client_a.post(f"/api/appearance-fees/{fee.id}/invoice/")
+
+        assert response.status_code == 200
+        assert response.data["status"] == "invoiced"
+        assert response.data["category"] == "flight"
+        assert client_a.get(f"/api/appearance-fees/{fee.id}/invoice/file/").status_code == 200
+
+    def test_email_body_names_the_category(self, advocate_a, client_a, settings):
+        invoice_service.get_or_create_profile(advocate_a)
+        AdvocateProfile.objects.filter(owner=advocate_a).update(
+            contact_email="advocate-a@example.com"
+        )
+        case = _make_case(advocate_a)
+        ClientContact.objects.create(
+            owner=advocate_a,
+            case=case,
+            name="Billing Person",
+            email="billing@example.com",
+            is_billing_contact=True,
+        )
+        hearing = _make_hearing(advocate_a, case)
+        settings.INVOICE_EMAIL_CONFIGURED = True
+        settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+
+        bodies = {}
+        for category in ("appearance", "hotel"):
+            fee = invoice_service.generate_invoice(
+                _make_charge(advocate_a, hearing, category, "4200.00")
+            )
+            mail.outbox.clear()
+            assert client_a.post(f"/api/appearance-fees/{fee.id}/send/").status_code == 200
+            bodies[category] = mail.outbox[0].body
+
+        assert "(appearance fee) for the hearing on" in bodies["appearance"]
+        assert "(hotel) for the hearing on" in bodies["hotel"]
+        # It is no longer worded as if every invoice were an appearance.
+        assert "appearance" not in bodies["hotel"].lower()
 
 
 # ---------------------------------------------------------------------------

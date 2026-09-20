@@ -198,8 +198,10 @@ def render_invoice_pdf(fee: AppearanceFee, profile: AdvocateProfile) -> bytes:
     pdf.ln(6)
 
     # --- Amount ---
+    # One invoice per charge, so the line item names what THIS charge is
+    # for (Appearance Fee / Hotel / Flight / Other).
     pdf.set_font("Helvetica", "B", 10)
-    pdf.cell(label_w, 9, "Appearance Fee", border=1)
+    pdf.cell(label_w, 9, _pdf_safe(fee.get_category_display()), border=1)
     pdf.set_font("Helvetica", "B", 12)
     pdf.cell(value_w, 9, _pdf_safe(_money(fee.amount)), border=1, align="R",
              new_x="LMARGIN", new_y="NEXT")
@@ -364,9 +366,13 @@ def send_invoice(fee: AppearanceFee) -> dict:
             "so the client can reply directly to you."
         )
     subject = f"Invoice {fee.invoice_number} - {fee.hearing.case.title}"
+    # The category goes in brackets rather than into the sentence: "the
+    # hotel on 05 Sep" / "the other on 05 Sep" don't read, while
+    # "(hotel) for the hearing on 05 Sep" does for every category.
     body = (
         f"Dear {contact.name},\n\n"
-        f"Please find attached invoice {fee.invoice_number} for the appearance on "
+        f"Please find attached invoice {fee.invoice_number} "
+        f"({fee.get_category_display().lower()}) for the hearing on "
         f"{timezone.localtime(fee.hearing.hearing_date).strftime('%d %b %Y')} "
         f"in {fee.hearing.case.title} ({fee.hearing.case.case_number}).\n\n"
         f"Amount due: {_money(fee.amount)}\n\n"

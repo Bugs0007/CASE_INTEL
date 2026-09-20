@@ -1,4 +1,8 @@
 export type FeeStatus = "pending" | "invoiced" | "paid";
+/** What a charge on a hearing is for. Only "appearance" has a server-side
+ * default amount (the advocate profile's default_fee_amount); every other
+ * category has to be given an explicit one. */
+export type FeeCategory = "appearance" | "hotel" | "flight" | "other";
 /** "logged" is the no-SMTP-configured path: the invoice was recorded as
  * delivered in the server log but no mail actually left the box. It is
  * deliberately distinct from "sent" -- never render it as delivered. */
@@ -7,9 +11,13 @@ export type FeeSendStatus = "not_sent" | "sent" | "logged";
 export type BookingType = "travel" | "hotel" | "other";
 export type BookingStatus = "pending" | "booked";
 
-/** Compact fee shape embedded in a Hearing (see HearingSerializer). */
+/** Compact charge shape embedded in a Hearing (see HearingSerializer). A
+ * hearing carries a list of these -- appearance fee, hotel, flight, ... --
+ * each with its own invoice and lifecycle. */
 export interface NestedAppearanceFee {
   id: number;
+  category: FeeCategory;
+  category_display: string;
   amount: string;
   status: FeeStatus;
   status_display: string;
@@ -34,7 +42,11 @@ export interface AppearanceFee extends NestedAppearanceFee {
 
 export interface AppearanceFeeCreateInput {
   hearing: number;
-  /** Omit to fall back to the advocate profile's default_fee_amount. */
+  /** Omit for an appearance fee. */
+  category?: FeeCategory;
+  /** Omit to fall back to the advocate profile's default_fee_amount --
+   * appearance category only. The server refuses a blank amount for any
+   * other category. */
   amount?: string;
   notes?: string;
 }
