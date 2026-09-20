@@ -48,6 +48,62 @@ class CourtOrderRecord:
 
 
 @dataclass
+class AdvocateSearchHit:
+    """One row of a District Courts "Search by Advocate" result grid --
+    see ecourts_parsing.parse_advocate_search_html for how this differs
+    from bharat_courts' generic CaseInfo it replaces on this path.
+
+    advocate_match_verified is True only when the portal's response for
+    this row included a genuine Advocate-Name column AND its text shared
+    a real (non-generic) name token with the advocate_name that was
+    searched, per name_matching.name_similarity -- the same scorer
+    core/services/conflict_check.py already uses for this kind of
+    problem. False means this row could NOT be checked against the
+    search at all: either the court complex's response format has no
+    Advocate column (confirmed live 17 Sep 2026 that most do, but eCourts
+    is not consistent about this across every complex/state -- same
+    caveat as core/services/cause_list/telangana_hc.py's per-document
+    layout detection), or the search was by bar_code, which eCourts never
+    exposes in this grid (see party_role.py's docstring for the same
+    limitation). False is never "probably wrong" -- it is "unknown," and
+    callers must not treat it as a mismatch.
+    """
+
+    case_number: str
+    case_type: str = ""
+    cnr_number: str = ""
+    filing_number: str = ""
+    registration_number: str = ""
+    registration_date: date | None = None
+    petitioner: str = ""
+    respondent: str = ""
+    status: str = ""
+    court_name: str = ""
+    judges: list[str] = field(default_factory=list)
+    next_hearing_date: date | None = None
+    advocate_match_verified: bool = False
+    matched_advocate_text: str | None = None
+
+    def to_dict(self) -> dict:
+        return {
+            "case_number": self.case_number,
+            "case_type": self.case_type,
+            "cnr_number": self.cnr_number,
+            "filing_number": self.filing_number,
+            "registration_number": self.registration_number,
+            "registration_date": self.registration_date.isoformat() if self.registration_date else None,
+            "petitioner": self.petitioner,
+            "respondent": self.respondent,
+            "status": self.status,
+            "court_name": self.court_name,
+            "judges": self.judges,
+            "next_hearing_date": self.next_hearing_date.isoformat() if self.next_hearing_date else None,
+            "advocate_match_verified": self.advocate_match_verified,
+            "matched_advocate_text": self.matched_advocate_text,
+        }
+
+
+@dataclass
 class CourtCaseData:
     """Normalized result of a single case lookup + history fetch."""
 

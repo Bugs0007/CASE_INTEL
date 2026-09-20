@@ -16,6 +16,17 @@ export interface AdvocateSearchResult {
   court_name: string;
   judges: string[];
   next_hearing_date: string | null;
+  /** True only when the court's response carried an advocate for this row
+   * AND it shared a real name token with the search. False/absent means it
+   * could not be checked (no advocate column for this court complex, a
+   * blank cell, or a bar-code search -- eCourts never publishes bar codes
+   * here). Absent on results saved before verification existed; treat as
+   * unverified. Never a mismatch: mismatches are dropped server-side. */
+  advocate_match_verified?: boolean;
+  /** The advocate text the court recorded for this row, when it reported
+   * one -- shown so a human can tell a genuine match from a different
+   * advocate who merely shares the name (e.g. a government prosecutor). */
+  matched_advocate_text?: string | null;
 }
 
 export interface AdvocateSearchRequest {

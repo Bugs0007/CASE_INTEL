@@ -91,9 +91,20 @@ District Courts only so far; HC Services' equivalent hasn't been spiked):
   -- a different name than fcaptcha_code (party/CNR) or case_captcha_code
   (case-number search). Reuses the same generic captcha-image/OCR flow
   (_solve_captcha()), just posted under this field's name.
-- Reuses parse_case_status_html for the adv_data payload -- same
-  results-grid shape the party-name/case-number searches already produce
-  (auto-detected 4- or 7-column format).
+- Does NOT reuse parse_case_status_html for the adv_data payload, despite
+  the JSON envelope being a sibling of submitPartyName/submitCaseNo --
+  root-caused live 17 Sep 2026 that the advocate-search grid is its OWN
+  column layout (Sr No | Case Number | Parties | Advocate Name | View),
+  not either of parse_case_status_html's documented 4-/7-column shapes,
+  and that generic parser's >4-column branch reads fixed offsets built
+  for a different grid, silently discarding the one column (Advocate
+  Name) advocate search actually needs to verify a match. See
+  ecourts_parsing.parse_advocate_search_html for the full account,
+  including live confirmation that the portal DOES filter server-side
+  (a nonsense name returned zero rows) -- the bug was never "the portal
+  doesn't filter," it was that nothing on our side could tell a genuine
+  match from a different person sharing a name fragment (e.g. a
+  government prosecutor).
 
 The "Invalid Request" bug that broke list_districts() (and every other
 District Courts AJAX call) was root-caused and FIXED 24 Jul 2026, then
@@ -123,7 +134,7 @@ import re
 import httpx
 from django.core.cache import cache
 
-from bharat_courts import CaseInfo, DistrictCourtClient, HCServicesClient, get_court, list_all_courts
+from bharat_courts import DistrictCourtClient, HCServicesClient, get_court, list_all_courts
 from bharat_courts.districtcourts import endpoints as dc_endpoints
 from bharat_courts.districtcourts.parser import CaptchaError as DistrictCaptchaError
 from bharat_courts.districtcourts.parser import ServerError as DistrictServerError
@@ -141,6 +152,7 @@ from core.services.court_data.ecourts_parsing import (
     _parse_district_orders,
     _parse_hc_orders,
     _strip_pdf_prefix,
+    parse_advocate_search_html,
     parse_case_history_html,
     split_bar_code,
 )
@@ -150,7 +162,7 @@ from core.services.court_data.exceptions import (
     CourtDataError,
     CourtPortalError,
 )
-from core.services.court_data.models import CourtCaseData, CourtOrderRecord
+from core.services.court_data.models import AdvocateSearchHit, CourtCaseData, CourtOrderRecord
 
 logger = logging.getLogger(__name__)
 
@@ -345,7 +357,7 @@ class EcourtsProvider(CourtDataProvider):
         advocate_name: str = "",
         bar_code: str = "",
         status_filter: str = "Both",
-    ) -> list[CaseInfo]:
+    ) -> list[AdvocateSearchHit]:
         """Search District Courts cases by advocate name or bar code.
 
         Exactly one of advocate_name (min 3 chars, partial match per the
@@ -556,7 +568,7 @@ class EcourtsProvider(CourtDataProvider):
         bar_code: str,
         bar_year: str,
         status_filter: str,
-    ) -> list[CaseInfo]:
+    ) -> list[AdvocateSearchHit]:
         """Hand-rolled retry loop (matches _district_cnr_search's existing
         pattern in this file) instead of bharat-courts' own
         _post_with_captcha_retry. Root-caused live 25 Jul 2026 -- two real
@@ -683,7 +695,7 @@ class EcourtsProvider(CourtDataProvider):
                         await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
                     continue
 
-                return parse_case_status_html(html)
+                return parse_advocate_search_html(html, advocate_name=advocate_name)
 
             if isinstance(last_exc, (DistrictCaptchaError, CaptchaSolveError)):
                 raise CaptchaSolveError(
