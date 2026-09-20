@@ -46,9 +46,10 @@ export interface Hearing {
   source: HearingSource;
   business_date: string | null;
   purpose: string | null;
-  /** Embedded by the API so the hearing card can render its fee badge
-   * without a request per hearing. Null when no fee has been recorded. */
-  appearance_fee: NestedAppearanceFee | null;
+  /** Embedded by the API so the hearing card can render its charge badges
+   * and rows without a request per hearing. Oldest first; empty when
+   * nothing has been recorded. */
+  appearance_fees: NestedAppearanceFee[];
   travel_bookings: NestedTravelBooking[];
   /** Written only by the `fetch_cause_lists` job, never by a client. */
   cause_list_status: CauseListStatus;

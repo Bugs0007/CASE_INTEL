@@ -2,12 +2,24 @@
 Hearing views — CRUD operations on case hearings.
 """
 
+from django.db.models import Prefetch
 from django.utils import timezone
 from rest_framework import generics
 
-from core.models import Hearing
+from core.models import AppearanceFee, Hearing
 from core.serializers import HearingSerializer
 from core.views.mixins import OwnerScopedMixin
+
+# A hearing's charges are reverse-FK rows, so Django does not fetch them with
+# the hearing -- without a prefetch HearingSerializer's embedded
+# `appearance_fees` costs one query per hearing and the calendar scales with
+# the diary. Ordered oldest-first (AppearanceFee.Meta orders newest-first) so
+# a card lists its charges in the order they were added -- the appearance fee
+# usually first -- and a newly added one appends instead of jumping to the
+# top. Same single extra query either way.
+_FEES_OLDEST_FIRST = Prefetch(
+    "appearance_fees", queryset=AppearanceFee.objects.order_by("created_at", "id")
+)
 
 
 class HearingListCreateView(OwnerScopedMixin, generics.ListCreateAPIView):
@@ -29,13 +41,10 @@ class HearingListCreateView(OwnerScopedMixin, generics.ListCreateAPIView):
     serializer_class = HearingSerializer
 
     def get_base_queryset(self):
-        # appearance_fee is a REVERSE OneToOne -- Django does not fetch it
-        # with the row, so without select_related here HearingSerializer's
-        # embedded fee costs one query per hearing and the calendar scales
-        # with the diary. court_orders is prefetched for the same reason,
-        # so get_order_summary can match in Python.
-        qs = Hearing.objects.select_related("case", "appearance_fee").prefetch_related(
-            "case__court_orders", "travel_bookings"
+        # court_orders is prefetched for the same reason as the fees (see
+        # _FEES_OLDEST_FIRST), so get_order_summary can match in Python.
+        qs = Hearing.objects.select_related("case").prefetch_related(
+            "case__court_orders", "travel_bookings", _FEES_OLDEST_FIRST
         )
 
         # Filter by case
@@ -70,6 +79,6 @@ class HearingDetailView(OwnerScopedMixin, generics.RetrieveUpdateDestroyAPIView)
     """
 
     serializer_class = HearingSerializer
-    queryset = Hearing.objects.select_related("case", "appearance_fee").prefetch_related(
-        "case__court_orders", "travel_bookings"
+    queryset = Hearing.objects.select_related("case").prefetch_related(
+        "case__court_orders", "travel_bookings", _FEES_OLDEST_FIRST
     )

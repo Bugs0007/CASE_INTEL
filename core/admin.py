@@ -287,10 +287,10 @@ class AdvocateProfileAdmin(admin.ModelAdmin):
 @admin.register(AppearanceFee)
 class AppearanceFeeAdmin(admin.ModelAdmin):
     list_display = (
-        "invoice_number", "hearing", "amount", "status", "send_status",
+        "invoice_number", "hearing", "category", "amount", "status", "send_status",
         "invoiced_at", "paid_at",
     )
-    list_filter = ("status", "send_status")
+    list_filter = ("category", "status", "send_status")
     search_fields = ("invoice_number",)
     # The whole invoicing lifecycle is owned by
     # core/services/invoice_service.py; editing these by hand in admin

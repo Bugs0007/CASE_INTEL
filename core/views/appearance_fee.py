@@ -15,6 +15,7 @@ import logging
 from django.core.files.storage import default_storage
 from django.http import FileResponse
 from rest_framework import generics, status
+from rest_framework.exceptions import ValidationError
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -65,10 +66,20 @@ class AppearanceFeeListCreateView(OwnerScopedMixin, generics.ListCreateAPIView):
         return qs
 
     def perform_create(self, serializer):
-        # Default the amount to the advocate's configured default fee
-        # when the client didn't send one -- that's what the profile
-        # field is for.
+        category = serializer.validated_data.get("category", AppearanceFee.CATEGORY_APPEARANCE)
+
         if not serializer.validated_data.get("amount"):
+            # Only an appearance fee has a sensible default: the profile's
+            # default_fee_amount is what the advocate charges to APPEAR.
+            # Filling it in for a hotel or flight bill would silently bill
+            # that charge at the appearance rate, so every other category
+            # has to arrive with an explicit amount -- and a blank one is
+            # refused here rather than saved as a Rs. 0 line that could
+            # later go out on an invoice.
+            if category != AppearanceFee.CATEGORY_APPEARANCE:
+                raise ValidationError(
+                    {"amount": "An amount is required for this kind of charge."}
+                )
             profile = invoice_service.get_or_create_profile(self.request.user)
             serializer.validated_data["amount"] = profile.default_fee_amount
         serializer.save(owner=self.request.user)
