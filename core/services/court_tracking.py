@@ -562,6 +562,28 @@ def _finalize_confirmed_fetch(case: Case, data: CourtCaseData) -> list:
     return new_hearing_dates
 
 
+def build_case_title(petitioner: str, respondent: str, fallback: str) -> str:
+    """The "Petitioner vs Respondent" title every case created from court
+    data gets -- a human-recognizable label, where case_number/CNR are not.
+    Same join convention preview_case_tracking uses for its case_title:
+    joins whichever of the two names came back, so one-sided data still
+    produces something rather than a lopsided "Name vs ", and only falls
+    back (to the case number) when neither did."""
+    return " vs ".join(p for p in (petitioner, respondent) if p) or fallback
+
+
+def opposing_party_for_role(user_party_role: str, petitioner: str, respondent: str) -> str | None:
+    """The other side's name, given which side the advocate is on. None
+    while the role is unknown -- naming the wrong party as the opponent on
+    a legal record (and in the conflict check) is worse than leaving it
+    blank for the advocate to fill in."""
+    if user_party_role == "petitioner":
+        return respondent or None
+    if user_party_role == "respondent":
+        return petitioner or None
+    return None
+
+
 def preview_case_creation_from_cnr(cnr: str, court_type: str | None, *, user) -> dict:
     """Case-less variant of preview_case_tracking() for the "Track by CNR"
     quick-add flow on the manual case entry page (see
@@ -627,11 +649,7 @@ def preview_case_creation_from_cnr(cnr: str, court_type: str | None, *, user) ->
             data.party_advocate_data,
         )
 
-    opposing_party = None
-    if user_party_role == "petitioner":
-        opposing_party = data.respondent or None
-    elif user_party_role == "respondent":
-        opposing_party = data.petitioner or None
+    opposing_party = opposing_party_for_role(user_party_role, data.petitioner, data.respondent)
 
     # The portal's own case number, not the CNR -- see
     # CourtCaseData.registration_number's docstring. Only a handful of
@@ -639,14 +657,10 @@ def preview_case_creation_from_cnr(cnr: str, court_type: str | None, *, user) ->
     # that's the only case the CNR fallback should ever cover.
     case_number = data.registration_number or cnr
 
-    # "Petitioner vs Respondent" is a human-recognizable case title;
-    # case_number/CNR are not. Same join convention preview_case_tracking
-    # already uses for its case_title field (joins whichever of the two
-    # names came back, so one-sided data still produces something rather
-    # than a lopsided "Name vs "), just falling back to case_number
-    # instead of None here, since this title is what gets pre-filled into
-    # the quick-add form, not a display-only preview value.
-    case_title = " vs ".join(p for p in (data.petitioner, data.respondent) if p) or case_number
+    # Falls back to case_number rather than None (as preview_case_tracking's
+    # case_title does), since this title is what gets pre-filled into the
+    # quick-add form, not a display-only preview value.
+    case_title = build_case_title(data.petitioner, data.respondent, case_number)
 
     # Warn before the advocate confirms: the court record's parties against
     # the other side of their existing cases. No extra portal call.

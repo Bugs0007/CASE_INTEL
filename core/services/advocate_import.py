@@ -35,12 +35,35 @@ from django.db import IntegrityError, transaction
 from core.models import ActivityLog, Case, ProcessingJob
 from core.services.court_data import CourtDataError
 from core.services.conflict_check import find_conflicts, record_flagged
-from core.services.court_tracking import refresh_case_tracking
+from core.services.court_tracking import (
+    build_case_title,
+    opposing_party_for_role,
+    refresh_case_tracking,
+)
 from core.services.party_role import detect_party_role
 
 logger = logging.getLogger(__name__)
 
 IMPORT_DELAY_SECONDS = 1
+
+
+def party_labels(
+    case_number: str, petitioner: str, respondent: str, user_party_role: str = "unknown"
+) -> tuple[str, str | None]:
+    """(title, opposing_party) for a case created from court data. The
+    rules (court_tracking.build_case_title / opposing_party_for_role) are
+    shared with the CNR quick-add flow, so both title a case the same way.
+
+    Clipped to the columns' max_length. These names come straight off the
+    portal and nothing upstream validates them; a long multi-party name
+    would raise DataError, which the import loop's IntegrityError handler
+    doesn't catch -- taking the rest of the batch down with it.
+    """
+    title = build_case_title(petitioner, respondent, case_number)
+    opposing_party = opposing_party_for_role(user_party_role, petitioner, respondent)
+    if opposing_party:
+        opposing_party = opposing_party[: Case._meta.get_field("opposing_party").max_length]
+    return title[: Case._meta.get_field("title").max_length], opposing_party
 
 
 def run_advocate_import(job: ProcessingJob, progress_callback=None) -> None:
@@ -93,18 +116,18 @@ def run_advocate_import(job: ProcessingJob, progress_callback=None) -> None:
             continue
 
         case_number = item.get("case_number") or cnr
+        # The parties as the search result gives them: enough to title the
+        # case even if the fetch below fails and the row is left
+        # never_fetched. Replaced by the court record's own names on success.
+        petitioner = str(item.get("petitioner") or "").strip()
+        respondent = str(item.get("respondent") or "").strip()
 
         try:
             with transaction.atomic():
                 case = Case.objects.create(
                     owner=job.owner,
                     case_number=case_number,
-                    # A free-text label the advocate assigns via the
-                    # case-details form -- starts as the case number itself
-                    # rather than an auto-generated "Petitioner vs
-                    # Respondent" string, since that's no longer this
-                    # field's purpose.
-                    title=case_number,
+                    title=party_labels(case_number, petitioner, respondent)[0],
                     client_name="",
                     court_type=court_type,
                     tracking_config={"court_type": court_type, "cnr": cnr},
@@ -153,7 +176,17 @@ def run_advocate_import(job: ProcessingJob, progress_callback=None) -> None:
         role = detect_party_role(advocate_name, bar_code, case.party_advocate_data)
         if role != "unknown":
             case.user_party_role = role
-            case.save(update_fields=["user_party_role"])
+
+        # Title and opposing party get the same one-shot treatment. The court
+        # record's names (kept on the case by the fetch) win over the search
+        # result's, as in the CNR flow; the search result's are the fallback.
+        # opposing_party stays blank while the role is unknown.
+        petitioner = case.petitioner_name or petitioner
+        respondent = case.respondent_name or respondent
+        case.title, case.opposing_party = party_labels(
+            case_number, petitioner, respondent, case.user_party_role
+        )
+        case.save(update_fields=["user_party_role", "title", "opposing_party"])
 
         # Nobody is there to confirm in a background import, so possible
         # conflicts never block it: they're recorded for the results screen

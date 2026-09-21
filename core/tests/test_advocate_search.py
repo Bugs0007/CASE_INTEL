@@ -15,11 +15,15 @@ job (job_type="advocate_import").
 """
 
 import asyncio
+import dataclasses
+from io import StringIO
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from bharat_courts import CaseInfo
 from django.contrib.auth.models import User
+from django.core.management import call_command
+from django.core.management.base import CommandError
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
@@ -27,6 +31,7 @@ from core.models import AdvocateSearchPreference, Case, JobAlreadyRunningError, 
 from core.services.advocate_import import run_advocate_import
 from core.services.advocate_search import AdvocateSearchCancelled, run_advocate_search
 from core.services.court_data import CaptchaSolveError, CourtPortalError
+from core.services.court_tracking import build_case_title, opposing_party_for_role
 from bharat_courts.districtcourts.parser import ServerError as DistrictServerError
 from core.services.court_data.ecourts_parsing import split_bar_code
 from core.services.court_data.ecourts_provider import _TokenSeedingDistrictClient
@@ -838,6 +843,22 @@ def _fake_case_data(cnr: str) -> CourtCaseData:
     )
 
 
+IMPORT_CNR = "MHAU019999992024"
+
+
+def _import_one(user, item, data, **job_kwargs) -> Case:
+    """Import a single search result with the portal fetch mocked to return
+    `data`, and hand back the Case it created."""
+    job = ProcessingJob.enqueue_advocate_import(user, [item], **job_kwargs)
+    with patch("core.services.court_tracking.get_provider") as mock_get_provider, \
+         patch("core.services.advocate_import.time.sleep"):
+        mock_get_provider.return_value.fetch_case.return_value = data
+        run_advocate_import(job)
+
+    job.refresh_from_db()
+    return Case.objects.get(id=job.payload["created"][0])
+
+
 @pytest.mark.django_db
 class TestAdvocateImport:
     def test_creates_cases_owned_by_job_owner(self, user_a):
@@ -857,22 +878,153 @@ class TestAdvocateImport:
         assert case.tracking_enabled is True
         assert case.party_advocate_data["petitioner_advocates"] == ["A. Sharma"]
 
-    def test_title_defaults_to_case_number_not_vs_format(self, user_a):
-        # Title is now a free-text label the advocate assigns via the
-        # case-details form -- it no longer auto-generates "Petitioner vs
-        # Respondent" at import time (that was the old _case_title
-        # behavior, now removed).
+    def test_title_is_petitioner_vs_respondent_and_case_number_is_kept(self, user_a):
+        # Same format as the CNR quick-add flow ("Ramesh Kumar vs TSSPDCL").
+        # Used to be the bare case number, which also left the case with no
+        # human-readable name at all in the case list.
+        case = _import_one(
+            user_a,
+            {
+                "cnr_number": IMPORT_CNR,
+                "case_number": "123/2024",
+                "petitioner": "Suresh Kumar",
+                "respondent": "State Bank",
+            },
+            _fake_case_data(IMPORT_CNR),
+        )
+        assert case.title == "Suresh Kumar vs State Bank"
+        assert case.case_number == "123/2024"
+
+    def test_court_record_names_win_over_search_result_names(self, user_a):
+        case = _import_one(
+            user_a,
+            {"cnr_number": IMPORT_CNR, "case_number": "123/2024", "petitioner": "S. Kumar", "respondent": "SBI"},
+            _fake_case_data(IMPORT_CNR),
+        )
+        assert case.title == "Suresh Kumar vs State Bank"
+
+    def test_title_comes_from_the_court_record_when_the_search_result_has_no_parties(self, user_a):
+        case = _import_one(
+            user_a, {"cnr_number": IMPORT_CNR, "case_number": "123/2024"}, _fake_case_data(IMPORT_CNR)
+        )
+        assert case.title == "Suresh Kumar vs State Bank"
+
+    def test_title_falls_back_to_case_number_only_when_no_party_is_known(self, user_a):
+        no_parties = dataclasses.replace(_fake_case_data(IMPORT_CNR), petitioner="", respondent="")
+        case = _import_one(user_a, {"cnr_number": IMPORT_CNR, "case_number": "123/2024"}, no_parties)
+        assert case.title == "123/2024"
+
+    def test_one_sided_parties_give_just_that_name(self, user_a):
+        one_sided = dataclasses.replace(_fake_case_data(IMPORT_CNR), petitioner="", respondent="")
+        case = _import_one(
+            user_a,
+            {"cnr_number": IMPORT_CNR, "case_number": "123/2024", "petitioner": "Suresh Kumar"},
+            one_sided,
+        )
+        assert case.title == "Suresh Kumar"
+
+    def test_opposing_party_is_the_respondent_for_a_petitioner_side_advocate(self, user_a):
+        case = _import_one(
+            user_a,
+            {"cnr_number": IMPORT_CNR, "case_number": "123/2024"},
+            _fake_case_data(IMPORT_CNR),
+            advocate_name="A. Sharma",
+        )
+        assert case.user_party_role == "petitioner"
+        assert case.opposing_party == "State Bank"
+
+    def test_opposing_party_is_the_petitioner_for_a_respondent_side_advocate(self, user_a):
+        respondent_side = dataclasses.replace(
+            _fake_case_data(IMPORT_CNR),
+            party_advocate_data={"petitioner_advocates": [], "respondent_advocates": ["A. Sharma"]},
+        )
+        case = _import_one(
+            user_a,
+            {"cnr_number": IMPORT_CNR, "case_number": "123/2024"},
+            respondent_side,
+            advocate_name="A. Sharma",
+        )
+        assert case.user_party_role == "respondent"
+        assert case.opposing_party == "Suresh Kumar"
+
+    @pytest.mark.parametrize(
+        "job_kwargs",
+        [{"advocate_name": "Someone Else"}, {"bar_code": "MAH/1234/2015"}, {}],
+        ids=["name-mismatch", "bar-code-search", "no-identity"],
+    )
+    def test_opposing_party_stays_blank_when_the_role_is_unknown(self, user_a, job_kwargs):
+        # Which of the two is the advocate's opponent can't be told without
+        # the role -- a guess would put the wrong party on the record.
+        case = _import_one(
+            user_a,
+            {"cnr_number": IMPORT_CNR, "case_number": "123/2024"},
+            _fake_case_data(IMPORT_CNR),
+            **job_kwargs,
+        )
+        assert case.user_party_role == "unknown"
+        assert case.opposing_party is None
+        # The title needs no role.
+        assert case.title == "Suresh Kumar vs State Bank"
+
+    def test_failed_fetch_still_leaves_the_case_titled_from_the_search_result(self, user_a):
+        # The row is created before the fetch and kept when the fetch fails,
+        # so it must not be left titled with its bare case number.
         job = ProcessingJob.enqueue_advocate_import(
-            user_a, [{"cnr_number": "MHAU019999992024", "case_number": "123/2024"}]
+            user_a,
+            [
+                {
+                    "cnr_number": IMPORT_CNR,
+                    "case_number": "123/2024",
+                    "petitioner": "Suresh Kumar",
+                    "respondent": "State Bank",
+                }
+            ],
         )
         with patch("core.services.court_tracking.get_provider") as mock_get_provider, \
              patch("core.services.advocate_import.time.sleep"):
-            mock_get_provider.return_value.fetch_case.return_value = _fake_case_data("MHAU019999992024")
+            mock_get_provider.return_value.fetch_case.side_effect = CaptchaSolveError("failed")
             run_advocate_import(job)
 
         job.refresh_from_db()
-        case = Case.objects.get(id=job.payload["created"][0])
-        assert case.title == "123/2024"
+        assert job.payload["created"] == []
+        assert len(job.payload["failed"]) == 1
+        assert Case.objects.get(owner=user_a, case_number="123/2024").title == "Suresh Kumar vs State Bank"
+
+    def test_overlong_party_names_are_clipped_and_do_not_abort_the_batch(self, user_a):
+        # title is 500 chars and opposing_party 255; a many-party case can
+        # exceed both. An unclipped value is a DataError, which would take
+        # every later item in the batch down with it.
+        long_data = dataclasses.replace(
+            _fake_case_data("CNR0000000000001"), petitioner="P" * 400, respondent="R" * 400
+        )
+        job = ProcessingJob.enqueue_advocate_import(
+            user_a,
+            [
+                {
+                    "cnr_number": "CNR0000000000001",
+                    "case_number": "1/2024",
+                    "petitioner": "P" * 400,
+                    "respondent": "R" * 400,
+                },
+                {"cnr_number": "CNR0000000000002", "case_number": "2/2024"},
+            ],
+            advocate_name="A. Sharma",
+        )
+        with patch("core.services.court_tracking.get_provider") as mock_get_provider, \
+             patch("core.services.advocate_import.time.sleep"):
+            mock_get_provider.return_value.fetch_case.side_effect = [
+                long_data,
+                _fake_case_data("CNR0000000000002"),
+            ]
+            run_advocate_import(job)
+
+        job.refresh_from_db()
+        assert job.payload["failed"] == []
+        assert len(job.payload["created"]) == 2
+        long_case = Case.objects.get(id=job.payload["created"][0])
+        assert len(long_case.title) == 500
+        assert long_case.title.startswith("P" * 400)
+        assert len(long_case.opposing_party) == 255
 
     def test_auto_detects_party_role_on_clean_match(self, user_a):
         job = ProcessingJob.enqueue_advocate_import(
@@ -1015,6 +1167,188 @@ class TestAdvocateImport:
             run_advocate_import(job)
 
         assert mock_sleep.call_count == 2  # N-1 delays for 3 items
+
+
+class TestCaseLabelHelpers:
+    """The rules the import and the CNR quick-add flow share."""
+
+    @pytest.mark.parametrize(
+        "petitioner, respondent, expected",
+        [
+            ("Ramesh Kumar", "TSSPDCL", "Ramesh Kumar vs TSSPDCL"),
+            ("Ramesh Kumar", "", "Ramesh Kumar"),
+            ("", "TSSPDCL", "TSSPDCL"),
+            ("", "", "WP/1/2026"),
+        ],
+    )
+    def test_build_case_title(self, petitioner, respondent, expected):
+        assert build_case_title(petitioner, respondent, "WP/1/2026") == expected
+
+    @pytest.mark.parametrize(
+        "role, expected",
+        [("petitioner", "R"), ("respondent", "P"), ("unknown", None)],
+    )
+    def test_opposing_party_for_role(self, role, expected):
+        assert opposing_party_for_role(role, "P", "R") == expected
+
+    def test_opposing_party_is_none_when_that_side_has_no_name(self):
+        assert opposing_party_for_role("petitioner", "P", "") is None
+
+
+# ---------------------------------------------------------------------------
+# backfill_import_case_titles (repairs cases imported before the fix)
+# ---------------------------------------------------------------------------
+
+
+def _imported_case(owner, number, cnr, **extra) -> Case:
+    """A case as the old import left it: titled with its own number, no
+    opposing party, tracking on."""
+    extra.setdefault("title", number)
+    return Case.objects.create(
+        owner=owner, case_number=number, client_name="", cnr_number=cnr, tracking_enabled=True, **extra
+    )
+
+
+def _named(owner, number, cnr, **extra) -> Case:
+    extra.setdefault("petitioner_name", "Suresh Kumar")
+    extra.setdefault("respondent_name", "State Bank")
+    return _imported_case(owner, number, cnr, **extra)
+
+
+def _backfill(*args) -> str:
+    out = StringIO()
+    call_command("backfill_import_case_titles", *args, stdout=out)
+    return out.getvalue()
+
+
+@pytest.mark.django_db
+class TestBackfillImportCaseTitles:
+    def test_sets_title_and_opposing_party_and_keeps_the_case_number(self, user_a):
+        case = _named(user_a, "123/2024", "CNR0000000000001", user_party_role="petitioner")
+
+        _backfill("--owner", "alice")
+
+        case.refresh_from_db()
+        assert case.title == "Suresh Kumar vs State Bank"
+        assert case.opposing_party == "State Bank"
+        assert case.case_number == "123/2024"
+
+    def test_respondent_side_gets_the_petitioner_as_opposing_party(self, user_a):
+        case = _named(user_a, "123/2024", "CNR0000000000001", user_party_role="respondent")
+
+        _backfill("--owner", "alice")
+
+        case.refresh_from_db()
+        assert case.opposing_party == "Suresh Kumar"
+
+    def test_dry_run_reports_but_writes_nothing(self, user_a):
+        case = _named(user_a, "123/2024", "CNR0000000000001", user_party_role="petitioner")
+
+        out = _backfill("--owner", "alice", "--dry-run")
+
+        case.refresh_from_db()
+        assert case.title == "123/2024"
+        assert case.opposing_party is None
+        assert "would update 1" in out
+        assert "Suresh Kumar vs State Bank" in out
+
+    def test_a_customised_title_and_an_existing_opposing_party_are_left_alone(self, user_a):
+        case = _named(
+            user_a,
+            "123/2024",
+            "CNR0000000000001",
+            title="Sharma family land matter",
+            opposing_party="Typed by the advocate",
+            user_party_role="petitioner",
+        )
+
+        out = _backfill("--owner", "alice")
+
+        case.refresh_from_db()
+        assert case.title == "Sharma family land matter"
+        assert case.opposing_party == "Typed by the advocate"
+        assert "Updated 0" in out
+
+    def test_a_customised_title_does_not_stop_the_opposing_party_being_filled(self, user_a):
+        case = _named(
+            user_a, "123/2024", "CNR0000000000001", title="Sharma matter", user_party_role="petitioner"
+        )
+
+        _backfill("--owner", "alice")
+
+        case.refresh_from_db()
+        assert case.title == "Sharma matter"
+        assert case.opposing_party == "State Bank"
+
+    def test_unknown_role_gets_a_title_but_no_opposing_party_and_is_reported(self, user_a):
+        case = _named(user_a, "123/2024", "CNR0000000000001")
+
+        out = _backfill("--owner", "alice")
+
+        case.refresh_from_db()
+        assert case.title == "Suresh Kumar vs State Bank"
+        assert not case.opposing_party
+        assert "isn't set" in out
+        assert str(case.id) in out
+
+    def test_case_with_no_party_names_is_skipped_and_reported(self, user_a):
+        case = _imported_case(user_a, "123/2024", "CNR0000000000001")
+
+        out = _backfill("--owner", "alice")
+
+        case.refresh_from_db()
+        assert case.title == "123/2024"
+        assert "backfill_party_names" in out
+        assert str(case.id) in out
+
+    def test_only_the_owners_cases_inside_the_id_range_are_touched(self, user_a, user_b):
+        below = _named(user_a, "1/2024", "CNR0000000000001")
+        inside = _named(user_a, "2/2024", "CNR0000000000002")
+        # Another advocate's case whose id falls inside the range.
+        theirs = _named(user_b, "3/2024", "CNR0000000000003")
+        above = _named(user_a, "4/2024", "CNR0000000000004")
+
+        _backfill("--owner", "alice", "--min-id", str(inside.id), "--max-id", str(above.id - 1))
+
+        for case, expected in [
+            (below, "1/2024"),
+            (inside, "Suresh Kumar vs State Bank"),
+            (theirs, "3/2024"),
+            (above, "4/2024"),
+        ]:
+            case.refresh_from_db()
+            assert case.title == expected
+
+    def test_cases_without_a_cnr_are_left_alone(self, user_a):
+        manual = Case.objects.create(
+            owner=user_a,
+            case_number="MANUAL-1",
+            title="MANUAL-1",
+            client_name="",
+            petitioner_name="Suresh Kumar",
+            respondent_name="State Bank",
+        )
+
+        _backfill("--owner", "alice")
+
+        manual.refresh_from_db()
+        assert manual.title == "MANUAL-1"
+
+    def test_second_run_changes_nothing(self, user_a):
+        case = _named(user_a, "123/2024", "CNR0000000000001", user_party_role="petitioner")
+        _backfill("--owner", "alice")
+        case.refresh_from_db()
+        before = (case.title, case.opposing_party)
+
+        out = _backfill("--owner", "alice")
+
+        case.refresh_from_db()
+        assert (case.title, case.opposing_party) == before
+        assert "Updated 0" in out
+
+    def test_unknown_owner_is_a_command_error(self, user_a):
+        with pytest.raises(CommandError):
+            _backfill("--owner", "nobody")
 
 
 # ---------------------------------------------------------------------------
