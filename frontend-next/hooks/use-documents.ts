@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { documentsApi } from "@/lib/api/documents";
 import { isDocumentActive } from "@/components/documents/document-status-badge";
 import { resolveFileUrl } from "@/lib/utils";
+import { caseKeys } from "@/hooks/use-cases";
 import type {
   Document,
   DocumentUploadInput,
@@ -58,6 +59,11 @@ export function useUploadDocument() {
     mutationFn: (data: DocumentUploadInput) => documentsApi.upload(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: documentKeys.lists() });
+      // A case card's document_count is read off the cases list response,
+      // which lives under a separate query key -- without this, an
+      // upload leaves that count stale until the cases list's own
+      // staleTime lapses.
+      queryClient.invalidateQueries({ queryKey: caseKeys.lists() });
     },
   });
 }
@@ -130,6 +136,8 @@ export function useDeleteDocument() {
     mutationFn: (id: number) => documentsApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: documentKeys.lists() });
+      // See useUploadDocument -- keeps the cases list's document_count in sync.
+      queryClient.invalidateQueries({ queryKey: caseKeys.lists() });
     },
   });
 }

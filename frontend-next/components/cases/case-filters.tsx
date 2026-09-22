@@ -11,10 +11,14 @@ interface CaseFiltersProps {
   activeStatus: CaseStatus | "all";
 }
 
+// Tabs filter on the app's own internal Case.status, not any live eCourts
+// status -- every imported case defaults to "open" and nothing sets
+// "pending" automatically, so a "Pending" tab reads as broken (always 0
+// results) even though most imported cases are, in fact, pending in
+// court. No "Pending" tab here; the label matches what's actually filtered.
 const STATUS_TABS = [
   { key: "all" as const, label: "All Cases" },
-  { key: "open" as const, label: "Active" },
-  { key: "pending" as const, label: "Pending" },
+  { key: "open" as const, label: "Open" },
   { key: "closed" as const, label: "Closed" },
   { key: "archived" as const, label: "Archived" },
 ];

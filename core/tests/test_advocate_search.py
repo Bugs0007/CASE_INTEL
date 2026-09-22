@@ -1194,6 +1194,32 @@ class TestCaseLabelHelpers:
     def test_opposing_party_is_none_when_that_side_has_no_name(self):
         assert opposing_party_for_role("petitioner", "P", "") is None
 
+    def test_title_trims_trailing_rep_by_clause(self):
+        assert build_case_title(
+            "HELIUM TRADERS PRIVATE LTD REP. BY SAILESH SONI", "K. AJAY KUMAR", "WP/1/2026"
+        ) == "Helium Traders Private Ltd vs K. Ajay Kumar"
+
+    def test_title_case_only_applied_to_predominantly_upper_multiword_names(self):
+        # Multi-word all-caps gets title-cased for readability...
+        assert (
+            build_case_title("RANGA SRINIVAS GOUD", "P", "WP/1/2026")
+            == "Ranga Srinivas Goud vs P"
+        )
+        # ...but a single all-caps word is left alone: more likely a real
+        # acronym (e.g. a company name like "TSSPDCL") than shouted text.
+        assert build_case_title("TSSPDCL", "Ramesh Kumar", "WP/1/2026") == "TSSPDCL vs Ramesh Kumar"
+        # Already mixed-case input is never touched.
+        assert (
+            build_case_title("Durga Enterprises", "Ranga Srinivas Goud", "WP/1/2026")
+            == "Durga Enterprises vs Ranga Srinivas Goud"
+        )
+
+    def test_opposing_party_for_role_also_gets_display_cleanup(self):
+        assert (
+            opposing_party_for_role("petitioner", "P", "K. AJAY KUMAR REP. BY SOMEONE")
+            == "K. Ajay Kumar"
+        )
+
 
 # ---------------------------------------------------------------------------
 # backfill_import_case_titles (repairs cases imported before the fix)
