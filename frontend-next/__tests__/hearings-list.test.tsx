@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HearingsList } from "@/components/hearings/hearings-list";
 import type { AdvocateProfile, Hearing, NestedAppearanceFee } from "@/types";
@@ -126,6 +126,48 @@ describe("HearingsList", () => {
     // Judge still renders (unrelated field) -- purpose specifically must not.
     expect(screen.getByText("Justice Rao")).toBeInTheDocument();
     expect(screen.queryByText("CALL WITH IAS")).not.toBeInTheDocument();
+  });
+
+  it("mounts the fee/travel billing controls for an upcoming hearing", () => {
+    const hearing = makeHearing({
+      hearing_date: "2099-01-01T05:00:00Z",
+      status: "scheduled",
+    });
+
+    renderWithClient(<HearingsList caseId={CASE_ID} hearings={[hearing]} />);
+
+    expect(screen.getByText("Add charge")).toBeInTheDocument();
+  });
+
+  it("does not mount the fee/travel billing controls for a past hearing", () => {
+    const hearing = makeHearing({
+      hearing_date: "2020-01-01T05:00:00Z",
+      status: "completed",
+    });
+
+    renderWithClient(<HearingsList caseId={CASE_ID} hearings={[hearing]} />);
+
+    expect(screen.queryByText("Add charge")).not.toBeInTheDocument();
+  });
+
+  it("paginates a long past-hearings list instead of mounting every row", () => {
+    const hearings = Array.from({ length: 60 }, (_, i) =>
+      makeHearing({
+        id: i + 1,
+        hearing_date: `2020-01-${String((i % 27) + 1).padStart(2, "0")}T05:00:00Z`,
+        status: "completed",
+      }),
+    );
+
+    renderWithClient(<HearingsList caseId={CASE_ID} hearings={hearings} />);
+
+    // Collapsed by default -- expand the Past section first.
+    fireEvent.click(screen.getByText("Expand"));
+
+    expect(screen.getAllByText("Justice Rao")).toHaveLength(25);
+    const loadMore = screen.getByText(/Load more \(35 remaining\)/);
+    fireEvent.click(loadMore);
+    expect(screen.getAllByText("Justice Rao")).toHaveLength(50);
   });
 });
 

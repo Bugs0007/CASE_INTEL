@@ -611,7 +611,9 @@ class TestParseCaseHistoryHtmlPairedCellRows:
         data = parse_case_history_html(html)
 
         assert data is not None
-        assert data.registration_number == "WP /26147/2026"
+        # Source HTML has a stray space after "WP" (a real portal quirk);
+        # normalize_case_number() collapses it before it reaches the field.
+        assert data.registration_number == "WP/26147/2026"
 
     def test_filing_number_in_the_same_paired_row_is_not_mistaken_for_registration_number(self):
         """Filing Number and Registration Number are genuinely different
@@ -652,7 +654,7 @@ class TestParseCaseHistoryHtmlPairedCellRows:
         data = parse_case_history_html(html)
 
         assert data is not None
-        assert data.registration_number == "WP /26147/2026"
+        assert data.registration_number == "WP/26147/2026"
         assert data.case_stage == "FOR PRONOUNCEMENT OF ORDERS"
         assert data.court_and_judge == "APARESH KUMAR SINGH"
 
