@@ -7,6 +7,7 @@ from core.models import AppearanceFee, Hearing
 
 class AppearanceFeeSerializer(serializers.ModelSerializer):
     status_display = serializers.CharField(source="get_status_display", read_only=True)
+    category_display = serializers.CharField(source="get_category_display", read_only=True)
     case_id = serializers.IntegerField(source="hearing.case_id", read_only=True)
     case_title = serializers.CharField(source="hearing.case.title", read_only=True)
     hearing_date = serializers.DateTimeField(source="hearing.hearing_date", read_only=True)
@@ -29,6 +30,8 @@ class AppearanceFeeSerializer(serializers.ModelSerializer):
             "case_id",
             "case_title",
             "hearing_date",
+            "category",
+            "category_display",
             "amount",
             "status",
             "status_display",
@@ -69,15 +72,18 @@ class AppearanceFeeSerializer(serializers.ModelSerializer):
 
 class NestedAppearanceFeeSerializer(serializers.ModelSerializer):
     """Compact fee shape embedded in HearingSerializer -- just what the
-    hearing card's badge needs, without the case/hearing back-references
-    the card already has."""
+    hearing card's badges and per-charge rows need, without the
+    case/hearing back-references the card already has."""
 
     status_display = serializers.CharField(source="get_status_display", read_only=True)
+    category_display = serializers.CharField(source="get_category_display", read_only=True)
 
     class Meta:
         model = AppearanceFee
         fields = [
             "id",
+            "category",
+            "category_display",
             "amount",
             "status",
             "status_display",

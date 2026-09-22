@@ -6,6 +6,7 @@ import type {
   AdvocateProfileUpdateInput,
   AppearanceFeeCreateInput,
   BookingType,
+  FeeCategory,
 } from "@/types";
 
 export const advocateProfileKeys = {
@@ -18,7 +19,7 @@ const BLOB_REVOKE_DELAY_MS = 60_000;
 
 /** Every fee/travel mutation changes data that is EMBEDDED in other
  * responses rather than fetched on its own:
- *   - hearing.appearance_fee / hearing.travel_bookings (HearingSerializer)
+ *   - hearing.appearance_fees / hearing.travel_bookings (HearingSerializer)
  *   - case.fee_summary (CaseSerializer)
  * so both caches have to be invalidated or the badge the user just acted
  * on keeps rendering its previous state. */
@@ -55,8 +56,10 @@ export function useUpdateAdvocateProfile() {
 // Appearance fees -- the PENDING -> INVOICED -> PAID lifecycle
 // ---------------------------------------------------------------------------
 
-/** Record a fee against a hearing. Omitting `amount` makes the server
- * fall back to the advocate profile's default_fee_amount. */
+/** Record a charge against a hearing. A hearing can carry several -- one
+ * per `category` or more. Omitting `amount` makes the server fall back to
+ * the advocate profile's default_fee_amount, but only for an appearance
+ * fee; any other category is rejected without an explicit amount. */
 export function useCreateFee(caseId: number) {
   const queryClient = useQueryClient();
 
@@ -70,7 +73,15 @@ export function useUpdateFee(caseId: number) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, ...data }: { id: number; amount?: string; notes?: string }) =>
+    mutationFn: ({
+      id,
+      ...data
+    }: {
+      id: number;
+      amount?: string;
+      notes?: string;
+      category?: FeeCategory;
+    }) =>
       appearanceFeesApi.update(id, data),
     onSuccess: () => invalidateBilling(queryClient, caseId),
   });

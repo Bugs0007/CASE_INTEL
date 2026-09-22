@@ -17,10 +17,11 @@ class HearingSerializer(serializers.ModelSerializer):
         source="get_hearing_type_display", read_only=True
     )
     status_display = serializers.CharField(source="get_status_display", read_only=True)
-    # Embedded read-only so the hearing card can render its fee badge and
-    # booking state without a second round-trip per hearing. appearance_fee
-    # is a OneToOne, so it's null on hearings with no fee recorded yet.
-    appearance_fee = NestedAppearanceFeeSerializer(read_only=True)
+    # Embedded read-only so the hearing card can render its fee badges and
+    # booking state without a second round-trip per hearing. A hearing can
+    # carry several charges (appearance fee, hotel, flight, ...), so this is
+    # a list -- empty on hearings with nothing recorded yet.
+    appearance_fees = NestedAppearanceFeeSerializer(many=True, read_only=True)
     travel_bookings = NestedTravelBookingSerializer(many=True, read_only=True)
     cause_list_status_display = serializers.CharField(
         source="get_cause_list_status_display", read_only=True
@@ -85,7 +86,7 @@ class HearingSerializer(serializers.ModelSerializer):
             "source",
             "business_date",
             "purpose",
-            "appearance_fee",
+            "appearance_fees",
             "travel_bookings",
             "cause_list_status",
             "cause_list_status_display",

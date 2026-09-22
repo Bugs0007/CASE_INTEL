@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HearingsList } from "@/components/hearings/hearings-list";
-import type { AdvocateProfile, Hearing } from "@/types";
+import type { AdvocateProfile, Hearing, NestedAppearanceFee } from "@/types";
 
 // HearingItem renders HearingBillingActions, which calls useAdvocateProfile()
 // -- mock the network layer the same way hearing-billing-actions.test.tsx
@@ -66,7 +66,7 @@ function makeHearing(overrides: Partial<Hearing> = {}): Hearing {
     source: "ecourts",
     business_date: null,
     purpose: null,
-    appearance_fee: null,
+    appearance_fees: [],
     travel_bookings: [],
     cause_list_status: "not_checked",
     cause_list_status_display: "Not checked",
@@ -77,6 +77,23 @@ function makeHearing(overrides: Partial<Hearing> = {}): Hearing {
     order_summary: null,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
+    ...overrides,
+  };
+}
+
+function makeFee(overrides: Partial<NestedAppearanceFee> = {}): NestedAppearanceFee {
+  return {
+    id: 1,
+    category: "appearance",
+    category_display: "Appearance Fee",
+    amount: "15000.00",
+    status: "pending",
+    status_display: "Pending",
+    invoice_number: "",
+    invoiced_at: null,
+    paid_at: null,
+    sent_at: null,
+    send_status: "not_sent",
     ...overrides,
   };
 }
@@ -119,7 +136,7 @@ describe("HearingsList", () => {
 
     renderWithClient(<HearingsList caseId={CASE_ID} hearings={[hearing]} />);
 
-    expect(screen.getByText("Record fee")).toBeInTheDocument();
+    expect(screen.getByText("Add charge")).toBeInTheDocument();
   });
 
   it("does not mount the fee/travel billing controls for a past hearing", () => {
@@ -130,7 +147,7 @@ describe("HearingsList", () => {
 
     renderWithClient(<HearingsList caseId={CASE_ID} hearings={[hearing]} />);
 
-    expect(screen.queryByText("Record fee")).not.toBeInTheDocument();
+    expect(screen.queryByText("Add charge")).not.toBeInTheDocument();
   });
 
   it("paginates a long past-hearings list instead of mounting every row", () => {
@@ -151,5 +168,93 @@ describe("HearingsList", () => {
     const loadMore = screen.getByText(/Load more \(35 remaining\)/);
     fireEvent.click(loadMore);
     expect(screen.getAllByText("Justice Rao")).toHaveLength(50);
+  });
+});
+
+describe("HearingsList charge badges", () => {
+  // The badge is one text run -- "Hotel · ₹4,200 · Pending" -- while the
+  // billing rows underneath render category, amount and status as separate
+  // elements, so matching the whole run finds the badge and only the badge.
+
+  it("renders one badge per charge, each prefixed with its category", () => {
+    const hearing = makeHearing({
+      appearance_fees: [
+        makeFee({ id: 1, category: "appearance", category_display: "Appearance Fee", amount: "15000.00" }),
+        makeFee({ id: 2, category: "hotel", category_display: "Hotel", amount: "4200.00" }),
+        makeFee({
+          id: 3,
+          category: "flight",
+          category_display: "Flight",
+          amount: "6800.00",
+          status: "paid",
+          status_display: "Paid",
+          invoice_number: "INV-0003",
+        }),
+      ],
+    });
+
+    renderWithClient(<HearingsList caseId={CASE_ID} hearings={[hearing]} />);
+
+    expect(screen.getByText(/^Appearance Fee · .*15,000 · Pending$/)).toBeInTheDocument();
+    expect(screen.getByText(/^Hotel · .*4,200 · Pending$/)).toBeInTheDocument();
+    expect(screen.getByText(/^Flight · .*6,800 · Paid$/)).toBeInTheDocument();
+  });
+
+  it("marks only a paid charge as settled, leaving the others pending", () => {
+    const hearing = makeHearing({
+      appearance_fees: [
+        makeFee({ id: 1, category: "hotel", category_display: "Hotel", status: "invoiced", status_display: "Invoiced", invoice_number: "INV-0002" }),
+        makeFee({ id: 2, category: "flight", category_display: "Flight", status: "paid", status_display: "Paid", invoice_number: "INV-0003" }),
+      ],
+    });
+
+    renderWithClient(<HearingsList caseId={CASE_ID} hearings={[hearing]} />);
+
+    // "invoiced" is billed-but-unpaid, the same bucket as not-yet-billed.
+    expect(screen.getByText(/^Hotel · /)).toHaveClass("ci-chip--pending");
+    expect(screen.getByText(/^Flight · /)).toHaveClass("ci-chip--ok");
+  });
+
+  it("explains the charge's state in a tooltip, naming its category", () => {
+    const hearing = makeHearing({
+      appearance_fees: [
+        makeFee({
+          id: 2,
+          category: "hotel",
+          category_display: "Hotel",
+          status: "invoiced",
+          status_display: "Invoiced",
+          invoice_number: "INV-0002",
+          send_status: "logged",
+        }),
+      ],
+    });
+
+    renderWithClient(<HearingsList caseId={CASE_ID} hearings={[hearing]} />);
+
+    // "logged" must never read as delivered.
+    expect(screen.getByText(/^Hotel · /)).toHaveAttribute(
+      "title",
+      "Hotel: Invoiced as INV-0002, logged only (email not configured on the server)",
+    );
+  });
+
+  it("does not round away paise on a charge amount", () => {
+    const hearing = makeHearing({
+      appearance_fees: [
+        makeFee({ id: 2, category: "hotel", category_display: "Hotel", amount: "4250.50" }),
+      ],
+    });
+
+    renderWithClient(<HearingsList caseId={CASE_ID} hearings={[hearing]} />);
+
+    expect(screen.getByText(/^Hotel · .*4,250\.50 · Pending$/)).toBeInTheDocument();
+  });
+
+  it("renders no charge badges for a hearing with no charges", () => {
+    renderWithClient(<HearingsList caseId={CASE_ID} hearings={[makeHearing()]} />);
+
+    expect(screen.queryByText(/ · Pending$/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/ · Paid$/)).not.toBeInTheDocument();
   });
 });
