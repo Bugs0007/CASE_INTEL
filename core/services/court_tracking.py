@@ -8,6 +8,7 @@ rate limiting/tracking_enabled checks can't be bypassed.
 from __future__ import annotations
 
 import logging
+import re
 import secrets
 import time
 from datetime import datetime, timedelta
@@ -562,13 +563,45 @@ def _finalize_confirmed_fetch(case: Case, data: CourtCaseData) -> list:
     return new_hearing_dates
 
 
+_REP_BY_CLAUSE_RE = re.compile(r"\b(?:rep(?:resented)?|reptd)\.?\s*by\b.*$", re.I)
+
+
+def _display_party_name(name: str) -> str:
+    """Light display-only cleanup for a party name headed into a case
+    title/opposing-party field -- NOT the same as
+    name_matching.clean_party_name(), which lowercases and strips all
+    punctuation for internal token comparison and isn't usable as a
+    display string. This only: (1) trims a trailing "REP. BY ..."/
+    "REPTD. BY ..." clause, the same boilerplate name_matching's
+    _PARTY_NOISE already strips for matching purposes, and (2) title-cases
+    the result, but only when the source is predominantly upper-case AND
+    multi-word (eCourts sometimes sends ALL-CAPS party names, but a single
+    all-caps word is more likely a genuine acronym -- e.g. "TSSPDCL" -- than
+    shouted boilerplate, so it's left alone) -- deliberately not a full
+    name-formatting pass, since blindly title-casing already-mixed-case
+    input risks mangling names str.title() doesn't handle well.
+    """
+    if not name:
+        return name
+    cleaned = _REP_BY_CLAUSE_RE.sub("", name).strip(" ,.-")
+    letters = [c for c in cleaned if c.isalpha()]
+    is_multiword = len(cleaned.split()) > 1
+    if is_multiword and letters and sum(1 for c in letters if c.isupper()) / len(letters) > 0.7:
+        cleaned = cleaned.title()
+    return cleaned
+
+
 def build_case_title(petitioner: str, respondent: str, fallback: str) -> str:
     """The "Petitioner vs Respondent" title every case created from court
     data gets -- a human-recognizable label, where case_number/CNR are not.
     Same join convention preview_case_tracking uses for its case_title:
     joins whichever of the two names came back, so one-sided data still
     produces something rather than a lopsided "Name vs ", and only falls
-    back (to the case number) when neither did."""
+    back (to the case number) when neither did. Names go through
+    _display_party_name() first -- this is purely cosmetic for the title;
+    it does not touch what's stored in Case.petitioner_name/respondent_name."""
+    petitioner = _display_party_name(petitioner)
+    respondent = _display_party_name(respondent)
     return " vs ".join(p for p in (petitioner, respondent) if p) or fallback
 
 
@@ -578,9 +611,9 @@ def opposing_party_for_role(user_party_role: str, petitioner: str, respondent: s
     a legal record (and in the conflict check) is worse than leaving it
     blank for the advocate to fill in."""
     if user_party_role == "petitioner":
-        return respondent or None
+        return _display_party_name(respondent) or None
     if user_party_role == "respondent":
-        return petitioner or None
+        return _display_party_name(petitioner) or None
     return None
 
 

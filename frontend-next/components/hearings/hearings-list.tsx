@@ -33,6 +33,10 @@ import type {
 } from "@/types";
 
 const DEFAULT_VISIBLE_COUNT = 5;
+// Past hearings can run into the hundreds on a long-running case, so
+// "show all" incrementally loads a page at a time instead of mounting
+// every row at once.
+const PAST_PAGE_SIZE = 25;
 
 interface HearingsListProps {
   caseId: number;
@@ -67,7 +71,7 @@ export function HearingsList({
   // Past hearings grow unbounded over a long case and are rarely what the
   // user opened the page to see, so this subsection defaults collapsed.
   const [pastOpen, setPastOpen] = useState(false);
-  const [pastShowAll, setPastShowAll] = useState(false);
+  const [pastVisibleCount, setPastVisibleCount] = useState(PAST_PAGE_SIZE);
   const [prepHearingId, setPrepHearingId] = useState<number | null>(null);
 
   const now = new Date();
@@ -103,7 +107,7 @@ export function HearingsList({
   const visibleUpcoming = upcomingShowAll
     ? upcomingHearings
     : upcomingHearings.slice(0, DEFAULT_VISIBLE_COUNT);
-  const visiblePast = pastShowAll ? pastHearings : pastHearings.slice(0, DEFAULT_VISIBLE_COUNT);
+  const visiblePast = pastHearings.slice(0, pastVisibleCount);
 
   return (
     <Card>
@@ -174,7 +178,9 @@ export function HearingsList({
               <Collapsible isOpen={pastOpen}>
                 <div
                   className={
-                    pastShowAll ? "max-h-[480px] overflow-y-auto pr-1 space-y-3" : "space-y-3"
+                    pastVisibleCount > PAST_PAGE_SIZE
+                      ? "max-h-[480px] overflow-y-auto pr-1 space-y-3"
+                      : "space-y-3"
                   }
                 >
                   {visiblePast.map((hearing, i) => (
@@ -192,14 +198,20 @@ export function HearingsList({
                     />
                   ))}
                 </div>
-                {pastHearings.length > DEFAULT_VISIBLE_COUNT && (
+                {pastHearings.length > PAST_PAGE_SIZE && (
                   <Button
                     variant="ghost"
                     size="sm"
                     className="w-full mt-2"
-                    onClick={() => setPastShowAll((v) => !v)}
+                    onClick={() =>
+                      setPastVisibleCount((v) =>
+                        v >= pastHearings.length ? PAST_PAGE_SIZE : v + PAST_PAGE_SIZE,
+                      )
+                    }
                   >
-                    {pastShowAll ? "Show less" : `Show all (${pastHearings.length})`}
+                    {pastVisibleCount >= pastHearings.length
+                      ? "Show less"
+                      : `Load more (${pastHearings.length - pastVisibleCount} remaining)`}
                   </Button>
                 )}
               </Collapsible>
@@ -308,7 +320,9 @@ function HearingItem({
             )}
           </div>
 
-          {/* Status, one badge per charge, and travel state */}
+          {/* Status, one badge per charge, and travel state -- read-only,
+              shown for every hearing regardless of isUpcoming (cheap: no
+              hooks). */}
           <div className="mt-2 flex items-center gap-2 flex-wrap">
             <StatusBadge status={hearing.status} />
             <CauseListBadge hearing={hearing} />
@@ -337,8 +351,12 @@ function HearingItem({
 
           {/* Add charges, run each one's invoice lifecycle, upload travel
               documents. The badges above show state; these are the
-              controls that change it. */}
-          <HearingBillingActions hearing={hearing} caseId={caseId} />
+              controls that change it. Past hearings rarely need new
+              charges entered against them, and each instance mounts
+              several React Query hooks + a file input -- on a case with
+              hundreds of past hearings that adds up to a real rendering
+              cost, so this only mounts for upcoming ones. */}
+          {isUpcoming && <HearingBillingActions hearing={hearing} caseId={caseId} />}
 
           {isUpcoming && onPrepare && (
             <Button

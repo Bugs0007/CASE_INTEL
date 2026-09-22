@@ -47,6 +47,7 @@ export interface UpcomingHearing {
   case_number: string;
   hearing_date: string;
   hearing_type: string;
+  hearing_type_display: string;
   judge: string | null;
   purpose: string | null;
   source: "manual" | "ecourts";

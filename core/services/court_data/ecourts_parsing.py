@@ -57,6 +57,23 @@ def _clean(text: str | None) -> str:
     return re.sub(r"\s+", " ", text.strip())
 
 
+_CASE_NUMBER_PREFIX_SPACE_RE = re.compile(r"^([A-Za-z]+)\s+(?=/)")
+
+
+def normalize_case_number(value: str | None) -> str:
+    """Collapse a stray space between a case-type prefix and the slash that
+    follows it (e.g. "WP /26147/2026" -> "WP/26147/2026") -- a formatting
+    quirk of the source portal HTML cell, not something _clean() removes
+    (it only collapses whitespace *runs*, deliberately leaving single
+    internal spaces alone since it's shared with fields like party names
+    where internal spacing is meaningful). Any other internal spacing in
+    the value is left untouched."""
+    cleaned = _clean(value)
+    if not cleaned:
+        return cleaned
+    return _CASE_NUMBER_PREFIX_SPACE_RE.sub(r"\1", cleaned)
+
+
 _LABEL_PUNCT_RE = re.compile(r"[.:]")
 
 
@@ -221,7 +238,7 @@ def parse_advocate_search_html(
         if len(cols) < 3:
             continue
 
-        case_number = _clean(cols[1].get_text())
+        case_number = normalize_case_number(cols[1].get_text())
         petitioner, respondent = _extract_parties(cols[2])
         cnr = _extract_cnr(row)
 
@@ -374,6 +391,9 @@ def parse_case_history_html(html: str) -> CourtCaseData | None:
                     elif not getattr(data, field_name):
                         setattr(data, field_name, value)
                     break
+
+    if data.registration_number:
+        data.registration_number = normalize_case_number(data.registration_number)
 
     data.petitioner = _extract_first_party(soup, "Petitioner_Advocate_table")
     data.respondent = _extract_first_party(soup, "Respondent_Advocate_table")

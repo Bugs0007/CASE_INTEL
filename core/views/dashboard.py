@@ -158,6 +158,7 @@ class UpcomingHearingsView(APIView):
                     "case_number": h.case.case_number,
                     "hearing_date": h.hearing_date,
                     "hearing_type": h.hearing_type,
+                    "hearing_type_display": h.get_hearing_type_display(),
                     "judge": h.judge,
                     "purpose": h.purpose,
                     "source": h.source,
