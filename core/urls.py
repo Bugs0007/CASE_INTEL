@@ -8,6 +8,19 @@ from django.urls import path
 
 from core.views import (
     AdvocateProfileView,
+    BillingPortfolioView,
+    CaseGenerateDocumentView,
+    ClientDetailView,
+    ClientListCreateView,
+    ClientMessageDetailView,
+    ClientMessageListView,
+    ClientMessageSendView,
+    ClientStatementPdfView,
+    DocTemplateListView,
+    SentMessageListView,
+    TrackingRefreshCancelView,
+    TrackingRefreshStatusView,
+    TrackingRefreshView,
     AdvocateSearchActiveListView,
     AdvocateSearchCancelView,
     AdvocateSearchImportStatusView,
@@ -158,6 +171,30 @@ urlpatterns = [
         name="case-tracking-refresh",
     ),
 
+    # Template-merge documents (vakalatnama, memo of appearance, cover
+    # letter) -- see core/services/doc_templates/
+    path(
+        "cases/<int:pk>/generate-document/",
+        CaseGenerateDocumentView.as_view(),
+        name="case-generate-document",
+    ),
+    path("doc-templates/", DocTemplateListView.as_view(), name="doc-template-list"),
+
+    # "Refresh all tracked cases" (dashboard button) -- a chain of worker
+    # jobs, see core/services/bulk_refresh.py. Literal "refresh-all/" can't
+    # collide with the <int:pk> case routes above.
+    path("cases/refresh-all/", TrackingRefreshView.as_view(), name="case-refresh-all"),
+    path(
+        "cases/refresh-all/<int:pk>/",
+        TrackingRefreshStatusView.as_view(),
+        name="case-refresh-all-status",
+    ),
+    path(
+        "cases/refresh-all/<int:pk>/cancel/",
+        TrackingRefreshCancelView.as_view(),
+        name="case-refresh-all-cancel",
+    ),
+
     # "Track by CNR" quick-add (manual case entry page): a case-less CNR
     # fetch/preview, then a confirm step that creates the Case itself --
     # unlike the tracking/preview|confirm routes above, which require an
@@ -290,6 +327,32 @@ urlpatterns = [
         TravelBookingFileView.as_view(),
         name="travel-booking-file",
     ),
+
+    # Clients (billing entities spanning cases) + billing portfolio. The
+    # statement is its own path, not ?format=pdf (DRF swallows `format`).
+    path("clients/", ClientListCreateView.as_view(), name="client-list"),
+    path("clients/<int:pk>/", ClientDetailView.as_view(), name="client-detail"),
+    path(
+        "clients/<int:pk>/statement/pdf/",
+        ClientStatementPdfView.as_view(),
+        name="client-statement-pdf",
+    ),
+    path("billing/portfolio/", BillingPortfolioView.as_view(), name="billing-portfolio"),
+
+    # Client emails: system-written drafts the advocate reviews and sends,
+    # and the audit log of everything sent (core/services/client_updates/)
+    path("client-messages/", ClientMessageListView.as_view(), name="client-message-list"),
+    path(
+        "client-messages/<int:pk>/",
+        ClientMessageDetailView.as_view(),
+        name="client-message-detail",
+    ),
+    path(
+        "client-messages/<int:pk>/send/",
+        ClientMessageSendView.as_view(),
+        name="client-message-send",
+    ),
+    path("sent-messages/", SentMessageListView.as_view(), name="sent-message-list"),
 
     # Client contacts
     path("client-contacts/", ClientContactListCreateView.as_view(), name="client-contact-list"),

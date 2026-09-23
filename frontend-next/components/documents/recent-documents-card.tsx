@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CollapseToggle } from "@/components/ui/collapse-toggle";
 import { Collapsible } from "@/components/ui/collapsible";
-import { Eye, FileText, Upload, Trash2, Play, Loader2 } from "lucide-react";
+import { Eye, FilePlus2, FileText, Upload, Trash2, Play, Loader2 } from "lucide-react";
 import { formatDate, getFileIcon } from "@/lib/utils";
 import {
   DocumentStatusBadge,
@@ -19,6 +19,8 @@ interface RecentDocumentsCardProps {
   documents: Document[];
   isLoading: boolean;
   onUploadClick: () => void;
+  /** Opens the template generator (vakalatnama etc.). Omitted = no button. */
+  onGenerateClick?: () => void;
   onProcess: (id: number) => void;
   onDelete: (id: number) => void;
   onView: (id: number) => void;
@@ -33,6 +35,7 @@ export function RecentDocumentsCard({
   documents,
   isLoading,
   onUploadClick,
+  onGenerateClick,
   onProcess,
   onDelete,
   onView,
@@ -54,6 +57,12 @@ export function RecentDocumentsCard({
         <CardTitle>Case Documents{documents.length > 0 ? ` (${documents.length})` : ""}</CardTitle>
         <div className="flex items-center gap-2">
           <CollapseToggle isOpen={sectionOpen} onToggle={() => setSectionOpen((v) => !v)} />
+          {onGenerateClick && (
+            <Button variant="secondary" size="sm" onClick={onGenerateClick}>
+              <FilePlus2 className="h-4 w-4" />
+              Generate
+            </Button>
+          )}
           <Button variant="primary" size="sm" onClick={onUploadClick}>
             <Upload className="h-4 w-4" />
             Upload Document

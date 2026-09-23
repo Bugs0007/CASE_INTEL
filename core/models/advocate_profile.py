@@ -1,3 +1,4 @@
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 from .mixins import OwnedModel
@@ -28,6 +29,10 @@ class AdvocateProfile(OwnedModel):
         default="",
         help_text="Name/firm as it should appear at the top of the invoice.",
     )
+    # The advocate's own name, for documents they sign personally
+    # (vakalatnama, memo of appearance). letterhead_name may be a firm.
+    advocate_name = models.CharField(max_length=255, blank=True, default="")
+    phone = models.CharField(max_length=50, blank=True, default="")
     address = models.TextField(
         blank=True, default="", help_text="Letterhead address block (free text, multi-line)."
     )
@@ -60,6 +65,14 @@ class AdvocateProfile(OwnedModel):
         help_text=(
             "Highest invoice sequence issued to THIS advocate. Never "
             "decremented -- a deleted invoice does not free its number."
+        ),
+    )
+    reminder_after_days = models.PositiveSmallIntegerField(
+        default=15,
+        validators=[MinValueValidator(1), MaxValueValidator(90)],
+        help_text=(
+            "Days an invoice may stay unpaid before a payment-reminder draft "
+            "is prepared, and the gap between reminders (at most 3)."
         ),
     )
     created_at = models.DateTimeField(auto_now_add=True)

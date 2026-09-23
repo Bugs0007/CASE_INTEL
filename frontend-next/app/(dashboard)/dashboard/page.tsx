@@ -7,6 +7,7 @@ import { HearingDensityStrip } from "@/components/dashboard/hearing-density-stri
 import { CasesByUrgency } from "@/components/dashboard/cases-by-urgency";
 import { DueSoon } from "@/components/dashboard/due-soon";
 import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
+import { RefreshAllButton } from "@/components/dashboard/refresh-all-button";
 import { useDashboard, useUpcomingHearings } from "@/hooks/use-dashboard";
 import { useDocuments } from "@/hooks/use-documents";
 import { useCases } from "@/hooks/use-cases";
@@ -86,6 +87,9 @@ export default function DashboardPage() {
 
   return (
     <div className="px-4 sm:px-7 pt-5 sm:pt-7 pb-[60px] max-w-[1240px] mx-auto">
+      {/* Refresh every tracked case from eCourts (background job) */}
+      <RefreshAllButton />
+
       {/* Needs Your Attention */}
       <NeedsAttention
         hearingsSoon={hearingsSoon}

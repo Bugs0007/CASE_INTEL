@@ -32,6 +32,20 @@ function handleUnauthorized(status: number) {
   }
 }
 
+/** The most useful message in a DRF error body: "detail" if present, else
+ * the first field error. Falls back to `fallback`. */
+export function apiErrorDetail(error: unknown, fallback: string): string {
+  if (error instanceof APIError && error.data && typeof error.data === "object") {
+    const body = error.data as Record<string, unknown>;
+    if (typeof body.detail === "string" && body.detail) return body.detail;
+    for (const value of Object.values(body)) {
+      const message = Array.isArray(value) ? value[0] : value;
+      if (typeof message === "string" && message) return message;
+    }
+  }
+  return fallback;
+}
+
 export async function apiClient<T>(
   endpoint: string,
   { params, ...config }: RequestConfig = {},

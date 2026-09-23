@@ -2,6 +2,8 @@
 Hearing views — CRUD operations on case hearings.
 """
 
+import logging
+
 from django.db.models import Prefetch
 from django.utils import timezone
 from rest_framework import generics
@@ -9,6 +11,8 @@ from rest_framework import generics
 from core.models import AppearanceFee, Hearing
 from core.serializers import HearingSerializer
 from core.views.mixins import OwnerScopedMixin
+
+logger = logging.getLogger(__name__)
 
 # A hearing's charges are reverse-FK rows, so Django does not fetch them with
 # the hearing -- without a prefetch HearingSerializer's embedded
@@ -82,3 +86,18 @@ class HearingDetailView(OwnerScopedMixin, generics.RetrieveUpdateDestroyAPIView)
     queryset = Hearing.objects.select_related("case").prefetch_related(
         "case__court_orders", "travel_bookings", _FEES_OLDEST_FIRST
     )
+
+    def perform_update(self, serializer):
+        old_date = serializer.instance.hearing_date
+        super().perform_update(serializer)
+        hearing = serializer.instance
+        if hearing.hearing_date != old_date:
+            # A draft "hearing moved to B" update for the client; the
+            # advocate sends it (or not) from the drafts inbox. Must never
+            # fail the edit itself.
+            try:
+                from core.services.client_updates import draft_update_for_reschedule
+
+                draft_update_for_reschedule(hearing, old_date)
+            except Exception:  # noqa: BLE001
+                logger.exception("Client update draft failed for hearing %s.", hearing.id)

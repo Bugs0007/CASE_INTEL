@@ -43,6 +43,8 @@ function makeCase(overrides: Partial<Case> = {}): Case {
     case_number: "WP/1000/2026",
     title: "Ramesh Kumar vs. TSSPDCL",
     client_name: "",
+    client: null,
+    client_detail: null,
     client_contacts: [],
     opposing_party: null,
     user_party_role: "unknown",

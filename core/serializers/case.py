@@ -10,6 +10,7 @@ from rest_framework import serializers
 
 from core.models import AppearanceFee, Case
 
+from .client import ClientSummarySerializer, scope_client_field
 from .client_contact import ClientContactSerializer
 
 
@@ -22,6 +23,11 @@ class CaseSerializer(serializers.ModelSerializer):
     next_hearing_date = serializers.SerializerMethodField()
     client_contacts = ClientContactSerializer(many=True, read_only=True)
     fee_summary = serializers.SerializerMethodField()
+    client_detail = ClientSummarySerializer(source="client", read_only=True)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        scope_client_field(self, self.context.get("request"))
 
     class Meta:
         model = Case
@@ -30,6 +36,8 @@ class CaseSerializer(serializers.ModelSerializer):
             "case_number",
             "title",
             "client_name",
+            "client",
+            "client_detail",
             "client_contacts",
             "opposing_party",
             "user_party_role",
@@ -153,12 +161,17 @@ class CaseCreateSerializer(serializers.ModelSerializer):
     two-step flow an advocate-search import already uses.
     """
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        scope_client_field(self, self.context.get("request"))
+
     class Meta:
         model = Case
         fields = [
             "case_number",
             "title",
             "client_name",
+            "client",
             "opposing_party",
             "user_party_role",
             "case_type",

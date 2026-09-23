@@ -42,6 +42,7 @@ class ProcessingJob(OwnedModel):
         ("advocate_import", "Advocate Case Import"),
         ("advocate_search", "Advocate Search (state-wide fan-out)"),
         ("case_briefing", "Case Briefing (hearing prep sheet)"),
+        ("tracking_refresh", "Refresh All Tracked Cases"),
     ]
 
     # Explicit pk so this model doesn't add to the pre-existing W042
@@ -240,6 +241,28 @@ class ProcessingJob(OwnedModel):
             job_type="advocate_import",
             payload={"selected": selected, "advocate_name": advocate_name, "bar_code": bar_code},
             progress_total=len(selected),
+        )
+
+    @classmethod
+    def enqueue_tracking_refresh(cls, owner, case_ids: list[int]) -> "ProcessingJob":
+        """Enqueue "refresh all my tracked cases" (the dashboard button).
+
+        Another sequential, CAPTCHA-gated fan-out at the eCourts portal, so
+        the same system-wide single-in-flight cap as the advocate_* jobs
+        applies (see JobAlreadyRunningError). The job works through
+        `case_ids` a batch at a time and queues its own follow-on job for
+        the rest -- see core/services/bulk_refresh.py -- and those
+        follow-ons are created directly, not through here, since the job
+        creating them is itself still active."""
+        if cls.active_of_type_exists("tracking_refresh"):
+            raise JobAlreadyRunningError(
+                "A refresh of tracked cases is already running. Please wait for it to finish."
+            )
+        return cls.objects.create(
+            owner=owner,
+            job_type="tracking_refresh",
+            payload={"case_ids": list(case_ids), "total": len(case_ids)},
+            progress_total=len(case_ids),
         )
 
     @classmethod

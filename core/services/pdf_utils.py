@@ -1,4 +1,5 @@
-"""Helpers shared by the fpdf2 renderers (invoices, hearing prep sheets)."""
+"""Helpers shared by the fpdf2 renderers (invoices, hearing prep sheets,
+client statements, generated documents)."""
 
 
 def pdf_safe(text) -> str:
@@ -12,3 +13,31 @@ def pdf_safe(text) -> str:
     if text is None:
         return ""
     return str(text).encode("latin-1", "replace").decode("latin-1")
+
+
+def draw_letterhead(pdf, profile) -> None:
+    """The advocate's letterhead block and rule, at the current position.
+
+    Shared so an invoice, a statement and a cover letter carry the same
+    header: letterhead name, address lines, bar registration number.
+    """
+    pdf.set_font("Helvetica", "B", 18)
+    pdf.cell(0, 10, pdf_safe(profile.letterhead_name or "Advocate"), new_x="LMARGIN", new_y="NEXT")
+
+    pdf.set_font("Helvetica", "", 10)
+    for line in (profile.address or "").splitlines():
+        if line.strip():
+            pdf.cell(0, 5, pdf_safe(line.strip()), new_x="LMARGIN", new_y="NEXT")
+    if profile.bar_registration_number:
+        pdf.cell(
+            0,
+            5,
+            pdf_safe(f"Bar Registration No.: {profile.bar_registration_number}"),
+            new_x="LMARGIN",
+            new_y="NEXT",
+        )
+
+    pdf.ln(4)
+    y = pdf.get_y()
+    pdf.line(pdf.l_margin, y, pdf.w - pdf.r_margin, y)
+    pdf.ln(6)

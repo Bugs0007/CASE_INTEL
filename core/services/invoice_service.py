@@ -18,27 +18,24 @@ from __future__ import annotations
 
 import logging
 from decimal import Decimal
-from email.utils import formataddr
 
-from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
-from django.core.mail import EmailMessage, get_connection
 from django.db import transaction
 from django.utils import timezone
 
-from core.models import AdvocateProfile, AppearanceFee, ClientContact
+from core.models import AdvocateProfile, AppearanceFee, ClientContact, ClientMessage, SentMessage
+from core.services import email_delivery
+from core.services.email_delivery import EMAIL_ENV_VARS_REQUIRED, email_is_configured
+from core.services.pdf_utils import draw_letterhead
 from core.services.pdf_utils import pdf_safe as _pdf_safe
 
 logger = logging.getLogger(__name__)
 
-# Env vars that must be present for invoice email to actually send. Kept
-# here (not only in settings.py) so the API can tell the user exactly
-# what to set -- see EMAIL_ENV_VARS_REQUIRED in the send result payload.
-EMAIL_ENV_VARS_REQUIRED = [
-    "RESEND_API_KEY",
-    "DEFAULT_FROM_EMAIL",
-]
+# The printed reverse-charge line for a business-entity client. Legal
+# services by an advocate to a business entity fall under reverse charge,
+# so the invoice only NAMES who pays the tax -- nothing is computed.
+REVERSE_CHARGE_LINE = "Tax payable on reverse charge basis by recipient"
 
 
 class InvoiceError(Exception):
@@ -54,7 +51,7 @@ class MissingBillingContactError(InvoiceError):
     (or one with no email address)."""
 
 
-class MissingContactEmailError(InvoiceError):
+class MissingContactEmailError(InvoiceError, email_delivery.MissingContactEmailError):
     """Raised when the sending advocate has no contact email set. A
     client-facing invoice email with no way to reply to the actual
     advocate is a bad default, so this blocks the send entirely rather
@@ -129,32 +126,14 @@ def render_invoice_pdf(fee: AppearanceFee, profile: AdvocateProfile) -> bytes:
 
     hearing = fee.hearing
     case = hearing.case
+    client = case.client  # the billing entity, if the advocate linked one
+    business_client = client is not None and client.is_business
 
     pdf = FPDF(orientation="P", unit="mm", format="A4")
     pdf.set_auto_page_break(auto=True, margin=20)
     pdf.add_page()
 
-    # --- Letterhead ---
-    pdf.set_font("Helvetica", "B", 18)
-    pdf.cell(0, 10, _pdf_safe(profile.letterhead_name or "Advocate"), new_x="LMARGIN", new_y="NEXT")
-
-    pdf.set_font("Helvetica", "", 10)
-    for line in (profile.address or "").splitlines():
-        if line.strip():
-            pdf.cell(0, 5, _pdf_safe(line.strip()), new_x="LMARGIN", new_y="NEXT")
-    if profile.bar_registration_number:
-        pdf.cell(
-            0,
-            5,
-            _pdf_safe(f"Bar Registration No.: {profile.bar_registration_number}"),
-            new_x="LMARGIN",
-            new_y="NEXT",
-        )
-
-    pdf.ln(4)
-    y = pdf.get_y()
-    pdf.line(pdf.l_margin, y, pdf.w - pdf.r_margin, y)
-    pdf.ln(6)
+    draw_letterhead(pdf, profile)
 
     # --- Invoice heading ---
     pdf.set_font("Helvetica", "B", 14)
@@ -176,10 +155,12 @@ def render_invoice_pdf(fee: AppearanceFee, profile: AdvocateProfile) -> bytes:
         ("Case Title", case.title or ""),
         ("Case Number", case.case_number or ""),
         ("CNR Number", case.cnr_number or "Not available"),
-        ("Client", case.client_name or ""),
+        ("Client", case.client_name or (client.name if client else "")),
         ("Hearing Date", timezone.localtime(hearing.hearing_date).strftime("%d %b %Y")),
         ("Court", hearing.location or "Not recorded"),
     ]
+    if business_client and client.gstin:
+        rows.append(("Recipient GSTIN", client.gstin))
     if hearing.judge:
         rows.append(("Judge", hearing.judge))
     if hearing.purpose:
@@ -205,6 +186,12 @@ def render_invoice_pdf(fee: AppearanceFee, profile: AdvocateProfile) -> bytes:
     pdf.set_font("Helvetica", "B", 12)
     pdf.cell(value_w, 9, _pdf_safe(_money(fee.amount)), border=1, align="R",
              new_x="LMARGIN", new_y="NEXT")
+
+    if business_client:
+        # Printed, never computed: this app does not calculate GST.
+        pdf.ln(4)
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.multi_cell(0, 5, _pdf_safe(REVERSE_CHARGE_LINE))
 
     if fee.notes:
         pdf.ln(6)
@@ -310,6 +297,18 @@ def mark_paid(fee: AppearanceFee) -> AppearanceFee:
     fee.paid_at = timezone.now()
     fee.save(update_fields=["status", "paid_at", "updated_at"])
     logger.info("Fee %d marked paid (invoice %s)", fee.id, fee.invoice_number or "-")
+
+    # A reminder about money already received must never go out: drop any
+    # reminder draft still waiting in the inbox for this fee.
+    ClientMessage.objects.filter(
+        fee=fee,
+        kind=ClientMessage.KIND_PAYMENT_REMINDER,
+        status=ClientMessage.STATUS_DRAFT,
+    ).update(
+        status=ClientMessage.STATUS_DISCARDED,
+        discard_reason="Invoice marked paid.",
+        updated_at=timezone.now(),
+    )
     return fee
 
 
@@ -332,16 +331,7 @@ def get_billing_contact(case) -> ClientContact:
     return contact
 
 
-def email_is_configured() -> bool:
-    """True when a real RESEND_API_KEY is present (see settings.py).
-
-    settings.INVOICE_EMAIL_CONFIGURED is computed once at startup from
-    the env; read through this helper so tests can patch one place.
-    """
-    return bool(getattr(settings, "INVOICE_EMAIL_CONFIGURED", False))
-
-
-def send_invoice(fee: AppearanceFee) -> dict:
+def send_invoice(fee: AppearanceFee, *, sent_by=None) -> dict:
     """Email the invoice PDF to the case's billing contact.
 
     When SMTP is not configured this does NOT fail -- it logs the full
@@ -380,23 +370,39 @@ def send_invoice(fee: AppearanceFee) -> dict:
         f"{profile.letterhead_name or 'Your advocate'}\n"
     )
 
-    if not email_is_configured():
-        logger.warning(
-            "EMAIL NOT CONFIGURED -- invoice %s NOT sent. Would have emailed %s <%s>: "
-            "%s (amount %s, case %s, hearing %s). Set %s in the environment to enable delivery.",
-            fee.invoice_number,
-            contact.name,
-            contact.email,
-            subject,
-            _money(fee.amount),
-            fee.hearing.case.case_number,
-            fee.hearing_id,
-            ", ".join(EMAIL_ENV_VARS_REQUIRED),
-        )
-        fee.sent_at = timezone.now()
-        fee.sent_to_email = contact.email
-        fee.send_status = AppearanceFee.SEND_LOGGED
-        fee.save(update_fields=["sent_at", "sent_to_email", "send_status", "updated_at"])
+    # Logged (no mail credentials) or really sent, the delivery goes
+    # through the one shared path -- which also writes the SentMessage
+    # audit row -- and the fee records which of the two it was.
+    pdf_bytes = b""
+    if email_is_configured():
+        with default_storage.open(fee.invoice_pdf_path, "rb") as handle:
+            pdf_bytes = handle.read()
+
+    result = email_delivery.deliver_email(
+        owner=fee.owner,
+        profile=profile,
+        to=[contact.email],
+        subject=subject,
+        body=body,
+        kind=SentMessage.KIND_INVOICE,
+        sent_by=sent_by,
+        attachments=[email_delivery.Attachment(f"{fee.invoice_number}.pdf", pdf_bytes)],
+        case=fee.hearing.case,
+        fee=fee,
+        log_context=(
+            f"invoice {fee.invoice_number} to {contact.name}, amount {_money(fee.amount)}, "
+            f"case {fee.hearing.case.case_number}, hearing {fee.hearing_id}"
+        ),
+    )
+
+    fee.sent_at = timezone.now()
+    fee.sent_to_email = contact.email
+    fee.send_status = (
+        AppearanceFee.SEND_SENT if result.delivered else AppearanceFee.SEND_LOGGED
+    )
+    fee.save(update_fields=["sent_at", "sent_to_email", "send_status", "updated_at"])
+
+    if not result.delivered:
         return {
             "sent": False,
             "recipient": contact.email,
@@ -405,42 +411,9 @@ def send_invoice(fee: AppearanceFee) -> dict:
                 "instead of sent. Set the environment variables listed in "
                 "missing_env_vars and try again."
             ),
-            "missing_env_vars": _missing_email_env_vars(),
-            "required_env_vars": list(EMAIL_ENV_VARS_REQUIRED),
+            "missing_env_vars": result.missing_env_vars,
+            "required_env_vars": result.required_env_vars,
         }
-
-    with default_storage.open(fee.invoice_pdf_path, "rb") as handle:
-        pdf_bytes = handle.read()
-
-    # Display name is the advocate's letterhead, address is the fixed
-    # server sender (must be on a Resend-verified domain -- see
-    # DEFAULT_FROM_EMAIL in settings.py). Reply-To and Cc use the
-    # advocate's own contact email (AdvocateProfile.contact_email, set on
-    # the Settings page -- deliberately separate from the User's login
-    # email) so a client hitting "reply" reaches the lawyer directly
-    # rather than the shared billing@ inbox, and the advocate keeps a
-    # copy of exactly what was sent. Guaranteed set at this point -- the
-    # gate above blocks the whole send otherwise.
-    from_email = formataddr((profile.letterhead_name or "Advocate", settings.DEFAULT_FROM_EMAIL))
-    reply_to = [profile.contact_email]
-    cc = [profile.contact_email]
-
-    message = EmailMessage(
-        subject=subject,
-        body=body,
-        from_email=from_email,
-        to=[contact.email],
-        cc=cc,
-        reply_to=reply_to,
-        connection=get_connection(),
-    )
-    message.attach(f"{fee.invoice_number}.pdf", pdf_bytes, "application/pdf")
-    message.send(fail_silently=False)
-
-    fee.sent_at = timezone.now()
-    fee.sent_to_email = contact.email
-    fee.send_status = AppearanceFee.SEND_SENT
-    fee.save(update_fields=["sent_at", "sent_to_email", "send_status", "updated_at"])
 
     logger.info("Invoice %s emailed to %s", fee.invoice_number, contact.email)
     return {
@@ -452,20 +425,6 @@ def send_invoice(fee: AppearanceFee) -> dict:
     }
 
 
-def _missing_email_env_vars() -> list[str]:
-    """The mail env vars that still need a value for real delivery.
-
-    Derived from email_is_configured() (settings.INVOICE_EMAIL_CONFIGURED)
-    rather than re-inspecting settings.RESEND_API_KEY directly -- the two
-    normally agree, but tests patch INVOICE_EMAIL_CONFIGURED directly (see
-    email_is_configured()'s docstring), and this needs to stay consistent
-    with that single patch point rather than independently re-deriving
-    from the env var underneath it, which would go stale the moment a
-    real key is actually present in the environment a test runs in.
-
-    DEFAULT_FROM_EMAIL has a working default in settings.py, so it's never
-    blank and would never appear here -- it's carried in
-    EMAIL_ENV_VARS_REQUIRED instead, which the API returns alongside this
-    as the full checklist.
-    """
-    return [] if email_is_configured() else ["RESEND_API_KEY"]
+# Kept for callers that imported it from here before the delivery code
+# moved to core/services/email_delivery.py.
+_missing_email_env_vars = email_delivery.missing_email_env_vars

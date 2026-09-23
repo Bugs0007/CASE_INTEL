@@ -49,6 +49,16 @@ class Case(OwnedModel):
     case_number = models.CharField(max_length=100)
     title = models.CharField(max_length=500)
     client_name = models.CharField(max_length=255)
+    # The billing entity this matter belongs to (see core/models/client.py).
+    # Optional: set by the advocate or by manage.py backfill_clients, never
+    # guessed automatically at intake.
+    client = models.ForeignKey(
+        "core.Client",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="cases",
+    )
     opposing_party = models.CharField(max_length=255, blank=True, null=True)
     case_type = models.CharField(max_length=50, choices=CASE_TYPE_CHOICES, blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="open")

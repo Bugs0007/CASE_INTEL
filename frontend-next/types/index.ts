@@ -12,3 +12,4 @@ export * from "./task";
 export * from "./hearing-digest";
 export * from "./conflict";
 export * from "./limitation";
+export * from "./client";
