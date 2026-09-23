@@ -14,6 +14,15 @@ class ClientContact(OwnedModel):
         ("assistant", "Assistant"),
     ]
 
+    # How the executant is described on a vakalatnama: "S/o Venkat Rao".
+    RELATION_CHOICES = [
+        ("", "Not set"),
+        ("s/o", "S/o"),
+        ("d/o", "D/o"),
+        ("w/o", "W/o"),
+        ("c/o", "C/o"),
+    ]
+
     case = models.ForeignKey(
         "core.Case", on_delete=models.CASCADE, related_name="client_contacts"
     )
@@ -22,6 +31,27 @@ class ClientContact(OwnedModel):
     phone = models.CharField(max_length=50, blank=True, null=True)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="primary")
     is_billing_contact = models.BooleanField(default=False)
+
+    # Opt-outs, checked when a draft is written AND again at send time.
+    receive_case_updates = models.BooleanField(
+        default=True, help_text="Send this contact 'your matter was heard' updates."
+    )
+    receive_payment_reminders = models.BooleanField(
+        default=True, help_text="Send this contact reminders about unpaid invoices."
+    )
+
+    # Executant details for generated documents (vakalatnama). Blank ones
+    # are asked for at generation time instead -- see
+    # core/services/doc_templates/.
+    relation_type = models.CharField(
+        max_length=5, choices=RELATION_CHOICES, blank=True, default=""
+    )
+    relation_name = models.CharField(
+        max_length=255, blank=True, default="", help_text="Father's / husband's name."
+    )
+    age = models.PositiveSmallIntegerField(blank=True, null=True)
+    address = models.TextField(blank=True, default="")
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

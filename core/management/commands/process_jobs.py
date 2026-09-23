@@ -34,6 +34,7 @@ from django.utils import timezone
 from core.models import Case, Document, ProcessingJob
 from core.services.advocate_import import run_advocate_import
 from core.services.advocate_search import AdvocateSearchCancelled, run_advocate_search
+from core.services.bulk_refresh import BulkRefreshCancelled, run_tracking_refresh
 from core.services.court_order_sync import sync_case_orders
 from core.services.document_processor import DocumentProcessor
 from core.services.hearing_digest import generate_case_briefing
@@ -181,6 +182,8 @@ class Command(BaseCommand):
                 run_advocate_search(job, progress_callback=report_progress)
             elif job.job_type == "case_briefing":
                 generate_case_briefing(Case.objects.get(id=job.case_id))
+            elif job.job_type == "tracking_refresh":
+                run_tracking_refresh(job, progress_callback=report_progress)
             else:
                 processor.process_document(job.document_id, progress_callback=report_progress)
                 # Order Overview runs here and ONLY here: the text (and
@@ -192,7 +195,7 @@ class Command(BaseCommand):
             self._finish(job, "failed", error=f"Document {job.document_id} no longer exists.")
         except Case.DoesNotExist:
             self._finish(job, "failed", error=f"Case {job.case_id} no longer exists.")
-        except AdvocateSearchCancelled:
+        except (AdvocateSearchCancelled, BulkRefreshCancelled):
             self._finish(job, "cancelled")
             self.stdout.write(f"Job {job.id} cancelled.")
         except Exception as exc:
@@ -254,6 +257,18 @@ class Command(BaseCommand):
                 )
         except Exception:  # noqa: BLE001
             logger.exception("Direction tasks failed for order %d.", order.id)
+
+        # The client-update DRAFT for the hearing this order was passed on
+        # (never sent -- the advocate reviews it in the drafts inbox). Its
+        # own try block, same reasoning as the tasks above.
+        try:
+            from core.services.client_updates import draft_update_for_order
+
+            message, outcome = draft_update_for_order(order)
+            if message is not None and outcome in ("created", "updated"):
+                self.stdout.write(f"Order {order.id} client update draft {message.id}: {outcome}")
+        except Exception:  # noqa: BLE001
+            logger.exception("Client update draft failed for order %d.", order.id)
 
     def _run_order_sync(self, job: ProcessingJob, report_progress) -> None:
         """Fetch new court-order PDFs for the job's case. Each downloaded

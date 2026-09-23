@@ -11,6 +11,9 @@ import {
   Plus,
   Calendar,
   Settings,
+  Inbox,
+  Receipt,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -39,6 +42,9 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/cases", label: "Cases", icon: Briefcase },
   { href: "/documents", label: "Documents", icon: FileText },
   { href: "/calendar", label: "Calendar", icon: Calendar },
+  { href: "/messages", label: "Client Messages", icon: Inbox },
+  { href: "/billing", label: "Billing", icon: Receipt },
+  { href: "/clients", label: "Clients", icon: Users },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

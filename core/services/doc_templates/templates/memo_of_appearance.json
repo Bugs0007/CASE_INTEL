@@ -1,0 +1,36 @@
+{
+  "key": "memo_of_appearance",
+  "title": "Memo of appearance",
+  "description": "Notice to the court recording your appearance for your client in the matter.",
+  "position": 2,
+  "letterhead": false,
+  "fields": [
+    {"name": "court", "label": "Court", "sources": ["case.court"], "required": true},
+    {"name": "case_number", "label": "Case number", "sources": ["case.case_number"], "required": true},
+    {"name": "petitioner", "label": "Petitioner(s)", "sources": ["case.petitioner_name"], "required": true, "multiline": true},
+    {"name": "respondent", "label": "Respondent(s)", "sources": ["case.respondent_name"], "required": true, "multiline": true},
+    {"name": "user_side", "label": "Your client's side (Petitioner / Respondent)", "sources": ["case.user_side"], "required": true},
+    {"name": "our_party", "label": "Your client, as named in the case", "sources": ["case.our_party", "case.client_name"], "required": true},
+    {"name": "advocate_name", "label": "Your name", "sources": ["profile.advocate_name"], "required": true},
+    {"name": "bar_registration_number", "label": "Your enrolment number", "sources": ["profile.bar_registration_number"], "required": true},
+    {"name": "advocate_address", "label": "Your address", "sources": ["profile.address"], "required": false, "multiline": true},
+    {"name": "advocate_phone", "label": "Your phone", "sources": ["profile.phone"], "required": false},
+    {"name": "advocate_email", "label": "Your email", "sources": ["profile.contact_email"], "required": false},
+    {"name": "place", "label": "Place", "sources": [], "required": true},
+    {"name": "date", "label": "Date", "sources": ["today"], "required": true}
+  ],
+  "blocks": [
+    {"type": "center", "text": "IN THE {court}"},
+    {"type": "center", "text": "{case_number}"},
+    {"type": "spacer", "height": 4},
+    {"type": "parties", "text": "Between:\n{petitioner}\t... Petitioner(s)\nAND\n{respondent}\t... Respondent(s)"},
+    {"type": "spacer", "height": 6},
+    {"type": "title", "text": "MEMO OF APPEARANCE"},
+    {"type": "spacer", "height": 4},
+    {"type": "paragraph", "text": "Please take notice that I, {advocate_name}, Advocate, appear on behalf of the {user_side}, {our_party}, in the above matter. Kindly record my appearance."},
+    {"type": "spacer", "height": 6},
+    {"type": "text", "text": "Place: {place}\nDate: {date}"},
+    {"type": "spacer", "height": 10},
+    {"type": "right", "text": "{advocate_name}\nAdvocate for the {user_side}\nEnrolment No. {bar_registration_number}\n{advocate_address}\n{advocate_phone}\n{advocate_email}"}
+  ]
+}

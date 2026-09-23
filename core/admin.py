@@ -18,7 +18,9 @@ from core.models import (
     CaseTag,
     CaseTagMap,
     Citation,
+    Client,
     ClientContact,
+    ClientMessage,
     Conversation,
     Document,
     DocumentChunk,
@@ -36,6 +38,7 @@ from core.models import (
     InviteToken,
     Message,
     ProcessingJob,
+    SentMessage,
     Task,
     TravelBooking,
 )
@@ -93,6 +96,37 @@ class ClientContactAdmin(admin.ModelAdmin):
     list_filter = ("role", "is_billing_contact")
     search_fields = ("name", "email", "phone")
     readonly_fields = ("created_at",)
+
+
+@admin.register(Client)
+class ClientAdmin(admin.ModelAdmin):
+    list_display = ("name", "owner", "client_type", "gstin", "email", "created_at")
+    list_filter = ("client_type",)
+    search_fields = ("name", "email", "gstin")
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(ClientMessage)
+class ClientMessageAdmin(admin.ModelAdmin):
+    list_display = ("id", "owner", "case", "kind", "status", "subject", "created_at", "sent_at")
+    list_filter = ("kind", "status")
+    search_fields = ("subject", "dedup_key")
+    readonly_fields = ("dedup_key", "send_result", "created_at", "updated_at", "sent_at")
+
+
+@admin.register(SentMessage)
+class SentMessageAdmin(admin.ModelAdmin):
+    """Audit log: read-only in admin too."""
+
+    list_display = ("id", "owner", "kind", "delivery", "subject", "sent_by", "sent_at")
+    list_filter = ("kind", "delivery")
+    search_fields = ("subject",)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(CaseTag)

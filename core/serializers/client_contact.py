@@ -27,6 +27,12 @@ class ClientContactSerializer(serializers.ModelSerializer):
             "phone",
             "role",
             "is_billing_contact",
+            "receive_case_updates",
+            "receive_payment_reminders",
+            "relation_type",
+            "relation_name",
+            "age",
+            "address",
             "created_at",
         ]
         read_only_fields = ["id", "created_at"]

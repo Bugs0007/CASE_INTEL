@@ -18,6 +18,8 @@ import { TasksCard } from "@/components/tasks/tasks-card";
 import { HearingDialog } from "@/components/hearings/hearing-dialog";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { UploadDocumentDialog } from "@/components/documents/upload-document-dialog";
+import { GenerateDocumentDialog } from "@/components/documents/generate-document-dialog";
+import { CaseClientUpdatesCard } from "@/components/client-updates/case-client-updates-card";
 import { RecentDocumentsCard } from "@/components/documents/recent-documents-card";
 import { showToast } from "@/components/ui/toaster";
 import {
@@ -32,6 +34,7 @@ export default function CaseDetailPage() {
   const caseId = Number(params.id);
   const [showChat, setShowChat] = useState(false);
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  const [isGenerateDialogOpen, setIsGenerateDialogOpen] = useState(false);
   const [isHearingDialogOpen, setIsHearingDialogOpen] = useState(false);
   const [editingHearing, setEditingHearing] = useState<Hearing | null>(null);
 
@@ -198,6 +201,10 @@ export default function CaseDetailPage() {
               latestOrder={latestDatedOrder}
             />
 
+            {/* Client emails drafted from the latest order / hearing date,
+                waiting for review. Renders nothing when there are none. */}
+            <CaseClientUpdatesCard caseId={caseId} />
+
             {/* Case Overview */}
             <CaseOverview case={caseItem} />
 
@@ -213,6 +220,7 @@ export default function CaseDetailPage() {
               documents={documents}
               isLoading={docsLoading}
               onUploadClick={() => setIsUploadDialogOpen(true)}
+              onGenerateClick={() => setIsGenerateDialogOpen(true)}
               onProcess={handleProcessDocument}
               onDelete={handleDeleteDocument}
               onView={handleViewDocument}
@@ -271,6 +279,13 @@ export default function CaseDetailPage() {
         isOpen={isUploadDialogOpen}
         onClose={() => setIsUploadDialogOpen(false)}
         defaultCaseId={caseId}
+      />
+
+      {/* Template-merge documents (vakalatnama, memo of appearance, ...) */}
+      <GenerateDocumentDialog
+        isOpen={isGenerateDialogOpen}
+        onClose={() => setIsGenerateDialogOpen(false)}
+        caseItem={caseItem}
       />
 
       {/* Add/Edit Hearing Dialog */}

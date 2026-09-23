@@ -4,7 +4,9 @@ from .appearance_fee import AppearanceFee
 from .case import Case
 from .case_briefing import CaseBriefing
 from .case_tag import CaseTag, CaseTagMap
+from .client import Client
 from .client_contact import ClientContact
+from .client_message import ClientMessage, SentMessage
 from .travel_booking import TravelBooking
 from .folder import Folder
 from .document import Document
@@ -35,7 +37,10 @@ __all__ = [
     "CaseBriefing",
     "CaseTag",
     "CaseTagMap",
+    "Client",
     "ClientContact",
+    "ClientMessage",
+    "SentMessage",
     "TravelBooking",
     "Folder",
     "Document",

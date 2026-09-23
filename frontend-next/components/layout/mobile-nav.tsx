@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Briefcase, FileText, Calendar, type LucideIcon } from "lucide-react";
+import { LayoutDashboard, Briefcase, FileText, Calendar, Inbox, Receipt, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface NavItem {
@@ -23,6 +23,10 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/cases", label: "Cases", icon: Briefcase },
   { href: "/documents", label: "Docs", icon: FileText },
   { href: "/calendar", label: "Calendar", icon: Calendar },
+  // Clients isn't here (six tabs is the most that keeps 44px+ targets at
+  // 375px) -- it's one tap away from the Billing page header.
+  { href: "/messages", label: "Inbox", icon: Inbox },
+  { href: "/billing", label: "Billing", icon: Receipt },
 ];
 
 /** Bottom tab bar -- the mobile stand-in for the desktop Sidebar. Shown only
