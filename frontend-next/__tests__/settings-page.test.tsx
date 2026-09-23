@@ -48,6 +48,9 @@ function makeProfile(overrides: Partial<AdvocateProfile> = {}): AdvocateProfile 
   return {
     id: 1,
     letterhead_name: "",
+    advocate_name: "",
+    phone: "",
+    reminder_after_days: 15,
     address: "",
     bar_registration_number: "",
     contact_email: "",

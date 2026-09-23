@@ -11,12 +11,15 @@ class AdvocateProfileSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "letterhead_name",
+            "advocate_name",
+            "phone",
             "address",
             "bar_registration_number",
             "contact_email",
             "default_fee_amount",
             "invoice_prefix",
             "last_invoice_sequence",
+            "reminder_after_days",
             "created_at",
             "updated_at",
         ]

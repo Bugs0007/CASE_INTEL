@@ -30,6 +30,9 @@ export default function SettingsPage() {
   const updateProfile = useUpdateAdvocateProfile();
 
   const [letterheadName, setLetterheadName] = useState("");
+  const [advocateName, setAdvocateName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [reminderDays, setReminderDays] = useState("15");
   const [address, setAddress] = useState("");
   const [barNumber, setBarNumber] = useState("");
   const [contactEmail, setContactEmail] = useState("");
@@ -41,6 +44,9 @@ export default function SettingsPage() {
   useEffect(() => {
     if (!profile) return;
     setLetterheadName(profile.letterhead_name);
+    setAdvocateName(profile.advocate_name ?? "");
+    setPhone(profile.phone ?? "");
+    setReminderDays(String(profile.reminder_after_days ?? 15));
     setAddress(profile.address);
     setBarNumber(profile.bar_registration_number);
     setContactEmail(profile.contact_email);
@@ -53,6 +59,9 @@ export default function SettingsPage() {
     try {
       await updateProfile.mutateAsync({
         letterhead_name: letterheadName,
+        advocate_name: advocateName,
+        phone,
+        reminder_after_days: Number(reminderDays) || 15,
         address,
         bar_registration_number: barNumber,
         contact_email: contactEmail,
@@ -115,6 +124,35 @@ export default function SettingsPage() {
                 Shown at the top of every invoice. Left blank, invoices are headed
                 &ldquo;Advocate&rdquo;.
               </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="advocate_name" className="mb-1 block text-sm font-medium text-gray-700">
+                  Your Name
+                </label>
+                <Input
+                  id="advocate_name"
+                  value={advocateName}
+                  onChange={(e) => setAdvocateName(e.target.value)}
+                  placeholder="e.g. S. Bhagath"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Used on documents you sign (vakalatnama, memo of appearance) and to sign client emails.
+                </p>
+              </div>
+              <div>
+                <label htmlFor="phone" className="mb-1 block text-sm font-medium text-gray-700">
+                  Phone
+                </label>
+                <Input
+                  id="phone"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  inputMode="tel"
+                  placeholder="e.g. 98480 00000"
+                />
+              </div>
             </div>
 
             <div>
@@ -189,6 +227,23 @@ export default function SettingsPage() {
                   &ldquo;INV&rdquo; numbers invoices INV-0001, INV-0002, …
                 </p>
               </div>
+            </div>
+
+            <div>
+              <label htmlFor="reminder_after_days" className="mb-1 block text-sm font-medium text-gray-700">
+                Payment Reminder After (days)
+              </label>
+              <Input
+                id="reminder_after_days"
+                value={reminderDays}
+                onChange={(e) => setReminderDays(e.target.value)}
+                inputMode="numeric"
+                className="sm:w-32"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                An invoice unpaid this long gets a reminder draft in Client Messages for you to review
+                and send (at most 3, the same gap apart; never once it&apos;s marked paid). 1 to 90.
+              </p>
             </div>
 
             {profile && profile.last_invoice_sequence > 0 && (

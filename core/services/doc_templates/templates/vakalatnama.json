@@ -1,0 +1,37 @@
+{
+  "key": "vakalatnama",
+  "title": "Vakalatnama",
+  "description": "Authority appointing you to act for the client, signed by the executant. A general English form: check it against the format your court prescribes, and affix the advocates' welfare stamp by hand.",
+  "position": 1,
+  "letterhead": false,
+  "fields": [
+    {"name": "court", "label": "Court", "sources": ["case.court"], "required": true},
+    {"name": "case_number", "label": "Case number", "sources": ["case.case_number"], "required": true},
+    {"name": "petitioner", "label": "Petitioner(s)", "sources": ["case.petitioner_name"], "required": true, "multiline": true},
+    {"name": "respondent", "label": "Respondent(s)", "sources": ["case.respondent_name"], "required": true, "multiline": true},
+    {"name": "user_side", "label": "Your client's side (Petitioner / Respondent)", "sources": ["case.user_side"], "required": true},
+    {"name": "executant_name", "label": "Executant's name", "sources": ["contact.name"], "required": true},
+    {"name": "executant_relation", "label": "Executant's relation (e.g. S/o Venkat Rao)", "sources": ["contact.relation"], "required": true},
+    {"name": "executant_age", "label": "Executant's age", "sources": ["contact.age"], "required": true},
+    {"name": "executant_address", "label": "Executant's address", "sources": ["contact.address"], "required": true, "multiline": true},
+    {"name": "advocate_name", "label": "Your name", "sources": ["profile.advocate_name"], "required": true},
+    {"name": "bar_registration_number", "label": "Your enrolment number", "sources": ["profile.bar_registration_number"], "required": true},
+    {"name": "advocate_address", "label": "Your address", "sources": ["profile.address"], "required": false, "multiline": true},
+    {"name": "place", "label": "Place of signing", "sources": [], "required": true},
+    {"name": "date", "label": "Date", "sources": ["today"], "required": true}
+  ],
+  "blocks": [
+    {"type": "center", "text": "IN THE {court}"},
+    {"type": "center", "text": "{case_number}"},
+    {"type": "spacer", "height": 4},
+    {"type": "parties", "text": "Between:\n{petitioner}\t... Petitioner(s)\nAND\n{respondent}\t... Respondent(s)"},
+    {"type": "spacer", "height": 6},
+    {"type": "title", "text": "VAKALATNAMA"},
+    {"type": "spacer", "height": 4},
+    {"type": "paragraph", "text": "I/We, {executant_name}, {executant_relation}, aged about {executant_age} years, residing at {executant_address}, the {user_side} in the above matter, do hereby appoint and retain {advocate_name}, Advocate (Enrolment No. {bar_registration_number}), to appear, act and plead for me/us in the above matter; to conduct, prosecute or defend the same and all proceedings that may be taken in respect of any application connected with it, including applications for review, execution and taxation; to file and receive back documents; to deposit and receive money on my/our behalf; and generally to take every step on my/our behalf that may be necessary in the above matter."},
+    {"type": "paragraph", "text": "I/We agree to ratify all acts done by the said Advocate in pursuance of this authority."},
+    {"type": "paragraph", "text": "Signed at {place} on {date}."},
+    {"type": "spacer", "height": 10},
+    {"type": "signature", "left": "Executant(s)\n\n\n{executant_name}", "right": "Accepted\n\n\n{advocate_name}\nAdvocate\n{advocate_address}"}
+  ]
+}

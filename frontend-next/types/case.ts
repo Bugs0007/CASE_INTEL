@@ -1,4 +1,5 @@
 import type { CaseFeeSummary } from "./billing";
+import type { ClientSummary } from "./client";
 
 export type CaseStatus = "open" | "closed" | "pending" | "archived";
 export type CasePriority = "low" | "medium" | "high" | "critical";
@@ -16,6 +17,8 @@ export type CourtType = "district" | "high_court";
 export type FetchStatus = "never_fetched" | "success" | "failed";
 export type UserPartyRole = "unknown" | "petitioner" | "respondent";
 export type ContactRole = "primary" | "assistant";
+/** How the executant is described on a vakalatnama ("S/o Venkat Rao"). */
+export type RelationType = "" | "s/o" | "d/o" | "w/o" | "c/o";
 
 export interface ClientContact {
   id: number;
@@ -25,6 +28,14 @@ export interface ClientContact {
   phone: string | null;
   role: ContactRole;
   is_billing_contact: boolean;
+  /** Opt-outs, re-checked at send time. */
+  receive_case_updates: boolean;
+  receive_payment_reminders: boolean;
+  /** Executant details for generated documents. */
+  relation_type: RelationType;
+  relation_name: string;
+  age: number | null;
+  address: string;
   created_at: string;
 }
 
@@ -35,6 +46,12 @@ export interface ClientContactInput {
   phone?: string;
   role: ContactRole;
   is_billing_contact: boolean;
+  receive_case_updates?: boolean;
+  receive_payment_reminders?: boolean;
+  relation_type?: RelationType;
+  relation_name?: string;
+  age?: number | null;
+  address?: string;
 }
 
 export interface Case {
@@ -42,6 +59,9 @@ export interface Case {
   case_number: string;
   title: string;
   client_name: string;
+  /** The billing entity this case belongs to, if linked. */
+  client: number | null;
+  client_detail: ClientSummary | null;
   client_contacts: ClientContact[];
   opposing_party: string | null;
   user_party_role: UserPartyRole;
@@ -69,6 +89,7 @@ export interface Case {
 /** PATCH /api/cases/<id>/ -- the case-details form's write shape. */
 export interface CaseUpdateInput {
   title?: string;
+  client?: number | null;
   opposing_party?: string;
   user_party_role?: UserPartyRole;
   case_type?: CaseType;

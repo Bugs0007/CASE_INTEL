@@ -14,6 +14,12 @@ from .chat import (
     CitationSerializer,
     MessageSerializer,
 )
+from .client import (
+    ClientMessageSerializer,
+    ClientSerializer,
+    ClientSummarySerializer,
+    SentMessageSerializer,
+)
 from .client_contact import ClientContactSerializer
 from .conversation import ConversationDetailSerializer, ConversationListSerializer
 from .court_order import CourtOrderSerializer
@@ -39,6 +45,10 @@ __all__ = [
     "ChatRequestSerializer",
     "CitationSerializer",
     "ClientContactSerializer",
+    "ClientMessageSerializer",
+    "ClientSerializer",
+    "ClientSummarySerializer",
+    "SentMessageSerializer",
     "ConversationDetailSerializer",
     "ConversationListSerializer",
     "CourtOrderSerializer",

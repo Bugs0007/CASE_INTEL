@@ -22,6 +22,9 @@ class Document(OwnedModel):
         # Fetched automatically from the court portal by order sync (Phase
         # B) -- the frontend renders these with a "From eCourts" badge.
         ("court_order", "Court Order (eCourts)"),
+        # Merged from a template (vakalatnama, memo of appearance, cover
+        # letter) -- see core/services/doc_templates/.
+        ("generated", "Generated from template"),
         ("other", "Other"),
     ]
 

@@ -88,6 +88,9 @@ export interface CaseFeeSummary {
 export interface AdvocateProfile {
   id: number;
   letterhead_name: string;
+  /** Your own name, for documents you sign (letterhead_name may be a firm). */
+  advocate_name: string;
+  phone: string;
   address: string;
   bar_registration_number: string;
   /** Billing/contact email -- separate from the account's login email.
@@ -96,12 +99,17 @@ export interface AdvocateProfile {
   default_fee_amount: string;
   invoice_prefix: string;
   last_invoice_sequence: number;
+  /** Days before a payment-reminder draft is prepared (1-90, default 15). */
+  reminder_after_days: number;
   created_at: string;
   updated_at: string;
 }
 
 export interface AdvocateProfileUpdateInput {
   letterhead_name?: string;
+  advocate_name?: string;
+  phone?: string;
+  reminder_after_days?: number;
   address?: string;
   bar_registration_number?: string;
   contact_email?: string;

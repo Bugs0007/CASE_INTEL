@@ -152,6 +152,9 @@ def refresh_case_tracking(case: Case, *, force: bool = False) -> dict:
         raise MissingTrackingConfigError(f"Case {case.id} has no tracking_config set")
 
     tracking_config = _resolve_court_type(case)
+    # A case's FIRST successful fetch reports its whole hearing history as
+    # "new" -- only a later fetch finding a new date is news for the client.
+    previously_fetched = case.last_fetched_at is not None
 
     provider = get_provider()
     start = time.monotonic()
@@ -214,12 +217,24 @@ def refresh_case_tracking(case: Case, *, force: bool = False) -> dict:
 
     _enqueue_order_sync(case)
 
+    drafts_created = 0
+    if previously_fetched and new_hearing_dates:
+        # A draft "next date is Y" update for the client -- never sent from
+        # here. Must not fail the fetch that found the date.
+        try:
+            from core.services.client_updates import draft_updates_for_new_dates
+
+            drafts_created = draft_updates_for_new_dates(case, new_hearing_dates)
+        except Exception:  # noqa: BLE001
+            logger.exception("Client update draft failed for case %s.", case.id)
+
     return {
         "rate_limited": False,
         "retry_after": None,
         "case": case,
         "data": data,
         "new_hearing_dates": new_hearing_dates,
+        "client_update_drafts": drafts_created,
     }
 
 

@@ -855,3 +855,199 @@ class TestTaskIsolation:
         resp = client_a.post("/api/tasks/", {"title": "mine", "owner": user_b.id}, format="json")
         assert resp.status_code == 201
         assert Task.objects.get(id=resp.data["id"]).owner == user_a
+
+
+# ---------------------------------------------------------------------------
+# Tier 2 endpoints: clients, billing portfolio, client-message drafts, the
+# sent-message audit log, document generation, and refresh-all. One
+# A-cannot-touch-B test per endpoint.
+# ---------------------------------------------------------------------------
+
+
+def _b_fee(user_b, case_b, *, invoiced=True):
+    from decimal import Decimal
+
+    from core.models import AppearanceFee
+    from core.services import invoice_service
+
+    hearing = Hearing.objects.create(
+        owner=user_b, case=case_b, hearing_date=timezone.now(), hearing_type="other"
+    )
+    fee = AppearanceFee.objects.create(owner=user_b, hearing=hearing, amount=Decimal("777.00"))
+    return invoice_service.generate_invoice(fee) if invoiced else fee
+
+
+def _b_message(user_b, case_b):
+    from core.models import ClientMessage
+
+    return ClientMessage.objects.create(
+        owner=user_b,
+        case=case_b,
+        kind=ClientMessage.KIND_CASE_UPDATE,
+        dedup_key=f"case_update:{case_b.id}:2026-09-01",
+        subject="Bob's update",
+        body="Bob's client update.",
+        recipients=[{"contact_id": 0, "name": "Bob Client", "email": "bobclient@example.com"}],
+    )
+
+
+@pytest.mark.django_db
+class TestTier2EndpointIsolation:
+    # --- clients/ and clients/<id>/ ---------------------------------------
+
+    def test_client_list_excludes_other_users_clients(self, client_a, user_a, user_b):
+        from core.models import Client
+
+        Client.objects.create(owner=user_a, name="Alice's client")
+        Client.objects.create(owner=user_b, name="Bob's client")
+        resp = client_a.get("/api/clients/")
+        assert [c["name"] for c in resp.data] == ["Alice's client"]
+
+    def test_client_create_ignores_supplied_owner(self, client_a, user_a, user_b):
+        from core.models import Client
+
+        resp = client_a.post("/api/clients/", {"name": "Mine", "owner": user_b.id}, format="json")
+        assert resp.status_code == 201
+        assert Client.objects.get(id=resp.data["id"]).owner == user_a
+
+    def test_client_detail_update_delete_404(self, client_a, user_b):
+        from core.models import Client
+
+        theirs = Client.objects.create(owner=user_b, name="Bob's client")
+        assert client_a.get(f"/api/clients/{theirs.id}/").status_code == 404
+        assert client_a.patch(f"/api/clients/{theirs.id}/", {"name": "x"}, format="json").status_code == 404
+        assert client_a.delete(f"/api/clients/{theirs.id}/").status_code == 404
+        theirs.refresh_from_db()
+        assert theirs.name == "Bob's client"
+
+    def test_client_statement_pdf_404(self, client_a, user_b):
+        from core.models import Client
+
+        theirs = Client.objects.create(owner=user_b, name="Bob's client")
+        assert client_a.get(f"/api/clients/{theirs.id}/statement/pdf/").status_code == 404
+
+    def test_statement_never_includes_another_users_fees(self, client_a, user_a, user_b, case_b):
+        import io
+
+        from pdfminer.high_level import extract_text
+
+        from core.models import Client
+
+        mine = Client.objects.create(owner=user_a, name="Shared Name Ltd")
+        case_b.client = Client.objects.create(owner=user_b, name="Shared Name Ltd")
+        case_b.save()
+        fee_b = _b_fee(user_b, case_b)
+        resp = client_a.get(f"/api/clients/{mine.id}/statement/pdf/")
+        assert resp.status_code == 200
+        assert fee_b.invoice_number not in extract_text(io.BytesIO(resp.content))
+
+    def test_case_cannot_link_another_users_client(self, client_a, case_a, user_b):
+        from core.models import Client
+
+        theirs = Client.objects.create(owner=user_b, name="Bob's client")
+        resp = client_a.patch(f"/api/cases/{case_a.id}/", {"client": theirs.id}, format="json")
+        assert resp.status_code == 400
+
+    # --- billing/portfolio/ ---------------------------------------------
+
+    def test_portfolio_excludes_other_users_fees(self, client_a, user_b, case_b):
+        _b_fee(user_b, case_b)
+        data = client_a.get("/api/billing/portfolio/").data
+        assert data["totals"]["invoiced_count"] == 0
+        assert data["unassigned"] == []
+        assert all(r["case_id"] != case_b.id for r in data["uninvoiced_hearings"])
+
+    # --- client-messages/ ---------------------------------------------------
+
+    def test_message_list_excludes_other_users(self, client_a, user_b, case_b):
+        _b_message(user_b, case_b)
+        assert client_a.get("/api/client-messages/").data == []
+        assert client_a.get("/api/client-messages/", {"case_id": case_b.id}).data == []
+
+    def test_message_detail_edit_discard_404(self, client_a, user_b, case_b):
+        message = _b_message(user_b, case_b)
+        assert client_a.get(f"/api/client-messages/{message.id}/").status_code == 404
+        assert (
+            client_a.patch(f"/api/client-messages/{message.id}/", {"body": "x"}, format="json").status_code
+            == 404
+        )
+        assert client_a.delete(f"/api/client-messages/{message.id}/").status_code == 404
+        message.refresh_from_db()
+        assert message.body == "Bob's client update."
+        assert message.status == "draft"
+
+    def test_message_send_404_and_nothing_sent(self, client_a, user_b, case_b):
+        from core.models import SentMessage
+
+        message = _b_message(user_b, case_b)
+        assert client_a.post(f"/api/client-messages/{message.id}/send/").status_code == 404
+        assert not SentMessage.objects.exists()
+
+    def test_message_recipients_cannot_point_at_another_users_contacts(
+        self, client_a, user_a, case_a, user_b, case_b
+    ):
+        from core.models import ClientMessage
+
+        mine = ClientMessage.objects.create(
+            owner=user_a, case=case_a, kind="case_update", dedup_key="k", subject="s", body="b"
+        )
+        theirs = ClientContact.objects.create(owner=user_b, case=case_b, name="Bob", email="b@example.com")
+        resp = client_a.patch(
+            f"/api/client-messages/{mine.id}/", {"recipient_contact_ids": [theirs.id]}, format="json"
+        )
+        assert resp.status_code == 400
+
+    # --- sent-messages/ -----------------------------------------------------
+
+    def test_sent_message_log_excludes_other_users(self, client_a, user_b, case_b):
+        from core.models import SentMessage
+
+        SentMessage.objects.create(
+            owner=user_b,
+            kind="invoice",
+            delivery="logged",
+            to_emails=["x@example.com"],
+            subject="Bob's invoice",
+            body_sha256="0" * 64,
+            case=case_b,
+        )
+        assert client_a.get("/api/sent-messages/").data == []
+        assert client_a.get("/api/sent-messages/", {"case_id": case_b.id}).data == []
+
+    # --- doc-templates/ and generate-document/ ---------------------------
+
+    def test_doc_template_readiness_for_other_users_case_404(self, client_a, case_b):
+        assert client_a.get("/api/doc-templates/", {"case": case_b.id}).status_code == 404
+
+    def test_generate_document_on_other_users_case_404(self, client_a, case_b):
+        resp = client_a.post(
+            f"/api/cases/{case_b.id}/generate-document/",
+            {"template": "cover_letter", "inputs": {"subject": "s", "body": "b"}},
+            format="json",
+        )
+        assert resp.status_code == 404
+        assert not Document.objects.filter(case=case_b).exists()
+
+    def test_generate_document_cannot_use_another_users_contact(self, client_a, case_a, user_b, case_b):
+        theirs = ClientContact.objects.create(owner=user_b, case=case_b, name="Bob Client")
+        resp = client_a.post(
+            f"/api/cases/{case_a.id}/generate-document/",
+            {"template": "cover_letter", "contact_id": theirs.id, "inputs": {"subject": "s", "body": "b"}},
+            format="json",
+        )
+        assert resp.status_code == 400
+        assert not Document.objects.exists()
+
+    # --- cases/refresh-all/ -------------------------------------------------
+
+    def test_refresh_all_status_and_cancel_404_for_other_users_run(self, client_a, user_b, case_b):
+        from core.models import ProcessingJob
+
+        run = ProcessingJob.objects.create(
+            owner=user_b, job_type="tracking_refresh", payload={"case_ids": [case_b.id], "total": 1}
+        )
+        assert client_a.get(f"/api/cases/refresh-all/{run.id}/").status_code == 404
+        assert client_a.post(f"/api/cases/refresh-all/{run.id}/cancel/").status_code == 404
+        assert client_a.get("/api/cases/refresh-all/").data == {"job_id": None}
+        run.refresh_from_db()
+        assert not run.cancel_requested

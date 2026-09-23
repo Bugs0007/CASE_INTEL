@@ -467,7 +467,7 @@ class CaseCnrCreateView(APIView):
         if not preview_token:
             return Response({"detail": "preview_token is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        serializer = CaseCnrCreateSerializer(data=request.data)
+        serializer = CaseCnrCreateSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
 
         try:

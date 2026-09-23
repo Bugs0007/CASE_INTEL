@@ -43,8 +43,26 @@ from .case_tracking import (
     CaseTrackingView,
     CourtStructureView,
 )
+from .bulk_refresh import (
+    TrackingRefreshCancelView,
+    TrackingRefreshStatusView,
+    TrackingRefreshView,
+)
 from .chat import ChatView
+from .client import (
+    BillingPortfolioView,
+    ClientDetailView,
+    ClientListCreateView,
+    ClientStatementPdfView,
+)
 from .client_contact import ClientContactDetailView, ClientContactListCreateView
+from .client_message import (
+    ClientMessageDetailView,
+    ClientMessageListView,
+    ClientMessageSendView,
+    SentMessageListView,
+)
+from .doc_template import CaseGenerateDocumentView, DocTemplateListView
 from .conversation import (
     ConversationDetailView,
     ConversationExportView,
@@ -90,6 +108,19 @@ from .travel_booking import (
 
 __all__ = [
     "AdvocateProfileView",
+    "BillingPortfolioView",
+    "CaseGenerateDocumentView",
+    "ClientDetailView",
+    "ClientListCreateView",
+    "ClientMessageDetailView",
+    "ClientMessageListView",
+    "ClientMessageSendView",
+    "ClientStatementPdfView",
+    "DocTemplateListView",
+    "SentMessageListView",
+    "TrackingRefreshCancelView",
+    "TrackingRefreshStatusView",
+    "TrackingRefreshView",
     "AppearanceFeeDetailView",
     "AppearanceFeeInvoiceFileView",
     "AppearanceFeeInvoiceView",

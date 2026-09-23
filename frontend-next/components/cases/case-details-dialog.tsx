@@ -6,14 +6,15 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { showToast } from "@/components/ui/toaster";
 import { useUpdateCase } from "@/hooks/use-cases";
+import { useClients } from "@/hooks/use-clients";
 import {
   useCreateClientContact,
   useDeleteClientContact,
   useUpdateClientContact,
 } from "@/hooks/use-client-contacts";
-import { X, FileEdit, Plus, Trash2 } from "lucide-react";
+import { X, FileEdit, Plus, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { APIError } from "@/lib/api/client";
-import type { Case, ContactRole, UserPartyRole } from "@/types";
+import type { Case, ContactRole, RelationType, UserPartyRole } from "@/types";
 
 interface CaseDetailsDialogProps {
   isOpen: boolean;
@@ -32,6 +33,14 @@ const CONTACT_ROLES: { value: ContactRole; label: string }[] = [
   { value: "assistant", label: "Assistant" },
 ];
 
+const RELATIONS: { value: RelationType; label: string }[] = [
+  { value: "", label: "Relation…" },
+  { value: "s/o", label: "S/o" },
+  { value: "d/o", label: "D/o" },
+  { value: "w/o", label: "W/o" },
+  { value: "c/o", label: "C/o" },
+];
+
 interface ContactRow {
   /** null for a row the advocate just added in this dialog -- not yet
    * persisted. Non-null rows are diffed against the case's original
@@ -45,6 +54,15 @@ interface ContactRow {
   phone: string;
   role: ContactRole;
   is_billing_contact: boolean;
+  receive_case_updates: boolean;
+  receive_payment_reminders: boolean;
+  /** Executant details (vakalatnama); age kept as text for the input. */
+  relation_type: RelationType;
+  relation_name: string;
+  age: string;
+  address: string;
+  /** UI only: the "more" section is expanded. */
+  expanded: boolean;
 }
 
 let newRowCounter = 0;
@@ -58,6 +76,13 @@ function rowsFromCase(caseItem: Case): ContactRow[] {
     phone: c.phone || "",
     role: c.role,
     is_billing_contact: c.is_billing_contact,
+    receive_case_updates: c.receive_case_updates ?? true,
+    receive_payment_reminders: c.receive_payment_reminders ?? true,
+    relation_type: c.relation_type ?? "",
+    relation_name: c.relation_name ?? "",
+    age: c.age != null ? String(c.age) : "",
+    address: c.address ?? "",
+    expanded: false,
   }));
 }
 
@@ -70,6 +95,8 @@ export function CaseDetailsDialog({ isOpen, onClose, case: caseItem }: CaseDetai
   const [title, setTitle] = useState("");
   const [opposingParty, setOpposingParty] = useState("");
   const [userPartyRole, setUserPartyRole] = useState<UserPartyRole>("unknown");
+  const [clientId, setClientId] = useState<number | null>(null);
+  const { data: clients = [] } = useClients();
   const [contacts, setContacts] = useState<ContactRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -80,6 +107,7 @@ export function CaseDetailsDialog({ isOpen, onClose, case: caseItem }: CaseDetai
     setTitle(caseItem.title);
     setOpposingParty(caseItem.opposing_party || "");
     setUserPartyRole(caseItem.user_party_role);
+    setClientId(caseItem.client ?? null);
     setContacts(rowsFromCase(caseItem));
   }, [isOpen, caseItem]);
 
@@ -109,6 +137,13 @@ export function CaseDetailsDialog({ isOpen, onClose, case: caseItem }: CaseDetai
         // First contact ever added defaults to the billing contact, so the
         // form always has exactly one selected once a row exists.
         is_billing_contact: prev.length === 0,
+        receive_case_updates: true,
+        receive_payment_reminders: true,
+        relation_type: "",
+        relation_name: "",
+        age: "",
+        address: "",
+        expanded: false,
       },
     ]);
   }
@@ -140,6 +175,10 @@ export function CaseDetailsDialog({ isOpen, onClose, case: caseItem }: CaseDetai
       setError("Every client contact needs a name (or remove the empty row).");
       return;
     }
+    if (contacts.some((row) => row.age.trim() && !/^\d{1,3}$/.test(row.age.trim()))) {
+      setError("A contact's age must be a whole number.");
+      return;
+    }
 
     setIsSaving(true);
     try {
@@ -153,6 +192,7 @@ export function CaseDetailsDialog({ isOpen, onClose, case: caseItem }: CaseDetai
             title: title.trim(),
             opposing_party: opposingParty.trim(),
             user_party_role: userPartyRole,
+            client: clientId,
           },
         }),
       ];
@@ -165,6 +205,12 @@ export function CaseDetailsDialog({ isOpen, onClose, case: caseItem }: CaseDetai
           phone: row.phone.trim() || undefined,
           role: row.role,
           is_billing_contact: row.is_billing_contact,
+          receive_case_updates: row.receive_case_updates,
+          receive_payment_reminders: row.receive_payment_reminders,
+          relation_type: row.relation_type,
+          relation_name: row.relation_name.trim(),
+          age: row.age.trim() ? Number(row.age.trim()) : null,
+          address: row.address.trim(),
         };
         if (row.id === null) {
           ops.push(createContact.mutateAsync(contactData));
@@ -177,7 +223,13 @@ export function CaseDetailsDialog({ isOpen, onClose, case: caseItem }: CaseDetai
           (original.email || "") !== row.email.trim() ||
           (original.phone || "") !== row.phone.trim() ||
           original.role !== row.role ||
-          original.is_billing_contact !== row.is_billing_contact;
+          original.is_billing_contact !== row.is_billing_contact ||
+          (original.receive_case_updates ?? true) !== row.receive_case_updates ||
+          (original.receive_payment_reminders ?? true) !== row.receive_payment_reminders ||
+          (original.relation_type ?? "") !== row.relation_type ||
+          (original.relation_name ?? "") !== row.relation_name.trim() ||
+          (original.age != null ? String(original.age) : "") !== row.age.trim() ||
+          (original.address ?? "") !== row.address.trim();
         if (changed) {
           ops.push(
             updateContact.mutateAsync({ id: row.id, caseId: caseItem.id, data: contactData }),
@@ -289,6 +341,29 @@ export function CaseDetailsDialog({ isOpen, onClose, case: caseItem }: CaseDetai
           </div>
 
           <div>
+            <label htmlFor="case-client" className="block text-sm font-medium text-gray-700 mb-1">
+              Client (who you bill)
+            </label>
+            <Select
+              id="case-client"
+              value={clientId ?? ""}
+              onChange={(e) => setClientId(e.target.value ? Number(e.target.value) : null)}
+            >
+              <option value="">Not linked</option>
+              {clients.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                  {c.client_type === "business" ? " (business)" : ""}
+                </option>
+              ))}
+            </Select>
+            <p className="mt-1 text-xs text-gray-500">
+              Groups this case into the client&apos;s outstanding statement, and decides the tax line on
+              invoices. Manage clients on the Clients page.
+            </p>
+          </div>
+
+          <div>
             <div className="flex items-center justify-between mb-2">
               <span className="block text-sm font-medium text-gray-700">Client Contacts</span>
               <Button type="button" variant="secondary" size="sm" onClick={handleAddContact}>
@@ -348,15 +423,82 @@ export function CaseDetailsDialog({ isOpen, onClose, case: caseItem }: CaseDetai
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
-                  <label className="flex items-center gap-2 text-xs text-gray-600">
-                    <input
-                      type="radio"
-                      name="billing_contact"
-                      checked={row.is_billing_contact}
-                      onChange={() => handleSetBillingContact(row.key)}
-                    />
-                    Billing contact
-                  </label>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <label className="flex items-center gap-2 text-xs text-gray-600">
+                      <input
+                        type="radio"
+                        name="billing_contact"
+                        checked={row.is_billing_contact}
+                        onChange={() => handleSetBillingContact(row.key)}
+                      />
+                      Billing contact
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => updateRow(row.key, { expanded: !row.expanded })}
+                      aria-expanded={row.expanded}
+                      className="flex items-center gap-1 text-xs text-gray-600 hover:text-gray-900"
+                    >
+                      Emails &amp; vakalatnama details
+                      {row.expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
+                  {row.expanded && (
+                    <div className="space-y-2 border-t border-gray-100 pt-2">
+                      <div className="flex flex-wrap gap-4 text-xs text-gray-700">
+                        <label className="flex items-center gap-1.5">
+                          <input
+                            type="checkbox"
+                            checked={row.receive_case_updates}
+                            onChange={(e) => updateRow(row.key, { receive_case_updates: e.target.checked })}
+                          />
+                          Send case updates
+                        </label>
+                        <label className="flex items-center gap-1.5">
+                          <input
+                            type="checkbox"
+                            checked={row.receive_payment_reminders}
+                            onChange={(e) => updateRow(row.key, { receive_payment_reminders: e.target.checked })}
+                          />
+                          Send payment reminders
+                        </label>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        <Select
+                          aria-label="Relation"
+                          value={row.relation_type}
+                          onChange={(e) => updateRow(row.key, { relation_type: e.target.value as RelationType })}
+                        >
+                          {RELATIONS.map((r) => (
+                            <option key={r.value || "none"} value={r.value}>
+                              {r.label}
+                            </option>
+                          ))}
+                        </Select>
+                        <div className="col-span-1 sm:col-span-2">
+                          <Input
+                            aria-label="Father's or husband's name"
+                            value={row.relation_name}
+                            onChange={(e) => updateRow(row.key, { relation_name: e.target.value })}
+                            placeholder="Father's / husband's name"
+                          />
+                        </div>
+                        <Input
+                          aria-label="Age"
+                          inputMode="numeric"
+                          value={row.age}
+                          onChange={(e) => updateRow(row.key, { age: e.target.value })}
+                          placeholder="Age"
+                        />
+                      </div>
+                      <Input
+                        aria-label="Contact address"
+                        value={row.address}
+                        onChange={(e) => updateRow(row.key, { address: e.target.value })}
+                        placeholder="Address (for the vakalatnama)"
+                      />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

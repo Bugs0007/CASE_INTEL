@@ -1,0 +1,31 @@
+{
+  "key": "cover_letter",
+  "title": "Cover letter (letterhead)",
+  "description": "A letter on your letterhead about this matter: you write the subject and body, the rest is filled in.",
+  "position": 3,
+  "letterhead": true,
+  "fields": [
+    {"name": "date", "label": "Date", "sources": ["today"], "required": true},
+    {"name": "recipient_name", "label": "To (name)", "sources": ["contact.name", "client.name"], "required": true},
+    {"name": "recipient_address", "label": "To (address)", "sources": ["contact.address", "client.address"], "required": false, "multiline": true},
+    {"name": "case_title", "label": "Case title", "sources": ["case.title"], "required": true},
+    {"name": "case_number", "label": "Case number", "sources": ["case.case_number"], "required": true},
+    {"name": "subject", "label": "Subject", "sources": [], "required": true},
+    {"name": "body", "label": "Letter body", "sources": [], "required": true, "multiline": true},
+    {"name": "advocate_name", "label": "Your name", "sources": ["profile.advocate_name", "profile.letterhead_name"], "required": true}
+  ],
+  "blocks": [
+    {"type": "right", "text": "Date: {date}"},
+    {"type": "spacer", "height": 4},
+    {"type": "text", "text": "To,\n{recipient_name}\n{recipient_address}"},
+    {"type": "spacer", "height": 4},
+    {"type": "heading", "text": "Subject: {subject}"},
+    {"type": "text", "text": "Ref: {case_title} ({case_number})"},
+    {"type": "spacer", "height": 4},
+    {"type": "text", "text": "Dear {recipient_name},"},
+    {"type": "spacer", "height": 2},
+    {"type": "paragraph", "text": "{body}"},
+    {"type": "spacer", "height": 8},
+    {"type": "text", "text": "Yours faithfully,\n\n\n{advocate_name}\nAdvocate"}
+  ]
+}
