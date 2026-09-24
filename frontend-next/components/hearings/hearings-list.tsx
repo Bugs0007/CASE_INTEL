@@ -94,9 +94,9 @@ export function HearingsList({
 
   if (isLoading) {
     return (
-      <Card>
+      <Card id="hearings">
         <CardHeader>
-          <CardTitle>Hearings & Deadlines</CardTitle>
+          <CardTitle>Hearings</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -115,10 +115,10 @@ export function HearingsList({
   const visiblePast = pastHearings.slice(0, pastVisibleCount);
 
   return (
-    <Card>
+    <Card id="hearings" className="scroll-mt-4">
       <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
         <CardTitle>
-          Hearings & Deadlines{hearings.length > 0 ? ` (${hearings.length})` : ""}
+          Hearings{hearings.length > 0 ? ` (${hearings.length})` : ""}
         </CardTitle>
         <div className="flex items-center gap-2">
           <CollapseToggle isOpen={sectionOpen} onToggle={() => setSectionOpen((v) => !v)} />

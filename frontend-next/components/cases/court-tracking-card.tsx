@@ -16,12 +16,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { CollapseToggle } from "@/components/ui/collapse-toggle";
-import { Collapsible } from "@/components/ui/collapsible";
 import { showToast } from "@/components/ui/toaster";
 import { APIError } from "@/lib/api/client";
 import { format } from "date-fns";
-import { formatDate, formatHearingDate, formatRelativeTime, isAwaitingUpdate, todayKey } from "@/lib/utils";
+import { formatDate, formatHearingDate, formatRelativeTime, todayKey } from "@/lib/utils";
 import {
   useConfirmTracking,
   useCourtStructure,
@@ -560,10 +558,6 @@ function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hea
   const refreshTracking = useRefreshTracking(caseItem.id);
   const untrackTracking = useUntrackTracking(caseItem.id);
   const [rateLimitedUntil, setRateLimitedUntil] = useState<string | null>(null);
-  const [hearingHistoryOpen, setHearingHistoryOpen] = useState(false);
-  // The history table stays unmounted until first opened -- a long case
-  // has hundreds of rows, and Collapsible keeps closed content mounted.
-  const [hearingHistoryMounted, setHearingHistoryMounted] = useState(false);
 
   const ecourtsHearings = useMemo(
     () => hearings.filter((h) => h.source === "ecourts").sort((a, b) => a.hearing_date.localeCompare(b.hearing_date)),
@@ -747,50 +741,13 @@ function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hea
           </Field>
         </div>
 
+        {/* The hearing history used to be repeated here as its own table --
+            the same rows as the Hearings list below (167 and 167 on a long
+            case). There is one list now; this just points to it. */}
         {ecourtsHearings.length > 0 && (
-          <div>
-            <div className="flex items-center justify-between mb-2.5">
-              <h4 className="text-[13px] font-semibold text-gray-700">
-                Hearing History ({ecourtsHearings.length})
-              </h4>
-              <CollapseToggle
-                isOpen={hearingHistoryOpen}
-                onToggle={() => {
-                  setHearingHistoryMounted(true);
-                  setHearingHistoryOpen((v) => !v);
-                }}
-              />
-            </div>
-            <Collapsible isOpen={hearingHistoryOpen}>
-              {hearingHistoryMounted && (
-                <div className="overflow-x-auto rounded-lg border border-gray-100">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50 text-left text-xs text-gray-500">
-                      <tr>
-                        <th className="px-3 py-2 font-medium">Date</th>
-                        <th className="px-3 py-2 font-medium">Purpose</th>
-                        <th className="px-3 py-2 font-medium">Judge</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {[...ecourtsHearings].reverse().map((h) => (
-                        <tr key={h.id} className={h.hearing_date.slice(0, 10) >= today ? "bg-gray-100" : ""}>
-                          <td className="px-3 py-2 whitespace-nowrap">
-                            {formatHearingDate(h.hearing_date)}
-                            {isAwaitingUpdate(h) && (
-                              <span className="ml-1.5 text-xs text-status-pending">awaiting update</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-2 text-gray-600">{h.purpose || "—"}</td>
-                          <td className="px-3 py-2 text-gray-600">{h.judge || "—"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </Collapsible>
-          </div>
+          <a href="#hearings" className="text-sm font-medium text-primary hover:underline">
+            {ecourtsHearings.length} hearing{ecourtsHearings.length === 1 ? "" : "s"} from eCourts -- see Hearings below
+          </a>
         )}
       </CardContent>
     </Card>

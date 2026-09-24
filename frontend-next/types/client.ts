@@ -228,6 +228,9 @@ export interface RefreshRunResults {
   skipped: number;
   new_hearing_dates: number;
   drafts_created: number;
+  /** Cases where the fetch found a new hearing date. Absent on runs from
+   * before this was counted. */
+  updated?: number;
 }
 
 export interface RefreshRun {

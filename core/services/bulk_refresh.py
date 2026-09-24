@@ -46,6 +46,9 @@ _EMPTY_RESULTS = {
     "failed": 0,
     "skipped": 0,
     "new_hearing_dates": 0,
+    # Cases where the fetch found something new -- "5 updated" under the
+    # dashboard button, as opposed to the count of dates above.
+    "updated": 0,
     "drafts_created": 0,
 }
 
@@ -194,7 +197,9 @@ def run_tracking_refresh(job: ProcessingJob, progress_callback=None) -> dict:
                     results["rate_limited"] += 1
                 else:
                     results["refreshed"] += 1
-                    results["new_hearing_dates"] += len(outcome.get("new_hearing_dates") or [])
+                    new_dates = outcome.get("new_hearing_dates") or []
+                    results["new_hearing_dates"] += len(new_dates)
+                    results["updated"] += 1 if new_dates else 0
                     results["drafts_created"] += outcome.get("client_update_drafts", 0)
 
         save()
