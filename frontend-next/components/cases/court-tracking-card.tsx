@@ -20,7 +20,8 @@ import { CollapseToggle } from "@/components/ui/collapse-toggle";
 import { Collapsible } from "@/components/ui/collapsible";
 import { showToast } from "@/components/ui/toaster";
 import { APIError } from "@/lib/api/client";
-import { formatDate, formatHearingDate, formatRelativeTime } from "@/lib/utils";
+import { format } from "date-fns";
+import { formatDate, formatHearingDate, formatRelativeTime, isAwaitingUpdate, todayKey } from "@/lib/utils";
 import {
   useConfirmTracking,
   useCourtStructure,
@@ -535,22 +536,48 @@ function TrackingPreviewPanel({
 
 const RATE_LIMIT_MS = 60 * 60 * 1000;
 
+/** When the next real fetch is allowed (one per case per hour), or null
+ * when Refresh is available now. Prefers the server's own figure. */
+function refreshAvailableAt(caseItem: Case, rateLimitedUntil: string | null): Date | null {
+  const candidates = [rateLimitedUntil, caseItem.tracking_freshness?.refresh_available_at];
+  if (caseItem.last_fetched_at) {
+    candidates.push(new Date(new Date(caseItem.last_fetched_at).getTime() + RATE_LIMIT_MS).toISOString());
+  }
+  const times = candidates
+    .filter((c): c is string => !!c)
+    .map((c) => new Date(c))
+    .filter((d) => !Number.isNaN(d.getTime()) && d.getTime() > Date.now());
+  return times.length ? new Date(Math.max(...times.map((d) => d.getTime()))) : null;
+}
+
+function refreshWaitText(caseItem: Case, availableAt: Date): string {
+  const checked = caseItem.last_fetched_at ? `Checked ${formatRelativeTime(caseItem.last_fetched_at)}` : "Checked recently";
+  const minutes = Math.max(1, Math.ceil((availableAt.getTime() - Date.now()) / 60000));
+  return `${checked}. eCourts allows one check an hour per case -- try again after ${format(availableAt, "h:mm a")} (in ${minutes} min).`;
+}
+
 function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hearing[] }) {
   const refreshTracking = useRefreshTracking(caseItem.id);
   const untrackTracking = useUntrackTracking(caseItem.id);
   const [rateLimitedUntil, setRateLimitedUntil] = useState<string | null>(null);
   const [hearingHistoryOpen, setHearingHistoryOpen] = useState(false);
+  // The history table stays unmounted until first opened -- a long case
+  // has hundreds of rows, and Collapsible keeps closed content mounted.
+  const [hearingHistoryMounted, setHearingHistoryMounted] = useState(false);
 
   const ecourtsHearings = useMemo(
     () => hearings.filter((h) => h.source === "ecourts").sort((a, b) => a.hearing_date.localeCompare(b.hearing_date)),
     [hearings],
   );
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayKey();
   const nextHearing = ecourtsHearings.find((h) => h.hearing_date.slice(0, 10) >= today);
 
-  const withinRateLimitWindow =
-    caseItem.last_fetched_at &&
-    Date.now() - new Date(caseItem.last_fetched_at).getTime() < RATE_LIMIT_MS;
+  const snapshot = caseItem.tracking_snapshot;
+  const freshness = caseItem.tracking_freshness;
+  const stale = !!freshness?.stale;
+  const disposal = caseItem.disposal;
+  const availableAt = refreshAvailableAt(caseItem, rateLimitedUntil);
+  const waitText = availableAt ? refreshWaitText(caseItem, availableAt) : null;
 
   const portalUrl = caseItem.court_type === "high_court" ? HC_PORTAL_URL : DISTRICT_PORTAL_URL;
 
@@ -559,10 +586,7 @@ function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hea
       const result = await refreshTracking.mutateAsync(false);
       if (result.rate_limited) {
         setRateLimitedUntil(result.retry_after || null);
-        showToast.error(
-          "Refresh limited",
-          "This case was checked recently. Try again in a bit.",
-        );
+        showToast.error("Refresh limited", "This case was checked recently. Try again in a bit.");
       } else {
         showToast.success(
           "Tracking refreshed",
@@ -571,7 +595,7 @@ function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hea
             : "No changes since last check.",
         );
       }
-    } catch (error) {
+    } catch {
       showToast.error("Refresh failed", "Could not reach the court portal. Please try again later.");
     }
   }
@@ -587,10 +611,45 @@ function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hea
     try {
       await untrackTracking.mutateAsync();
       showToast.success("Tracking removed", "You can set up tracking again with the correct case.");
-    } catch (error) {
+    } catch {
       showToast.error("Could not remove tracking", "Please try again.");
     }
   }
+
+  // Status: what eCourts itself said last time, not a guess from hearings.
+  const statusText = disposal
+    ? "Disposed"
+    : snapshot?.case_status || (nextHearing ? "Pending" : "—");
+
+  let nextHearingCell: React.ReactNode;
+  if (nextHearing) {
+    nextHearingCell = (
+      <span className="flex items-center gap-1 text-sm font-medium text-gray-900">
+        <CalendarClock className="h-3.5 w-3.5 text-primary" />
+        {formatHearingDate(nextHearing.hearing_date)}
+      </span>
+    );
+  } else if (disposal) {
+    nextHearingCell = <span className="text-sm text-gray-500">None -- case disposed</span>;
+  } else if (stale) {
+    // Old data can't say "none scheduled" -- a date may well have been set.
+    nextHearingCell = <span className="text-sm text-status-pending">Unknown -- refresh to check</span>;
+  } else {
+    nextHearingCell = <span className="text-sm text-gray-500">None scheduled</span>;
+  }
+
+  const refreshButton = (
+    <Button
+      variant="secondary"
+      size="sm"
+      onClick={handleRefresh}
+      disabled={refreshTracking.isPending || !!availableAt}
+      aria-describedby={waitText ? `refresh-wait-${caseItem.id}` : undefined}
+    >
+      {refreshTracking.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+      {refreshTracking.isPending ? "Refreshing..." : "Refresh"}
+    </Button>
+  );
 
   return (
     <Card>
@@ -600,21 +659,10 @@ function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hea
           Court Tracking
         </CardTitle>
         <div className="flex items-center gap-2">
-          <div title={withinRateLimitWindow ? "You can refresh again about an hour after the last check." : undefined}>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleRefresh}
-              disabled={refreshTracking.isPending || !!withinRateLimitWindow}
-            >
-              {refreshTracking.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-              {refreshTracking.isPending ? "Refreshing..." : "Refresh"}
-            </Button>
-          </div>
+          {/* A disabled button fires no hover events in some browsers, so
+              the explanation sits on a wrapper -- and is also written out
+              under the button for touch screens, where there is no hover. */}
+          <span title={waitText ?? undefined}>{refreshButton}</span>
           <Button
             variant="ghost"
             size="sm"
@@ -623,16 +671,41 @@ function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hea
             title="Untrack this case / fix a wrong case match"
             className="text-destructive hover:bg-status-alert-soft hover:text-destructive-hover"
           >
-            {untrackTracking.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Trash2 className="h-4 w-4" />
-            )}
+            {untrackTracking.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
             Untrack
           </Button>
         </div>
+        {waitText && (
+          <p id={`refresh-wait-${caseItem.id}`} className="basis-full text-xs text-gray-500">
+            {waitText}
+          </p>
+        )}
       </CardHeader>
       <CardContent>
+        {stale && (
+          <div
+            role="status"
+            className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-status-pending bg-status-pending-soft px-3 py-2 text-sm text-status-pending"
+          >
+            <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+            <span className="font-semibold">Outdated</span>
+            <span>
+              · last checked {caseItem.last_fetched_at ? formatRelativeTime(caseItem.last_fetched_at) : "never"}
+              {freshness && freshness.awaiting_update_count > 0 &&
+                ` · ${freshness.awaiting_update_count} past hearing${freshness.awaiting_update_count === 1 ? "" : "s"} awaiting an update`}
+            </span>
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={refreshTracking.isPending || !!availableAt}
+              title={waitText ?? undefined}
+              className="ml-auto font-semibold underline disabled:no-underline disabled:opacity-60"
+            >
+              Refresh
+            </button>
+          </div>
+        )}
+
         <div className="mb-4 rounded-lg bg-gray-100 border border-gray-200 p-3 text-xs text-gray-600">
           Data sourced from eCourts ({caseItem.court_type === "high_court" ? "hcservices" : "services"}
           .ecourts.gov.in). May be delayed or incomplete -- always verify against official court
@@ -655,27 +728,20 @@ function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hea
             {caseItem.fetch_status === "failed" ? (
               <Badge variant="danger">Last fetch failed</Badge>
             ) : (
-              <span className="text-sm text-gray-900">{nextHearing ? "Pending" : "—"}</span>
-            )}
-          </Field>
-          <Field label="Next Hearing">
-            {nextHearing ? (
-              <span className="flex items-center gap-1 text-sm font-medium text-gray-900">
-                <CalendarClock className="h-3.5 w-3.5 text-primary" />
-                {formatHearingDate(nextHearing.hearing_date)}
+              <span className="text-sm text-gray-900" title={snapshot?.nature_of_disposal || undefined}>
+                {statusText}
               </span>
-            ) : (
-              <span className="text-sm text-gray-500">None scheduled</span>
             )}
           </Field>
+          <Field label="Next Hearing">{nextHearingCell}</Field>
           <Field label="Judge">
-            <span className="text-sm text-gray-900">{nextHearing?.judge || "—"}</span>
+            <span className="text-sm text-gray-900">{nextHearing?.judge || snapshot?.court_and_judge || "—"}</span>
           </Field>
           <Field label="Stage / Purpose">
-            <span className="text-sm text-gray-900">{nextHearing?.purpose || "—"}</span>
+            <span className="text-sm text-gray-900">{nextHearing?.purpose || snapshot?.case_stage || "—"}</span>
           </Field>
           <Field label="Last Refreshed">
-            <span className="text-sm text-gray-500">
+            <span className={stale ? "text-sm text-status-pending" : "text-sm text-gray-500"}>
               {caseItem.last_fetched_at ? formatRelativeTime(caseItem.last_fetched_at) : "Never"}
             </span>
           </Field>
@@ -689,30 +755,40 @@ function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hea
               </h4>
               <CollapseToggle
                 isOpen={hearingHistoryOpen}
-                onToggle={() => setHearingHistoryOpen((v) => !v)}
+                onToggle={() => {
+                  setHearingHistoryMounted(true);
+                  setHearingHistoryOpen((v) => !v);
+                }}
               />
             </div>
             <Collapsible isOpen={hearingHistoryOpen}>
-              <div className="overflow-x-auto rounded-lg border border-gray-100">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 text-left text-xs text-gray-500">
-                    <tr>
-                      <th className="px-3 py-2 font-medium">Date</th>
-                      <th className="px-3 py-2 font-medium">Purpose</th>
-                      <th className="px-3 py-2 font-medium">Judge</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {[...ecourtsHearings].reverse().map((h) => (
-                      <tr key={h.id} className={h.hearing_date.slice(0, 10) >= today ? "bg-gray-100" : ""}>
-                        <td className="px-3 py-2 whitespace-nowrap">{formatHearingDate(h.hearing_date)}</td>
-                        <td className="px-3 py-2 text-gray-600">{h.purpose || "—"}</td>
-                        <td className="px-3 py-2 text-gray-600">{h.judge || "—"}</td>
+              {hearingHistoryMounted && (
+                <div className="overflow-x-auto rounded-lg border border-gray-100">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 text-left text-xs text-gray-500">
+                      <tr>
+                        <th className="px-3 py-2 font-medium">Date</th>
+                        <th className="px-3 py-2 font-medium">Purpose</th>
+                        <th className="px-3 py-2 font-medium">Judge</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {[...ecourtsHearings].reverse().map((h) => (
+                        <tr key={h.id} className={h.hearing_date.slice(0, 10) >= today ? "bg-gray-100" : ""}>
+                          <td className="px-3 py-2 whitespace-nowrap">
+                            {formatHearingDate(h.hearing_date)}
+                            {isAwaitingUpdate(h) && (
+                              <span className="ml-1.5 text-xs text-status-pending">awaiting update</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-gray-600">{h.purpose || "—"}</td>
+                          <td className="px-3 py-2 text-gray-600">{h.judge || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </Collapsible>
           </div>
         )}

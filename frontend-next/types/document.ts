@@ -25,6 +25,9 @@ export interface Document {
   case_id: number | null;
   case_title?: string | null; // For backward compatibility
   filename: string;
+  /** What to call it on screen: "Order 4 · 17 Aug 2026" for an eCourts
+   * order, otherwise the filename. */
+  display_name?: string;
   file_path: string;
   file_type: string | null;
   file_size: number | null;

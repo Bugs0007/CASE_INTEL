@@ -15,7 +15,11 @@ from rest_framework.response import Response
 from core.models import ClientMessage, SentMessage
 from core.serializers.client import ClientMessageSerializer, SentMessageSerializer
 from core.services import client_updates
-from core.services.email_delivery import DeliveryError
+from core.services.email_delivery import (
+    DeliveryError,
+    MissingAdvocateNameError,
+    MissingContactEmailError,
+)
 from core.views.mixins import OwnerScopedMixin
 
 logger = logging.getLogger(__name__)
@@ -114,6 +118,12 @@ class ClientMessageSendView(OwnerScopedMixin, generics.GenericAPIView):
             return Response({"detail": str(exc), "code": "not_a_draft"}, status=status.HTTP_409_CONFLICT)
         except client_updates.InvoiceAlreadyPaidError as exc:
             return Response({"detail": str(exc), "code": "invoice_paid"}, status=status.HTTP_409_CONFLICT)
+        except client_updates.NoRecipientsError as exc:
+            return Response({"detail": str(exc), "code": "no_recipients"}, status=status.HTTP_400_BAD_REQUEST)
+        except MissingAdvocateNameError as exc:
+            return Response({"detail": str(exc), "code": "missing_advocate_name"}, status=status.HTTP_400_BAD_REQUEST)
+        except MissingContactEmailError as exc:
+            return Response({"detail": str(exc), "code": "missing_contact_email"}, status=status.HTTP_400_BAD_REQUEST)
         except (client_updates.ClientMessageError, DeliveryError) as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as exc:  # noqa: BLE001 -- mail provider failures

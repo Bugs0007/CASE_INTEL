@@ -170,14 +170,17 @@ export default function SettingsPage() {
 
             <div>
               <label htmlFor="bar_registration_number" className="mb-1 block text-sm font-medium text-gray-700">
-                Bar Registration Number
+                Bar enrolment number
               </label>
               <Input
                 id="bar_registration_number"
                 value={barNumber}
                 onChange={(e) => setBarNumber(e.target.value)}
-                placeholder="e.g. AP/1234/2015"
+                placeholder="e.g. TS/1234/2015"
               />
+              <p className="mt-1 text-xs text-gray-500">
+                As issued by the Bar Council. Printed on the vakalatnama and memo of appearance.
+              </p>
             </div>
 
             <div>

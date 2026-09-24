@@ -98,7 +98,7 @@ describe("SettingsPage", () => {
 
     const nameInput = await screen.findByLabelText(/name \/ firm/i);
     await user.type(nameInput, "S. Bhagath, Advocate");
-    await user.type(screen.getByLabelText(/bar registration number/i), "AP/1234/2015");
+    await user.type(screen.getByLabelText(/bar enrolment number/i), "AP/1234/2015");
     await user.click(screen.getByRole("button", { name: /save changes/i }));
 
     await waitFor(() => {

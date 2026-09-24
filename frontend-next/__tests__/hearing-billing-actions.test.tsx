@@ -289,15 +289,21 @@ describe("HearingBillingActions: adding a charge", () => {
     expect(showToast.error).toHaveBeenCalledWith("Enter an amount", expect.any(String));
   });
 
-  it("only promises a default amount for an appearance fee", async () => {
+  it("only promises a default amount for an appearance fee, and only when one is set", async () => {
     const user = userEvent.setup();
+    vi.mocked(advocateProfileApi.get).mockResolvedValue(makeProfile({ default_fee_amount: "15000.00" }));
     renderHearing();
 
     const amount = screen.getByLabelText("Charge amount");
-    expect(amount).toHaveAttribute("placeholder", "Amount (optional)");
+    await waitFor(() => expect(amount).toHaveAttribute("placeholder", expect.stringMatching(/^Amount \(default .*15,000\)$/)));
 
     await user.selectOptions(screen.getByLabelText("Charge category"), "hotel");
     expect(amount).toHaveAttribute("placeholder", "Amount");
+  });
+
+  it("promises no default when none is set (a blank would be a Rs. 0 charge)", () => {
+    renderHearing();
+    expect(screen.getByLabelText("Charge amount")).toHaveAttribute("placeholder", "Amount");
   });
 
   it("surfaces the server's field error when adding a charge is rejected", async () => {

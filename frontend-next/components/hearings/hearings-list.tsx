@@ -2,14 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { StatusBadge } from "@/components/ui/badge";
+import { Badge, StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CollapseToggle } from "@/components/ui/collapse-toggle";
 import { CauseListBadge } from "@/components/hearings/cause-list-badge";
 import { HearingBillingActions } from "@/components/hearings/hearing-billing-actions";
 import { HearingDigestDialog } from "@/components/hearings/hearing-digest-dialog";
 import { Collapsible } from "@/components/ui/collapsible";
-import { formatFeeAmount, formatHearingDate, staggerDelay } from "@/lib/utils";
+import { formatFeeAmount, formatHearingDate, isAwaitingUpdate, staggerDelay } from "@/lib/utils";
 import { groupOrdersByDate, hearingDateKey } from "@/hooks/use-court-orders";
 import {
   Calendar,
@@ -71,6 +71,11 @@ export function HearingsList({
   // Past hearings grow unbounded over a long case and are rarely what the
   // user opened the page to see, so this subsection defaults collapsed.
   const [pastOpen, setPastOpen] = useState(false);
+  // Collapsible keeps its children mounted while closed, so the past rows
+  // would render on every page load even though nobody opened them. Mount
+  // them the first time the section opens, then keep them (so closing it
+  // again still animates).
+  const [pastMounted, setPastMounted] = useState(false);
   const [pastVisibleCount, setPastVisibleCount] = useState(PAST_PAGE_SIZE);
   const [prepHearingId, setPrepHearingId] = useState<number | null>(null);
 
@@ -173,9 +178,17 @@ export function HearingsList({
                 <h4 className="text-sm font-medium text-gray-700 uppercase tracking-wide">
                   Past ({pastHearings.length})
                 </h4>
-                <CollapseToggle isOpen={pastOpen} onToggle={() => setPastOpen((v) => !v)} />
+                <CollapseToggle
+                  isOpen={pastOpen}
+                  onToggle={() => {
+                    setPastMounted(true);
+                    setPastOpen((v) => !v);
+                  }}
+                />
               </div>
               <Collapsible isOpen={pastOpen}>
+                {pastMounted && (
+                <>
                 <div
                   className={
                     pastVisibleCount > PAST_PAGE_SIZE
@@ -213,6 +226,8 @@ export function HearingsList({
                       ? "Show less"
                       : `Load more (${pastHearings.length - pastVisibleCount} remaining)`}
                   </Button>
+                )}
+                </>
                 )}
               </Collapsible>
             </div>
@@ -273,7 +288,7 @@ function HearingItem({
   return (
     <div
       style={staggerDelay(index)}
-      className="p-3.5 border border-gray-100 rounded-lg transition-colors hover:bg-gray-50 animate-fade-up motion-reduce:animate-none"
+      className="p-3.5 border border-gray-100 rounded-lg animate-fade-up motion-reduce:animate-none"
     >
       <div className="flex items-start justify-between">
         <div className="flex-1">
@@ -324,7 +339,13 @@ function HearingItem({
               shown for every hearing regardless of isUpcoming (cheap: no
               hooks). */}
           <div className="mt-2 flex items-center gap-2 flex-wrap">
-            <StatusBadge status={hearing.status} />
+            {isAwaitingUpdate(hearing) ? (
+              <span title="This date has passed. Refresh court tracking to see what happened.">
+                <Badge variant="warning">Awaiting update</Badge>
+              </span>
+            ) : (
+              <StatusBadge status={hearing.status} />
+            )}
             <CauseListBadge hearing={hearing} />
             <FeeBadges fees={hearing.appearance_fees} />
             <TravelBadge bookings={hearing.travel_bookings} />
@@ -351,12 +372,14 @@ function HearingItem({
 
           {/* Add charges, run each one's invoice lifecycle, upload travel
               documents. The badges above show state; these are the
-              controls that change it. Past hearings rarely need new
-              charges entered against them, and each instance mounts
-              several React Query hooks + a file input -- on a case with
-              hundreds of past hearings that adds up to a real rendering
-              cost, so this only mounts for upcoming ones. */}
-          {isUpcoming && <HearingBillingActions hearing={hearing} caseId={caseId} />}
+              controls that change it. Past hearings get them too -- a
+              hearing is billed AFTER it's heard, and an invoiced charge
+              must stay reachable to be marked paid (or its reminders
+              never stop). Past cards open compact: charges and their
+              buttons, with the add-charge form behind "Record fee". The
+              past list itself is paginated, so this never mounts more
+              than a page of rows. */}
+          <HearingBillingActions hearing={hearing} caseId={caseId} compact={!isUpcoming} />
 
           {isUpcoming && onPrepare && (
             <Button

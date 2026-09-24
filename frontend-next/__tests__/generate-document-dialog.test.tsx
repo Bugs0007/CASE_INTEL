@@ -107,6 +107,44 @@ describe("GenerateDocumentDialog", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it("asks for the side with a select and saves ticked answers for next time", async () => {
+    const user = userEvent.setup();
+    vi.mocked(docTemplatesApi.forCase).mockResolvedValue([
+      {
+        ...VAKALAT,
+        fields: [
+          field({
+            name: "user_side", label: "Your client's side", where: "your client's side in the case details",
+            savable: true, choices: ["Petitioner", "Respondent"],
+          }),
+          field({ name: "executant_age", label: "Executant's age", where: "the client contact on this case", savable: true }),
+          field({ name: "place", label: "Place of signing" }),
+        ],
+      },
+    ]);
+    vi.mocked(docTemplatesApi.generate).mockResolvedValue({ id: 1, filename: "vakalatnama.pdf" } as never);
+    renderDialog();
+
+    const side = await screen.findByRole("combobox", { name: /^your client's side/i });
+    expect(side.tagName).toBe("SELECT"); // not free text
+    await user.selectOptions(side, "Respondent");
+    await user.type(screen.getByLabelText(/executant's age/i), "45");
+    await user.type(screen.getByLabelText(/place of signing/i), "Hyderabad");
+    // "Place" has no home on the record: no box for it.
+    expect(screen.getAllByLabelText(/save for next time/i)).toHaveLength(2);
+    await user.click(screen.getAllByLabelText(/save for next time/i)[1]); // the age
+    await user.click(screen.getByRole("button", { name: /generate pdf/i }));
+
+    await waitFor(() =>
+      expect(docTemplatesApi.generate).toHaveBeenCalledWith(42, {
+        template: "vakalatnama",
+        contact_id: 9,
+        inputs: { user_side: "Respondent", executant_age: "45", place: "Hyderabad" },
+        save: ["executant_age"],
+      }),
+    );
+  });
+
   it("lists what the server still says is missing", async () => {
     const user = userEvent.setup();
     vi.mocked(docTemplatesApi.generate).mockRejectedValue(

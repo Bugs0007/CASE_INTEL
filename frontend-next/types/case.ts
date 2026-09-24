@@ -84,6 +84,56 @@ export interface Case {
   needs_attention: boolean;
   next_hearing_date: string | null;
   fee_summary: CaseFeeSummary;
+  // --- Case detail only (GET /api/cases/<id>/, CaseDetailSerializer) ---
+  /** The parties as the court record gives them (set on every fetch). */
+  petitioner_name?: string;
+  respondent_name?: string;
+  /** What the latest successful eCourts fetch said, null if never fetched. */
+  tracking_snapshot?: TrackingSnapshot | null;
+  tracking_freshness?: TrackingFreshness;
+  /** The case looks disposed of -- the page offers to close it. */
+  disposal?: CaseDisposal | null;
+  /** Contacts who can receive case-update emails. 0 = no drafts are written. */
+  update_recipient_count?: number;
+  /** Petitioner/respondent from the court record, else the "X vs Y" title,
+   * plus which one is ours/opposing given user_party_role. */
+  parties?: CaseParties;
+}
+
+export interface CaseParties {
+  petitioner: string;
+  respondent: string;
+  /** "record" (eCourts), "title" (split from "X vs Y"), or "" (neither). */
+  source: "record" | "title" | "";
+  ours: string;
+  opposing: string;
+}
+
+export interface TrackingSnapshot {
+  case_status: string | null;
+  case_stage: string | null;
+  court_and_judge: string | null;
+  court_name: string | null;
+  nature_of_disposal: string | null;
+  next_hearing_date: string | null;
+}
+
+export interface TrackingFreshness {
+  /** Last check older than stale_after_days, or a past hearing still
+   * marked scheduled. */
+  stale: boolean;
+  reasons: ("last_checked" | "past_hearing_unconfirmed")[];
+  stale_after_days: number;
+  awaiting_update_count: number;
+  /** Set while Refresh is rate-limited (one real fetch per hour). */
+  refresh_available_at: string | null;
+}
+
+export interface CaseDisposal {
+  source: "ecourts" | "order";
+  detail: string;
+  order_id: number | null;
+  order_date: string | null;
 }
 
 /** PATCH /api/cases/<id>/ -- the case-details form's write shape. */

@@ -1,5 +1,6 @@
 "use client";
 
+import { pluralize } from "@/lib/utils";
 import { useState, useMemo } from "react";
 import { DocumentFilters } from "@/components/documents/document-filters";
 import { DocumentTable } from "@/components/documents/document-table";
@@ -116,7 +117,7 @@ export default function DocumentsPage() {
         <div className="min-w-0">
           <h1 className="text-page-title text-gray-900 mb-1.5">Documents</h1>
           <p className="text-sm text-gray-600">
-            {filteredDocuments.length} documents across all cases
+            {pluralize(filteredDocuments.length, "document")} across all cases
           </p>
         </div>
         <button

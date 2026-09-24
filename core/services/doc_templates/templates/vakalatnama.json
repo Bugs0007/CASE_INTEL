@@ -15,7 +15,7 @@
     {"name": "executant_age", "label": "Executant's age", "sources": ["contact.age"], "required": true},
     {"name": "executant_address", "label": "Executant's address", "sources": ["contact.address"], "required": true, "multiline": true},
     {"name": "advocate_name", "label": "Your name", "sources": ["profile.advocate_name"], "required": true},
-    {"name": "bar_registration_number", "label": "Your enrolment number", "sources": ["profile.bar_registration_number"], "required": true},
+    {"name": "bar_registration_number", "label": "Bar enrolment number", "sources": ["profile.bar_registration_number"], "required": true},
     {"name": "advocate_address", "label": "Your address", "sources": ["profile.address"], "required": false, "multiline": true},
     {"name": "place", "label": "Place of signing", "sources": [], "required": true},
     {"name": "date", "label": "Date", "sources": ["today"], "required": true}

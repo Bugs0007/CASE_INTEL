@@ -57,21 +57,9 @@ def _clean(text: str | None) -> str:
     return re.sub(r"\s+", " ", text.strip())
 
 
-_CASE_NUMBER_PREFIX_SPACE_RE = re.compile(r"^([A-Za-z]+)\s+(?=/)")
-
-
-def normalize_case_number(value: str | None) -> str:
-    """Collapse a stray space between a case-type prefix and the slash that
-    follows it (e.g. "WP /26147/2026" -> "WP/26147/2026") -- a formatting
-    quirk of the source portal HTML cell, not something _clean() removes
-    (it only collapses whitespace *runs*, deliberately leaving single
-    internal spaces alone since it's shared with fields like party names
-    where internal spacing is meaningful). Any other internal spacing in
-    the value is left untouched."""
-    cleaned = _clean(value)
-    if not cleaned:
-        return cleaned
-    return _CASE_NUMBER_PREFIX_SPACE_RE.sub(r"\1", cleaned)
+# Lives in core/services/case_numbers.py (the Case model uses it too);
+# imported here so the parsers and existing imports keep working.
+from core.services.case_numbers import normalize_case_number  # noqa: E402,F401
 
 
 _LABEL_PUNCT_RE = re.compile(r"[.:]")

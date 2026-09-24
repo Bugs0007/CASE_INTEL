@@ -74,7 +74,11 @@ class DocTemplateListView(OwnerScopedMixin, generics.GenericAPIView):
 
 class CaseGenerateDocumentView(OwnerScopedMixin, generics.GenericAPIView):
     """POST /api/cases/<id>/generate-document/
-        {"template": "vakalatnama", "contact_id": 3, "inputs": {"place": "Hyderabad"}}
+        {"template": "vakalatnama", "contact_id": 3, "inputs": {"place": "Hyderabad"},
+         "save": ["executant_age"]}
+
+    `save` lists typed fields to also write back to the case, contact or
+    profile ("Save for next time"); only fields marked savable qualify.
 
     201 with the new Document. 400 with code "missing_fields" and the list
     of what's missing when a required field is still empty -- nothing is
@@ -91,6 +95,9 @@ class CaseGenerateDocumentView(OwnerScopedMixin, generics.GenericAPIView):
         inputs = request.data.get("inputs") or {}
         if not isinstance(inputs, dict):
             return Response({"inputs": ["Expected an object of field: value."]}, status=status.HTTP_400_BAD_REQUEST)
+        save = request.data.get("save") or []
+        if not isinstance(save, list) or not all(isinstance(name, str) for name in save):
+            return Response({"save": ["Expected a list of field names."]}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             document = doc_templates.generate_document(
@@ -99,6 +106,7 @@ class CaseGenerateDocumentView(OwnerScopedMixin, generics.GenericAPIView):
                 profile=get_or_create_profile(request.user),
                 contact_id=_int_or_none(request.data.get("contact_id")),
                 inputs=inputs,
+                save=save,
             )
         except doc_templates.MissingFieldsError as exc:
             return Response(

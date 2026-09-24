@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronUp, Loader2, Send, Trash2 } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronUp, Loader2, Send, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { showToast } from "@/components/ui/toaster";
+import { useAdvocateProfile } from "@/hooks/use-billing";
 import {
   useDiscardClientMessage,
   useSendClientMessage,
@@ -59,6 +60,15 @@ export function ClientMessageCard({ message, showCase = false, defaultOpen = fal
     body !== message.body ||
     recipientIds.join(",") !== message.recipients.map((r) => r.contact_id).join(",");
   const busy = update.isPending || send.isPending || discard.isPending;
+
+  // Why Send can't work right now, checked here so the button says so up
+  // front instead of failing on click. The server enforces the same rules.
+  // The profile is undefined while loading -- never block on "unknown".
+  const { data: profile } = useAdvocateProfile();
+  const nameMissing = isDraft && profile !== undefined && !profile.advocate_name?.trim();
+  const contactEmailMissing = isDraft && profile !== undefined && !profile.contact_email;
+  const noRecipients = recipientIds.length === 0;
+  const sendBlocked = noRecipients || nameMissing || contactEmailMissing;
 
   async function save(): Promise<boolean> {
     try {
@@ -200,6 +210,32 @@ export function ClientMessageCard({ message, showCase = false, defaultOpen = fal
                   className="font-sans"
                 />
               </div>
+              {(nameMissing || contactEmailMissing || (noRecipients && message.eligible_recipients.length > 0)) && (
+                <div className="flex items-start gap-1.5 rounded-md bg-status-alert-soft px-2.5 py-1.5 text-xs text-status-alert">
+                  <AlertTriangle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                  <span>
+                    {nameMissing ? (
+                      <>
+                        Add your name in{" "}
+                        <Link href="/settings" className="font-medium underline">
+                          Settings
+                        </Link>{" "}
+                        before sending -- it&apos;s how the email is signed.
+                      </>
+                    ) : contactEmailMissing ? (
+                      <>
+                        Add your contact email in{" "}
+                        <Link href="/settings" className="font-medium underline">
+                          Settings
+                        </Link>{" "}
+                        so the client can reply to you.
+                      </>
+                    ) : (
+                      "Tick at least one recipient to send this."
+                    )}
+                  </span>
+                </div>
+              )}
               <div className="flex flex-wrap justify-end gap-2">
                 <Button variant="ghost" size="sm" onClick={handleDiscard} disabled={busy}>
                   <Trash2 className="h-4 w-4" />
@@ -210,7 +246,20 @@ export function ClientMessageCard({ message, showCase = false, defaultOpen = fal
                     Save draft
                   </Button>
                 )}
-                <Button size="sm" onClick={handleSend} disabled={busy}>
+                <Button
+                  size="sm"
+                  onClick={handleSend}
+                  disabled={busy || sendBlocked}
+                  title={
+                    noRecipients
+                      ? "No recipients -- nobody to send this to"
+                      : nameMissing
+                        ? "Add your name in Settings first"
+                        : contactEmailMissing
+                          ? "Add your contact email in Settings first"
+                          : undefined
+                  }
+                >
                   {send.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                   Send
                 </Button>

@@ -45,18 +45,40 @@ def _display_purpose(purpose: str) -> str:
     return purpose
 
 
+def case_title(case) -> str:
+    """The case's real title, or "" when it has none. A case added by CNR
+    before its parties were known carries the CNR (or its number) as a
+    placeholder title -- that is not a name to show a client."""
+    title = (case.title or "").strip()
+    placeholders = {(case.cnr_number or "").strip().upper(), (case.case_number or "").strip().upper()}
+    if not title or title.upper() in placeholders - {""}:
+        return ""
+    return title
+
+
+def matter_label(case) -> str:
+    """What to call the matter in a subject line: its title, else its case
+    number -- never the CNR."""
+    return case_title(case) or (case.case_number or "").strip() or "your matter"
+
+
 def matter_name(case) -> str:
     """The case title, with its number appended only when the title doesn't
     already carry it (imported titles usually start with it)."""
-    title = (case.title or "").strip()
+    title = case_title(case)
     number = (case.case_number or "").strip()
     if not number or number in title:
         return title or number
+    if not title:
+        return number
     return f"{title} ({number})"
 
 
 def signature(profile) -> str:
-    return profile.advocate_name or profile.letterhead_name or "Your advocate"
+    """Name, then firm on the next line -- see email_delivery.advocate_signature."""
+    from core.services.email_delivery import advocate_signature
+
+    return advocate_signature(profile)
 
 
 def what_happened_line(order: CourtOrder | None) -> str:
@@ -81,9 +103,13 @@ def compose_case_update(
     order: CourtOrder | None,
     next_date: date | None,
     next_purpose: str = "",
+    disposed: bool = False,
 ) -> tuple[str, str]:
-    """Subject and body for a 'your matter was heard' update."""
-    subject = f"Update on your matter: {case.title}"[:255]
+    """Subject and body for a 'your matter was heard' update.
+
+    `disposed`: the order (or eCourts) says the case is over, so there is
+    no next date to wait for -- say that instead of "not fixed yet"."""
+    subject = f"Update on your matter: {matter_label(case)}"[:255]
 
     lines = [_greeting(recipient_names), ""]
     lines.append(f"This is an update on your matter {matter_name(case)}.")
@@ -100,6 +126,11 @@ def compose_case_update(
             f"The next date of hearing is {_fmt(next_date)}"
             + (f" (listed for: {purpose})." if purpose else ".")
         )
+    elif disposed:
+        lines.append(
+            "With this, the court has disposed of the matter, so there is no further "
+            "date of hearing. I will be in touch about the order and any next steps."
+        )
     else:
         lines.append("The next date of hearing has not been fixed yet. I will let you know once it is.")
     lines.append("")
@@ -115,7 +146,7 @@ def compose_reschedule_update(
     *, case, profile, recipient_names: list[str], old_date: date, new_date: date, purpose: str = ""
 ) -> tuple[str, str]:
     """A hearing the advocate moved by hand: 'now listed on B'."""
-    subject = f"Hearing date changed: {case.title}"[:255]
+    subject = f"Hearing date changed: {matter_label(case)}"[:255]
     purpose = _display_purpose(purpose)
     lines = [
         _greeting(recipient_names),
@@ -142,7 +173,7 @@ _ORDINAL = {1: "", 2: "Second reminder: ", 3: "Final reminder: "}
 def compose_payment_reminder(*, fee, profile, recipient_name: str, reminder_number: int) -> tuple[str, str]:
     case = fee.hearing.case
     prefix = _ORDINAL.get(reminder_number, "Reminder: ")
-    subject = f"{prefix}Payment reminder for invoice {fee.invoice_number} - {case.title}"[:255]
+    subject = f"{prefix}Payment reminder for invoice {fee.invoice_number} - {matter_label(case)}"[:255]
     invoiced = timezone.localtime(fee.invoiced_at).date() if fee.invoiced_at else None
     hearing_day = timezone.localtime(fee.hearing.hearing_date).date()
     lines = [

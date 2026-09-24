@@ -22,13 +22,16 @@ interface GenerateDocumentDialogProps {
  * your profile and the client contact, no AI involved.
  *
  * Everything already on record is shown filled in; anything a template
- * needs that isn't on record gets a box here, for this document only
- * (nothing typed is saved back). Generation is refused while a required
- * field is empty, with the list of what's missing. */
+ * needs that isn't on record gets a box here. A typed answer that has a
+ * home on the record (your profile, the contact, the case) gets a "Save
+ * for next time" box that writes it back as the document is generated.
+ * Generation is refused while a required field is empty, with the list of
+ * what's missing. */
 export function GenerateDocumentDialog({ isOpen, onClose, caseItem }: GenerateDocumentDialogProps) {
   const [contactId, setContactId] = useState<number | null>(null);
   const [templateKey, setTemplateKey] = useState<string>("");
   const [inputs, setInputs] = useState<Record<string, string>>({});
+  const [saveFields, setSaveFields] = useState<Set<string>>(new Set());
   const [serverMissing, setServerMissing] = useState<DocTemplateField[]>([]);
 
   const { data: templates = [], isLoading } = useDocTemplatesForCase(caseItem.id, contactId, isOpen);
@@ -37,6 +40,7 @@ export function GenerateDocumentDialog({ isOpen, onClose, caseItem }: GenerateDo
   useEffect(() => {
     if (!isOpen) return;
     setInputs({});
+    setSaveFields(new Set());
     setServerMissing([]);
   }, [isOpen, templateKey, contactId]);
 
@@ -66,16 +70,33 @@ export function GenerateDocumentDialog({ isOpen, onClose, caseItem }: GenerateDo
   );
   const stillMissing = typedFields.filter((f) => f.required && !(inputs[f.name] ?? "").trim());
 
+  function toggleSave(name: string, on: boolean) {
+    setSaveFields((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(name);
+      else next.delete(name);
+      return next;
+    });
+  }
+
   async function handleGenerate() {
     if (!template) return;
     setServerMissing([]);
     try {
+      const save = typedFields
+        .filter((f) => f.savable && saveFields.has(f.name) && (inputs[f.name] ?? "").trim())
+        .map((f) => f.name);
       const document = await generate.mutateAsync({
         template: template.key,
         contact_id: contactId,
         inputs: Object.fromEntries(Object.entries(inputs).filter(([, v]) => v.trim())),
+        ...(save.length ? { save } : {}),
       });
-      showToast.success(`${template.title} generated`, `Saved to this case's documents as ${document.filename}.`);
+      showToast.success(
+        `${template.title} generated`,
+        `Saved to this case's documents as ${document.filename}.` +
+          (save.length ? ` ${save.length} answer${save.length === 1 ? "" : "s"} saved for next time.` : ""),
+      );
       onClose();
     } catch (error) {
       if (error instanceof APIError && (error.data as { code?: string })?.code === "missing_fields") {
@@ -199,7 +220,20 @@ export function GenerateDocumentDialog({ isOpen, onClose, caseItem }: GenerateDo
                             {f.label}
                             {f.required ? <span className="text-status-alert"> *</span> : " (optional)"}
                           </label>
-                          {f.multiline ? (
+                          {f.choices && f.choices.length > 0 ? (
+                            <Select
+                              id={`input-${f.name}`}
+                              value={inputs[f.name] ?? ""}
+                              onChange={(e) => setInputs((prev) => ({ ...prev, [f.name]: e.target.value }))}
+                            >
+                              <option value="">Choose…</option>
+                              {f.choices.map((choice) => (
+                                <option key={choice} value={choice}>
+                                  {choice}
+                                </option>
+                              ))}
+                            </Select>
+                          ) : f.multiline ? (
                             <Textarea
                               id={`input-${f.name}`}
                               rows={f.name === "body" ? 8 : 3}
@@ -213,10 +247,22 @@ export function GenerateDocumentDialog({ isOpen, onClose, caseItem }: GenerateDo
                               onChange={(e) => setInputs((prev) => ({ ...prev, [f.name]: e.target.value }))}
                             />
                           )}
-                          {f.where && (
-                            <p className="mt-0.5 text-xs text-gray-400">
-                              To keep it for next time, add it in {f.where}.
-                            </p>
+                          {f.savable ? (
+                            <label className="mt-1 flex items-center gap-1.5 text-xs text-gray-600">
+                              <input
+                                type="checkbox"
+                                checked={saveFields.has(f.name)}
+                                onChange={(e) => toggleSave(f.name, e.target.checked)}
+                              />
+                              Save for next time
+                              {f.where && <span className="text-gray-400">(to {f.where})</span>}
+                            </label>
+                          ) : (
+                            f.where && (
+                              <p className="mt-0.5 text-xs text-gray-400">
+                                To keep it for next time, add it in {f.where}.
+                              </p>
+                            )
                           )}
                         </div>
                       ))}

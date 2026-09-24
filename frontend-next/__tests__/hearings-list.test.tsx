@@ -57,7 +57,8 @@ function makeHearing(overrides: Partial<Hearing> = {}): Hearing {
     id: 7,
     case: CASE_ID,
     case_title: "Sharma vs. Meridian",
-    hearing_date: "2026-09-01T05:00:00Z",
+    // Upcoming by default; the tests about past hearings set their own date.
+    hearing_date: "2099-09-01T05:00:00Z",
     hearing_type: "motion",
     hearing_type_display: "Motion",
     location: "District Court",
@@ -142,15 +143,46 @@ describe("HearingsList", () => {
     expect(screen.getByText("Add charge")).toBeInTheDocument();
   });
 
-  it("does not mount the fee/travel billing controls for a past hearing", () => {
-    const hearing = makeHearing({
-      hearing_date: "2020-01-01T05:00:00Z",
-      status: "completed",
-    });
+  it("does not mount past hearings until the Past section is opened", () => {
+    const hearing = makeHearing({ hearing_date: "2020-01-01T05:00:00Z", status: "completed" });
 
     renderWithClient(<HearingsList caseId={CASE_ID} hearings={[hearing]} />);
 
+    expect(screen.queryByText("Justice Rao")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("Expand"));
+    expect(screen.getByText("Justice Rao")).toBeInTheDocument();
+  });
+
+  it("lets a past hearing be billed: Record fee opens the add-charge form", () => {
+    // Billing's "hearings not yet billed" are all past hearings -- the
+    // controls must be reachable there (production bug: they weren't).
+    const hearing = makeHearing({ hearing_date: "2020-01-01T05:00:00Z", status: "completed" });
+
+    renderWithClient(<HearingsList caseId={CASE_ID} hearings={[hearing]} />);
+    fireEvent.click(screen.getByText("Expand"));
+
     expect(screen.queryByText("Add charge")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("Record fee"));
+    expect(screen.getByText("Add charge")).toBeInTheDocument();
+  });
+
+  it("keeps the whole invoice lifecycle on a past hearing's invoiced charge", () => {
+    // An INVOICED fee that can't be marked paid keeps payment reminders
+    // coming forever.
+    const hearing = makeHearing({
+      hearing_date: "2020-01-01T05:00:00Z",
+      status: "completed",
+      appearance_fees: [
+        makeFee({ status: "invoiced", status_display: "Invoiced", invoice_number: "INV-0007" }),
+      ],
+    });
+
+    renderWithClient(<HearingsList caseId={CASE_ID} hearings={[hearing]} />);
+    fireEvent.click(screen.getByText("Expand"));
+
+    expect(screen.getByRole("button", { name: "Mark Paid (Appearance Fee)" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "View PDF (Appearance Fee)" })).toBeInTheDocument();
+    expect(screen.getByText("Add another charge")).toBeInTheDocument();
   });
 
   it("paginates a long past-hearings list instead of mounting every row", () => {

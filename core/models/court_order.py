@@ -91,6 +91,12 @@ class CourtOrder(OwnedModel):
     summary_llm_calls = models.PositiveSmallIntegerField(
         default=0, help_text="LLM calls spent on this order. 0 for the templated paths."
     )
+    # The order's own text finally disposes of the main case ("the writ
+    # petition is disposed of ... pending miscellaneous petitions shall
+    # stand closed"). Set in the worker from the extracted text by
+    # core/services/disposal.py -- a pattern match, no LLM -- and read by
+    # the case page's "close this case?" banner and the client update.
+    disposes_case = models.BooleanField(default=False)
 
     class Meta:
         db_table = "court_orders"
