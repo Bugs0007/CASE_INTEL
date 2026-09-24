@@ -77,6 +77,10 @@ class CourtOrder(OwnedModel):
         help_text="Which path this order took -- how many orders reach the LLM.",
     )
     summary_what_happened = models.TextField(blank=True, default="")
+    # The same, rewritten for a client with no legal training -- what client
+    # update emails say (core/services/client_updates/plain.py). Empty until
+    # generated, and for orders that didn't need the LLM summary.
+    summary_plain = models.TextField(blank=True, default="")
     # Stored as they appear in the ORDER (petitioner/respondent), not as
     # "your side"/"other side". Which is which for this advocate is
     # applied at render time from Case.user_party_role, so correcting the

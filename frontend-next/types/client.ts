@@ -71,6 +71,8 @@ export interface ClientMessage {
   invoice_number: string | null;
   hearing: number | null;
   hearing_date: string | null;
+  /** The day the news happened: the hearing a case update reports. */
+  event_date: string | null;
   court_order: number | null;
   sent_at: string | null;
   discard_reason: string;

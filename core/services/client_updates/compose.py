@@ -88,7 +88,8 @@ def what_happened_line(order: CourtOrder | None) -> str:
     if order is None:
         return ""
     if order.summary_status == CourtOrder.SUMMARY_SUMMARIZED:
-        return (order.summary_what_happened or "").strip()
+        # The client's version when there is one; the advocate's otherwise.
+        return (order.summary_plain or order.summary_what_happened or "").strip()
     if order.summary_status == CourtOrder.SUMMARY_NO_DIRECTIONS:
         return _NO_DIRECTIONS_TEXT
     # pending / failed / unreadable: nothing reliable to report.

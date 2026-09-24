@@ -327,6 +327,15 @@ class Command(BaseCommand):
         except Exception:  # noqa: BLE001
             logger.exception("Disposal check failed for order %d.", order.id)
 
+        # A lay reader's version of the summary for the client email below
+        # (one LLM call, LLM-summarised orders only). Falls back silently.
+        try:
+            from core.services.client_updates.plain import ensure_plain_summary
+
+            ensure_plain_summary(order)
+        except Exception:  # noqa: BLE001
+            logger.exception("Plain-language summary failed for order %d.", order.id)
+
         # The client-update DRAFT for the hearing this order was passed on
         # (never sent -- the advocate reviews it in the drafts inbox). Its
         # own try block, same reasoning as the tasks above.
