@@ -15,6 +15,7 @@ from decimal import Decimal
 
 from core.models import CourtOrder
 from core.services.india_time import india_date
+from core.services.money import format_inr
 
 # Client-facing wording for the orders the summariser resolves without an
 # LLM. The advocate-facing texts in order_summary/service.py talk about
@@ -164,7 +165,7 @@ def compose_reschedule_update(
 
 
 def _money(amount: Decimal) -> str:
-    return f"Rs. {Decimal(amount):,.2f}"
+    return format_inr(amount)
 
 
 _ORDINAL = {1: "", 2: "Second reminder: ", 3: "Final reminder: "}

@@ -20,6 +20,7 @@ from decimal import Decimal
 
 from core.models import AppearanceFee, Client
 from core.services.india_time import india_date, india_fmt, india_today
+from core.services.money import pdf_inr
 from core.services.pdf_utils import draw_letterhead, pdf_safe
 
 AGING_BUCKETS = (
@@ -192,7 +193,7 @@ def uninvoiced_hearings_this_month(hearings_qs, *, today: date | None = None) ->
 
 
 def _money(amount: Decimal) -> str:
-    return f"Rs. {Decimal(amount):,.2f}"
+    return pdf_inr(amount)
 
 
 def render_client_statement_pdf(client: Client, fees_qs, profile, *, today: date | None = None) -> bytes:

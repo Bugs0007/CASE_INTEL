@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { showToast } from "@/components/ui/toaster";
-import { AgingBuckets, formatRupees } from "@/components/billing/aging-buckets";
+import { AgingBuckets } from "@/components/billing/aging-buckets";
 import {
   billingPortfolioKeys,
   useBillingPortfolio,
@@ -16,7 +16,8 @@ import {
 } from "@/hooks/use-clients";
 import { useUpdateCase } from "@/hooks/use-cases";
 import { apiErrorDetail } from "@/lib/api/client";
-import { formatHearingDate } from "@/lib/utils";
+import { formatINR } from "@/lib/utils";
+import { UnbilledHearings } from "@/components/billing/unbilled-hearings";
 import { useQueryClient } from "@tanstack/react-query";
 
 /** Billing across every case: how long invoices have been unpaid, who owes
@@ -76,10 +77,10 @@ export default function BillingPage() {
             <CardHeader className="flex flex-row flex-wrap items-baseline justify-between gap-2">
               <CardTitle>Awaiting payment</CardTitle>
               <span className="text-sm text-gray-600">
-                {formatRupees(data.totals.invoiced_amount)} across {data.totals.invoiced_count} invoice
+                {formatINR(data.totals.invoiced_amount)} across {data.totals.invoiced_count} invoice
                 {data.totals.invoiced_count === 1 ? "" : "s"}
                 {data.totals.pending_count > 0 &&
-                  ` · ${formatRupees(data.totals.pending_amount)} recorded but not yet invoiced`}
+                  ` · ${formatINR(data.totals.pending_amount)} recorded but not yet invoiced`}
               </span>
             </CardHeader>
             <CardContent>
@@ -123,9 +124,9 @@ export default function BillingPage() {
                             {row.client_type === "business" ? " · business" : ""}
                           </div>
                         </td>
-                        <td className="px-3 py-2 text-right font-mono">{formatRupees(row.invoiced_amount)}</td>
+                        <td className="px-3 py-2 text-right font-mono">{formatINR(row.invoiced_amount)}</td>
                         <td className="px-3 py-2 text-right font-mono text-gray-600">
-                          {formatRupees(row.pending_amount)}
+                          {formatINR(row.pending_amount)}
                         </td>
                         <td className="px-3 py-2 text-right text-gray-600">
                           {row.oldest_invoice_days !== null ? `${row.oldest_invoice_days} d` : "—"}
@@ -180,9 +181,9 @@ export default function BillingPage() {
                       </div>
                     </div>
                     <div className="text-right font-mono text-sm">
-                      {formatRupees(row.invoiced_amount)}
+                      {formatINR(row.invoiced_amount)}
                       {Number(row.pending_amount) > 0 && (
-                        <div className="text-xs text-gray-500">+ {formatRupees(row.pending_amount)} not invoiced</div>
+                        <div className="text-xs text-gray-500">+ {formatINR(row.pending_amount)} not invoiced</div>
                       )}
                     </div>
                     {clients.length > 0 ? (
@@ -216,27 +217,7 @@ export default function BillingPage() {
               <CardTitle>This month&apos;s hearings not yet billed</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              {data.uninvoiced_hearings.length === 0 ? (
-                <p className="text-sm text-gray-500">Every hearing so far this month has been invoiced.</p>
-              ) : (
-                data.uninvoiced_hearings.map((h) => (
-                  <Link
-                    key={h.hearing_id}
-                    href={`/cases/${h.case_id}`}
-                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-100 px-3 py-2 hover:bg-gray-50"
-                  >
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">
-                        {formatHearingDate(h.hearing_date)} · {h.case_number}
-                      </div>
-                      <div className="text-xs text-gray-500 truncate">{h.case_title}</div>
-                    </div>
-                    <span className="ci-chip ci-chip--pending">
-                      {h.has_fee ? `${formatRupees(h.pending_amount)} not invoiced` : "No fee recorded"}
-                    </span>
-                  </Link>
-                ))
-              )}
+              <UnbilledHearings rows={data.uninvoiced_hearings} />
               {data.uninvoiced_hearings_total > data.uninvoiced_hearings.length && (
                 <p className="text-xs text-gray-500">
                   Showing {data.uninvoiced_hearings.length} of {data.uninvoiced_hearings_total}.

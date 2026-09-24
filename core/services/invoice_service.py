@@ -28,6 +28,7 @@ from core.models import AdvocateProfile, AppearanceFee, ClientContact, ClientMes
 from core.services import email_delivery
 from core.services.email_delivery import EMAIL_ENV_VARS_REQUIRED, email_is_configured
 from core.services.india_time import india_fmt
+from core.services.money import format_inr, pdf_inr
 from core.services.pdf_utils import draw_letterhead
 from core.services.pdf_utils import pdf_safe as _pdf_safe
 
@@ -112,9 +113,10 @@ def allocate_invoice_number(user) -> tuple[str, int]:
 # ---------------------------------------------------------------------------
 
 def _money(amount: Decimal) -> str:
-    """Rs. 1234.50 -- 'Rs.' not the rupee sign, which is not Latin-1 and
-    would render as '?' under the core fonts (see _pdf_safe)."""
-    return f"Rs. {Decimal(amount):,.2f}"
+    """For the PDF: "Rs. 1,31,000" -- 'Rs.' not the rupee sign, which is
+    not Latin-1 and would render as '?' under the core fonts (see
+    _pdf_safe). Same grouping and no-".00" rule as everywhere else."""
+    return pdf_inr(amount)
 
 
 def render_invoice_pdf(fee: AppearanceFee, profile: AdvocateProfile) -> bytes:
@@ -366,7 +368,7 @@ def send_invoice(fee: AppearanceFee, *, sent_by=None) -> dict:
         f"({fee.get_category_display().lower()}) for the hearing on "
         f"{india_fmt(fee.hearing.hearing_date)} "
         f"in {fee.hearing.case.title} ({fee.hearing.case.case_number}).\n\n"
-        f"Amount due: {_money(fee.amount)}\n\n"
+        f"Amount due: {format_inr(fee.amount)}\n\n"
         f"Regards,\n"
         f"{email_delivery.advocate_signature(profile)}\n"
     )
