@@ -12,9 +12,9 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from django.utils import timezone
 
 from core.models import CourtOrder
+from core.services.india_time import india_date
 
 # Client-facing wording for the orders the summariser resolves without an
 # LLM. The advocate-facing texts in order_summary/service.py talk about
@@ -174,8 +174,8 @@ def compose_payment_reminder(*, fee, profile, recipient_name: str, reminder_numb
     case = fee.hearing.case
     prefix = _ORDINAL.get(reminder_number, "Reminder: ")
     subject = f"{prefix}Payment reminder for invoice {fee.invoice_number} - {matter_label(case)}"[:255]
-    invoiced = timezone.localtime(fee.invoiced_at).date() if fee.invoiced_at else None
-    hearing_day = timezone.localtime(fee.hearing.hearing_date).date()
+    invoiced = india_date(fee.invoiced_at)
+    hearing_day = india_date(fee.hearing.hearing_date)
     lines = [
         _greeting([recipient_name]),
         "",

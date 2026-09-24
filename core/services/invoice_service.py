@@ -27,6 +27,7 @@ from django.utils import timezone
 from core.models import AdvocateProfile, AppearanceFee, ClientContact, ClientMessage, SentMessage
 from core.services import email_delivery
 from core.services.email_delivery import EMAIL_ENV_VARS_REQUIRED, email_is_configured
+from core.services.india_time import india_fmt
 from core.services.pdf_utils import draw_letterhead
 from core.services.pdf_utils import pdf_safe as _pdf_safe
 
@@ -144,7 +145,7 @@ def render_invoice_pdf(fee: AppearanceFee, profile: AdvocateProfile) -> bytes:
     pdf.cell(
         0,
         5,
-        _pdf_safe(f"Invoice Date: {timezone.localtime(issued).strftime('%d %b %Y')}"),
+        _pdf_safe(f"Invoice Date: {india_fmt(issued)}"),
         new_x="LMARGIN",
         new_y="NEXT",
     )
@@ -156,7 +157,7 @@ def render_invoice_pdf(fee: AppearanceFee, profile: AdvocateProfile) -> bytes:
         ("Case Number", case.case_number or ""),
         ("CNR Number", case.cnr_number or "Not available"),
         ("Client", case.client_name or (client.name if client else "")),
-        ("Hearing Date", timezone.localtime(hearing.hearing_date).strftime("%d %b %Y")),
+        ("Hearing Date", india_fmt(hearing.hearing_date)),
         ("Court", hearing.location or "Not recorded"),
     ]
     if business_client and client.gstin:
@@ -363,7 +364,7 @@ def send_invoice(fee: AppearanceFee, *, sent_by=None) -> dict:
         f"Dear {contact.name},\n\n"
         f"Please find attached invoice {fee.invoice_number} "
         f"({fee.get_category_display().lower()}) for the hearing on "
-        f"{timezone.localtime(fee.hearing.hearing_date).strftime('%d %b %Y')} "
+        f"{india_fmt(fee.hearing.hearing_date)} "
         f"in {fee.hearing.case.title} ({fee.hearing.case.case_number}).\n\n"
         f"Amount due: {_money(fee.amount)}\n\n"
         f"Regards,\n"

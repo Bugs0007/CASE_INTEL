@@ -28,7 +28,6 @@ import string
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
@@ -36,6 +35,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 from core.models import ClientContact, Document
+from core.services.india_time import INDIA_TZ, india_today
 from core.services.pdf_utils import draw_letterhead, pdf_safe
 
 logger = logging.getLogger(__name__)
@@ -212,11 +212,11 @@ def get_template(key: str) -> DocTemplate:
 # are stored as UTC midnights), so timezone.localdate() is yesterday for the
 # first 5.5 hours of every Indian day -- a vakalatnama signed at 2 am would
 # carry the wrong date.
-DOCUMENT_TIMEZONE = ZoneInfo("Asia/Kolkata")
+DOCUMENT_TIMEZONE = INDIA_TZ
 
 
 def document_date():
-    return timezone.localdate(timezone=DOCUMENT_TIMEZONE)
+    return india_today()
 
 
 @dataclass
