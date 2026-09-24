@@ -1,19 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { showToast } from "@/components/ui/toaster";
 import { useUpdateCase } from "@/hooks/use-cases";
-import { useClients } from "@/hooks/use-clients";
+import { useClients, useCreateClient } from "@/hooks/use-clients";
 import {
   useCreateClientContact,
   useDeleteClientContact,
   useUpdateClientContact,
 } from "@/hooks/use-client-contacts";
-import { X, FileEdit, Plus, Trash2, ChevronDown, ChevronUp } from "lucide-react";
-import { APIError } from "@/lib/api/client";
+import { X, FileEdit, Plus, Trash2, ChevronDown, ChevronUp, UserPlus, Loader2 } from "lucide-react";
+import { APIError, apiErrorDetail } from "@/lib/api/client";
+import { hasPlaceholderTitle } from "@/lib/utils";
 import type { Case, ContactRole, RelationType, UserPartyRole } from "@/types";
 
 interface CaseDetailsDialogProps {
@@ -96,20 +97,70 @@ export function CaseDetailsDialog({ isOpen, onClose, case: caseItem }: CaseDetai
   const [opposingParty, setOpposingParty] = useState("");
   const [userPartyRole, setUserPartyRole] = useState<UserPartyRole>("unknown");
   const [clientId, setClientId] = useState<number | null>(null);
-  const { data: clients = [] } = useClients();
+  // Only fetched while the dialog is open -- the dialog is mounted on the
+  // case page all the time.
+  const { data: clients = [] } = useClients(undefined, isOpen);
+  const createClient = useCreateClient();
+  // The opposing party we filled in from the court record/title, so a
+  // change of side can replace it -- but never overwrite what was typed.
+  const autoOpposing = useRef<string | null>(null);
   const [contacts, setContacts] = useState<ContactRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Seed the form when the dialog OPENS -- not whenever the case object
+  // changes, or a background refetch would wipe edits in progress.
   useEffect(() => {
     if (!isOpen) return;
     setError(null);
-    setTitle(caseItem.title);
-    setOpposingParty(caseItem.opposing_party || "");
+    // A CNR standing in as the title is no title: suggest "X vs Y" from
+    // the parties instead, or leave it empty to type.
+    const parties = caseItem.parties;
+    const suggested =
+      parties?.petitioner && parties?.respondent ? `${parties.petitioner} vs ${parties.respondent}` : "";
+    setTitle(hasPlaceholderTitle(caseItem) ? suggested : caseItem.title);
     setUserPartyRole(caseItem.user_party_role);
     setClientId(caseItem.client ?? null);
     setContacts(rowsFromCase(caseItem));
-  }, [isOpen, caseItem]);
+    const derived = caseItem.opposing_party ? null : caseItem.parties?.opposing || null;
+    autoOpposing.current = derived;
+    setOpposingParty(caseItem.opposing_party || derived || "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  function handleRoleChange(role: UserPartyRole) {
+    setUserPartyRole(role);
+    // Picking a side names the other one as the opposing party, from the
+    // court record or the "X vs Y" title -- unless the advocate typed one.
+    const parties = caseItem.parties;
+    if (!parties || (opposingParty.trim() && opposingParty !== autoOpposing.current)) return;
+    const other = role === "petitioner" ? parties.respondent : role === "respondent" ? parties.petitioner : "";
+    autoOpposing.current = other || null;
+    setOpposingParty(other);
+  }
+
+  // "Create client from this contact": the contact that would be billed.
+  const billingRow = contacts.find((row) => row.is_billing_contact) ?? contacts[0];
+
+  async function handleCreateClientFromContact() {
+    if (!billingRow?.name.trim()) return;
+    try {
+      const created = await createClient.mutateAsync({
+        name: billingRow.name.trim(),
+        client_type: "individual",
+        email: billingRow.email.trim(),
+        phone: billingRow.phone.trim(),
+        address: billingRow.address.trim(),
+      });
+      setClientId(created.id);
+      showToast.success(
+        `Client "${created.name}" created`,
+        "Linked to this case -- press Save Changes to keep it.",
+      );
+    } catch (err) {
+      showToast.error("Could not create the client", apiErrorDetail(err, "Please try again."));
+    }
+  }
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -318,7 +369,7 @@ export function CaseDetailsDialog({ isOpen, onClose, case: caseItem }: CaseDetai
               <Select
                 id="user-party-role"
                 value={userPartyRole}
-                onChange={(e) => setUserPartyRole(e.target.value as UserPartyRole)}
+                onChange={(e) => handleRoleChange(e.target.value as UserPartyRole)}
               >
                 {PARTY_ROLES.map((r) => (
                   <option key={r.value} value={r.value}>
@@ -337,6 +388,11 @@ export function CaseDetailsDialog({ isOpen, onClose, case: caseItem }: CaseDetai
                 onChange={(e) => setOpposingParty(e.target.value)}
                 placeholder="e.g., Jane Johnson"
               />
+              {autoOpposing.current && opposingParty === autoOpposing.current && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Filled in from the {caseItem.parties?.source === "title" ? "case title" : "court record"}.
+                </p>
+              )}
             </div>
           </div>
 
@@ -357,9 +413,23 @@ export function CaseDetailsDialog({ isOpen, onClose, case: caseItem }: CaseDetai
                 </option>
               ))}
             </Select>
+            {clientId === null && billingRow?.name.trim() && (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="mt-2"
+                onClick={handleCreateClientFromContact}
+                disabled={createClient.isPending}
+              >
+                {createClient.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserPlus className="h-3.5 w-3.5" />}
+                Create client from {billingRow.name.trim()}
+              </Button>
+            )}
             <p className="mt-1 text-xs text-gray-500">
               Groups this case into the client&apos;s outstanding statement, and decides the tax line on
-              invoices. Manage clients on the Clients page.
+              invoices. The contacts below are the people you write to; a client is who you bill.
+              Manage clients on the Clients page.
             </p>
           </div>
 

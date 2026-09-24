@@ -9,7 +9,6 @@
 
 import io
 import json
-from datetime import date
 
 import pytest
 from django.contrib.auth.models import User
@@ -134,7 +133,7 @@ class TestReadiness:
         vakalat = next(t for t in resp.data if t["key"] == "vakalatnama")
         missing = {f["name"]: f["where"] for f in vakalat["fields"] if f["missing"]}
         assert vakalat["ready"] is False
-        assert "advocate_name" in missing and missing["advocate_name"].startswith("Settings")
+        assert "advocate_name" in missing and "Settings" in missing["advocate_name"]
         assert "executant_name" in missing and "client contact" in missing["executant_name"]
         assert "place" in missing  # never stored anywhere -- always typed
         filled = {f["name"]: f for f in vakalat["fields"]}
@@ -274,4 +273,6 @@ def test_date_source_is_today(advocate):
         case=case,
         profile=AdvocateProfile.objects.get(owner=advocate),
     )
-    assert {f.name: f.value for f in resolution.fields}["date"] == date.today().strftime("%d %B %Y")
+    # India's date, not the server's UTC one (they differ 00:00-05:30 IST).
+    today_in_india = timezone.localdate(timezone=engine.DOCUMENT_TIMEZONE)
+    assert {f.name: f.value for f in resolution.fields}["date"] == today_in_india.strftime("%d %B %Y")

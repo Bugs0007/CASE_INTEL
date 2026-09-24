@@ -12,6 +12,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.serializers import AdvocateProfileSerializer
+from core.services.client_updates.send import resign_open_drafts
 from core.services.invoice_service import get_or_create_profile
 
 
@@ -31,7 +32,11 @@ class AdvocateProfileView(APIView):
 
     def patch(self, request: Request) -> Response:
         profile = get_or_create_profile(request.user)
+        signed_as = (profile.advocate_name, profile.letterhead_name)
         serializer = AdvocateProfileSerializer(profile, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        if (profile.advocate_name, profile.letterhead_name) != signed_as:
+            # Waiting drafts were signed with the old name/firm.
+            resign_open_drafts(request.user)
         return Response(serializer.data, status=status.HTTP_200_OK)

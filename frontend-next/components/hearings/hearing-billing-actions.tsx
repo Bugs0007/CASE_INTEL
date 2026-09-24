@@ -49,6 +49,11 @@ function errorDetail(error: unknown, fallback: string): string {
 interface HearingBillingActionsProps {
   hearing: Hearing;
   caseId: number;
+  /** Past hearings: the charges and their lifecycle buttons show as usual,
+   * but the add-charge form and booking upload stay behind one "Record
+   * fee" button until asked for -- a long page of past hearings stays a
+   * list of dates, not a wall of empty forms. */
+  compact?: boolean;
 }
 
 /** The billable charges on one hearing, plus travel upload.
@@ -63,8 +68,9 @@ interface HearingBillingActionsProps {
  * button for it).
  *
  * The fee badges above this block show STATE; this is where it changes. */
-export function HearingBillingActions({ hearing, caseId }: HearingBillingActionsProps) {
+export function HearingBillingActions({ hearing, caseId, compact = false }: HearingBillingActionsProps) {
   const fees = hearing.appearance_fees;
+  const [formOpen, setFormOpen] = useState(!compact);
   const [category, setCategory] = useState<FeeCategory>("appearance");
   const [amount, setAmount] = useState("");
   const [bookingType, setBookingType] = useState<BookingType>("travel");
@@ -79,6 +85,13 @@ export function HearingBillingActions({ hearing, caseId }: HearingBillingActions
   // are exactly the case this UI exists for.
   const showContactEmailWarning =
     contactEmailMissing && fees.some((fee) => fee.status === "invoiced");
+  // Blank only falls back to the default when there IS one; with none set
+  // the server refuses a blank amount rather than saving a Rs. 0 charge.
+  const defaultFee = Number(advocateProfile?.default_fee_amount ?? 0);
+  const amountPlaceholder =
+    category === "appearance" && defaultFee > 0
+      ? `Amount (default ${formatFeeAmount(advocateProfile!.default_fee_amount)})`
+      : "Amount";
 
   const createFee = useCreateFee(caseId);
   const uploadTravel = useUploadTravelBooking(caseId);
@@ -134,6 +147,17 @@ export function HearingBillingActions({ hearing, caseId }: HearingBillingActions
 
   return (
     <div className="mt-3 space-y-2">
+      {!formOpen ? (
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setFormOpen(true)}
+          title="Record a fee or other charge for this hearing"
+        >
+          <Plus className="h-4 w-4" />
+          {fees.length > 0 ? "Add another charge" : "Record fee"}
+        </Button>
+      ) : (
       <div className="flex flex-wrap items-center gap-2">
         <Select
           value={category}
@@ -152,7 +176,7 @@ export function HearingBillingActions({ hearing, caseId }: HearingBillingActions
         <Input
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          placeholder={category === "appearance" ? "Amount (optional)" : "Amount"}
+          placeholder={amountPlaceholder}
           inputMode="decimal"
           aria-label="Charge amount"
           className="h-11 md:h-8 w-40 text-sm"
@@ -172,6 +196,7 @@ export function HearingBillingActions({ hearing, caseId }: HearingBillingActions
           Add charge
         </Button>
       </div>
+      )}
 
       {fees.length > 0 && (
         <ul aria-label="Charges" className="space-y-1.5">
@@ -198,6 +223,7 @@ export function HearingBillingActions({ hearing, caseId }: HearingBillingActions
           booking BOOKED -- there is no separate status control. This is a
           document upload, separate from the billable charges above: what a
           hotel COST is a charge; the confirmation PDF is a booking. */}
+      {formOpen && (
       <div className="flex flex-wrap items-center gap-2">
         <Select
           value={bookingType}
@@ -234,6 +260,7 @@ export function HearingBillingActions({ hearing, caseId }: HearingBillingActions
           Upload booking
         </Button>
       </div>
+      )}
     </div>
   );
 }

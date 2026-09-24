@@ -16,6 +16,15 @@ abuse-sensitive than the status pages we already hit):
     catches up across future refreshes instead of burst-downloading;
   - dedup via CourtOrder.dedup_key BEFORE downloading, so a re-fetch
     never re-downloads (or duplicates) an already-ingested order;
+  - the portal's order NUMBER is a position, not an identity: HC Services
+    numbers the Orders table 1..n by date at render time, so an order
+    uploaded late (the 13 Aug order appearing after the 14 Aug one) shifts
+    every later order up by one. A listed order whose key is new but whose
+    date matches an order we hold that is no longer listed under its old
+    key is the same order renumbered: the row is relabelled, nothing is
+    downloaded. Without this the 14 Aug order was stored twice (as "2" and
+    then "3") and "Order 2" showed on two hearings -- see
+    reconcile_renumbered() and migration 0037 for the clean-up;
   - per-order failure isolation: one bad download skips that order and
     continues, it doesn't fail the sync.
 
@@ -128,17 +137,112 @@ def order_sequence_sort_key(order_number: str) -> tuple:
     return (1, 0, value.lower())
 
 
+def _relabel(row: CourtOrder, record: CourtOrderRecord) -> None:
+    """Point a held order at the portal's current number/date for it."""
+    row.order_number = record.order_number
+    row.dedup_key = record.dedup_key
+    row.description = record.description or row.description
+    row.judge = record.judge or row.judge
+    fields = ["order_number", "dedup_key", "description", "judge"]
+    if record.order_date != row.order_date:
+        row.order_date = record.order_date
+        fields.append("order_date")
+        if row.document_id:
+            Document.objects.filter(id=row.document_id).update(document_date=record.order_date)
+    row.save(update_fields=fields)
+
+
+def reconcile_renumbered(case: Case, records: list[CourtOrderRecord]) -> tuple[list[CourtOrderRecord], int]:
+    """Match listed orders with new keys to held orders the portal now
+    lists under a different number (see the module docstring).
+
+    Pairs only by DATE and only unambiguously: for each date, the listed
+    orders with new keys and the held orders no longer listed must be the
+    same count; they are then paired in sequence order. Returns (the
+    records still genuinely new, how many rows were relabelled).
+    """
+    listed_keys = {r.dedup_key for r in records}
+    held = list(CourtOrder.objects.filter(case=case))
+    held_keys = {o.dedup_key for o in held}
+    unmatched = [r for r in records if r.dedup_key not in held_keys]
+    stale = [o for o in held if o.dedup_key not in listed_keys]
+
+    relabelled = 0
+    remaining = list(unmatched)
+    for day in sorted({r.order_date for r in unmatched if r.order_date}):
+        recs = sorted(
+            (r for r in unmatched if r.order_date == day),
+            key=lambda r: order_sequence_sort_key(r.order_number),
+        )
+        rows = sorted(
+            (o for o in stale if o.order_date == day),
+            key=lambda o: order_sequence_sort_key(o.order_number),
+        )
+        if not rows or len(recs) != len(rows):
+            continue
+        for record, row in zip(recs, rows):
+            logger.info(
+                "Order sync for case %s: order dated %s renumbered on the portal "
+                "(%s -> %s); relabelling instead of downloading it again.",
+                case.id, day, row.order_number, record.order_number,
+            )
+            _relabel(row, record)
+            remaining.remove(record)
+            stale.remove(row)
+            relabelled += 1
+    return remaining, relabelled
+
+
+def _normalised_text(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", (text or "").lower())
+
+
+def _pdf_text(pdf_bytes: bytes) -> str:
+    try:
+        from io import BytesIO
+
+        from PyPDF2 import PdfReader
+
+        return "\n".join(page.extract_text() or "" for page in PdfReader(BytesIO(pdf_bytes)).pages)
+    except Exception:  # noqa: BLE001 -- unreadable PDF: not provably the same
+        return ""
+
+
+def _same_order_redated(
+    case: Case, record: CourtOrderRecord, pdf_bytes: bytes, listed_keys: set[str]
+) -> CourtOrder | None:
+    """The held order `record` really is, when the portal changed its DATE
+    (same number, old key no longer listed) -- proven by identical text,
+    since the PDFs themselves are stamped per download and never hash
+    alike. None when there's no such row or the text can't prove it."""
+    candidates = [
+        o
+        for o in CourtOrder.objects.filter(case=case, order_number=record.order_number)
+        .exclude(order_date=record.order_date)
+        .exclude(dedup_key__in=listed_keys)
+        .select_related("document")
+        if o.document is not None and o.document.extracted_text
+    ]
+    if len(candidates) != 1:
+        return None
+    new_text = _normalised_text(_pdf_text(pdf_bytes))
+    if len(new_text) < 200 or new_text != _normalised_text(candidates[0].document.extracted_text):
+        return None
+    return candidates[0]
+
+
 def sync_case_orders(case: Case, progress_callback=None) -> dict:
     """Fetch newly-listed orders for a tracked case. Worker entry point.
 
-    Returns {"listed": int, "new": int, "downloaded": int, "failed": int}.
+    Returns {"listed": int, "new": int, "downloaded": int, "failed": int,
+    "relabelled": int}.
 
     Raises CourtDataError only if the LISTING itself fails (nothing to
     work with); individual download failures are logged and skipped.
     """
     if not case.tracking_enabled or not case.tracking_config:
         logger.info("Order sync skipped for case %s: tracking not enabled/configured.", case.id)
-        return {"listed": 0, "new": 0, "downloaded": 0, "failed": 0}
+        return {"listed": 0, "new": 0, "downloaded": 0, "failed": 0, "relabelled": 0}
 
     config = dict(case.tracking_config)
     # Cascade-shaped configs carry no CNR; the portals' order listing is
@@ -147,15 +251,13 @@ def sync_case_orders(case: Case, progress_callback=None) -> dict:
         config["cnr"] = case.cnr_number
     if not config.get("cnr"):
         logger.info("Order sync skipped for case %s: no CNR known yet.", case.id)
-        return {"listed": 0, "new": 0, "downloaded": 0, "failed": 0}
+        return {"listed": 0, "new": 0, "downloaded": 0, "failed": 0, "relabelled": 0}
 
     provider = get_provider()
     records = provider.list_orders(config)
 
-    known_keys = set(
-        CourtOrder.objects.filter(case=case).values_list("dedup_key", flat=True)
-    )
-    new_records = [r for r in records if r.dedup_key not in known_keys]
+    listed_keys = {r.dedup_key for r in records}
+    new_records, relabelled = reconcile_renumbered(case, records)
     to_download = new_records[:MAX_DOWNLOADS_PER_SYNC]
     if len(new_records) > MAX_DOWNLOADS_PER_SYNC:
         logger.info(
@@ -181,6 +283,19 @@ def sync_case_orders(case: Case, progress_callback=None) -> dict:
                 "Order sync for case %s: download failed for %s: %s",
                 case.id, record.dedup_key, exc,
             )
+            continue
+
+        redated = _same_order_redated(case, record, pdf_bytes, listed_keys)
+        if redated is not None:
+            logger.info(
+                "Order sync for case %s: order %s re-dated on the portal (%s -> %s); "
+                "same text, relabelling instead of storing it twice.",
+                case.id, record.order_number, redated.order_date, record.order_date,
+            )
+            _relabel(redated, record)
+            relabelled += 1
+            if progress_callback:
+                progress_callback(downloaded + failed + relabelled, total)
             continue
 
         filename = _order_filename(case, record)
@@ -235,4 +350,5 @@ def sync_case_orders(case: Case, progress_callback=None) -> dict:
         "new": len(new_records),
         "downloaded": downloaded,
         "failed": failed,
+        "relabelled": relabelled,
     }

@@ -52,11 +52,12 @@ export const refreshAllKeys = {
 // Clients
 // ---------------------------------------------------------------------------
 
-export function useClients(search?: string) {
+export function useClients(search?: string, enabled = true) {
   return useQuery({
     queryKey: clientKeys.list(search),
     queryFn: () => clientsApi.list(search),
     staleTime: 60 * 1000,
+    enabled,
   });
 }
 
@@ -191,7 +192,15 @@ export function useGenerateDocument(caseId: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: GenerateDocumentInput) => docTemplatesApi.generate(caseId, data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: documentKeys.lists() }),
+    onSuccess: (_doc, data) => {
+      queryClient.invalidateQueries({ queryKey: documentKeys.lists() });
+      if (data.save?.length) {
+        // Answers written back to the case, contact or profile.
+        queryClient.invalidateQueries({ queryKey: caseKeys.detail(caseId) });
+        queryClient.invalidateQueries({ queryKey: ["advocate-profile"] });
+        queryClient.invalidateQueries({ queryKey: ["doc-templates", caseId] });
+      }
+    },
   });
 }
 

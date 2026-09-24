@@ -64,6 +64,19 @@ export function formatHearingDate(dateString: string | null | undefined): string
   }
 }
 
+/** Today's calendar date where the viewer is, as "yyyy-MM-dd" -- the shape
+ * hearing_date.slice(0, 10) compares against. */
+export function todayKey(): string {
+  return format(new Date(), "yyyy-MM-dd");
+}
+
+/** A hearing whose date has passed while it's still marked "scheduled":
+ * only a court-tracking refresh learns what happened on it, so it must
+ * read "Awaiting update" -- never "Scheduled", which it no longer is. */
+export function isAwaitingUpdate(hearing: { hearing_date: string; status: string }): boolean {
+  return hearing.status === "scheduled" && hearing.hearing_date.slice(0, 10) < todayKey();
+}
+
 export function formatDateTime(dateString: string | null | undefined): string {
   if (!dateString) return "";
   try {
@@ -156,6 +169,21 @@ export function getFileIcon(fileType: string | null): string {
  * in). */
 export function primaryClientContact(contacts: ClientContact[]): ClientContact | null {
   return contacts.find((c) => c.is_billing_contact) ?? contacts[0] ?? null;
+}
+
+/** A case added by CNR before its parties were known carries its CNR (or
+ * its number) as a stand-in title. That's not a name for the matter --
+ * show it as untitled and ask for one. Mirrors client_updates.compose.
+ * case_title on the server, which keeps it out of client emails. */
+export function hasPlaceholderTitle(caseItem: { title: string; cnr_number: string | null; case_number: string }): boolean {
+  const title = (caseItem.title || "").trim().toUpperCase();
+  if (!title) return true;
+  return [caseItem.cnr_number, caseItem.case_number].some((v) => v && v.trim().toUpperCase() === title);
+}
+
+/** "1 case", "3 cases" -- a count with its noun agreeing. */
+export function pluralize(count: number, singular: string, plural = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : plural}`;
 }
 
 export function truncate(str: string, maxLength: number): string {

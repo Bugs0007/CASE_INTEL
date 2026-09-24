@@ -44,7 +44,7 @@ class DocumentListView(OwnerScopedMixin, generics.ListAPIView):
     serializer_class = DocumentSerializer
 
     def get_base_queryset(self):
-        qs = _with_latest_jobs(Document.objects.select_related("case"))
+        qs = _with_latest_jobs(Document.objects.select_related("case", "court_order"))
         case_id = self.request.query_params.get("case_id")
         if case_id is not None:
             qs = qs.filter(case_id=case_id)
@@ -65,7 +65,7 @@ class DocumentDetailView(OwnerScopedMixin, generics.RetrieveUpdateDestroyAPIView
     """
 
     serializer_class = DocumentSerializer
-    queryset = _with_latest_jobs(Document.objects.select_related("case"))
+    queryset = _with_latest_jobs(Document.objects.select_related("case", "court_order"))
 
 
 class DocumentUploadView(APIView):
@@ -162,7 +162,7 @@ class DocumentProcessView(APIView):
         logger.info("Document %d queued for processing (job %d)", pk, job.id)
 
         document = (
-            _with_latest_jobs(Document.objects.select_related("case")).get(id=pk)
+            _with_latest_jobs(Document.objects.select_related("case", "court_order")).get(id=pk)
         )
         return Response(
             DocumentSerializer(document).data, status=status.HTTP_202_ACCEPTED

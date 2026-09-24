@@ -5,8 +5,10 @@ there, no code change. Each declares:
 
   fields  -- name, label, required, and an ordered list of `sources` to
              fill it from (see SOURCES below). A field no source can fill
-             is taken from the generation request's `inputs`; nothing typed
-             there is ever saved back to the record.
+             is taken from the generation request's `inputs`. A typed value
+             is saved back to the record only when the request lists the
+             field in `save` AND the field has a home (SAVERS below) --
+             the dialog's "Save for next time" boxes.
   blocks  -- what to print, top to bottom, with {field} placeholders.
 
 A required field still empty after both passes blocks generation: the
@@ -26,13 +28,14 @@ import string
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.utils import timezone
 from django.utils.text import slugify
 
-from core.models import ClientContact, Document, Hearing
+from core.models import ClientContact, Document
 from core.services.pdf_utils import draw_letterhead, pdf_safe
 
 logger = logging.getLogger(__name__)
@@ -91,6 +94,8 @@ class FieldState:
     source: str  # the source that filled it, "input", or ""
     where: str
     missing: bool = False
+    savable: bool = False  # a typed value can be written back (SAVERS)
+    choices: tuple[str, ...] = ()  # a fixed set of answers (a select, not free text)
 
     def as_dict(self) -> dict:
         return {
@@ -102,6 +107,8 @@ class FieldState:
             "source": self.source,
             "where": self.where,
             "missing": self.missing,
+            "savable": self.savable,
+            "choices": list(self.choices),
         }
 
 
@@ -201,6 +208,17 @@ def get_template(key: str) -> DocTemplate:
 # ---------------------------------------------------------------------------
 
 
+# The date a document is signed, in India. TIME_ZONE is UTC (hearing dates
+# are stored as UTC midnights), so timezone.localdate() is yesterday for the
+# first 5.5 hours of every Indian day -- a vakalatnama signed at 2 am would
+# carry the wrong date.
+DOCUMENT_TIMEZONE = ZoneInfo("Asia/Kolkata")
+
+
+def document_date():
+    return timezone.localdate(timezone=DOCUMENT_TIMEZONE)
+
+
 @dataclass
 class Context:
     case: object
@@ -210,32 +228,22 @@ class Context:
 
 
 def _court(ctx: Context) -> str:
-    from core.services.court_tracking import latest_snapshot
+    from core.services.parties import case_court_name
 
-    snapshot = latest_snapshot(ctx.case) or {}
-    if snapshot.get("court_name"):
-        return snapshot["court_name"]
-    hearing = (
-        Hearing.objects.filter(case=ctx.case)
-        .exclude(location__isnull=True)
-        .exclude(location="")
-        .order_by("-hearing_date")
-        .first()
-    )
-    return hearing.location if hearing else ""
+    return case_court_name(ctx.case)
 
 
 def _user_side(ctx: Context) -> str:
     return {"petitioner": "Petitioner", "respondent": "Respondent"}.get(ctx.case.user_party_role, "")
 
 
-def _our_party(ctx: Context) -> str:
-    role = ctx.case.user_party_role
-    if role == "petitioner":
-        return ctx.case.petitioner_name
-    if role == "respondent":
-        return ctx.case.respondent_name
-    return ""
+def _party(which: str):
+    def get(ctx: Context) -> str:
+        from core.services.parties import case_parties
+
+        return getattr(case_parties(ctx.case), which)
+
+    return get
 
 
 def _relation(ctx: Context) -> str:
@@ -264,17 +272,18 @@ def _attr(obj_name: str, attr: str):
 
 
 SOURCES = {
-    "today": lambda ctx: timezone.localdate().strftime("%d %B %Y"),
+    "today": lambda ctx: document_date().strftime("%d %B %Y"),
     "case.title": _attr("case", "title"),
     "case.case_number": _attr("case", "case_number"),
     "case.cnr_number": _attr("case", "cnr_number"),
     "case.client_name": _attr("case", "client_name"),
     "case.opposing_party": _attr("case", "opposing_party"),
-    "case.petitioner_name": _attr("case", "petitioner_name"),
-    "case.respondent_name": _attr("case", "respondent_name"),
+    # The record's parties, else the "X vs Y" title (core/services/parties.py).
+    "case.petitioner_name": _party("petitioner"),
+    "case.respondent_name": _party("respondent"),
     "case.court": _court,
     "case.user_side": _user_side,
-    "case.our_party": _our_party,
+    "case.our_party": _party("ours"),
     "profile.advocate_name": _attr("profile", "advocate_name"),
     "profile.letterhead_name": _attr("profile", "letterhead_name"),
     "profile.address": _attr("profile", "address"),
@@ -292,12 +301,99 @@ SOURCES = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Save for next time: where a typed answer can be written back
+# ---------------------------------------------------------------------------
+
+USER_SIDE_CHOICES = ("Petitioner", "Respondent")
+_PROFILE_FIELDS = ("advocate_name", "letterhead_name", "address", "bar_registration_number", "phone", "contact_email")
+_RELATION_TYPES = ("s/o", "d/o", "w/o", "c/o")
+
+
+class SaveBackError(DocTemplateError):
+    pass
+
+
+def _save_profile(attr):
+    def save(ctx: Context, value: str) -> None:
+        setattr(ctx.profile, attr, value)
+        ctx.profile.save(update_fields=[attr, "updated_at"])
+        if attr in ("advocate_name", "letterhead_name"):
+            # Waiting client-email drafts are signed with these; same as a
+            # change made in Settings (views/advocate_profile.py).
+            from core.services.client_updates.send import resign_open_drafts
+
+            resign_open_drafts(ctx.profile.owner)
+
+    return save
+
+
+def _save_contact(attr):
+    def save(ctx: Context, value: str) -> None:
+        if ctx.contact is None:
+            raise SaveBackError("There's no client contact on this case to save it to.")
+        if attr == "age":
+            if not value.isdigit() or not 0 < int(value) < 150:
+                raise SaveBackError("Age must be a whole number to be saved.")
+            value = int(value)
+        setattr(ctx.contact, attr, value)
+        ctx.contact.save(update_fields=[attr])
+
+    return save
+
+
+def _save_relation(ctx: Context, value: str) -> None:
+    """ "S/o Venkat Rao" -> relation_type "s/o", relation_name "Venkat Rao"."""
+    if ctx.contact is None:
+        raise SaveBackError("There's no client contact on this case to save it to.")
+    head, _, rest = value.strip().partition(" ")
+    relation_type = head.lower().replace(".", "")
+    if relation_type not in _RELATION_TYPES or not rest.strip():
+        raise SaveBackError('Write the relation as "S/o Name", "D/o Name", "W/o Name" or "C/o Name" to save it.')
+    ctx.contact.relation_type = relation_type
+    ctx.contact.relation_name = rest.strip()
+    ctx.contact.save(update_fields=["relation_type", "relation_name"])
+
+
+def _save_user_side(ctx: Context, value: str) -> None:
+    role = value.strip().lower()
+    if role not in ("petitioner", "respondent"):
+        raise SaveBackError("Your client's side must be Petitioner or Respondent.")
+    ctx.case.user_party_role = role
+    ctx.case.save(update_fields=["user_party_role"])
+
+
+def _save_case(attr):
+    def save(ctx: Context, value: str) -> None:
+        setattr(ctx.case, attr, value)
+        ctx.case.save(update_fields=[attr])
+
+    return save
+
+
+# First source of a field -> how to store a typed value there. A field
+# whose first source isn't here (the date, the place, a letter's body, the
+# court) has no home on the record and is only ever typed per document.
+SAVERS = {
+    **{f"profile.{attr}": _save_profile(attr) for attr in _PROFILE_FIELDS},
+    "contact.name": _save_contact("name"),
+    "contact.age": _save_contact("age"),
+    "contact.address": _save_contact("address"),
+    "contact.email": _save_contact("email"),
+    "contact.phone": _save_contact("phone"),
+    "contact.relation": _save_relation,
+    "case.user_side": _save_user_side,
+    "case.petitioner_name": _save_case("petitioner_name"),
+    "case.respondent_name": _save_case("respondent_name"),
+}
+
+
 def _where(f: TemplateField) -> str:
     """Where the advocate can record this permanently, or "" when it has no
     home in the data and is always typed at generation time."""
     first = f.sources[0] if f.sources else ""
     if first.startswith("profile."):
-        return "Settings (your profile)"
+        return "your profile in Settings"
     if first.startswith("contact."):
         return "the client contact on this case"
     if first == "case.court":
@@ -345,8 +441,12 @@ def resolve(template: DocTemplate, *, case, profile, contact=None, inputs: dict 
                 break
         if not value:
             typed = str(inputs.get(f.name, "") or "").strip()[:MAX_INPUT_LENGTH]
+            if typed and f.sources and f.sources[0] == "case.user_side":
+                # A select in the dialog; anything else is not an answer.
+                typed = next((c for c in USER_SIDE_CHOICES if c.lower() == typed.lower()), "")
             if typed:
                 value, source = typed, "input"
+        first = f.sources[0] if f.sources else ""
         resolution.fields.append(
             FieldState(
                 name=f.name,
@@ -357,9 +457,29 @@ def resolve(template: DocTemplate, *, case, profile, contact=None, inputs: dict 
                 source=source,
                 where=_where(f),
                 missing=f.required and not value,
+                # A contact field has nowhere to go without a contact.
+                savable=first in SAVERS and (contact is not None or not first.startswith("contact.")),
+                choices=USER_SIDE_CHOICES if first == "case.user_side" else (),
             )
         )
     return resolution
+
+
+def save_back(template: DocTemplate, resolution: Resolution, ctx: Context, names) -> list[str]:
+    """Write the TYPED values of the fields in `names` back to their home.
+    Values that came from the record already live there and are skipped.
+    Returns the labels saved. Raises SaveBackError when a value can't be
+    stored; the caller runs this in a transaction, before rendering."""
+    by_name = {f.name: f for f in template.fields}
+    states = {state.name: state for state in resolution.fields}
+    saved = []
+    for name in dict.fromkeys(names or []):
+        field_def, state = by_name.get(name), states.get(name)
+        if field_def is None or state is None or state.source != "input" or not state.savable:
+            continue
+        SAVERS[field_def.sources[0]](ctx, state.value)
+        saved.append(state.label)
+    return saved
 
 
 # ---------------------------------------------------------------------------
@@ -483,22 +603,39 @@ def _signature(pdf, block: dict, values: dict[str, str], width: float) -> None:
 # ---------------------------------------------------------------------------
 
 
-def generate_document(case, template_key: str, *, profile, contact_id: int | None = None, inputs: dict | None = None) -> Document:
+def generate_document(
+    case,
+    template_key: str,
+    *,
+    profile,
+    contact_id: int | None = None,
+    inputs: dict | None = None,
+    save: list[str] | None = None,
+) -> Document:
     """Merge, render, and save the PDF as a Document on `case`.
 
-    Raises UnknownTemplateError, InvalidContactError, or MissingFieldsError
-    (carrying the list of what's missing) -- in which case nothing is saved.
+    `save`: field names whose TYPED values should also be written back to
+    the case, contact or profile ("Save for next time").
+
+    Raises UnknownTemplateError, InvalidContactError, MissingFieldsError
+    (carrying the list of what's missing) or SaveBackError -- in which case
+    nothing is saved.
     """
+    from django.db import transaction
+
     template = get_template(template_key)
     contact = pick_contact(case, contact_id)
     resolution = resolve(template, case=case, profile=profile, contact=contact, inputs=inputs)
     if resolution.missing:
         raise MissingFieldsError([f.as_dict() for f in resolution.missing])
+    if save:
+        with transaction.atomic():
+            save_back(template, resolution, Context(case=case, profile=profile, contact=contact, client=case.client), save)
 
     values = resolution.values
     pdf_bytes = render_pdf(template, values, profile)
 
-    stamp = timezone.now().strftime("%Y%m%d-%H%M%S")
+    stamp = timezone.localtime(timezone=DOCUMENT_TIMEZONE).strftime("%Y%m%d-%H%M%S")
     filename = f"{slugify(template.title) or template.key}-{slugify(case.case_number) or case.id}-{stamp}.pdf"
     saved = default_storage.save(f"generated/{case.owner_id}/{filename}", ContentFile(pdf_bytes))
     document = Document.objects.create(
@@ -509,7 +646,7 @@ def generate_document(case, template_key: str, *, profile, contact_id: int | Non
         file_type="pdf",
         file_size=len(pdf_bytes),
         document_type="generated",
-        document_date=timezone.localdate(),
+        document_date=document_date(),
         # Nothing to extract or OCR: the text is ours. Not embedded -- a
         # template merge adds nothing Case Bot needs to search, and prod
         # has no embedding provider configured anyway.

@@ -1,18 +1,23 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, PriorityBadge } from "@/components/ui/badge";
-import { Bot, Calendar, ChevronLeft } from "lucide-react";
+import { Bot, Calendar, ChevronLeft, Pencil } from "lucide-react";
+import { hasPlaceholderTitle } from "@/lib/utils";
 import type { Case } from "@/types";
 
 interface CaseDetailHeaderProps {
   case: Case;
   onToggleChat?: () => void;
+  /** Opens Edit Details -- offered when the case has no real title yet. */
+  onEditDetails?: () => void;
 }
 
 export function CaseDetailHeader({
   case: caseItem,
   onToggleChat,
+  onEditDetails,
 }: CaseDetailHeaderProps) {
+  const untitled = hasPlaceholderTitle(caseItem);
   return (
     <div className="bg-white border-b border-gray-100 px-4 sm:px-7 py-4 sm:py-5 flex-shrink-0">
       <Link
@@ -41,9 +46,24 @@ export function CaseDetailHeader({
       </div>
 
       {/* Case Title */}
-      <h1 className="text-[26px] font-bold text-gray-900 mb-2">
-        {caseItem.title}
-      </h1>
+      {untitled ? (
+        <div className="mb-2 flex flex-wrap items-center gap-3">
+          <h1 className="text-[26px] font-bold text-gray-400">Untitled matter</h1>
+          {onEditDetails && (
+            <Button variant="secondary" size="sm" onClick={onEditDetails}>
+              <Pencil className="h-3.5 w-3.5" />
+              Add a title
+            </Button>
+          )}
+          <span className="basis-full text-xs text-gray-500">
+            Client emails use the case number until the matter has a title.
+          </span>
+        </div>
+      ) : (
+        <h1 className="text-[26px] font-bold text-gray-900 mb-2">
+          {caseItem.title}
+        </h1>
+      )}
       <div className="flex items-center gap-4 text-[13px] text-gray-600">
         {caseItem.case_type && (
           <span className="capitalize">{caseItem.case_type} Case</span>

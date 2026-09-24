@@ -151,6 +151,21 @@ class TestBackfillClients:
         assert theirs.client.owner == other  # never merged across owners
         assert theirs.client_id != c.client_id
 
+    def test_a_contact_without_an_email_still_names_a_client(self, advocate):
+        """Production: /clients empty -- imported cases have no client_name,
+        and a contact with no email gave the backfill nothing to group on."""
+        a = _case(advocate, client_name="")
+        b = _case(advocate, client_name="")
+        ClientContact.objects.create(owner=advocate, case=a, name="Karthik Bablu", is_billing_contact=True)
+        ClientContact.objects.create(owner=advocate, case=b, name="KARTHIK BABLU", role="primary")
+
+        call_command("backfill_clients", stdout=StringIO())
+
+        a.refresh_from_db()
+        b.refresh_from_db()
+        assert a.client is not None and a.client.name.lower() == "karthik bablu"
+        assert a.client_id == b.client_id
+
     def test_dry_run_writes_nothing(self, advocate):
         _case(advocate, client_name="Acme")
         out = StringIO()

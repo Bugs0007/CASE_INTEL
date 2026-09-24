@@ -18,17 +18,47 @@ interface RequestConfig extends RequestInit {
   params?: Record<string, string | number | boolean | undefined>;
 }
 
-function authHeader(): Record<string, string> {
-  const token = getToken();
-  return token ? { Authorization: `Token ${token}` } : {};
+/** Send `url` with the CURRENT token, and survive the one 401 that isn't
+ * really a sign-out.
+ *
+ * DRF tokens here don't expire and there is no refresh token: a 401 means
+ * the token this request carried was deleted server-side -- a logout (the
+ * token is one per USER, so logging out anywhere, e.g. another tab or
+ * another person on a shared account, kills it everywhere) or a password
+ * change. If another tab has since signed in again, localStorage already
+ * holds a newer token: retry once with it instead of throwing the user
+ * out. Only when the token that failed is still the stored one is the
+ * session really gone -- then it's cleared and the user sent to /login
+ * with a way back to where they were.
+ *
+ * Before this, any 401 wiped the token and hard-redirected mid-click
+ * ("one Generate click redirected to /login"). */
+async function authedFetch(url: string, init: RequestInit, headers: Record<string, string>): Promise<Response> {
+  const sentToken = getToken();
+  const withToken = (token: string | null) => ({
+    ...init,
+    headers: { ...headers, ...(token ? { Authorization: `Token ${token}` } : {}), ...(init.headers as Record<string, string> | undefined) },
+  });
+  let response = await fetch(url, withToken(sentToken));
+  if (response.status === 401) {
+    const current = getToken();
+    if (current && current !== sentToken) {
+      response = await fetch(url, withToken(current));
+    }
+    if (response.status === 401) signOutIfStillCurrent(current ?? sentToken);
+  }
+  return response;
 }
 
-function handleUnauthorized(status: number) {
-  if (status === 401 && typeof window !== "undefined") {
-    clearToken();
-    if (window.location.pathname !== "/login") {
-      window.location.href = "/login";
-    }
+function signOutIfStillCurrent(failedToken: string | null) {
+  if (typeof window === "undefined") return;
+  // Another tab may have signed in while this request was in flight.
+  if (getToken() !== failedToken) return;
+  clearToken();
+  const { pathname, search } = window.location;
+  if (pathname !== "/login") {
+    const next = encodeURIComponent(pathname + search);
+    window.location.href = `/login?next=${next}&expired=1`;
   }
 }
 
@@ -60,17 +90,9 @@ export async function apiClient<T>(
     });
   }
 
-  const response = await fetch(url.toString(), {
-    ...config,
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeader(),
-      ...config.headers,
-    },
-  });
+  const response = await authedFetch(url.toString(), config, { "Content-Type": "application/json" });
 
   if (!response.ok) {
-    handleUnauthorized(response.status);
     const data = await response.json().catch(() => null);
     throw new APIError(response.status, data);
   }
@@ -103,16 +125,9 @@ export async function apiBlob(
     });
   }
 
-  const response = await fetch(url.toString(), {
-    ...config,
-    headers: {
-      ...authHeader(),
-      ...config.headers,
-    },
-  });
+  const response = await authedFetch(url.toString(), config, {});
 
   if (!response.ok) {
-    handleUnauthorized(response.status);
     // Errors from these endpoints are still JSON (DRF Response), even
     // though a success is binary.
     const data = await response.json().catch(() => null);
@@ -126,17 +141,10 @@ export async function uploadFile<T>(
   endpoint: string,
   formData: FormData,
 ): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    method: "POST",
-    body: formData,
-    // Don't set Content-Type - browser sets it with boundary
-    headers: {
-      ...authHeader(),
-    },
-  });
+  // Don't set Content-Type - browser sets it with boundary
+  const response = await authedFetch(`${API_BASE_URL}${endpoint}`, { method: "POST", body: formData }, {});
 
   if (!response.ok) {
-    handleUnauthorized(response.status);
     const data = await response.json().catch(() => null);
     throw new APIError(response.status, data);
   }

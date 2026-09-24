@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, PriorityBadge } from "@/components/ui/badge";
 import { MoreVertical, Trash2 } from "lucide-react";
-import { cn, staggerDelay, primaryClientContact } from "@/lib/utils";
+import { cn, hasPlaceholderTitle, pluralize, staggerDelay, primaryClientContact } from "@/lib/utils";
 import type { UrgencyReason } from "@/lib/case-urgency";
 import type { Case } from "@/types";
 
@@ -117,15 +117,28 @@ export function CaseCard({ case: caseItem, onDelete, isDeleting, urgencyReason, 
       <div className="text-xs text-gray-400 font-mono mb-1">
         {caseItem.case_number}
       </div>
-      <h3 className="text-base font-semibold text-gray-900 mb-2 line-clamp-2 leading-snug">
-        {caseItem.title}
+      <h3
+        className={cn(
+          "text-base font-semibold mb-2 line-clamp-2 leading-snug",
+          hasPlaceholderTitle(caseItem) ? "text-gray-400" : "text-gray-900",
+        )}
+      >
+        {hasPlaceholderTitle(caseItem) ? "Untitled matter" : caseItem.title}
       </h3>
-      <div className="text-meta text-gray-600 mb-3.5">{client?.name || "No client on file"}</div>
+      {/* The billed Client when one is linked, else the contact -- each
+          labelled, so a contact never reads as a client Billing can't find. */}
+      <div className="text-meta text-gray-600 mb-3.5 truncate">
+        {caseItem.client_detail
+          ? `Client: ${caseItem.client_detail.name}`
+          : client
+            ? `Contact: ${client.name}`
+            : "No client or contact yet"}
+      </div>
 
       {/* Footer */}
       <div className="flex items-center gap-3.5 pt-3 border-t border-gray-100 text-xs text-gray-400">
-        <span>{caseItem.document_count} docs</span>
-        <span>{caseItem.hearing_count} hearings</span>
+        <span>{pluralize(caseItem.document_count, "doc")}</span>
+        <span>{pluralize(caseItem.hearing_count, "hearing")}</span>
       </div>
     </Card>
   );

@@ -69,6 +69,12 @@ class ClientMessage(OwnedModel):
     )
     kind = models.CharField(max_length=20, choices=KIND_CHOICES)
     dedup_key = models.CharField(max_length=120)
+    # The day the news happened: the hearing a case update reports, or the
+    # day a new date was found / a hearing was moved. A case keeps ONE open
+    # case-update draft -- a draft for a later event replaces an untouched
+    # earlier one, and nothing is drafted for an event older than one the
+    # case already has (see client_updates.service.upsert_case_update).
+    event_date = models.DateField(blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_DRAFT)
     subject = models.CharField(max_length=255)
     body = models.TextField()

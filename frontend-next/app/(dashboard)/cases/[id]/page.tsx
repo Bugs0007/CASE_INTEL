@@ -7,8 +7,11 @@ import { useCase } from "@/hooks/use-cases";
 import { useDocuments } from "@/hooks/use-documents";
 import { useDeleteHearing, useHearings } from "@/hooks/use-hearings";
 import { useCaseOrders, useViewOrder } from "@/hooks/use-court-orders";
+import { useClientMessages } from "@/hooks/use-clients";
 import { CaseDetailHeader } from "@/components/cases/case-detail-header";
 import { CaseOverview } from "@/components/cases/case-overview";
+import { CaseDetailsDialog } from "@/components/cases/case-details-dialog";
+import { DisposalBanner, UpdateRecipientsNote } from "@/components/cases/case-banners";
 import { CaseFeeSummaryCard } from "@/components/cases/case-fee-summary";
 import { OrderOverviewCard } from "@/components/cases/order-overview";
 import { CaseDetailSkeleton } from "@/components/cases/case-detail-skeleton";
@@ -35,6 +38,7 @@ export default function CaseDetailPage() {
   const [showChat, setShowChat] = useState(false);
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [isGenerateDialogOpen, setIsGenerateDialogOpen] = useState(false);
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [isHearingDialogOpen, setIsHearingDialogOpen] = useState(false);
   const [editingHearing, setEditingHearing] = useState<Hearing | null>(null);
 
@@ -65,7 +69,10 @@ export default function CaseDetailPage() {
   });
   // Fetched once for the whole case and bucketed by date inside
   // HearingsList, rather than one request per hearing card.
-  const { data: courtOrders = [] } = useCaseOrders(caseId);
+  const { data: courtOrders = [], isLoading: ordersLoading } = useCaseOrders(caseId);
+  // Same query (and cache entry) CaseClientUpdatesCard reads -- only its
+  // loading state is needed here, see the skeleton gate below.
+  const { isLoading: draftsLoading } = useClientMessages({ case_id: caseId, status: "draft" });
 
   // Most recent dated order: the default start for a limitation deadline.
   const latestDatedOrder = courtOrders.reduce<{ id: number; order_date: string } | null>(
@@ -82,7 +89,13 @@ export default function CaseDetailPage() {
   const deleteHearing = useDeleteHearing();
   const viewOrder = useViewOrder();
 
-  if (caseLoading) {
+  // Order Overview and the client-update drafts sit at the TOP of the page
+  // and only render once their own queries answer. Showing the page before
+  // then made them pop in above everything, shoving Edit Details and
+  // Generate down between mouse-down and click -- the "first click does
+  // nothing" report. All three queries start together, so waiting for the
+  // two small ones costs almost nothing and the page appears once, in place.
+  if (caseLoading || ordersLoading || draftsLoading) {
     return <CaseDetailSkeleton />;
   }
 
@@ -166,7 +179,11 @@ export default function CaseDetailPage() {
   return (
     <div className="h-full overflow-hidden flex flex-col">
       {/* Header */}
-      <CaseDetailHeader case={caseItem} onToggleChat={() => setShowChat((v) => !v)} />
+      <CaseDetailHeader
+        case={caseItem}
+        onToggleChat={() => setShowChat((v) => !v)}
+        onEditDetails={() => setIsDetailsDialogOpen(true)}
+      />
 
       {/* Main Content — a real flex row, not an overlay: the chat panel is a
           persistent sibling column with its own height from this flex
@@ -184,11 +201,16 @@ export default function CaseDetailPage() {
             this is the sole column and always full-width. */}
         <div className="flex-1 overflow-y-auto min-w-0 lg:min-w-[400px]">
           <div className="@container max-w-[900px] mx-auto px-4 sm:px-7 pt-6 pb-[var(--mobile-nav-height)] lg:pb-[60px] space-y-5">
+            {/* The case looks disposed of: offer to close it (never
+                automatic). */}
+            <DisposalBanner caseItem={caseItem} />
+
             {/* Order Overview -- the AI summary of the most recent
                 order, deliberately above Case Overview: it is the
                 "what just happened" the advocate opened the page for. */}
             <OrderOverviewCard
               orders={courtOrders}
+              currentNextHearing={caseItem.next_hearing_date}
               onViewOrder={handleViewOrder}
               viewingOrderId={viewOrder.isPending ? viewOrder.variables : undefined}
             />
@@ -204,9 +226,13 @@ export default function CaseDetailPage() {
             {/* Client emails drafted from the latest order / hearing date,
                 waiting for review. Renders nothing when there are none. */}
             <CaseClientUpdatesCard caseId={caseId} />
+            <UpdateRecipientsNote
+              caseItem={caseItem}
+              onEditDetails={() => setIsDetailsDialogOpen(true)}
+            />
 
             {/* Case Overview */}
-            <CaseOverview case={caseItem} />
+            <CaseOverview case={caseItem} onEditDetails={() => setIsDetailsDialogOpen(true)} />
 
             {/* Appearance fee position -- renders nothing until the case
                 has at least one fee recorded. */}
@@ -279,6 +305,12 @@ export default function CaseDetailPage() {
         isOpen={isUploadDialogOpen}
         onClose={() => setIsUploadDialogOpen(false)}
         defaultCaseId={caseId}
+      />
+
+      <CaseDetailsDialog
+        isOpen={isDetailsDialogOpen}
+        onClose={() => setIsDetailsDialogOpen(false)}
+        case={caseItem}
       />
 
       {/* Template-merge documents (vakalatnama, memo of appearance, ...) */}

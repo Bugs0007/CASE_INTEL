@@ -971,6 +971,43 @@ def _build_snapshot(data: CourtCaseData, new_hearing_dates: list) -> dict:
     }
 
 
+def tracking_freshness(case: Case, *, now=None) -> dict:
+    """Whether what the case page shows from eCourts can be trusted as
+    current, and when a manual refresh is next allowed.
+
+    Stale when the last successful check is older than TRACKING_STALE_DAYS,
+    or a hearing date has passed while still marked scheduled (only a
+    refresh learns what happened on it). The page then says "Outdated"
+    instead of presenting old data -- above all never "None scheduled".
+    """
+    from django.conf import settings
+
+    now = now or timezone.now()
+    result = {
+        "stale": False,
+        "reasons": [],
+        "stale_after_days": int(getattr(settings, "TRACKING_STALE_DAYS", 3)),
+        "awaiting_update_count": 0,
+        "refresh_available_at": None,
+    }
+    if not case.tracking_enabled:
+        return result
+
+    if case.last_fetched_at is None or now - case.last_fetched_at > timedelta(days=result["stale_after_days"]):
+        result["reasons"].append("last_checked")
+    awaiting = Hearing.objects.filter(
+        case=case, status="scheduled", hearing_date__date__lt=timezone.localdate()
+    ).count()
+    if awaiting:
+        result["reasons"].append("past_hearing_unconfirmed")
+        result["awaiting_update_count"] = awaiting
+    result["stale"] = bool(result["reasons"])
+
+    if case.last_fetched_at is not None and now - case.last_fetched_at < MIN_REFETCH_INTERVAL:
+        result["refresh_available_at"] = case.last_fetched_at + MIN_REFETCH_INTERVAL
+    return result
+
+
 def latest_snapshot(case: Case) -> dict | None:
     """The snapshot from the most recent successful fetch, for display
     without triggering a new one. None if the case has never been

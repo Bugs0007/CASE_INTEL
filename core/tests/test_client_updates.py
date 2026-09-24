@@ -33,6 +33,7 @@ from core.models import (
     SentMessage,
 )
 from core.services.client_updates import (
+    draft_case_update,
     draft_update_for_order,
     draft_updates_for_new_dates,
     send_client_message,
@@ -259,12 +260,184 @@ class TestDraftGeneration:
         assert draft_updates_for_new_dates(case, [today - timedelta(days=3)]) == 0
         assert not ClientMessage.objects.exists()
 
-    def test_draft_without_recipients_is_still_kept(self, advocate, today):
+    def test_no_draft_when_nobody_can_receive_it(self, advocate, today):
+        """WP/23998/2026 and OS/740/2015 in production: drafts with no
+        contact email, Send enabled, and a red warning. Now: no draft; the
+        case page asks for a client email instead."""
         case = _case(advocate)
-        message, outcome = draft_update_for_order(_order(case, today - timedelta(days=1)))
+        _contact(case, "No Email", None)
+        _contact(case, "Opted Out", "out@example.com", receive_case_updates=False)
+
+        assert draft_update_for_order(_order(case, today - timedelta(days=1))) == (None, "skipped")
+        assert not ClientMessage.objects.exists()
+
+    def test_case_page_reports_how_many_contacts_can_receive_updates(self, api, advocate):
+        case = _case(advocate)
+        assert api.get(f"/api/cases/{case.id}/").data["update_recipient_count"] == 0
+        _contact(case)
+        assert api.get(f"/api/cases/{case.id}/").data["update_recipient_count"] == 1
+
+
+# ---------------------------------------------------------------------------
+# One open update per case: age limit, latest event only, replace not stack
+# ---------------------------------------------------------------------------
+
+
+def _order_n(case, number, order_date, **extra):
+    return CourtOrder.objects.create(
+        owner=case.owner,
+        case=case,
+        order_number=str(number),
+        order_date=order_date,
+        dedup_key=f"CNR:{number}:{order_date}",
+        summary_status=extra.pop("summary_status", CourtOrder.SUMMARY_SUMMARIZED),
+        summary_what_happened=extra.pop("what", f"Order {number} passed."),
+        **extra,
+    )
+
+
+@pytest.mark.django_db
+class TestDraftRules:
+    def test_a_hearing_older_than_the_limit_gets_no_draft(self, advocate, today):
+        case = _case(advocate)
+        _contact(case)
+        assert draft_update_for_order(_order(case, today - timedelta(days=8))) == (None, "skipped")
+        assert not ClientMessage.objects.exists()
+
+    def test_the_limit_is_a_setting(self, advocate, today, settings):
+        settings.CLIENT_UPDATE_MAX_AGE_DAYS = 30
+        case = _case(advocate)
+        _contact(case)
+        _, outcome = draft_update_for_order(_order(case, today - timedelta(days=20)))
         assert outcome == "created"
-        assert message.recipients == []
-        assert message.body.startswith("Dear Sir/Madam,")
+
+    def test_backdated_orders_from_one_sync_draft_one_update_for_the_latest(self, advocate, today):
+        """The WP/23998/2026 flood: one refresh synced three orders and each
+        drafted its own update. Only the latest hearing event is news."""
+        case = _case(advocate)
+        _contact(case)
+        days = [today - timedelta(days=d) for d in (6, 5, 2)]
+        orders = [_order_n(case, i + 1, day) for i, day in enumerate(days)]
+        for day in days:
+            _hearing(case, day)
+
+        outcomes = [draft_update_for_order(order)[1] for order in orders]
+
+        assert outcomes == ["skipped", "skipped", "created"]
+        draft = ClientMessage.objects.get()
+        assert draft.court_order == orders[-1]
+        assert draft.event_date == days[-1]
+
+    def test_the_latest_order_processed_first_still_wins(self, advocate, today):
+        case = _case(advocate)
+        _contact(case)
+        older, newer = _order_n(case, 1, today - timedelta(days=4)), _order_n(case, 2, today - timedelta(days=2))
+        draft_update_for_order(newer)
+        assert draft_update_for_order(older) == (None, "skipped")
+        assert ClientMessage.objects.get().court_order == newer
+
+    def test_an_order_is_old_news_once_a_later_hearing_was_held(self, advocate, today):
+        case = _case(advocate)
+        _contact(case)
+        _hearing(case, today - timedelta(days=1))
+        assert draft_update_for_order(_order(case, today - timedelta(days=3))) == (None, "skipped")
+
+    def test_a_newer_event_replaces_an_untouched_draft(self, advocate, today):
+        case = _case(advocate)
+        _contact(case)
+        first, _ = draft_updates_for_new_dates_helper(case, today, heard_ago=4, next_in=10)
+        _hearing(case, today - timedelta(days=1))
+        order = _order_n(case, 9, today - timedelta(days=1))
+
+        second, outcome = draft_update_for_order(order)
+
+        assert outcome == "replaced"
+        assert second.id == first.id  # re-pointed, not stacked
+        assert ClientMessage.objects.filter(status=ClientMessage.STATUS_DRAFT).count() == 1
+        assert second.event_date == today - timedelta(days=1)
+        assert second.court_order == order
+
+    def test_an_edited_draft_is_kept_and_the_newer_one_added(self, advocate, today):
+        case = _case(advocate)
+        _contact(case)
+        first, _ = draft_update_for_order(_order_n(case, 1, today - timedelta(days=4)))
+        ClientMessage.objects.filter(id=first.id).update(edited_by_user=True, body="Mine.")
+
+        second, outcome = draft_update_for_order(_order_n(case, 2, today - timedelta(days=1)))
+
+        assert outcome == "created"
+        assert second.id != first.id
+        first.refresh_from_db()
+        assert first.status == ClientMessage.STATUS_DRAFT and first.body == "Mine."
+
+    def test_nothing_older_than_an_update_already_sent(self, advocate, today):
+        case = _case(advocate)
+        _contact(case)
+        sent, _ = draft_update_for_order(_order_n(case, 5, today - timedelta(days=1)))
+        ClientMessage.objects.filter(id=sent.id).update(status=ClientMessage.STATUS_SENT)
+
+        _, outcome = draft_case_update(case, heard_on=today - timedelta(days=3))
+
+        assert outcome == "skipped"
+        assert ClientMessage.objects.count() == 1
+
+    def test_a_new_date_after_a_long_gap_drafts_the_next_date_alone(self, advocate, today):
+        case = _case(advocate)
+        _contact(case)
+        _hearing(case, today - timedelta(days=60))
+        nxt = today + timedelta(days=9)
+        _hearing(case, nxt, purpose="HEARING")
+
+        assert draft_updates_for_new_dates(case, [nxt]) == 1
+
+        draft = ClientMessage.objects.get()
+        assert "was heard on" not in draft.body
+        assert nxt.strftime("%d %B %Y") in draft.body
+        assert draft.event_date == today
+
+    def test_a_disposing_order_says_so_instead_of_no_next_date(self, advocate, today):
+        """WP/26147/2026: the latest order disposes of the writ petition,
+        but the draft said the next date hadn't been fixed yet."""
+        case = _case(advocate)
+        _contact(case)
+        order = _order(case, today - timedelta(days=1))
+        CourtOrder.objects.filter(id=order.id).update(disposes_case=True)
+        order.refresh_from_db()
+
+        message, _ = draft_update_for_order(order)
+
+        assert "disposed of the matter" in message.body
+        assert "has not been fixed yet" not in message.body
+
+    def test_ecourts_disposed_status_also_gives_disposal_wording(self, advocate, today):
+        from core.models import CourtFetchLog
+
+        case = _case(advocate, tracking_enabled=True, court_type="high_court")
+        _contact(case)
+        CourtFetchLog.objects.create(
+            owner=advocate, case=case, success=True,
+            fields_changed={"snapshot": {"case_status": "Case disposed", "nature_of_disposal": "Contested--DISPOSED OF NO COSTS"}},
+        )
+        message, _ = draft_update_for_order(_order(case, today - timedelta(days=1)))
+        assert "disposed of the matter" in message.body
+
+    def test_subject_never_uses_the_cnr_as_the_matter_name(self, advocate, today):
+        case = Case.objects.create(
+            owner=advocate, case_number="WP/23998/2026", title="HBHC010494552026",
+            cnr_number="HBHC010494552026", client_name="",
+        )
+        _contact(case)
+        message, _ = draft_update_for_order(_order(case, today - timedelta(days=1)))
+        assert message.subject == "Update on your matter: WP/23998/2026"
+        assert "HBHC010494552026" not in message.body
+
+
+def draft_updates_for_new_dates_helper(case, today, *, heard_ago, next_in):
+    heard, nxt = today - timedelta(days=heard_ago), today + timedelta(days=next_in)
+    _hearing(case, heard)
+    _hearing(case, nxt)
+    draft_updates_for_new_dates(case, [nxt])
+    return ClientMessage.objects.get(), "created"
 
 
 # ---------------------------------------------------------------------------
@@ -436,6 +609,47 @@ class TestSending:
         assert resp.status_code == 400
         assert "contact email" in resp.data["detail"].lower()
         assert not SentMessage.objects.exists()
+
+    def test_blocked_without_the_advocates_name(self, api, advocate, today):
+        message = self._draft(advocate, today)
+        AdvocateProfile.objects.filter(owner=advocate).update(advocate_name="", letterhead_name="case intel law")
+
+        resp = api.post(f"/api/client-messages/{message.id}/send/")
+
+        assert resp.status_code == 400
+        assert resp.data["code"] == "missing_advocate_name"
+        assert not SentMessage.objects.exists()
+
+    def test_signed_with_the_name_then_the_firm(self, advocate, today):
+        AdvocateProfile.objects.filter(owner=advocate).update(letterhead_name="Rao & Associates")
+        message = self._draft(advocate, today)
+        assert message.body.rstrip().endswith("Regards,\nA. Rao\nRao & Associates")
+
+    def test_setting_the_name_re_signs_untouched_drafts_only(self, api, advocate, today):
+        AdvocateProfile.objects.filter(owner=advocate).update(advocate_name="", letterhead_name="case intel law")
+        untouched = self._draft(advocate, today)
+        assert untouched.body.rstrip().endswith("Regards,\ncase intel law")
+        edited = ClientMessage.objects.create(
+            owner=advocate, case=untouched.case, kind="case_update", dedup_key="k-edited",
+            subject="s", body="Mine.\n\nRegards,\ncase intel law\n", edited_by_user=True,
+        )
+
+        resp = api.patch("/api/advocate-profile/", {"advocate_name": "A. Rao"}, format="json")
+
+        assert resp.status_code == 200
+        untouched.refresh_from_db()
+        edited.refresh_from_db()
+        assert untouched.body.rstrip().endswith("Regards,\nA. Rao\ncase intel law")
+        assert edited.body == "Mine.\n\nRegards,\ncase intel law\n"
+
+    def test_zero_recipients_is_refused_with_its_own_code(self, api, advocate, today):
+        message = self._draft(advocate, today)
+        ClientContact.objects.update(email="")
+
+        resp = api.post(f"/api/client-messages/{message.id}/send/")
+
+        assert resp.status_code == 400
+        assert resp.data["code"] == "no_recipients"
 
     def test_cannot_send_twice(self, api, advocate, today):
         message = self._draft(advocate, today)
