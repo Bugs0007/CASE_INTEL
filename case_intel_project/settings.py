@@ -144,8 +144,12 @@ REST_FRAMEWORK = {
         "rest_framework.parsers.JSONParser",
     ],
     "EXCEPTION_HANDLER": "rest_framework.views.exception_handler",
+    # Per-session, expiring tokens (core/models/auth_session.py) behind the
+    # same "Authorization: Token <key>" header DRF's TokenAuthentication
+    # used. rest_framework.authtoken stays installed only so its table (and
+    # migration 0040, which carries existing keys over) keep working.
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.TokenAuthentication",
+        "core.authentication.SessionTokenAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
@@ -400,6 +404,10 @@ TRACKING_STALE_DAYS = config("TRACKING_STALE_DAYS", default=3, cast=int)
 # one that grows until the box swaps. 0 disables either limit. See
 # core/management/commands/process_jobs.py.
 WORKER_MAX_JOBS = config("WORKER_MAX_JOBS", default=200, cast=int)
+
+# A signed-in session (core/models/auth_session.py) ends after this many
+# days without use; every request pushes it out again.
+AUTH_SESSION_IDLE_DAYS = config("AUTH_SESSION_IDLE_DAYS", default=7, cast=int)
 WORKER_MAX_RSS_MB = config("WORKER_MAX_RSS_MB", default=300, cast=int)
 
 # ============================================================================
