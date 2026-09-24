@@ -18,15 +18,26 @@ loop requeues any running job whose heartbeat is older than
 --stale-seconds (or fails it permanently after MAX_ATTEMPTS claims, so a
 job that reliably kills the worker can't crash-loop forever).
 
+Recycling: a long-lived Python process never hands memory back to the
+OS, and one document job used to leave ~200MB resident for good. After
+each job the worker checks how many jobs it has run and its own RSS
+(core/services/process_memory.py); past --max-jobs or --max-rss-mb it
+exits with RECYCLE_EXIT_CODE between jobs -- never mid-job -- and systemd
+starts a fresh one. The unit's Restart=on-failure restarts on any
+non-zero exit, so no unit change is needed (Restart=always would also
+work). 0 turns either limit off.
+
 Usage:
     python manage.py process_jobs                 # long-lived loop
     python manage.py process_jobs --once          # drain queue, then exit
+    python manage.py process_jobs --max-jobs 0 --max-rss-mb 0   # never recycle
 """
 
 import logging
 import threading
 import time
 
+from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db import close_old_connections, connections, transaction
 from django.utils import timezone
@@ -38,6 +49,7 @@ from core.services.bulk_refresh import BulkRefreshCancelled, run_tracking_refres
 from core.services.court_order_sync import sync_case_orders
 from core.services.document_processor import DocumentProcessor
 from core.services.hearing_digest import generate_case_briefing
+from core.services.process_memory import current_rss_mb
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +57,10 @@ DEFAULT_POLL_INTERVAL = 3.0     # seconds between empty polls -- no busy loop
 DEFAULT_STALE_SECONDS = 300     # running + no heartbeat for this long => reclaim
 HEARTBEAT_SECONDS = 30
 MAX_ATTEMPTS = 3
+# EX_TEMPFAIL: "try again". Non-zero so Restart=on-failure brings the
+# worker straight back; distinct so a recycle is easy to tell from a crash
+# in `systemctl status` / journalctl.
+RECYCLE_EXIT_CODE = 75
 
 
 class Command(BaseCommand):
@@ -64,6 +80,19 @@ class Command(BaseCommand):
             help=f"Seconds to sleep between empty polls (default {DEFAULT_POLL_INTERVAL}).",
         )
         parser.add_argument(
+            "--max-jobs",
+            type=int,
+            default=getattr(settings, "WORKER_MAX_JOBS", 200),
+            help="Exit (for systemd to restart) after this many jobs. 0 = never.",
+        )
+        parser.add_argument(
+            "--max-rss-mb",
+            type=float,
+            default=getattr(settings, "WORKER_MAX_RSS_MB", 300),
+            help="Exit (for systemd to restart) once resident memory passes this, "
+                 "checked between jobs. 0 = never.",
+        )
+        parser.add_argument(
             "--stale-seconds",
             type=float,
             default=DEFAULT_STALE_SECONDS,
@@ -76,9 +105,17 @@ class Command(BaseCommand):
         poll_interval = options["poll_interval"]
         stale_seconds = options["stale_seconds"]
 
-        self.stdout.write("process_jobs worker started (poll=%ss, stale=%ss)"
-                          % (poll_interval, stale_seconds))
+        max_jobs = options["max_jobs"]
+        max_rss_mb = options["max_rss_mb"]
+
+        rss = current_rss_mb()
+        self.stdout.write(
+            "process_jobs worker started (poll=%ss, stale=%ss, recycle after %s jobs or %s MB; rss=%s MB)"
+            % (poll_interval, stale_seconds, max_jobs or "unlimited", max_rss_mb or "unlimited",
+               f"{rss:.0f}" if rss is not None else "?")
+        )
         processor = DocumentProcessor()
+        jobs_done = 0
 
         while True:
             close_old_connections()
@@ -93,6 +130,26 @@ class Command(BaseCommand):
                 continue
 
             self._process_job(job, processor)
+            jobs_done += 1
+
+            reason = self._recycle_reason(jobs_done, max_jobs, max_rss_mb)
+            if reason:
+                self.stdout.write(
+                    f"Recycling the worker: {reason}. Exiting with {RECYCLE_EXIT_CODE} "
+                    "so systemd starts a fresh process."
+                )
+                raise SystemExit(RECYCLE_EXIT_CODE)
+
+    @staticmethod
+    def _recycle_reason(jobs_done: int, max_jobs: int, max_rss_mb: float) -> str:
+        """Why this worker should exit now, or "" to carry on."""
+        if max_jobs and jobs_done >= max_jobs:
+            return f"{jobs_done} jobs run (limit {max_jobs})"
+        if max_rss_mb:
+            rss = current_rss_mb()
+            if rss is not None and rss > max_rss_mb:
+                return f"resident memory {rss:.0f} MB is over {max_rss_mb:.0f} MB"
+        return ""
 
     # ------------------------------------------------------------------
     # Queue operations

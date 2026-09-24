@@ -331,6 +331,10 @@ if USE_S3:
     # ap-south-1 (and other newer regions) require SigV4 explicitly.
     AWS_S3_SIGNATURE_VERSION = "s3v4"
     AWS_S3_FILE_OVERWRITE = False
+    # django-storages keeps a whole S3 object in memory when it's read
+    # (default 0 = never spill). Past 5MB it now spills to a temp file, so
+    # a large order PDF read by the worker doesn't sit in RAM.
+    AWS_S3_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 
     STORAGES = {
         "default": {
@@ -388,6 +392,15 @@ CLIENT_UPDATE_MAX_AGE_DAYS = config("CLIENT_UPDATE_MAX_AGE_DAYS", default=7, cas
 # than this (or a past hearing is still marked scheduled) -- see
 # core/services/court_tracking.tracking_freshness().
 TRACKING_STALE_DAYS = config("TRACKING_STALE_DAYS", default=3, cast=int)
+
+# The process_jobs worker exits between jobs -- for systemd to restart it
+# fresh -- after this many jobs or once its resident memory passes this
+# many MB. A long-lived Python process never returns freed memory to the
+# OS; on the t3.small that is the difference between a steady worker and
+# one that grows until the box swaps. 0 disables either limit. See
+# core/management/commands/process_jobs.py.
+WORKER_MAX_JOBS = config("WORKER_MAX_JOBS", default=200, cast=int)
+WORKER_MAX_RSS_MB = config("WORKER_MAX_RSS_MB", default=300, cast=int)
 
 # ============================================================================
 # Outbound email (invoice delivery to a case's billing contact)
