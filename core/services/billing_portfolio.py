@@ -110,6 +110,13 @@ def portfolio(fees_qs, hearings_qs, *, today: date | None = None) -> dict:
         if "case_ids" in row:
             row["case_ids"].add(case.id)
 
+    # A row is only worth showing when money is actually owed: a Rs. 0
+    # charge (an appearance fee recorded before a default fee was set) put
+    # "WP/23998/2026 -- Rs. 0.00" under "cases not linked to a client" next
+    # to text saying money was owed.
+    by_client = {k: r for k, r in by_client.items() if r["invoiced_amount"] + r["pending_amount"] > ZERO}
+    unassigned = {k: r for k, r in unassigned.items() if r["invoiced_amount"] + r["pending_amount"] > ZERO}
+
     clients = sorted(
         by_client.values(),
         key=lambda r: (-(r["oldest_invoice_days"] or -1), -r["invoiced_amount"], r["client_name"]),
@@ -294,14 +301,20 @@ def render_client_statement_pdf(client: Client, fees_qs, profile, *, today: date
 def group_cases_for_backfill(cases) -> list[dict]:
     """Group an owner's unassigned cases into would-be Clients for
     manage.py backfill_clients: by billing-contact email (case-insensitive),
-    else by normalised client name. Pure -- returns the plan, writes nothing."""
+    else by normalised client name -- the case's legacy client_name, else
+    the billing (then primary) contact's name. Cases imported from eCourts
+    have no client_name, so without the contact fallback a contact with no
+    email (the common case) was skipped and /clients stayed empty. Pure --
+    returns the plan, writes nothing."""
     from core.services.name_matching import normalize_name
 
     groups: dict[str, dict] = defaultdict(lambda: {"cases": [], "names": [], "emails": set()})
     for case in cases:
-        contact = next((c for c in case.client_contacts.all() if c.is_billing_contact), None)
+        contacts = list(case.client_contacts.all())
+        contact = next((c for c in contacts if c.is_billing_contact), None)
         email = (contact.email or "").strip().lower() if contact and contact.email else ""
-        name = (case.client_name or "").strip()
+        named = contact or next((c for c in contacts if c.role == "primary"), None)
+        name = (case.client_name or "").strip() or (named.name.strip() if named else "")
         if email:
             key = f"email:{email}"
         elif normalize_name(name):

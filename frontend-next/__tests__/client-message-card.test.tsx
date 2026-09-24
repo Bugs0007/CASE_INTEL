@@ -3,7 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ClientMessageCard } from "@/components/client-updates/client-message-card";
-import type { ClientMessage, SendClientMessageResult } from "@/types";
+import type { AdvocateProfile, ClientMessage, SendClientMessageResult } from "@/types";
 
 vi.mock("@/lib/api/clients", () => ({
   clientMessagesApi: { list: vi.fn(), update: vi.fn(), discard: vi.fn(), send: vi.fn() },
@@ -14,11 +14,18 @@ vi.mock("@/lib/api/clients", () => ({
   refreshAllApi: {},
 }));
 
+vi.mock("@/lib/api/billing", () => ({
+  advocateProfileApi: { get: vi.fn(), update: vi.fn() },
+  appearanceFeesApi: {},
+  travelBookingsApi: {},
+}));
+
 vi.mock("@/components/ui/toaster", () => ({
   showToast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
 }));
 
 import { clientMessagesApi } from "@/lib/api/clients";
+import { advocateProfileApi } from "@/lib/api/billing";
 import { showToast } from "@/components/ui/toaster";
 
 function makeMessage(overrides: Partial<ClientMessage> = {}): ClientMessage {
@@ -71,7 +78,29 @@ function renderCard(message: ClientMessage) {
   );
 }
 
-beforeEach(() => vi.clearAllMocks());
+function makeProfile(overrides: Partial<AdvocateProfile> = {}): AdvocateProfile {
+  return {
+    id: 1,
+    letterhead_name: "Rao & Associates",
+    advocate_name: "A. Rao",
+    phone: "",
+    address: "",
+    bar_registration_number: "",
+    contact_email: "rao@example.com",
+    default_fee_amount: "0.00",
+    invoice_prefix: "INV",
+    last_invoice_sequence: 0,
+    reminder_after_days: 15,
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+    ...overrides,
+  };
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(advocateProfileApi.get).mockResolvedValue(makeProfile());
+});
 
 describe("ClientMessageCard", () => {
   it("reports a real delivery as sent", async () => {
@@ -138,15 +167,32 @@ describe("ClientMessageCard", () => {
     expect(clientMessagesApi.send).toHaveBeenCalledWith(5);
   });
 
-  it("refuses to send with no recipient ticked", async () => {
+  it("disables Send with no recipient ticked, and says why", async () => {
     const user = userEvent.setup();
     renderCard(makeMessage());
 
     await user.click(screen.getByRole("checkbox", { name: /client one/i }));
-    await user.click(screen.getByRole("button", { name: /^send$/i }));
 
+    expect(screen.getByRole("button", { name: /^send$/i })).toBeDisabled();
+    expect(screen.getByText("Tick at least one recipient to send this.")).toBeInTheDocument();
     expect(clientMessagesApi.send).not.toHaveBeenCalled();
-    expect(showToast.error).toHaveBeenCalledWith("No recipients", expect.any(String));
+  });
+
+  it("disables Send when no contact on the case can receive it", () => {
+    // Production: drafts on cases with no contact email kept Send enabled
+    // next to the red "no client contact" warning.
+    renderCard(makeMessage({ recipients: [], eligible_recipients: [] }));
+
+    expect(screen.getByText(/No client contact on this case can receive this/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^send$/i })).toBeDisabled();
+  });
+
+  it("blocks Send until the advocate's name is set, linking to Settings", async () => {
+    vi.mocked(advocateProfileApi.get).mockResolvedValue(makeProfile({ advocate_name: "" }));
+    renderCard(makeMessage());
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /^send$/i })).toBeDisabled());
+    expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
   });
 
   it("shows a logged message as never delivered", () => {

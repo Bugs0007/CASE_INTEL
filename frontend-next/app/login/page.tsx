@@ -1,11 +1,21 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { setToken, setUsername as storeUsername } from "@/lib/auth";
 import { login } from "@/lib/api/auth";
+
+/** Where to go after signing in: the page a lapsed session was on (set by
+ * lib/api/client.ts as ?next=). Same-site paths only -- never an open
+ * redirect to another origin. */
+function returnPath(): string | null {
+  if (typeof window === "undefined") return null;
+  const next = new URLSearchParams(window.location.search).get("next");
+  if (!next || !next.startsWith("/") || next.startsWith("//") || next.startsWith("/login")) return null;
+  return next;
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,6 +24,13 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Set by lib/api/client.ts when a request found the session gone (the
+  // shared token was logged out elsewhere). Read after mount -- the page
+  // is prerendered, so the query string isn't known at build time.
+  const [sessionEnded, setSessionEnded] = useState(false);
+  useEffect(() => {
+    setSessionEnded(new URLSearchParams(window.location.search).get("expired") === "1");
+  }, []);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -24,7 +41,7 @@ export default function LoginPage() {
       const data = await login(username, password);
       setToken(data.token);
       storeUsername(data.username);
-      router.push("/dashboard");
+      router.push(returnPath() ?? "/dashboard");
     } catch {
       setError("Invalid username or password.");
     } finally {
@@ -39,6 +56,12 @@ export default function LoginPage() {
           <div className="font-serif text-[26px] text-gray-900">Case Intel</div>
           <div className="text-sm text-gray-500 mt-1.5">Sign in to your workspace</div>
         </div>
+
+        {sessionEnded && (
+          <div role="status" className="mb-4 rounded-lg border border-status-pending bg-status-pending-soft px-4 py-3 text-sm text-gray-800">
+            Your session ended -- this account was signed out elsewhere. Sign in again to pick up where you left off.
+          </div>
+        )}
 
         <div className="ci-card p-8">
           <form onSubmit={handleSubmit} className="flex flex-col gap-[18px]">

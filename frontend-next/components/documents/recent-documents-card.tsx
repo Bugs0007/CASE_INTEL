@@ -145,7 +145,7 @@ function DocumentRow({
   const isThisDocProcessing = isProcessPending && processingDocId === doc.id;
 
   return (
-    <div className="flex items-center justify-between p-3 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors">
+    <div className="flex items-center justify-between p-3 border border-gray-100 rounded-lg">
       <div className="flex items-center gap-3 flex-1 min-w-0">
         <span className="text-xl flex-shrink-0">{fileIcon}</span>
         <div className="flex-1 min-w-0">
@@ -154,9 +154,9 @@ function DocumentRow({
               type="button"
               onClick={() => onView(doc.id)}
               className="font-medium text-gray-900 truncate hover:text-primary hover:underline text-left"
-              title="Open document"
+              title={`Open ${doc.filename}`}
             >
-              {doc.filename}
+              {doc.display_name || doc.filename}
             </button>
             {doc.document_type === "court_order" && (
               <span className="ci-chip ci-chip--none flex-shrink-0">

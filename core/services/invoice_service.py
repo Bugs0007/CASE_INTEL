@@ -367,7 +367,7 @@ def send_invoice(fee: AppearanceFee, *, sent_by=None) -> dict:
         f"in {fee.hearing.case.title} ({fee.hearing.case.case_number}).\n\n"
         f"Amount due: {_money(fee.amount)}\n\n"
         f"Regards,\n"
-        f"{profile.letterhead_name or 'Your advocate'}\n"
+        f"{email_delivery.advocate_signature(profile)}\n"
     )
 
     # Logged (no mail credentials) or really sent, the delivery goes

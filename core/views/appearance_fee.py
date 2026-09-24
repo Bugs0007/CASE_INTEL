@@ -81,6 +81,15 @@ class AppearanceFeeListCreateView(OwnerScopedMixin, generics.ListCreateAPIView):
                     {"amount": "An amount is required for this kind of charge."}
                 )
             profile = invoice_service.get_or_create_profile(self.request.user)
+            if not profile.default_fee_amount:
+                # No default set yet: falling back to it would save a Rs. 0
+                # charge that then sits in Billing as "owed".
+                raise ValidationError(
+                    {
+                        "amount": "Enter an amount, or set your default appearance fee in "
+                        "Settings to have it filled in."
+                    }
+                )
             serializer.validated_data["amount"] = profile.default_fee_amount
         serializer.save(owner=self.request.user)
 

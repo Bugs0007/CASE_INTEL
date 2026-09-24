@@ -4,10 +4,14 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { format, parseISO } from "date-fns";
 import { AlertTriangle, FileText, Gavel, Loader2 } from "lucide-react";
+import { formatHearingDate, todayKey } from "@/lib/utils";
 import type { CourtOrder, OrderSummary } from "@/types";
 
 interface OrderOverviewProps {
   orders: CourtOrder[];
+  /** The case's current next hearing per Court Tracking -- shown instead
+   * once the order's own next date has passed. */
+  currentNextHearing?: string | null;
   onViewOrder?: (orderId: number) => void;
   viewingOrderId?: number;
 }
@@ -31,6 +35,7 @@ function latestOrder(orders: CourtOrder[]): CourtOrder | null {
  * freshly-ingested order. */
 export function OrderOverviewCard({
   orders,
+  currentNextHearing,
   onViewOrder,
   viewingOrderId,
 }: OrderOverviewProps) {
@@ -69,14 +74,21 @@ export function OrderOverviewCard({
         )}
       </CardHeader>
       <CardContent>
-        <OrderSummaryBody summary={summary} />
+        <OrderSummaryBody summary={summary} currentNextHearing={currentNextHearing} />
       </CardContent>
     </Card>
   );
 }
 
 /** The summary body, shared by the case page and the calendar entry. */
-export function OrderSummaryBody({ summary }: { summary: OrderSummary }) {
+export function OrderSummaryBody({
+  summary,
+  currentNextHearing,
+}: {
+  summary: OrderSummary;
+  /** Only the case page passes this; see NextDateLine. */
+  currentNextHearing?: string | null;
+}) {
   if (summary.status === "failed") {
     return (
       <div className="flex items-start gap-2 text-sm text-status-alert">
@@ -110,15 +122,48 @@ export function OrderSummaryBody({ summary }: { summary: OrderSummary }) {
       )}
 
       {summary.next_date && (
-        <div className="pt-3 border-t border-gray-100 text-sm">
-          <span className="text-gray-500">Next date: </span>
-          <span className="font-medium text-gray-900">
-            {format(parseISO(summary.next_date), "d MMM yyyy")}
-          </span>
-          {summary.next_date_purpose && (
-            <span className="text-gray-500"> — {summary.next_date_purpose}</span>
-          )}
-        </div>
+        <NextDateLine summary={summary} currentNextHearing={currentNextHearing} />
+      )}
+    </div>
+  );
+}
+
+/** The order's own "next date". Once that date has passed it's history --
+ * the case has moved on, and Court Tracking knows the current date -- so it
+ * greys out and points there instead of reading like the upcoming hearing. */
+function NextDateLine({
+  summary,
+  currentNextHearing,
+}: {
+  summary: OrderSummary;
+  currentNextHearing?: string | null;
+}) {
+  const nextDate = summary.next_date as string;
+  const passed = nextDate < todayKey();
+  if (!passed) {
+    return (
+      <div className="pt-3 border-t border-gray-100 text-sm">
+        <span className="text-gray-500">Next date: </span>
+        <span className="font-medium text-gray-900">{format(parseISO(nextDate), "d MMM yyyy")}</span>
+        {summary.next_date_purpose && (
+          <span className="text-gray-500"> — {summary.next_date_purpose}</span>
+        )}
+      </div>
+    );
+  }
+  return (
+    <div className="pt-3 border-t border-gray-100 text-sm text-gray-400">
+      <span>Next date in this order: </span>
+      <span className="line-through">{format(parseISO(nextDate), "d MMM yyyy")}</span>
+      <span> (passed)</span>
+      {currentNextHearing !== undefined && (
+        <span className="text-gray-600">
+          {" "}
+          ·{" "}
+          {currentNextHearing
+            ? `Current next hearing: ${formatHearingDate(currentNextHearing)} (Court Tracking)`
+            : "See Court Tracking for the current next hearing"}
+        </span>
       )}
     </div>
   );

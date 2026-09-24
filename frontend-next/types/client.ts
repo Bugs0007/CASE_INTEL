@@ -137,6 +137,11 @@ export interface DocTemplateField {
   /** Where the advocate can fill it in permanently. */
   where: string;
   missing: boolean;
+  /** A typed value can be written back to the case/contact/profile
+   * ("Save for next time"). */
+  savable?: boolean;
+  /** A fixed set of answers -- rendered as a select, not free text. */
+  choices?: string[];
 }
 
 export interface DocTemplateForCase extends DocTemplateSummary {
@@ -149,6 +154,8 @@ export interface GenerateDocumentInput {
   template: string;
   contact_id?: number | null;
   inputs?: Record<string, string>;
+  /** Typed fields to also save back to the record. */
+  save?: string[];
 }
 
 // ---------------------------------------------------------------------------

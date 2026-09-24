@@ -1,5 +1,7 @@
 from django.db import models
 
+from core.services.case_numbers import normalize_case_number
+
 from .mixins import OwnedModel
 
 
@@ -47,6 +49,11 @@ class Case(OwnedModel):
     ]
 
     case_number = models.CharField(max_length=100)
+    # The case number exactly as it first arrived, when tidying changed it
+    # ("WP /26147/2026" from the portal -> case_number "WP/26147/2026").
+    # Blank when it arrived clean. Kept for search and for matching the
+    # portal's own spelling; never shown as the case number.
+    case_number_raw = models.CharField(max_length=100, blank=True, default="")
     title = models.CharField(max_length=500)
     client_name = models.CharField(max_length=255)
     # The billing entity this matter belongs to (see core/models/client.py).
@@ -130,6 +137,21 @@ class Case(OwnedModel):
                 fields=["owner", "case_number"], name="unique_case_owner_case_number"
             ),
         ]
+
+    def save(self, *args, **kwargs):
+        """Every way a case is made -- manual entry, Track by CNR, advocate
+        import -- lands here, so this is where the case number is tidied
+        (and the original kept in case_number_raw)."""
+        update_fields = kwargs.get("update_fields")
+        if update_fields is None or "case_number" in update_fields:
+            normalized = normalize_case_number(self.case_number)
+            if normalized and normalized != self.case_number:
+                if not self.case_number_raw:
+                    self.case_number_raw = self.case_number
+                self.case_number = normalized
+                if update_fields is not None:
+                    kwargs["update_fields"] = {*update_fields, "case_number_raw"}
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.case_number} - {self.title}"

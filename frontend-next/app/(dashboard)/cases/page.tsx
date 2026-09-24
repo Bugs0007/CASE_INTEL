@@ -1,5 +1,6 @@
 "use client";
 
+import { pluralize } from "@/lib/utils";
 import { useEffect, useRef, useState, useMemo } from "react";
 import Link from "next/link";
 import { Search } from "lucide-react";
@@ -134,7 +135,7 @@ export default function CasesPage() {
         <div className="min-w-0">
           <h1 className="text-page-title text-gray-900 mb-1.5">Cases</h1>
           <p className="text-sm text-gray-600">
-            {filteredCases.length} cases across your workspace
+            {pluralize(filteredCases.length, "case")} across your workspace
           </p>
         </div>
         <div className="flex items-center gap-2">

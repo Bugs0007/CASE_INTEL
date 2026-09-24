@@ -34,6 +34,7 @@ class CaseSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "case_number",
+            "case_number_raw",
             "title",
             "client_name",
             "client",
@@ -64,6 +65,7 @@ class CaseSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id",
+            "case_number_raw",
             "created_at",
             "cnr_number",
             "fetch_status",
@@ -139,6 +141,82 @@ class CaseSerializer(serializers.ModelSerializer):
             or getattr(obj, "has_ecourts_update", False)
             or getattr(obj, "has_failed_document", False)
         )
+
+
+class CaseDetailSerializer(CaseSerializer):
+    """The case page's shape: everything in CaseSerializer, plus what only
+    the detail page needs -- each costs a query or two, which is fine for
+    one case and would be an N+1 on the list.
+
+      tracking_snapshot   what the latest successful eCourts fetch said
+                          (status, stage, judge, court, nature of disposal)
+      tracking_freshness  whether that is still current (court_tracking.
+                          tracking_freshness) and when Refresh unlocks
+      disposal            the case looks disposed of (disposal.py): the
+                          page offers to close it, never closes it itself
+      update_recipient_count
+                          contacts who can receive case-update emails; 0
+                          means no drafts will be written for this case
+      petitioner_name / respondent_name
+                          the parties as the court record gives them
+      parties             petitioner/respondent from the record, else the
+                          "X vs Y" title, plus which is ours/opposing
+                          (core/services/parties.py -- the same answer the
+                          document generator prints)
+    """
+
+    tracking_snapshot = serializers.SerializerMethodField()
+    tracking_freshness = serializers.SerializerMethodField()
+    disposal = serializers.SerializerMethodField()
+    update_recipient_count = serializers.SerializerMethodField()
+    parties = serializers.SerializerMethodField()
+
+    class Meta(CaseSerializer.Meta):
+        fields = CaseSerializer.Meta.fields + [
+            "petitioner_name",
+            "respondent_name",
+            "tracking_snapshot",
+            "tracking_freshness",
+            "disposal",
+            "update_recipient_count",
+            "parties",
+        ]
+        read_only_fields = CaseSerializer.Meta.read_only_fields + ["petitioner_name", "respondent_name"]
+
+    def _snapshot(self, obj: Case):
+        if not hasattr(obj, "_tracking_snapshot"):
+            from core.services.court_tracking import latest_snapshot
+
+            obj._tracking_snapshot = latest_snapshot(obj) if obj.tracking_enabled else None
+        return obj._tracking_snapshot
+
+    def get_tracking_snapshot(self, obj: Case):
+        snapshot = self._snapshot(obj)
+        if not snapshot:
+            return None
+        keys = ("case_status", "case_stage", "court_and_judge", "court_name", "nature_of_disposal", "next_hearing_date")
+        return {key: snapshot.get(key) for key in keys}
+
+    def get_tracking_freshness(self, obj: Case):
+        from core.services.court_tracking import tracking_freshness
+
+        return tracking_freshness(obj)
+
+    def get_disposal(self, obj: Case):
+        from core.services.disposal import case_disposal
+
+        disposal = case_disposal(obj, snapshot=self._snapshot(obj) or {})
+        return disposal.as_dict() if disposal else None
+
+    def get_parties(self, obj: Case) -> dict:
+        from core.services.parties import case_parties
+
+        return case_parties(obj).as_dict()
+
+    def get_update_recipient_count(self, obj: Case) -> int:
+        from core.services.client_updates.service import update_recipients
+
+        return len(update_recipients(obj))
 
 
 class CaseCreateSerializer(serializers.ModelSerializer):

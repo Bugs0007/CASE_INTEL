@@ -32,7 +32,7 @@ def draw_letterhead(pdf, profile) -> None:
         pdf.cell(
             0,
             5,
-            pdf_safe(f"Bar Registration No.: {profile.bar_registration_number}"),
+            pdf_safe(f"Enrolment No.: {profile.bar_registration_number}"),
             new_x="LMARGIN",
             new_y="NEXT",
         )

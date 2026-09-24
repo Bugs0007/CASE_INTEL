@@ -51,6 +51,10 @@ class DocumentSerializer(serializers.ModelSerializer):
     job_progress_current = serializers.SerializerMethodField()
     job_progress_total = serializers.SerializerMethodField()
     job_error = serializers.SerializerMethodField()
+    # What to call the document on screen. For an eCourts order,
+    # "Order 4 · 17 Aug 2026" instead of HBHC010536082026_order_4_2026-08-17.pdf
+    # (the filename stays available, e.g. as a tooltip).
+    display_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Document
@@ -62,6 +66,7 @@ class DocumentSerializer(serializers.ModelSerializer):
             "folder",
             "folder_name",
             "filename",
+            "display_name",
             "file_path",
             "file_type",
             "file_size",
@@ -86,6 +91,18 @@ class DocumentSerializer(serializers.ModelSerializer):
             "file_type",  # File type is determined by the file
             "file_size",  # File size is determined by the file
         ]
+
+    def get_display_name(self, obj) -> str:
+        if obj.document_type != "court_order":
+            return obj.filename
+        try:
+            order = obj.court_order  # reverse one-to-one; select_related by the views
+        except Document.court_order.RelatedObjectDoesNotExist:
+            return obj.filename
+        label = f"Order {order.order_number}"
+        if order.order_date:
+            label += f" · {order.order_date.day} {order.order_date:%b %Y}"
+        return label
 
     def _latest_job(self, obj):
         if not hasattr(obj, "_latest_job_cache"):

@@ -110,6 +110,7 @@ def send_client_message(message: ClientMessage, *, user) -> dict:
 
     profile = get_or_create_profile(message.owner)
     email_delivery.require_contact_email(profile, what="client emails")
+    email_delivery.require_advocate_name(profile)
 
     attachments = []
     if (
@@ -167,6 +168,34 @@ def send_client_message(message: ClientMessage, *, user) -> dict:
         "missing_env_vars": result.missing_env_vars,
         "required_env_vars": result.required_env_vars,
     }
+
+
+_SIGN_OFF = "Regards,\n"
+
+
+def resign_open_drafts(owner) -> int:
+    """Re-sign the owner's untouched drafts after their name or firm
+    changed in Settings, so a draft written before "Your Name" was filled
+    in doesn't go out under the old signature. Only the lines after the
+    last "Regards," change; an edited draft is the advocate's own text and
+    is never touched. Returns the number of drafts re-signed."""
+    from . import compose
+
+    new_signature = compose.signature(get_or_create_profile(owner))
+    count = 0
+    drafts = ClientMessage.objects.filter(
+        owner=owner, status=ClientMessage.STATUS_DRAFT, edited_by_user=False
+    )
+    for message in drafts:
+        head, sign_off, _old = message.body.rpartition(_SIGN_OFF)
+        if not sign_off:
+            continue
+        body = f"{head}{sign_off}{new_signature}\n"
+        if body != message.body:
+            message.body = body
+            message.save(update_fields=["body", "updated_at"])
+            count += 1
+    return count
 
 
 def discard_client_message(message: ClientMessage, *, reason: str = "Discarded by the advocate.") -> ClientMessage:

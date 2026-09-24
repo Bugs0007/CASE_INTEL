@@ -42,6 +42,13 @@ class DeliveryError(Exception):
     """Base for delivery failures that should surface as a 4xx."""
 
 
+class MissingAdvocateNameError(DeliveryError):
+    """The sending advocate has no name set ("Your Name" in Settings). A
+    client email signed only with a firm name -- or worse, a login-ish
+    placeholder -- doesn't say who is writing, so client messages are
+    blocked until it is set, same as the contact email."""
+
+
 class MissingContactEmailError(DeliveryError):
     """The sending advocate has no contact email set. A client-facing email
     with no way to reply to the actual advocate is a bad default, so this
@@ -93,6 +100,31 @@ def require_contact_email(profile: AdvocateProfile, *, what: str = "emails") -> 
             "so the client can reply directly to you."
         )
     return profile.contact_email
+
+
+def require_advocate_name(profile: AdvocateProfile) -> str:
+    name = (profile.advocate_name or "").strip()
+    if not name:
+        raise MissingAdvocateNameError(
+            "Add your name in Settings before sending client emails -- it is how "
+            "the email is signed."
+        )
+    return name
+
+
+def advocate_signature(profile: AdvocateProfile) -> str:
+    """How client-facing email is signed: the advocate's own name, then the
+    firm on a second line when there is one (and it isn't the same text).
+    With no name set, the firm alone -- client messages can't be SENT in
+    that state (require_advocate_name), so that fallback only shows on a
+    draft or an invoice email from a firm."""
+    name = (profile.advocate_name or "").strip()
+    firm = (profile.letterhead_name or "").strip()
+    if not name:
+        return firm or "Your advocate"
+    if firm and firm.lower() != name.lower():
+        return f"{name}\n{firm}"
+    return name
 
 
 def body_sha256(body: str) -> str:

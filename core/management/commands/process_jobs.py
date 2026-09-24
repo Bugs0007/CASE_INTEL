@@ -258,6 +258,18 @@ class Command(BaseCommand):
         except Exception:  # noqa: BLE001
             logger.exception("Direction tasks failed for order %d.", order.id)
 
+        # Does this order finally dispose of the case? A pattern match on
+        # the text (core/services/disposal.py), read by the case page's
+        # "close this case?" banner and by the draft below -- so it runs
+        # first. Never closes anything itself.
+        try:
+            from core.services.disposal import mark_order_disposal
+
+            if mark_order_disposal(order):
+                self.stdout.write(f"Order {order.id} disposes of the case.")
+        except Exception:  # noqa: BLE001
+            logger.exception("Disposal check failed for order %d.", order.id)
+
         # The client-update DRAFT for the hearing this order was passed on
         # (never sent -- the advocate reviews it in the drafts inbox). Its
         # own try block, same reasoning as the tasks above.
@@ -279,7 +291,7 @@ class Command(BaseCommand):
         self.stdout.write(
             f"Order sync for case {case.id}: {result['listed']} listed, "
             f"{result['new']} new, {result['downloaded']} downloaded, "
-            f"{result['failed']} failed."
+            f"{result['failed']} failed, {result.get('relabelled', 0)} renumbered on the portal."
         )
 
     @staticmethod

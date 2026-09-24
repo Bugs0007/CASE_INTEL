@@ -39,7 +39,7 @@ export function DocumentRow({
       document.processing_status === "failed");
 
   return (
-    <div className="bg-white border border-gray-100 rounded-lg px-[18px] py-4 flex items-center gap-4 flex-wrap transition-colors hover:bg-gray-50/60">
+    <div className="bg-white border border-gray-100 rounded-lg px-[18px] py-4 flex items-center gap-4 flex-wrap">
       <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 text-lg">
         {fileIcon}
       </div>
@@ -50,9 +50,9 @@ export function DocumentRow({
             type="button"
             onClick={() => onView(document.id)}
             className="text-sm font-semibold text-gray-900 truncate hover:text-primary hover:underline text-left"
-            title="Open document"
+            title={`Open ${document.filename}`}
           >
-            {document.filename}
+            {document.display_name || document.filename}
           </button>
           {document.document_type === "court_order" ? (
             <span className="ci-chip ci-chip--none flex-shrink-0">

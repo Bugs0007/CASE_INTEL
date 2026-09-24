@@ -12,7 +12,7 @@
     {"name": "user_side", "label": "Your client's side (Petitioner / Respondent)", "sources": ["case.user_side"], "required": true},
     {"name": "our_party", "label": "Your client, as named in the case", "sources": ["case.our_party", "case.client_name"], "required": true},
     {"name": "advocate_name", "label": "Your name", "sources": ["profile.advocate_name"], "required": true},
-    {"name": "bar_registration_number", "label": "Your enrolment number", "sources": ["profile.bar_registration_number"], "required": true},
+    {"name": "bar_registration_number", "label": "Bar enrolment number", "sources": ["profile.bar_registration_number"], "required": true},
     {"name": "advocate_address", "label": "Your address", "sources": ["profile.address"], "required": false, "multiline": true},
     {"name": "advocate_phone", "label": "Your phone", "sources": ["profile.phone"], "required": false},
     {"name": "advocate_email", "label": "Your email", "sources": ["profile.contact_email"], "required": false},

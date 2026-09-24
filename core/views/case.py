@@ -12,7 +12,7 @@ from rest_framework import generics, status
 from rest_framework.response import Response
 
 from core.models import Case, Document, Hearing
-from core.serializers import CaseCreateSerializer, CaseSerializer
+from core.serializers import CaseCreateSerializer, CaseDetailSerializer, CaseSerializer
 from core.services.conflict_check import (
     conflict_response_body,
     find_conflicts,
@@ -176,7 +176,7 @@ class CaseDetailView(OwnerScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     user 404s here exactly as if it didn't exist.
     """
 
-    serializer_class = CaseSerializer
+    serializer_class = CaseDetailSerializer
 
     def get_base_queryset(self):
         qs = Case.objects.prefetch_related("client_contacts").annotate(

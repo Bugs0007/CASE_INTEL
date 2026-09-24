@@ -378,6 +378,17 @@ TELANGANA_HC_BENCH_CODE = config("TELANGANA_HC_BENCH_CODE", default="1")
 # unaffected.
 CAUSE_LIST_COURTS = config("CAUSE_LIST_COURTS", default="telangana_hc", cast=Csv())
 
+# Client-update drafts are news, not history: a hearing heard longer ago
+# than this gets no "your matter was heard on X" draft (a first order sync
+# on an old case would otherwise draft one per back-order). See
+# core/services/client_updates/service.py.
+CLIENT_UPDATE_MAX_AGE_DAYS = config("CLIENT_UPDATE_MAX_AGE_DAYS", default=7, cast=int)
+
+# Court Tracking reads as "Outdated" once the last successful fetch is older
+# than this (or a past hearing is still marked scheduled) -- see
+# core/services/court_tracking.tracking_freshness().
+TRACKING_STALE_DAYS = config("TRACKING_STALE_DAYS", default=3, cast=int)
+
 # ============================================================================
 # Outbound email (invoice delivery to a case's billing contact)
 # ============================================================================
