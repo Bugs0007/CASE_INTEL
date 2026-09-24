@@ -122,7 +122,13 @@ const config: Config = {
       },
       animation: {
         "chat-indeterminate": "chat-indeterminate 1.2s ease-in-out infinite",
-        "fade-up": "fade-up 0.25s ease-out both",
+        // "backwards", not "both": a forwards fill leaves translateY(0) on
+        // the element for good, and any transform makes it the containing
+        // block and stacking context for position:fixed descendants -- which
+        // put every z-50 dialog on a page (the dashboard template wraps all
+        // of them in this) UNDER the z-30 mobile nav, its Save/Generate
+        // buttons untappable at phone width. Ending state is identical.
+        "fade-up": "fade-up 0.25s ease-out backwards",
         "fade-in": "fade-in 0.2s ease-out both",
         "slide-in-right": "slide-in-right 0.3s ease-out both",
       },
