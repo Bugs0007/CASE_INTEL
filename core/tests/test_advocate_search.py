@@ -24,7 +24,6 @@ from bharat_courts import CaseInfo
 from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
 from core.models import AdvocateSearchPreference, Case, JobAlreadyRunningError, ProcessingJob
@@ -36,6 +35,7 @@ from bharat_courts.districtcourts.parser import ServerError as DistrictServerErr
 from core.services.court_data.ecourts_parsing import split_bar_code
 from core.services.court_data.ecourts_provider import _TokenSeedingDistrictClient
 from core.services.court_data.models import CourtCaseData
+from core.tests.auth_helpers import token_for
 
 
 # ---------------------------------------------------------------------------
@@ -76,8 +76,7 @@ def user_b():
 
 def _authed_client(user):
     client = APIClient()
-    token, _ = Token.objects.get_or_create(user=user)
-    client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+    client.credentials(HTTP_AUTHORIZATION=f"Token {token_for(user)}")
     return client
 
 

@@ -18,13 +18,12 @@ interface NeedsAttentionProps {
   overdueTasks?: Task[];
 }
 
-// "has {article} {label} hearing" -- e.g. "a Trial hearing", "an Appeal
-// hearing". "Other" reads oddly as "an Other hearing", so it collapses to
-// the single word "another" instead ("has another hearing").
-function describeHearingType(display: string): string {
-  if (display.toLowerCase() === "other") return "another";
-  const article = /^[aeiou]/i.test(display) ? "an" : "a";
-  return `${article} ${display}`;
+// "Hearing tomorrow", or "Trial hearing tomorrow" when the type says
+// something. eCourts hearings are all type "Other", which used to read
+// "has another hearing tomorrow" -- as if there had already been one.
+function hearingHeadline(display: string, when: "today" | "tomorrow"): string {
+  const type = display.toLowerCase() === "other" ? "Hearing" : `${display} hearing`;
+  return `${type} ${when}`;
 }
 
 type AttentionItem = {
@@ -66,9 +65,11 @@ export function NeedsAttention({
       icon: CalendarClock,
       message: (
         <>
-          <span className="font-semibold">{h.case_title}</span> has{" "}
-          {describeHearingType(h.hearing_type_display)} hearing{" "}
-          {h.days_until === 0 ? "today" : "tomorrow"}
+          <span className="font-semibold">
+            {hearingHeadline(h.hearing_type_display, h.days_until === 0 ? "today" : "tomorrow")}
+          </span>
+          {" · "}
+          {h.case_title}
           {h.purpose ? ` — ${h.purpose}` : ""}
         </>
       ),

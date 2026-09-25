@@ -8,11 +8,10 @@ Usage:
 
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand, CommandError
-from rest_framework.authtoken.models import Token
 
 
 class Command(BaseCommand):
-    help = "Create or update a user and print their DRF auth token."
+    help = "Create or update a user and print a new session token for them."
 
     def add_arguments(self, parser):
         parser.add_argument("username", type=str)
@@ -35,8 +34,11 @@ class Command(BaseCommand):
             user.email = email
         user.save()
 
-        token, _ = Token.objects.get_or_create(user=user)
+        from core.models import AuthSession
+        from core.services.auth_sessions import create_session
+
+        _session, token_key = create_session(user, source=AuthSession.SOURCE_COMMAND)
 
         action = "Created" if created else "Updated"
         self.stdout.write(self.style.SUCCESS(f"{action} user '{username}'"))
-        self.stdout.write(f"Token: {token.key}")
+        self.stdout.write(f"Token: {token_key}  (a new 7-day session; logging out ends it)")

@@ -16,12 +16,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from django.contrib.auth.models import User
-from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
 from core.models import AdvocateProfile, Case
 from core.services.court_data import CaseNotFoundError
 from core.services.court_data.models import CourtCaseData, HearingRecord
+from core.tests.auth_helpers import token_for
 
 CNR = "MHAU019999992024"
 OTHER_CNR = "DLHC012345678920"
@@ -29,8 +29,7 @@ OTHER_CNR = "DLHC012345678920"
 
 def _authed_client(user):
     client = APIClient()
-    token, _ = Token.objects.get_or_create(user=user)
-    client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+    client.credentials(HTTP_AUTHORIZATION=f"Token {token_for(user)}")
     return client
 
 

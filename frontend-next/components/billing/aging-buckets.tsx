@@ -1,11 +1,8 @@
-import { cn } from "@/lib/utils";
+import { cn, formatINR } from "@/lib/utils";
 import type { AgingBucket } from "@/types";
 
-export function formatRupees(amount: string | number): string {
-  const n = typeof amount === "string" ? Number(amount) : amount;
-  return `Rs. ${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
+/** Amber for overdue, red for long overdue -- but only when the bucket
+ * actually holds invoices. An empty bucket is not a warning. */
 const TONE: Record<AgingBucket["label"], string> = {
   "0-30": "border-gray-200",
   "31-60": "border-status-pending",
@@ -21,10 +18,21 @@ export function AgingBuckets({ buckets }: { buckets: AgingBucket[] }) {
       {buckets.map((b) => (
         <div
           key={b.label}
-          className={cn("rounded-lg border-l-4 border bg-surface px-3 py-2.5", TONE[b.label])}
+          data-empty={b.count === 0 ? "true" : undefined}
+          className={cn(
+            "rounded-lg border-l-4 border bg-surface px-3 py-2.5",
+            b.count > 0 ? TONE[b.label] : "border-gray-200",
+          )}
         >
           <div className="text-xs text-gray-500">{b.label} days</div>
-          <div className="font-mono text-base font-semibold text-gray-900">{formatRupees(b.amount)}</div>
+          <div
+            className={cn(
+              "font-mono text-base font-semibold",
+              b.count > 0 ? "text-gray-900" : "text-gray-400",
+            )}
+          >
+            {formatINR(b.amount)}
+          </div>
           <div className="text-xs text-gray-500">
             {b.count} invoice{b.count === 1 ? "" : "s"}
           </div>

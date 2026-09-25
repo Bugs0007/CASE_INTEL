@@ -71,6 +71,8 @@ export interface ClientMessage {
   invoice_number: string | null;
   hearing: number | null;
   hearing_date: string | null;
+  /** The day the news happened: the hearing a case update reports. */
+  event_date: string | null;
   court_order: number | null;
   sent_at: string | null;
   discard_reason: string;
@@ -228,6 +230,9 @@ export interface RefreshRunResults {
   skipped: number;
   new_hearing_dates: number;
   drafts_created: number;
+  /** Cases where the fetch found a new hearing date. Absent on runs from
+   * before this was counted. */
+  updated?: number;
 }
 
 export interface RefreshRun {

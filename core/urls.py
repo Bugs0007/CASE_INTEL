@@ -79,6 +79,9 @@ from core.views import (
     LimitationRulesView,
     LoginView,
     LogoutView,
+    SessionDetailView,
+    SessionListView,
+    SessionRevokeOthersView,
     RegisterView,
     TaskDetailView,
     TaskListCreateView,
@@ -102,6 +105,14 @@ urlpatterns = [
     ),
     path("auth/login/", LoginView.as_view(), name="auth-login"),
     path("auth/logout/", LogoutView.as_view(), name="auth-logout"),
+    # Signed-in sessions (one per login), each revocable on its own.
+    path("auth/sessions/", SessionListView.as_view(), name="auth-sessions"),
+    path(
+        "auth/sessions/revoke-others/",
+        SessionRevokeOthersView.as_view(),
+        name="auth-sessions-revoke-others",
+    ),
+    path("auth/sessions/<int:pk>/", SessionDetailView.as_view(), name="auth-session-detail"),
     path(
         "auth/change-username/",
         ChangeUsernameView.as_view(),

@@ -12,6 +12,7 @@ import { APIError } from "@/lib/api/client";
 import { changePassword, changeUsername } from "@/lib/api/auth";
 import { setToken, setUsername as storeUsername } from "@/lib/auth";
 import { useAdvocateProfile, useUpdateAdvocateProfile } from "@/hooks/use-billing";
+import { SignedInSessionsCard } from "@/components/settings/signed-in-sessions-card";
 
 /** The billing identity that appears on every generated invoice.
  *
@@ -275,6 +276,9 @@ export default function SettingsPage() {
       </div>
       <div className="mt-6">
         <ChangePasswordCard />
+      </div>
+      <div className="mt-6">
+        <SignedInSessionsCard />
       </div>
     </div>
   );

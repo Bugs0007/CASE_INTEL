@@ -14,7 +14,12 @@ Improvements over the original:
 
 import hashlib
 import logging
+import os
 import re
+import shutil
+import sys
+import tempfile
+from contextlib import contextmanager
 
 from django.core.files.storage import default_storage
 from django.db import connection
@@ -46,6 +51,56 @@ EMBED_BATCH_SIZE = 100
 # ~10-20MB regardless of document size; the only cost is that a sentence
 # straddling a segment boundary may be split in two.
 NLP_SEGMENT_CHARS = 100_000
+
+# Pages parsed per PdfReader when extracting text. PyPDF2 caches every page
+# object a reader has touched, so one reader over a 400-page judgment holds
+# all of it at once; a fresh reader per batch bounds that to this many.
+PDF_PAGE_BATCH = 20
+
+
+@contextmanager
+def _torch_hidden():
+    """Import spaCy without dragging in torch.
+
+    thinc (spaCy's ML layer) imports torch whenever it is installed -- and
+    it is, for Case Bot's cross-encoder reranker. In the worker that import
+    alone cost ~220MB resident (measured: `import spacy` 15MB -> 238MB),
+    for a sentence splitter that is a tokenizer plus punctuation rules and
+    never touches a model. With torch marked unimportable for the length of
+    the spaCy import, thinc records has_torch=False and spaCy works as
+    before. The marker is removed afterwards, so anything that genuinely
+    needs torch later (the reranker, in the web process) still imports it.
+    """
+    if "torch" in sys.modules:
+        yield
+        return
+    sys.modules["torch"] = None  # "import torch" -> ImportError
+    try:
+        yield
+    finally:
+        if sys.modules.get("torch", 0) is None:
+            del sys.modules["torch"]
+
+
+@contextmanager
+def _local_copy(file_path: str):
+    """A path on local disk for a stored file: the file itself on local
+    storage, else a temp copy streamed out in blocks (S3 would otherwise
+    hand back the whole object in memory)."""
+    try:
+        yield default_storage.path(file_path)
+        return
+    except NotImplementedError:
+        pass
+    suffix = os.path.splitext(file_path)[1]
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        with default_storage.open(file_path, "rb") as src:
+            shutil.copyfileobj(src, tmp, length=65536)
+        tmp_path = tmp.name
+    try:
+        yield tmp_path
+    finally:
+        os.unlink(tmp_path)
 
 
 class DocumentProcessor:
@@ -82,7 +137,8 @@ class DocumentProcessor:
         if self._nlp is not None:
             return self._nlp
         try:
-            import spacy
+            with _torch_hidden():
+                import spacy
             try:
                 # exclude (not disable!) every component and keep only the
                 # model's tokenizer + a rule-based sentencizer. With the
@@ -157,18 +213,33 @@ class DocumentProcessor:
 
     @staticmethod
     def _extract_pdf(file_path: str) -> str:
+        return DocumentProcessor._extract_pdf_with_page_count(file_path)[0]
+
+    @staticmethod
+    def _extract_pdf_with_page_count(file_path: str) -> tuple[str, int]:
+        """Text and page count in one pass, page batch by page batch.
+
+        The file is read from local disk (streamed out of S3 first), and a
+        fresh PdfReader handles each PDF_PAGE_BATCH pages, so neither the
+        whole file nor every parsed page sits in memory at once.
+        """
         try:
             import PyPDF2
         except ImportError:
             raise ImportError("pip install PyPDF2")
         text_parts = []
-        with default_storage.open(file_path, "rb") as f:
-            reader = PyPDF2.PdfReader(f)
-            for page in reader.pages:
-                page_text = page.extract_text()
-                if page_text:
-                    text_parts.append(page_text)
-        return "\n".join(text_parts)
+        with _local_copy(file_path) as local_path:
+            with open(local_path, "rb") as fh:
+                page_count = len(PyPDF2.PdfReader(fh).pages)
+            for start in range(0, page_count, PDF_PAGE_BATCH):
+                with open(local_path, "rb") as fh:
+                    reader = PyPDF2.PdfReader(fh)
+                    for index in range(start, min(start + PDF_PAGE_BATCH, page_count)):
+                        page_text = reader.pages[index].extract_text()
+                        if page_text:
+                            text_parts.append(page_text)
+                    del reader
+        return "\n".join(text_parts), page_count
 
     @staticmethod
     def _pdf_page_count(file_path: str) -> int:
@@ -176,8 +247,8 @@ class DocumentProcessor:
             import PyPDF2
         except ImportError:
             raise ImportError("pip install PyPDF2")
-        with default_storage.open(file_path, "rb") as f:
-            return len(PyPDF2.PdfReader(f).pages)
+        with _local_copy(file_path) as local_path, open(local_path, "rb") as fh:
+            return len(PyPDF2.PdfReader(fh).pages)
 
     @staticmethod
     def _extract_docx(file_path: str) -> str:
@@ -402,18 +473,23 @@ class DocumentProcessor:
                     progress_callback(n_cloned, n_cloned)
                 return document
 
-            extracted_text = self.extract_text_from_file(
-                document.file_path, document.file_type or ""
-            )
+            is_pdf = (document.file_type or "").lower().lstrip(".") == "pdf"
+            if is_pdf:
+                # One pass for the text AND the page count the OCR check
+                # needs, instead of parsing the PDF twice.
+                extracted_text, page_count = self._extract_pdf_with_page_count(document.file_path)
+            else:
+                extracted_text = self.extract_text_from_file(
+                    document.file_path, document.file_type or ""
+                )
 
             # --- OCR fallback for scanned PDFs (worker context only:
             # views enqueue a ProcessingJob rather than calling this
             # inline, so this slow path never runs in a request cycle).
             ocr_applied = False
-            if (document.file_type or "").lower().lstrip(".") == "pdf":
+            if is_pdf:
                 from core.services.ocr_service import extract_text_with_ocr, needs_ocr
 
-                page_count = self._pdf_page_count(document.file_path)
                 if needs_ocr(extracted_text, page_count):
                     logger.info(
                         "Document %d yields negligible text (%d chars over %d "

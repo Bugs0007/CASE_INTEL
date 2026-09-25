@@ -12,9 +12,10 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from django.utils import timezone
 
 from core.models import CourtOrder
+from core.services.india_time import india_date
+from core.services.money import format_inr
 
 # Client-facing wording for the orders the summariser resolves without an
 # LLM. The advocate-facing texts in order_summary/service.py talk about
@@ -87,7 +88,8 @@ def what_happened_line(order: CourtOrder | None) -> str:
     if order is None:
         return ""
     if order.summary_status == CourtOrder.SUMMARY_SUMMARIZED:
-        return (order.summary_what_happened or "").strip()
+        # The client's version when there is one; the advocate's otherwise.
+        return (order.summary_plain or order.summary_what_happened or "").strip()
     if order.summary_status == CourtOrder.SUMMARY_NO_DIRECTIONS:
         return _NO_DIRECTIONS_TEXT
     # pending / failed / unreadable: nothing reliable to report.
@@ -164,7 +166,7 @@ def compose_reschedule_update(
 
 
 def _money(amount: Decimal) -> str:
-    return f"Rs. {Decimal(amount):,.2f}"
+    return format_inr(amount)
 
 
 _ORDINAL = {1: "", 2: "Second reminder: ", 3: "Final reminder: "}
@@ -174,8 +176,8 @@ def compose_payment_reminder(*, fee, profile, recipient_name: str, reminder_numb
     case = fee.hearing.case
     prefix = _ORDINAL.get(reminder_number, "Reminder: ")
     subject = f"{prefix}Payment reminder for invoice {fee.invoice_number} - {matter_label(case)}"[:255]
-    invoiced = timezone.localtime(fee.invoiced_at).date() if fee.invoiced_at else None
-    hearing_day = timezone.localtime(fee.hearing.hearing_date).date()
+    invoiced = india_date(fee.invoiced_at)
+    hearing_day = india_date(fee.hearing.hearing_date)
     lines = [
         _greeting([recipient_name]),
         "",

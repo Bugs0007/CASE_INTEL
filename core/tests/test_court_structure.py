@@ -28,13 +28,13 @@ from bharat_courts.districtcourts.parser import ServerError as DistrictServerErr
 from bharat_courts.hcservices.parser import ServerError as HCServerError
 from django.contrib.auth.models import User
 from django.core.cache import cache
-from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
 from core.models import ProcessingJob
 from core.services.advocate_search import run_advocate_search
 from core.services.court_data import CourtPortalError
 from core.services.court_data.ecourts_provider import EcourtsProvider
+from core.tests.auth_helpers import token_for
 
 
 @pytest.fixture(autouse=True)
@@ -80,8 +80,7 @@ def user_a():
 @pytest.fixture
 def client_a(user_a):
     client = APIClient()
-    token, _ = Token.objects.get_or_create(user=user_a)
-    client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+    client.credentials(HTTP_AUTHORIZATION=f"Token {token_for(user_a)}")
     return client
 
 

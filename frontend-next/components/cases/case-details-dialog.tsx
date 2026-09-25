@@ -361,7 +361,7 @@ export function CaseDetailsDialog({ isOpen, onClose, case: caseItem }: CaseDetai
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label htmlFor="user-party-role" className="block text-sm font-medium text-gray-700 mb-1">
                 Your Client&apos;s Side
@@ -452,7 +452,7 @@ export function CaseDetailsDialog({ isOpen, onClose, case: caseItem }: CaseDetai
               {contacts.map((row) => (
                 <div key={row.key} className="border border-gray-100 rounded-lg p-3 space-y-2">
                   <div className="flex items-start gap-2">
-                    <div className="flex-1 grid grid-cols-2 gap-2">
+                    <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <Input
                         aria-label="Contact name"
                         value={row.name}

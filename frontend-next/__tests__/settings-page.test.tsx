@@ -32,6 +32,13 @@ vi.mock("@/lib/api/billing", () => ({
   },
 }));
 
+// The signed-in devices card lists sessions; the page tests don't cover it
+// (see signed-in-sessions-card.test.tsx) -- just keep it off the network.
+vi.mock("@/lib/api/auth", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/api/auth")>()),
+  authSessionsApi: { list: vi.fn().mockResolvedValue([]), revoke: vi.fn(), revokeOthers: vi.fn() },
+}));
+
 vi.mock("@/components/ui/toaster", () => ({
   showToast: {
     success: vi.fn(),
