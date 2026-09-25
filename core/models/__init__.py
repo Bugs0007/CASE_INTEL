@@ -28,9 +28,11 @@ from .court_tracking_preview import CourtTrackingPreview
 from .processing_job import JobAlreadyRunningError, ProcessingJob
 from .advocate_search_preference import AdvocateSearchPreference
 from .invite_token import InviteToken
+from .auth_session import AuthSession
 
 __all__ = [
     "AccountLock",
+    "AuthSession",
     "AdvocateProfile",
     "AppearanceFee",
     "Case",

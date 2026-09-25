@@ -17,9 +17,10 @@ from collections import defaultdict
 from datetime import date
 from decimal import Decimal
 
-from django.utils import timezone
 
 from core.models import AppearanceFee, Client
+from core.services.india_time import india_date, india_fmt, india_today
+from core.services.money import pdf_inr
 from core.services.pdf_utils import draw_letterhead, pdf_safe
 
 AGING_BUCKETS = (
@@ -34,7 +35,7 @@ ZERO = Decimal("0.00")
 
 
 def _age_days(fee: AppearanceFee, today: date) -> int:
-    invoiced = timezone.localtime(fee.invoiced_at).date() if fee.invoiced_at else today
+    invoiced = india_date(fee.invoiced_at) or today
     return max((today - invoiced).days, 0)
 
 
@@ -50,7 +51,7 @@ def portfolio(fees_qs, hearings_qs, *, today: date | None = None) -> dict:
 
     fees_qs / hearings_qs must already be owner-scoped.
     """
-    today = today or timezone.localdate()
+    today = today or india_today()
     fees = list(
         fees_qs.filter(status__in=(AppearanceFee.STATUS_INVOICED, AppearanceFee.STATUS_PENDING))
         .select_related("hearing__case__client")
@@ -158,7 +159,7 @@ def _money_fields(row: dict, *keys: str) -> dict:
 def uninvoiced_hearings_this_month(hearings_qs, *, today: date | None = None) -> list[dict]:
     """Hearings this calendar month that have happened but aren't billed:
     no charge recorded at all, or only charges still PENDING."""
-    today = today or timezone.localdate()
+    today = today or india_today()
     month_start = today.replace(day=1)
     hearings = (
         hearings_qs.filter(hearing_date__date__gte=month_start, hearing_date__date__lte=today)
@@ -192,7 +193,7 @@ def uninvoiced_hearings_this_month(hearings_qs, *, today: date | None = None) ->
 
 
 def _money(amount: Decimal) -> str:
-    return f"Rs. {Decimal(amount):,.2f}"
+    return pdf_inr(amount)
 
 
 def render_client_statement_pdf(client: Client, fees_qs, profile, *, today: date | None = None) -> bytes:
@@ -202,7 +203,7 @@ def render_client_statement_pdf(client: Client, fees_qs, profile, *, today: date
 
     from core.services.invoice_service import REVERSE_CHARGE_LINE
 
-    today = today or timezone.localdate()
+    today = today or india_today()
     fees = list(
         fees_qs.filter(hearing__case__client=client)
         .filter(status__in=(AppearanceFee.STATUS_INVOICED, AppearanceFee.STATUS_PENDING))
@@ -248,12 +249,12 @@ def render_client_statement_pdf(client: Client, fees_qs, profile, *, today: date
         pdf.set_font("Helvetica", "", 9)
         for fee in invoiced:
             case = fee.hearing.case
-            invoiced_on = timezone.localtime(fee.invoiced_at).date() if fee.invoiced_at else None
+            invoiced_on = india_date(fee.invoiced_at)
             cells = (
                 fee.invoice_number,
                 invoiced_on.strftime("%d %b %Y") if invoiced_on else "",
                 f"{case.case_number} {case.title}"[:40],
-                timezone.localtime(fee.hearing.hearing_date).strftime("%d %b %Y"),
+                india_fmt(fee.hearing.hearing_date),
                 _money(fee.amount),
                 str(_age_days(fee, today)),
             )
@@ -280,7 +281,7 @@ def render_client_statement_pdf(client: Client, fees_qs, profile, *, today: date
                 0,
                 6,
                 pdf_safe(
-                    f"{timezone.localtime(fee.hearing.hearing_date).strftime('%d %b %Y')}  "
+                    f"{india_fmt(fee.hearing.hearing_date)}  "
                     f"{case.case_number} {case.title[:40]}  {fee.get_category_display()}  {_money(fee.amount)}"
                 ),
                 new_x="LMARGIN",

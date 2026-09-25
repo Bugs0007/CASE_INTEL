@@ -32,6 +32,9 @@ from .auth import (
     LoginView,
     LogoutView,
     RegisterView,
+    SessionDetailView,
+    SessionListView,
+    SessionRevokeOthersView,
 )
 from .case import CaseDetailView, CaseListView
 from .case_tracking import (
@@ -183,6 +186,9 @@ __all__ = [
     "LimitationRulesView",
     "LoginView",
     "LogoutView",
+    "SessionDetailView",
+    "SessionListView",
+    "SessionRevokeOthersView",
     "RegisterView",
     "TaskDetailView",
     "TaskListCreateView",

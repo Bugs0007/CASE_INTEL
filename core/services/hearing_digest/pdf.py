@@ -10,6 +10,7 @@ from datetime import date, datetime
 
 from django.utils import timezone
 
+from core.services.india_time import INDIA_TZ
 from core.services.pdf_utils import pdf_safe
 
 _BRIEFING_PLACEHOLDER = {
@@ -173,4 +174,4 @@ def _fmt_datetime(value) -> str:
         return ""
     if isinstance(value, str):
         return value
-    return timezone.localtime(value).strftime("%d %b %Y, %H:%M %Z")
+    return timezone.localtime(value, INDIA_TZ).strftime("%d %b %Y, %H:%M IST")

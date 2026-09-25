@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { format, subDays } from "date-fns";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -48,6 +49,7 @@ function makeMessage(overrides: Partial<ClientMessage> = {}): ClientMessage {
     invoice_number: null,
     hearing: null,
     hearing_date: null,
+    event_date: null,
     court_order: null,
     sent_at: null,
     discard_reason: "",
@@ -193,6 +195,21 @@ describe("ClientMessageCard", () => {
 
     await waitFor(() => expect(screen.getByRole("button", { name: /^send$/i })).toBeDisabled());
     expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
+  });
+
+  it("warns before sending an update about a hearing more than a week old", () => {
+    // Local calendar dates, as the card counts them -- an ISO (UTC) date is
+    // a day behind in India between midnight and 05:30.
+    const tenDaysAgo = format(subDays(new Date(), 10), "yyyy-MM-dd");
+    renderCard(makeMessage({ event_date: tenDaysAgo }));
+    expect(screen.getByText("10 days old")).toBeInTheDocument();
+    expect(screen.getByText(/reports a hearing from 10 days ago/)).toBeInTheDocument();
+  });
+
+  it("does not warn about a recent hearing", () => {
+    const yesterday = format(subDays(new Date(), 1), "yyyy-MM-dd");
+    renderCard(makeMessage({ event_date: yesterday }));
+    expect(screen.queryByText(/days old/)).not.toBeInTheDocument();
   });
 
   it("shows a logged message as never delivered", () => {

@@ -13,7 +13,6 @@ from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
 from django.utils import timezone
-from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
 from core.models import (
@@ -27,6 +26,7 @@ from core.models import (
 )
 from core.services.vector_search_service import VectorSearchService
 from core.views import chat as chat_view
+from core.tests.auth_helpers import token_for
 
 
 @pytest.fixture
@@ -41,8 +41,7 @@ def user_b():
 
 def _authed_client(user):
     client = APIClient()
-    token, _ = Token.objects.get_or_create(user=user)
-    client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+    client.credentials(HTTP_AUTHORIZATION=f"Token {token_for(user)}")
     return client
 
 
@@ -429,9 +428,8 @@ class TestAuthEndpoints:
 
         resp = client.post("/api/auth/logout/")
         assert resp.status_code == 204
-        assert not Token.objects.filter(key=token).exists()
 
-        # The now-deleted token can no longer authenticate.
+        # The ended session can no longer authenticate.
         resp = client.get("/api/cases/")
         assert resp.status_code == 401
 
@@ -759,6 +757,11 @@ _MANUALLY_SCOPED_VIEWS = {
     "gmail.GmailSyncView",
     "gmail.EmailListView",
     "gmail.EmailLinkView",
+    # Signed-in sessions: every query filters AuthSession by request.user;
+    # tenancy covered in test_auth_sessions.py.
+    "auth.SessionListView",
+    "auth.SessionDetailView",
+    "auth.SessionRevokeOthersView",
 }
 
 

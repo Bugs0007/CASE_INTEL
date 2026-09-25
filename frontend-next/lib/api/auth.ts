@@ -56,15 +56,36 @@ export function changeUsername(
   });
 }
 
+/** One signed-in device (GET /api/auth/sessions/). */
+export interface AuthSessionRow {
+  id: number;
+  source: string;
+  source_display: string;
+  user_agent: string;
+  ip_address: string | null;
+  created_at: string;
+  last_used_at: string;
+  expires_at: string;
+  /** The session this request came in on. */
+  current: boolean;
+}
+
+export const authSessionsApi = {
+  list: () => apiClient<AuthSessionRow[]>("/auth/sessions/"),
+  revoke: (id: number) => apiClient<void>(`/auth/sessions/${id}/`, { method: "DELETE" }),
+  revokeOthers: () =>
+    apiClient<{ revoked: number }>("/auth/sessions/revoke-others/", { method: "POST" }),
+};
+
 export interface ChangePasswordResponse {
   token: string;
 }
 
-/** Self-service password change. On success the server rotates the auth
- * token (every existing token for this user is deleted, a fresh one
- * issued) -- the caller must store the returned token in place of the
- * old one, or the current session stops authenticating on its very next
- * request. Same credentials_locked 403 as changeUsername(). */
+/** Self-service password change. On success the server ends every
+ * session this account has (other devices included) and issues a fresh
+ * one -- the caller must store the returned token in place of the old
+ * one, or this device stops authenticating on its very next request. Same
+ * credentials_locked 403 as changeUsername(). */
 export function changePassword(
   currentPassword: string,
   newPassword: string,

@@ -13,6 +13,7 @@ from core.models import (
     AdvocateProfile,
     AdvocateSearchPreference,
     AppearanceFee,
+    AuthSession,
     Case,
     CaseBriefing,
     CaseTag,
@@ -96,6 +97,17 @@ class ClientContactAdmin(admin.ModelAdmin):
     list_filter = ("role", "is_billing_contact")
     search_fields = ("name", "email", "phone")
     readonly_fields = ("created_at",)
+
+
+@admin.register(AuthSession)
+class AuthSessionAdmin(admin.ModelAdmin):
+    """Signed-in sessions. Only a hash of each key is stored, so there is
+    nothing secret to show; revoking = setting revoked_at."""
+
+    list_display = ("id", "user", "source", "created_at", "last_used_at", "expires_at", "revoked_at")
+    list_filter = ("source",)
+    search_fields = ("user__username", "user_agent")
+    readonly_fields = ("key_hash", "created_at", "last_used_at", "user_agent", "ip_address", "source")
 
 
 @admin.register(Client)

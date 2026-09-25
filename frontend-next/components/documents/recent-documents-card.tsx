@@ -65,7 +65,7 @@ export function RecentDocumentsCard({
           )}
           <Button variant="primary" size="sm" onClick={onUploadClick}>
             <Upload className="h-4 w-4" />
-            Upload Document
+            Upload<span className="hidden sm:inline"> Document</span>
           </Button>
         </div>
       </CardHeader>

@@ -13,17 +13,16 @@ import pytest
 from bs4 import BeautifulSoup
 from django.contrib.auth.models import User
 from django.urls import reverse
-from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
 from core.models import AccountLock
 from core.services.account_security import is_credentials_locked
+from core.tests.auth_helpers import token_for
 
 
 def _authed_api_client(user):
     client = APIClient()
-    token, _ = Token.objects.get_or_create(user=user)
-    client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+    client.credentials(HTTP_AUTHORIZATION=f"Token {token_for(user)}")
     return client
 
 
@@ -69,8 +68,12 @@ class TestChangeUsernameAndPassword:
         )
         assert resp.status_code == 400
 
-    def test_unlocked_user_can_change_password(self, api, user):
-        old_token = Token.objects.get(user=user).key
+    def test_unlocked_user_can_change_password(self, user):
+        old_token = token_for(user)
+        api = APIClient()
+        api.credentials(HTTP_AUTHORIZATION=f"Token {old_token}")
+        other_device = APIClient()
+        other_device.credentials(HTTP_AUTHORIZATION=f"Token {token_for(user)}")
 
         resp = api.post(
             "/api/auth/change-password/",
@@ -83,8 +86,12 @@ class TestChangeUsernameAndPassword:
 
         user.refresh_from_db()
         assert user.check_password("Br4nd-N3w-Passw0rd!")
-        # The old token must no longer authenticate anything.
-        assert not Token.objects.filter(key=old_token).exists()
+        # Every earlier session -- this device's and any other -- is over;
+        # only the fresh token works.
+        assert api.get("/api/cases/").status_code == 401
+        assert other_device.get("/api/cases/").status_code == 401
+        api.credentials(HTTP_AUTHORIZATION=f"Token {new_token}")
+        assert api.get("/api/cases/").status_code == 200
 
     def test_password_change_requires_correct_current_password(self, api, user):
         resp = api.post(

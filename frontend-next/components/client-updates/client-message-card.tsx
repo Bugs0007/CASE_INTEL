@@ -15,6 +15,7 @@ import {
 } from "@/hooks/use-clients";
 import { apiErrorDetail } from "@/lib/api/client";
 import { cn, formatDate, formatHearingDate } from "@/lib/utils";
+import { differenceInCalendarDays, parseISO } from "date-fns";
 import type { ClientMessage } from "@/types";
 
 interface ClientMessageCardProps {
@@ -23,6 +24,9 @@ interface ClientMessageCardProps {
   showCase?: boolean;
   defaultOpen?: boolean;
 }
+
+/** Mirrors CLIENT_UPDATE_MAX_AGE_DAYS on the server (no new drafts past it). */
+const STALE_UPDATE_DAYS = 7;
 
 function kindNoun(message: ClientMessage): string {
   return message.kind === "payment_reminder" ? "Reminder" : "Update";
@@ -69,6 +73,12 @@ export function ClientMessageCard({ message, showCase = false, defaultOpen = fal
   const contactEmailMissing = isDraft && profile !== undefined && !profile.contact_email;
   const noRecipients = recipientIds.length === 0;
   const sendBlocked = noRecipients || nameMissing || contactEmailMissing;
+
+  // A case update about a hearing more than a week ago may no longer be
+  // news (or may have been overtaken) -- say so before it goes out.
+  const reportedDay = message.kind === "case_update" ? (message.event_date ?? message.hearing_date?.slice(0, 10)) : null;
+  const daysOld = reportedDay ? differenceInCalendarDays(new Date(), parseISO(reportedDay)) : 0;
+  const stale = isDraft && daysOld > STALE_UPDATE_DAYS;
 
   async function save(): Promise<boolean> {
     try {
@@ -141,6 +151,11 @@ export function ClientMessageCard({ message, showCase = false, defaultOpen = fal
               {message.status === "logged" ? "Logged, not emailed" : message.status_display}
             </span>
             {message.edited_by_user && isDraft && <span className="text-xs text-gray-500">edited</span>}
+            {stale && (
+              <span className="ci-chip ci-chip--pending" title="The hearing this update reports was more than a week ago.">
+                {daysOld} days old
+              </span>
+            )}
           </div>
           <div className="mt-1 text-sm font-medium text-gray-900 truncate">{message.subject}</div>
           <div className="text-xs text-gray-500">
@@ -170,6 +185,15 @@ export function ClientMessageCard({ message, showCase = false, defaultOpen = fal
 
           {isDraft ? (
             <>
+              {stale && (
+                <div className="flex items-start gap-1.5 rounded-md bg-status-pending-soft px-2.5 py-1.5 text-xs text-gray-800">
+                  <AlertTriangle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-status-pending" />
+                  <span>
+                    This reports a hearing from {daysOld} days ago. Check it&apos;s still news -- and that
+                    nothing newer has happened -- before sending.
+                  </span>
+                </div>
+              )}
               <div>
                 <span className="block text-xs font-medium text-gray-700 mb-1">To</span>
                 {message.eligible_recipients.length === 0 ? (

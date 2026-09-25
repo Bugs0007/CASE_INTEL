@@ -12,6 +12,7 @@ import {
   useStartRefreshAll,
 } from "@/hooks/use-clients";
 import { APIError, apiErrorDetail } from "@/lib/api/client";
+import { formatRelativeTime } from "@/lib/utils";
 import type { RefreshRun } from "@/types";
 
 function summary(run: RefreshRun): string {
@@ -24,6 +25,21 @@ function summary(run: RefreshRun): string {
     r.drafts_created ? `${r.drafts_created} client update${r.drafts_created === 1 ? "" : "s"} drafted` : "",
   ].filter(Boolean);
   return parts.join(" · ");
+}
+
+/** "Last run 9 min ago · 24 checked · 5 updated · 0 errors" -- what the
+ * last finished run did, so the button isn't a leap of faith. */
+export function lastRunLine(run: RefreshRun): string {
+  const r = run.results;
+  const when = run.finished_at ? formatRelativeTime(run.finished_at) : formatRelativeTime(run.created_at);
+  const stopped =
+    run.status === "cancelled" ? " (cancelled)" : run.status === "failed" || run.aborted_reason ? " (stopped early)" : "";
+  return [
+    `Last run ${when}${stopped}`,
+    `${run.done} checked`,
+    `${r.updated ?? 0} updated`,
+    `${r.failed} error${r.failed === 1 ? "" : "s"}`,
+  ].join(" · ");
 }
 
 /** "Refresh all tracked cases" -- fetches every open tracked case from
@@ -93,6 +109,9 @@ export function RefreshAllButton() {
   }
 
   const pct = current && current.total ? Math.round((current.done / current.total) * 100) : 0;
+  // The run this page watched, else the latest from the server.
+  const latestRun = latest.data && latest.data.job_id !== null ? (latest.data as RefreshRun) : null;
+  const lastRun = [current, latestRun].find((r): r is RefreshRun => !!r && !isRunActive(r)) ?? null;
 
   return (
     <div className="mb-5 flex flex-wrap items-center gap-3">
@@ -133,6 +152,11 @@ export function RefreshAllButton() {
           <span className="text-xs text-gray-500">
             Checks eCourts for every open tracked case, one at a time. Cases checked in the last hour are skipped.
           </span>
+          {lastRun && (
+            <span className="basis-full text-xs text-gray-600" data-testid="refresh-last-run">
+              {lastRunLine(lastRun)}
+            </span>
+          )}
         </>
       )}
     </div>

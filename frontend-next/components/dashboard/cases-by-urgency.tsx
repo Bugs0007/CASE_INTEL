@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { reasonForCase, sortByUrgencyPriority } from "@/lib/case-urgency";
-import { staggerDelay } from "@/lib/utils";
+import { formatHearingDate, staggerDelay } from "@/lib/utils";
 import type { Case } from "@/types";
 
 interface CasesByUrgencyProps {
@@ -62,7 +62,10 @@ export function CasesByUrgency({
                         {c.title}
                       </div>
                       <div className="text-xs font-mono text-gray-500">
-                        {c.case_number} · {c.priority} priority
+                        {c.case_number}
+                        {c.next_hearing_date && ` · hearing ${formatHearingDate(c.next_hearing_date)}`}
+                        {/* "medium" is every case's default: only say so when it's been changed. */}
+                        {c.priority !== "medium" && ` · ${c.priority} priority`}
                       </div>
                     </div>
                   </div>

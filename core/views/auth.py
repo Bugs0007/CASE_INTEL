@@ -1,5 +1,9 @@
 """
-Token authentication views: login, logout, invite-gated register.
+Token authentication views: login, logout, invite-gated register, and the
+signed-in sessions list.
+
+Each login creates its own expiring, revocable session
+(core/services/auth_sessions.py); logout ends only that one.
 
 Self-service registration with no invite is intentionally not possible --
 the owner generates a single-use InviteToken from Django admin and emails
@@ -14,36 +18,38 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers, status
-from rest_framework.authtoken.models import Token
-from rest_framework.authtoken.views import ObtainAuthToken
+from rest_framework.authtoken.serializers import AuthTokenSerializer
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.models import InviteToken
+from core.models import AuthSession, InviteToken
+from core.services import auth_sessions
 from core.services.account_security import is_credentials_locked
 
 
-class LoginView(ObtainAuthToken):
-    """Exchange username + password for an auth token.
+class LoginView(APIView):
+    """Exchange username + password for a new session token.
 
     POST /api/auth/login/
     { "username": "...", "password": "..." }
     Returns: { "token": "...", "user_id": 1, "username": "..." }
+
+    Every login is its own session: signing in on a second device no longer
+    shares -- or, on logout, kills -- the first device's token.
     """
 
     permission_classes = [AllowAny]
+    authentication_classes = []
 
     def post(self, request, *args, **kwargs):
-        serializer = self.serializer_class(
-            data=request.data, context={"request": request}
-        )
+        serializer = AuthTokenSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data["user"]
-        token, _ = Token.objects.get_or_create(user=user)
+        _session, key = auth_sessions.create_session(user, request, source=AuthSession.SOURCE_LOGIN)
         return Response(
             {
-                "token": token.key,
+                "token": key,
                 "user_id": user.pk,
                 "username": user.username,
             }
@@ -151,11 +157,11 @@ class RegisterView(APIView):
             invite.used_at = timezone.now()
             invite.used_by = user
             invite.save(update_fields=["used_at", "used_by"])
-            token = Token.objects.create(user=user)
+            _session, key = auth_sessions.create_session(user, request, source=AuthSession.SOURCE_REGISTER)
 
         return Response(
             {
-                "token": token.key,
+                "token": key,
                 "user_id": user.pk,
                 "username": user.username,
             },
@@ -164,17 +170,66 @@ class RegisterView(APIView):
 
 
 class LogoutView(APIView):
-    """Invalidate the caller's current auth token.
+    """End the caller's current session -- only this one.
 
     POST /api/auth/logout/
-    Requires the normal Authorization: Token <token> header. Deletes that
-    token server-side so it can no longer authenticate -- the frontend
-    should also clear its locally-stored copy (see frontend-next/lib/auth.ts).
+    Requires the normal Authorization: Token <token> header. Revokes that
+    session server-side; the user's other devices stay signed in. The
+    frontend also clears its stored copy (see frontend-next/lib/auth.ts).
     """
 
     def post(self, request, *args, **kwargs):
-        request.auth.delete()
+        auth_sessions.revoke(request.auth)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+def _session_row(session: AuthSession, current: AuthSession | None) -> dict:
+    return {
+        "id": session.id,
+        "source": session.source,
+        "source_display": session.get_source_display(),
+        "user_agent": session.user_agent,
+        "ip_address": session.ip_address,
+        "created_at": session.created_at,
+        "last_used_at": session.last_used_at,
+        "expires_at": session.expires_at,
+        "current": current is not None and session.id == current.id,
+    }
+
+
+class SessionListView(APIView):
+    """The caller's signed-in sessions.
+
+    GET  /api/auth/sessions/          -> active sessions, current one flagged
+    POST /api/auth/sessions/revoke-others/ is SessionRevokeOthersView.
+
+    Always scoped to request.user -- there's no id to guess.
+    """
+
+    def get(self, request, *args, **kwargs):
+        rows = auth_sessions.active_sessions(request.user).order_by("-last_used_at", "-id")
+        return Response([_session_row(s, request.auth) for s in rows])
+
+
+class SessionDetailView(APIView):
+    """DELETE /api/auth/sessions/<id>/ -- sign that one session out.
+    Another user's session id is a 404, exactly like a missing one."""
+
+    def delete(self, request, pk, *args, **kwargs):
+        session = AuthSession.objects.filter(id=pk, user=request.user, revoked_at__isnull=True).first()
+        if session is None:
+            return Response({"detail": "Session not found."}, status=status.HTTP_404_NOT_FOUND)
+        auth_sessions.revoke(session)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class SessionRevokeOthersView(APIView):
+    """POST /api/auth/sessions/revoke-others/ -- sign out every session but
+    this one. Returns {"revoked": n}."""
+
+    def post(self, request, *args, **kwargs):
+        revoked = auth_sessions.revoke_all(request.user, except_session=request.auth)
+        return Response({"revoked": revoked})
 
 
 def _credentials_locked_response() -> Response:
@@ -268,13 +323,10 @@ class ChangePasswordView(APIView):
     Returns: { "token": "..." }
 
     Same credentials_locked check (and same reasoning) as
-    ChangeUsernameView -- see there. On success, also rotates the auth
-    token: deletes every existing token for this user and issues a fresh
-    one, so a leaked/stolen token stops authenticating the moment the
-    real owner changes their password, instead of quietly continuing to
-    work forever regardless of the password change. The caller must swap
-    to the returned token; the one that authenticated THIS request is
-    deleted too (harmless -- the response has already been built).
+    ChangeUsernameView -- see there. On success, every session this user has
+    is revoked (a stolen token stops working the moment the real owner
+    changes their password) and a fresh one is issued for this device. The
+    caller must swap to the returned token.
     """
 
     def post(self, request, *args, **kwargs):
@@ -287,7 +339,12 @@ class ChangePasswordView(APIView):
         request.user.set_password(serializer.validated_data["new_password"])
         request.user.save(update_fields=["password"])
 
-        Token.objects.filter(user=request.user).delete()
-        token = Token.objects.create(user=request.user)
+        # A new session for this device; every existing one -- including
+        # the one this request came in on, and any a thief might hold --
+        # ends now.
+        auth_sessions.revoke_all(request.user)
+        _session, key = auth_sessions.create_session(
+            request.user, request, source=AuthSession.SOURCE_PASSWORD_CHANGE
+        )
 
-        return Response({"token": token.key})
+        return Response({"token": key})

@@ -59,7 +59,8 @@ export default function LoginPage() {
 
         {sessionEnded && (
           <div role="status" className="mb-4 rounded-lg border border-status-pending bg-status-pending-soft px-4 py-3 text-sm text-gray-800">
-            Your session ended -- this account was signed out elsewhere. Sign in again to pick up where you left off.
+            Your session ended -- you were signed out, or this device wasn&apos;t used for a week. Sign in again to
+            pick up where you left off.
           </div>
         )}
 

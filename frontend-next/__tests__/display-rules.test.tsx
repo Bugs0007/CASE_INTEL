@@ -22,6 +22,11 @@ describe("placeholder titles", () => {
     expect(hasPlaceholderTitle({ title: "Lakshmi vs State", cnr_number: "HBHC010494552026", case_number: "WP/23998/2026" })).toBe(false);
   });
 
+  it("sees through the 'CNR ' case number a CNR-added case starts with", () => {
+    expect(hasPlaceholderTitle({ title: "HBHC010536072026", cnr_number: null, case_number: "CNR HBHC010536072026" })).toBe(true);
+    expect(hasPlaceholderTitle({ title: "CNR Holdings vs State", cnr_number: null, case_number: "CNR HBHC010536072026" })).toBe(false);
+  });
+
   it("asks for a title on the case page", () => {
     const onEditDetails = vi.fn();
     render(

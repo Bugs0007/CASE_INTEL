@@ -120,14 +120,16 @@ export function formatFileSize(bytes: number | null | undefined): string {
   return `${size.toFixed(1)} ${units[unitIndex]}`;
 }
 
-/** A charge amount for display: "₹15,000", or "₹4,250.50" when there are
- * paise to show. Amounts come off the API as decimal strings so money never
- * round-trips through a float -- parse for display only. Whole rupees drop
- * the ".00", but a hotel or flight bill with paise is never rounded away.
- * Falls back to the raw string if it isn't a number. */
-export function formatFeeAmount(value: string): string {
-  const amount = Number(value);
-  if (!Number.isFinite(amount)) return value;
+/** THE money format, everywhere on screen: "₹1,31,000" -- the rupee sign,
+ * Indian digit grouping (lakhs), and no ".00" for whole rupees; paise are
+ * shown only when there are some ("₹4,250.50"), never rounded away.
+ * Amounts come off the API as decimal strings so money never round-trips
+ * through a float -- parse for display only. Falls back to the raw value if
+ * it isn't a number. (PDFs print "Rs." instead: their core fonts have no
+ * rupee sign -- see core/services/money.py.) */
+export function formatINR(value: string | number): string {
+  const amount = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(amount)) return String(value);
   const digits = Number.isInteger(amount) ? 0 : 2;
   return amount.toLocaleString("en-IN", {
     style: "currency",
@@ -136,6 +138,9 @@ export function formatFeeAmount(value: string): string {
     maximumFractionDigits: digits,
   });
 }
+
+/** A charge amount -- the same format as every other amount. */
+export const formatFeeAmount = formatINR;
 
 /** The `download/` endpoint returns a storage-relative URL on local disk
  * (e.g. "/media/documents/foo.pdf", same-origin to the Django backend --
@@ -178,7 +183,10 @@ export function primaryClientContact(contacts: ClientContact[]): ClientContact |
 export function hasPlaceholderTitle(caseItem: { title: string; cnr_number: string | null; case_number: string }): boolean {
   const title = (caseItem.title || "").trim().toUpperCase();
   if (!title) return true;
-  return [caseItem.cnr_number, caseItem.case_number].some((v) => v && v.trim().toUpperCase() === title);
+  // A case added by CNR starts as case_number "CNR HBHC0105..." and title
+  // "HBHC0105..." until the first refresh fills both in.
+  const bare = (v: string | null) => (v || "").trim().toUpperCase().replace(/^CNR\s+/, "");
+  return [caseItem.cnr_number, caseItem.case_number].some((v) => v && bare(v) === title);
 }
 
 /** "1 case", "3 cases" -- a count with its noun agreeing. */
