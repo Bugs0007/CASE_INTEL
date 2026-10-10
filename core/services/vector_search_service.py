@@ -23,8 +23,10 @@ Why this beats cosine-only search for legal documents:
     - Semantic search catches paraphrases and synonyms that BM25 misses.
     - RRF fusion keeps the best of both worlds without requiring any LLM call.
 
-The optional cross-encoder reranker (sentence-transformers) further refines
-the top results without any Ollama call, saving ~15 seconds per query.
+The optional cross-encoder reranker further refines the top results without
+any Ollama call, saving ~15 seconds per query. It runs on onnxruntime, not
+torch, so a web worker doesn't carry a ~430 MB framework for a 90 MB model --
+see core/services/reranker.py.
 """
 
 import logging
@@ -37,6 +39,7 @@ from pgvector.django import CosineDistance
 
 from core.models import DocumentChunk
 from core.services.ai_service_factory import get_embedding_service
+from core.services.reranker import get_reranker
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +94,6 @@ class VectorSearchService:
 
     def __init__(self, embedding_service=None, use_reranker: bool = True) -> None:
         self._embedding_service = embedding_service or get_embedding_service()
-        self._reranker = None
         self._use_reranker = use_reranker
 
     # ------------------------------------------------------------------
@@ -99,23 +101,15 @@ class VectorSearchService:
     # ------------------------------------------------------------------
 
     def _get_reranker(self):
-        """Lazy-load the cross-encoder. Returns None if not installed."""
-        if self._reranker is not None:
-            return self._reranker
+        """The shared, lazily loaded reranker, or None (disabled/unavailable).
+
+        One instance per process lives in core.services.reranker rather than
+        on this object, so every VectorSearchService -- and every request
+        thread -- shares a single copy of the model.
+        """
         if not self._use_reranker:
             return None
-        try:
-            from sentence_transformers import CrossEncoder
-            # ms-marco-MiniLM-L-6-v2 is ~80 MB, runs fast on CPU
-            self._reranker = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
-            logger.info("Cross-encoder reranker loaded.")
-        except ImportError:
-            logger.warning(
-                "sentence-transformers not installed — skipping reranker. "
-                "Install with: pip install sentence-transformers"
-            )
-            self._reranker = None
-        return self._reranker
+        return get_reranker()
 
     # ------------------------------------------------------------------
     # Vector search leg
@@ -248,8 +242,16 @@ class VectorSearchService:
         much more accurate relevance scores than embedding cosine distance.
         This replaces the LLM-based chunk_ranker node entirely.
         """
+        if not candidates:
+            return candidates[:top_k]
         reranker = self._get_reranker()
-        if reranker is None or not candidates:
+        if reranker is None:
+            if self._use_reranker:
+                # Scores stay on the RRF scale (~0.02), which graph/nodes.py
+                # reads as low confidence -- so this is visible to users too.
+                logger.warning(
+                    "Reranking skipped (reranker unavailable); returning RRF order."
+                )
             return candidates[:top_k]
 
         pairs = [(query, chunk.chunk_text) for chunk, _ in candidates]

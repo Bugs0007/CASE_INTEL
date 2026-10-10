@@ -132,6 +132,7 @@ import logging
 import re
 
 import httpx
+from django.conf import settings
 from django.core.cache import cache
 
 from bharat_courts import DistrictCourtClient, HCServicesClient, get_court, list_all_courts
@@ -310,6 +311,30 @@ class _TokenSeedingDistrictClient(DistrictCourtClient):
 HIERARCHY_CACHE_TTL = 60 * 60 * 24 * 30  # 30 days
 CACHE_KEY_PREFIX = "court_data:hierarchy"
 
+def _run_bounded(coro, *, label: str):
+    """asyncio.run() with a wall-clock budget (COURT_PORTAL_CALL_TIMEOUT_SECONDS).
+
+    bharat-courts allows each HTTP request 60 s and retries it, and a CNR
+    lookup chains CAPTCHA attempts and possibly a second portal -- so one
+    web request could otherwise run for many minutes. Under sync workers
+    gunicorn's arbiter killed the worker at 120 s (a 502 for whoever else it
+    was serving); under gthread nothing does, and a stuck lookup would hold
+    a request thread indefinitely. This turns "too long" into the same
+    CourtPortalError the views already map to a clean 502 'portal_error'.
+
+    Used for the paths a web request (or a refresh in the worker) takes; the
+    worker-only fan-outs (advocate search, order downloads) pace themselves.
+    """
+    budget = getattr(settings, "COURT_PORTAL_CALL_TIMEOUT_SECONDS", 90)
+    try:
+        return asyncio.run(asyncio.wait_for(coro, timeout=budget))
+    except asyncio.TimeoutError as exc:
+        raise CourtPortalError(
+            f"The court portal did not answer within {budget:.0f} seconds ({label}). "
+            "Please try again."
+        ) from exc
+
+
 class EcourtsProvider(CourtDataProvider):
     """CourtDataProvider backed by bharat-courts against the live eCourts
     portals. Public methods are synchronous; asyncio.run() bridges into
@@ -336,14 +361,14 @@ class EcourtsProvider(CourtDataProvider):
             return self.fetch_case_by_cnr(cnr, court_type)
 
         if court_type == "district":
-            return asyncio.run(self._fetch_district(tracking_config))
-        return asyncio.run(self._fetch_hc(tracking_config))
+            return _run_bounded(self._fetch_district(tracking_config), label="fetch case")
+        return _run_bounded(self._fetch_hc(tracking_config), label="fetch case")
 
     def fetch_case_by_cnr(self, cnr: str, court_type: str) -> CourtCaseData:
         if court_type == "district":
-            return asyncio.run(self._fetch_district_by_cnr(cnr))
+            return _run_bounded(self._fetch_district_by_cnr(cnr), label="fetch by CNR")
         if court_type == "high_court":
-            return asyncio.run(self._fetch_hc_by_cnr(cnr))
+            return _run_bounded(self._fetch_hc_by_cnr(cnr), label="fetch by CNR")
         raise ValueError(f"Unknown court_type: {court_type!r}")
 
     # ------------------------------------------------------------------
@@ -1049,7 +1074,7 @@ class EcourtsProvider(CourtDataProvider):
         silently re-wrapped) pass through unchanged.
         """
         try:
-            return asyncio.run(coro)
+            return _run_bounded(coro, label="court structure")
         except ValueError:
             raise
         except CourtDataError:

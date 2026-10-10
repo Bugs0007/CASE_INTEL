@@ -27,9 +27,23 @@ starts a fresh one. The unit's Restart=on-failure restarts on any
 non-zero exit, so no unit change is needed (Restart=always would also
 work). 0 turns either limit off.
 
+Priority and lanes: the queue is not plain FIFO. A claim takes the
+highest-priority queued job first (_job_priority below): a user's own upload
+or hearing-prep briefing, then the background-fetched order PDFs, then the
+long portal-paced jobs (order sync, refresh-all, advocate import/search).
+That reorders what is WAITING; it cannot interrupt a job already running, and
+one advocate search runs 10-45 minutes. So a second worker can be started
+with `--lane interactive`, which only ever claims document and briefing jobs:
+uploads keep flowing while the other worker is deep in a fan-out. The default
+`--lane all` is the original single-worker behaviour, and a `--lane all`
+worker running alongside an interactive one is fine -- the queue is safe for
+any number of workers (skip_locked); the limit is the box's memory, not
+correctness.
+
 Usage:
     python manage.py process_jobs                 # long-lived loop
     python manage.py process_jobs --once          # drain queue, then exit
+    python manage.py process_jobs --lane interactive   # uploads/briefings only
     python manage.py process_jobs --max-jobs 0 --max-rss-mb 0   # never recycle
 """
 
@@ -40,6 +54,7 @@ import time
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db import close_old_connections, connections, transaction
+from django.db.models import Case as SqlCase, IntegerField, Value, When
 from django.utils import timezone
 
 from core.models import Case, Document, ProcessingJob
@@ -61,6 +76,28 @@ MAX_ATTEMPTS = 3
 # worker straight back; distinct so a recycle is easy to tell from a crash
 # in `systemctl status` / journalctl.
 RECYCLE_EXIT_CODE = 75
+
+# Job types a worker running each lane may claim. "all" is every type.
+INTERACTIVE_JOB_TYPES = ("document", "case_briefing")
+LANES = ("all", "interactive")
+
+# Lower claims first. A document job is the interactive tier UNLESS its
+# document is a court order the portal sync fetched in the background (a
+# 100-case import queues hundreds of those); those must not sit ahead of
+# an advocate's own upload. Everything else is the long portal-paced work.
+PRIORITY_USER = 0
+PRIORITY_BACKGROUND_DOCUMENT = 1
+PRIORITY_BULK = 2
+
+
+def _job_priority():
+    return SqlCase(
+        When(job_type="document", document__document_type="court_order",
+             then=Value(PRIORITY_BACKGROUND_DOCUMENT)),
+        When(job_type__in=INTERACTIVE_JOB_TYPES, then=Value(PRIORITY_USER)),
+        default=Value(PRIORITY_BULK),
+        output_field=IntegerField(),
+    )
 
 
 class Command(BaseCommand):
@@ -93,6 +130,14 @@ class Command(BaseCommand):
                  "checked between jobs. 0 = never.",
         )
         parser.add_argument(
+            "--lane",
+            choices=LANES,
+            default="all",
+            help="Which jobs this worker may claim: 'all' (default) or "
+                 "'interactive' (document + briefing jobs only, so uploads are "
+                 "never stuck behind a long advocate search on another worker).",
+        )
+        parser.add_argument(
             "--stale-seconds",
             type=float,
             default=DEFAULT_STALE_SECONDS,
@@ -104,14 +149,15 @@ class Command(BaseCommand):
         once = options["once"]
         poll_interval = options["poll_interval"]
         stale_seconds = options["stale_seconds"]
+        lane = options["lane"]
 
         max_jobs = options["max_jobs"]
         max_rss_mb = options["max_rss_mb"]
 
         rss = current_rss_mb()
         self.stdout.write(
-            "process_jobs worker started (poll=%ss, stale=%ss, recycle after %s jobs or %s MB; rss=%s MB)"
-            % (poll_interval, stale_seconds, max_jobs or "unlimited", max_rss_mb or "unlimited",
+            "process_jobs worker started (lane=%s, poll=%ss, stale=%ss, recycle after %s jobs or %s MB; rss=%s MB)"
+            % (lane, poll_interval, stale_seconds, max_jobs or "unlimited", max_rss_mb or "unlimited",
                f"{rss:.0f}" if rss is not None else "?")
         )
         processor = DocumentProcessor()
@@ -121,7 +167,7 @@ class Command(BaseCommand):
             close_old_connections()
             self._reclaim_stale_jobs(stale_seconds)
 
-            job = self._claim_next_job()
+            job = self._claim_next_job(lane)
             if job is None:
                 if once:
                     self.stdout.write("Queue empty -- exiting (--once).")
@@ -155,14 +201,23 @@ class Command(BaseCommand):
     # Queue operations
     # ------------------------------------------------------------------
 
-    def _claim_next_job(self):
-        """Atomically claim the oldest queued job, or return None."""
+    def _claim_next_job(self, lane: str = "all"):
+        """Atomically claim the best queued job for `lane`, or return None.
+
+        "Best" is lowest priority number (see _job_priority), then oldest.
+        `of=("self",)` locks only the job row: ordering by priority joins
+        the nullable document FK, and Postgres refuses FOR UPDATE on the
+        nullable side of an outer join.
+        """
         with transaction.atomic():
+            queued = ProcessingJob.objects.filter(status="queued")
+            if lane == "interactive":
+                queued = queued.filter(job_type__in=INTERACTIVE_JOB_TYPES)
             job = (
-                ProcessingJob.objects
-                .select_for_update(skip_locked=True)
-                .filter(status="queued")
-                .order_by("created_at")
+                queued
+                .annotate(priority=_job_priority())
+                .order_by("priority", "created_at", "id")
+                .select_for_update(skip_locked=True, of=("self",))
                 .first()
             )
             if job is None:
