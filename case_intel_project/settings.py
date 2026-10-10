@@ -277,6 +277,45 @@ OLLAMA_BASE_URL = config("OLLAMA_BASE_URL", default="http://localhost:11434")
 OLLAMA_MODEL = config("OLLAMA_MODEL", default="llama3.1:8b")
 OLLAMA_EMBEDDING_MODEL = config("OLLAMA_EMBEDDING_MODEL", default="nomic-embed-text")
 
+# Per-attempt timeout (seconds) for an OpenAI/Groq-compatible chat request, and
+# how many times the SDK may retry a timed-out/429/5xx call. Without a bound
+# the SDK waits 10 minutes, so one hung provider pins a gunicorn worker until
+# the arbiter kills it -- and under gthread (where the arbiter's timeout no
+# longer covers a stuck request) it would pin a thread for good. Worst case
+# for one call is TIMEOUT x (1 + RETRIES); Case Bot makes two calls (HyDE,
+# answer) in one request, so keep 2 x that comfortably under the gunicorn
+# --timeout (120 s): 25 x 2 x 2 = 100 s at the defaults, and the HyDE call
+# is further capped by AI_HYDE_TIMEOUT_SECONDS below.
+LLM_REQUEST_TIMEOUT_SECONDS = config("LLM_REQUEST_TIMEOUT_SECONDS", default=25, cast=float)
+LLM_MAX_RETRIES = config("LLM_MAX_RETRIES", default=1, cast=int)
+# HyDE only improves retrieval and already falls back to the raw query when it
+# fails, so it gets a short single attempt rather than the full budget.
+AI_HYDE_TIMEOUT_SECONDS = config("AI_HYDE_TIMEOUT_SECONDS", default=10, cast=float)
+# A local Ollama model on CPU can legitimately take far longer than a hosted
+# API, so it has its own, looser bound. Not the production path (USE_GROQ).
+OLLAMA_REQUEST_TIMEOUT_SECONDS = config("OLLAMA_REQUEST_TIMEOUT_SECONDS", default=120, cast=float)
+
+# Wall-clock budget (seconds) for one web-facing eCourts call -- a case fetch,
+# a CNR lookup, a court-hierarchy lookup (core/services/court_data/
+# ecourts_provider.py:_run_bounded). The portal client's own limits are 60 s
+# per HTTP request x 3 retries, chained across CAPTCHA attempts; without this
+# a request thread can be held for minutes. Keep it under gunicorn's --timeout.
+COURT_PORTAL_CALL_TIMEOUT_SECONDS = config("COURT_PORTAL_CALL_TIMEOUT_SECONDS", default=90, cast=float)
+
+# Case Bot cross-encoder reranker (core/services/reranker.py).
+#   onnx  (default) onnxruntime, no torch in the web process
+#   torch the original sentence-transformers CrossEncoder (~+430 MB per worker)
+#   none  no reranking: RRF order, and every answer carries the low-confidence
+#         note because the confidence threshold assumes cross-encoder scores
+RERANKER_BACKEND = config("RERANKER_BACKEND", default="onnx")
+# onnxruntime intra-op threads per scoring call. Measured on a dev laptop for
+# 18 x ~100-token pairs: 1 thread ~1.0 s, 2 threads ~0.67 s, the same as torch
+# at equal thread counts. The box has 2 vCPUs, so more than 2 only adds
+# contention with the other request threads and the job worker.
+RERANKER_ONNX_THREADS = config("RERANKER_ONNX_THREADS", default=2, cast=int)
+# After a failed load, wait this long before trying again (seconds).
+RERANKER_RETRY_SECONDS = config("RERANKER_RETRY_SECONDS", default=300, cast=int)
+
 # AI Workflow Configuration
 AI_SEARCH_TOP_K = config("AI_SEARCH_TOP_K", default=10, cast=int)
 AI_RERANK_TOP_K = config("AI_RERANK_TOP_K", default=5, cast=int)

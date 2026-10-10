@@ -47,6 +47,14 @@ class GeminiEmbeddingService:
     # 429 RESOURCE_EXHAUSTED specifically, wait long enough for the
     # per-minute window to roll over instead.
     RATE_LIMIT_RETRY_DELAY = 30.0  # seconds
+    # embed_text() is the interactive path (one chat query inside a web
+    # request); ingestion uses embed_texts(). A web worker must not sit in
+    # a 30 s rate-limit sleep or an unbounded HTTP wait, so queries get a
+    # short per-call timeout, one retry, and no rate-limit sleep. A failed
+    # query embedding is already handled upstream (VectorSearchService falls
+    # back to keyword-only results), unlike a failed ingestion embedding.
+    QUERY_TIMEOUT_SECONDS = 8
+    QUERY_RETRY_ATTEMPTS = 2
 
     def __init__(
         self,
@@ -61,17 +69,21 @@ class GeminiEmbeddingService:
         self._client = genai.Client(api_key=resolved_key)
         self.model = model or settings.GEMINI_EMBEDDING_MODEL
 
-    def _call_with_retry(self, func, *args, **kwargs):
+    def _call_with_retry(self, func, *args, attempts=None, rate_limit_wait=True, **kwargs):
         """Execute function with exponential backoff retry.
 
         Only retries transient API errors; the final failure is re-raised
         so the caller fails the processing job instead of continuing with
         a partially-embedded document.
+
+        `attempts` overrides DEFAULT_RETRY_ATTEMPTS and `rate_limit_wait=False`
+        skips the long 429 sleep -- both for the interactive query path.
         """
         last_error = None
         delay = self.DEFAULT_RETRY_DELAY
+        max_attempts = attempts or self.DEFAULT_RETRY_ATTEMPTS
 
-        for attempt in range(self.DEFAULT_RETRY_ATTEMPTS):
+        for attempt in range(max_attempts):
             try:
                 return func(*args, **kwargs)
             except errors.APIError as e:
@@ -79,27 +91,39 @@ class GeminiEmbeddingService:
                 logger.warning(
                     "Gemini embedding request failed (attempt %d/%d): %s",
                     attempt + 1,
-                    self.DEFAULT_RETRY_ATTEMPTS,
+                    max_attempts,
                     str(e),
                 )
-                if attempt < self.DEFAULT_RETRY_ATTEMPTS - 1:
+                if attempt < max_attempts - 1:
                     wait = delay
-                    if getattr(e, "code", None) == 429:
+                    if rate_limit_wait and getattr(e, "code", None) == 429:
                         wait = max(wait, self.RATE_LIMIT_RETRY_DELAY)
                     time.sleep(wait)
                     delay *= 2  # Exponential backoff
 
         raise last_error
 
-    def _embed_batch(self, texts: list[str]) -> list[list[float]]:
-        """Embed a single request (must already respect GEMINI_BATCH_LIMIT)."""
+    def _embed_batch(self, texts: list[str], *, interactive: bool = False) -> list[list[float]]:
+        """Embed a single request (must already respect GEMINI_BATCH_LIMIT).
+
+        `interactive=True` is for a query inside a web request: bounded by
+        QUERY_TIMEOUT_SECONDS and QUERY_RETRY_ATTEMPTS with no rate-limit
+        sleep. Ingestion keeps the patient defaults.
+        """
+        config_kwargs = {"output_dimensionality": settings.EMBEDDING_DIMENSIONS}
+        retry_kwargs = {}
+        if interactive:
+            # http_options.timeout is in milliseconds.
+            config_kwargs["http_options"] = types.HttpOptions(
+                timeout=int(self.QUERY_TIMEOUT_SECONDS * 1000)
+            )
+            retry_kwargs = {"attempts": self.QUERY_RETRY_ATTEMPTS, "rate_limit_wait": False}
         response = self._call_with_retry(
             self._client.models.embed_content,
             model=self.model,
             contents=texts,
-            config=types.EmbedContentConfig(
-                output_dimensionality=settings.EMBEDDING_DIMENSIONS
-            ),
+            config=types.EmbedContentConfig(**config_kwargs),
+            **retry_kwargs,
         )
 
         embeddings = [list(e.values) for e in response.embeddings]
@@ -126,7 +150,7 @@ class GeminiEmbeddingService:
             return [0.0] * settings.EMBEDDING_DIMENSIONS
 
         start_time = time.perf_counter()
-        embeddings = self._embed_batch([text])
+        embeddings = self._embed_batch([text], interactive=True)
         elapsed = time.perf_counter() - start_time
 
         logger.debug(

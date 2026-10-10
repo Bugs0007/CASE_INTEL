@@ -1,0 +1,452 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Case Intel — System Architecture",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1340,
+      620
+    ],
+    "views": [
+      {
+        "id": "request-path",
+        "label": "Request path",
+        "focus": [
+          "advocate",
+          "web",
+          "api",
+          "db"
+        ],
+        "note": "Browser to Vercel to the DRF API on EC2, every query owner-scoped, state in RDS Postgres."
+      },
+      {
+        "id": "job-queue",
+        "label": "Postgres job queue",
+        "focus": [
+          "api",
+          "db",
+          "worker",
+          "ai",
+          "courts"
+        ],
+        "note": "Views enqueue ProcessingJob rows; one worker claims them with skip_locked and does the slow calls."
+      },
+      {
+        "id": "cause-lists",
+        "label": "Cause-list schedule",
+        "focus": [
+          "timer",
+          "courts",
+          "db"
+        ],
+        "note": "A per-court systemd timer fetches cause-list PDFs at 19:00 and 06:30 and matches them to hearings."
+      },
+      {
+        "id": "outbound",
+        "label": "Files and email",
+        "focus": [
+          "api",
+          "s3",
+          "resend"
+        ],
+        "note": "Documents and order PDFs go to S3 (or local disk); invoice email goes out through Resend when configured."
+      }
+    ],
+    "repository": {
+      "url": "https://github.com/Bugs0007/CASE_INTEL",
+      "revision": "f405d9eade744b87faecb942f7e29984132e2ff4"
+    }
+  },
+  "components": [
+    {
+      "id": "advocate",
+      "type": "external",
+      "label": "Advocate",
+      "sublabel": "browser",
+      "pos": [
+        30,
+        284
+      ],
+      "size": [
+        110,
+        64
+      ],
+      "sources": [
+        {
+          "path": "frontend-next/app/(dashboard)/layout.tsx",
+          "label": "dashboard shell"
+        }
+      ]
+    },
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "Next.js 15 app",
+      "sublabel": "Vercel · React 19",
+      "pos": [
+        210,
+        280
+      ],
+      "size": [
+        160,
+        72
+      ],
+      "sources": [
+        {
+          "path": "frontend-next/app/layout.tsx",
+          "label": "app root"
+        },
+        {
+          "path": "frontend-next/next.config.mjs",
+          "label": "Next config"
+        }
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "Django + DRF API",
+      "sublabel": "EC2 · gunicorn",
+      "tag": "Token auth",
+      "pos": [
+        470,
+        280
+      ],
+      "size": [
+        170,
+        72
+      ],
+      "sources": [
+        {
+          "path": "core/urls.py",
+          "label": "/api/ routes"
+        },
+        {
+          "path": "core/views/mixins.py",
+          "label": "OwnerScopedMixin"
+        },
+        {
+          "path": "case_intel_project/settings.py",
+          "label": "settings"
+        }
+      ]
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "PostgreSQL + pgvector",
+      "sublabel": "RDS · data + job queue",
+      "pos": [
+        750,
+        280
+      ],
+      "size": [
+        190,
+        72
+      ],
+      "sources": [
+        {
+          "path": "core/models/processing_job.py",
+          "label": "ProcessingJob"
+        },
+        {
+          "path": "core/models/document_chunk.py",
+          "label": "DocumentChunk 768-d"
+        }
+      ]
+    },
+    {
+      "id": "worker",
+      "type": "backend",
+      "label": "process_jobs worker",
+      "sublabel": "systemd · case-intel-worker",
+      "pos": [
+        1050,
+        280
+      ],
+      "size": [
+        190,
+        72
+      ],
+      "sources": [
+        {
+          "path": "core/management/commands/process_jobs.py",
+          "label": "worker loop"
+        },
+        {
+          "path": "deploy/case-intel-worker.service",
+          "label": "systemd unit"
+        }
+      ]
+    },
+    {
+      "id": "s3",
+      "type": "cloud",
+      "label": "S3 media",
+      "sublabel": "USE_S3 · else local disk",
+      "pos": [
+        560,
+        490
+      ],
+      "size": [
+        170,
+        64
+      ],
+      "sources": [
+        {
+          "path": "case_intel_project/settings.py",
+          "label": "STORAGES"
+        }
+      ]
+    },
+    {
+      "id": "timer",
+      "type": "backend",
+      "label": "Cause-list timer",
+      "sublabel": "systemd · 19:00 + 06:30",
+      "pos": [
+        1050,
+        490
+      ],
+      "size": [
+        190,
+        64
+      ],
+      "sources": [
+        {
+          "path": "deploy/systemd/case-intel-causelist@.timer",
+          "label": "timer unit"
+        },
+        {
+          "path": "core/management/commands/fetch_cause_lists.py",
+          "label": "fetch_cause_lists"
+        },
+        {
+          "path": "core/services/cause_list/registry.py",
+          "label": "court registry"
+        }
+      ]
+    },
+    {
+      "id": "resend",
+      "type": "external",
+      "label": "Resend",
+      "sublabel": "email API · optional",
+      "pos": [
+        210,
+        490
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "sources": [
+        {
+          "path": "core/services/email_delivery.py",
+          "label": "email delivery"
+        },
+        {
+          "path": "core/services/invoice_service.py",
+          "label": "invoice send"
+        },
+        {
+          "path": "core/services/client_updates/send.py",
+          "label": "client updates"
+        }
+      ]
+    },
+    {
+      "id": "ai",
+      "type": "external",
+      "label": "AI providers",
+      "sublabel": "LLM + embeddings",
+      "tag": "Groq · Gemini · Ollama",
+      "pos": [
+        750,
+        40
+      ],
+      "size": [
+        190,
+        72
+      ],
+      "sources": [
+        {
+          "path": "core/services/ai_service_factory.py",
+          "label": "provider factory"
+        }
+      ]
+    },
+    {
+      "id": "courts",
+      "type": "external",
+      "label": "Court portals",
+      "sublabel": "eCourts DC/HC · Telangana HC",
+      "pos": [
+        1050,
+        40
+      ],
+      "size": [
+        190,
+        72
+      ],
+      "sources": [
+        {
+          "path": "core/services/court_data/ecourts_provider.py",
+          "label": "eCourts client"
+        },
+        {
+          "path": "core/services/cause_list/telangana_hc.py",
+          "label": "TSHC cause lists"
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "AWS ap-south-1",
+      "wraps": [
+        "api",
+        "db",
+        "worker",
+        "s3",
+        "timer"
+      ],
+      "pad": 40
+    },
+    {
+      "kind": "region",
+      "label": "Vercel",
+      "wraps": [
+        "web"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "browse",
+      "from": "advocate",
+      "to": "web",
+      "label": "HTTPS",
+      "variant": "emphasis"
+    },
+    {
+      "id": "rest",
+      "from": "web",
+      "to": "api",
+      "label": "REST /api/",
+      "variant": "emphasis"
+    },
+    {
+      "id": "orm",
+      "from": "api",
+      "to": "db",
+      "label": "ORM + enqueue",
+      "variant": "emphasis"
+    },
+    {
+      "id": "claim",
+      "from": "worker",
+      "to": "db",
+      "label": "claim job"
+    },
+    {
+      "id": "rag",
+      "from": "api",
+      "to": "ai",
+      "label": "Case Bot RAG",
+      "fromSide": "top",
+      "toSide": "left",
+      "labelAt": [
+        725,
+        180
+      ]
+    },
+    {
+      "id": "summaries",
+      "from": "worker",
+      "to": "ai",
+      "label": "summaries · embeddings",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "portal-fetch",
+      "from": "worker",
+      "to": "courts",
+      "label": "order sync · search",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "labelAt": [
+        1151,
+        154
+      ]
+    },
+    {
+      "id": "causelist-fetch",
+      "from": "timer",
+      "to": "courts",
+      "label": "cause-list PDFs",
+      "fromSide": "right",
+      "toSide": "right",
+      "labelAt": [
+        1264,
+        421
+      ]
+    },
+    {
+      "id": "causelist-store",
+      "from": "timer",
+      "to": "db",
+      "label": "match hearings",
+      "fromSide": "left",
+      "toSide": "bottom"
+    },
+    {
+      "id": "files",
+      "from": "api",
+      "to": "s3",
+      "label": "documents",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "email",
+      "from": "api",
+      "to": "resend",
+      "label": "invoice + client email",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "right"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "amber",
+      "title": "Postgres is the queue",
+      "items": [
+        "No Celery or Redis: views enqueue ProcessingJob rows",
+        "The worker claims them with select_for_update(skip_locked)"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Two AI axes",
+      "items": [
+        "LLM via get_llm_client(): Groq, Ollama or OpenAI",
+        "Embeddings: Gemini or Ollama, fixed at 768-d"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Guardrails",
+      "items": [
+        "Token auth; every queryset is owner-scoped",
+        "Tracking refresh hits eCourts inline, max once per case per hour"
+      ]
+    }
+  ]
+}
