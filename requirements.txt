@@ -73,6 +73,15 @@ ddddocr==1.6.1
 onnxruntime==1.27.0
 opencv-python-headless==5.0.0.93
 
+# Case Bot's reranker (core/services/reranker.py) runs the cross-encoder's
+# ONNX export on onnxruntime (above) + the Hugging Face `tokenizers` library,
+# not torch. tokenizers was only ever installed transitively through
+# transformers; pinned here because the reranker imports it directly, so
+# removing torch/transformers/sentence-transformers from a deployment (they
+# are only needed for RERANKER_BACKEND=torch and the parity test) cannot
+# silently take it away.
+tokenizers==0.22.2
+
 # ============================================================================
 # DOCUMENT PROCESSING
 # ============================================================================

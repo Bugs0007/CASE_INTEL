@@ -37,6 +37,9 @@ export interface HearingDigest {
       item_number: string;
       court_hall: string;
       stage: string;
+      bench?: string;
+      list_type?: string;
+      note?: string;
       checked_at: string | null;
     };
   };

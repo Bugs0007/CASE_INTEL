@@ -19,24 +19,26 @@ from unittest.mock import patch
 
 import pytest
 from django.contrib.auth.models import User
-from django.utils import timezone
 
 from core.models import Case, Hearing
-from core.services.cause_list import (
+from core.services.causelists import base, service
+from core.services.causelists.adapters.telangana_hc import (
     CauseListDay,
-    CauseListNotPublishedError,
-    CauseListParseError,
     build_pdf_url,
+    get_adapter,
     normalize_case_token,
     parse_cause_list_pdf,
     parse_meta_table,
     strip_pdf_bom,
 )
-from core.services.cause_list.service import (
-    apply_cause_list,
-    candidate_keys_for_case,
-    check_cause_list_for_date,
-    mark_not_published,
+from core.services.causelists.exceptions import CauseListParseError
+from core.services.causelists.matcher import identity_for_case
+from core.tests.causelist_support import (
+    StaticAdapter,
+    make_case,
+    make_doc,
+    make_hearing,
+    target_of,
 )
 
 FIXTURES = pathlib.Path(__file__).parent / "fixtures" / "causelists" / "live_2026-08-03"
@@ -346,7 +348,8 @@ class TestNormalizeCaseToken:
 
 
 # ---------------------------------------------------------------------------
-# Matching against tracked hearings
+# Matching against tracked hearings -- the same assertions as always, now
+# driven through the framework's service on the REAL fixtures.
 # ---------------------------------------------------------------------------
 
 
@@ -355,98 +358,133 @@ def advocate(db):
     return User.objects.create_user(username="cause-list-advocate", password="pass-123")
 
 
-def make_hearing(owner, case_number, *, court_type="high_court"):
-    case = Case.objects.create(
-        owner=owner,
-        case_number=case_number,
-        title=case_number,
-        client_name="",
-        court_type=court_type,
-        tracking_enabled=True,
-        tracking_config={"court_type": court_type, "cnr": "TSHC010051622026"},
+def telangana_case(owner, case_number, **extra):
+    return make_case(
+        owner,
+        case_number,
+        tracking_config={"hc_court_code": "telangana", "cnr": "HBHC010051622026"},
+        **extra,
     )
-    return Hearing.objects.create(
-        owner=owner,
-        case=case,
-        hearing_date=timezone.make_aware(datetime.datetime(2026, 8, 3, 0, 0)),
-        hearing_type="other",
-        source="ecourts",
-        status="scheduled",
+
+
+def hearing_for(owner, case_number, *, court_type="high_court"):
+    if court_type == "high_court":
+        case = telangana_case(owner, case_number)
+    else:
+        case = make_case(owner, case_number, court_type="district")
+    return make_hearing(owner, case, LIST_DATE)
+
+
+def fixture_docs():
+    return [
+        make_doc(FIXTURES / name, doc_key=list_type, list_type=list_type)
+        for list_type, name in PDF_FIXTURES.items()
+    ]
+
+
+def run_day(hearings, *, docs=None, status="ok", doc_total=None, error=""):
+    """The service on the Telangana fixtures: returns the GroupReport."""
+    adapter = StaticAdapter(
+        "telangana_hc",
+        fixture_docs() if docs is None else docs,
+        get_adapter().parse,
+        status=status,
+        doc_total=doc_total,
+        error=error,
     )
+    target = target_of(adapter, "telangana_hc/1")
+    return service.process_group(adapter, target, LIST_DATE, hearings)
+
+
+def numberless_case(owner):
+    """A Telangana case with neither a parseable number nor a CNR."""
+    case = make_case(owner, "HBHC010051622026", tracking_config={"hc_court_code": "telangana"})
+    case.cnr_number = None
+    case.save()
+    return case
 
 
 @pytest.mark.django_db
 class TestApplyCauseList:
-    def test_a_listed_case_gets_its_item_number_and_hall(self, advocate, day):
-        hearing = make_hearing(advocate, "WA/102/2026")
-        result = apply_cause_list(day, [hearing])
+    def test_a_listed_case_gets_its_item_number_and_hall(self, advocate):
+        hearing = hearing_for(advocate, "WA/102/2026")
+        report = run_day([hearing])
 
         hearing.refresh_from_db()
         assert hearing.cause_list_status == Hearing.CAUSE_LIST_LISTED
         assert hearing.cause_list_item_number == "1"
         assert hearing.cause_list_court_hall == "1"
-        assert result["listed"] == 1
+        assert hearing.cause_list_list_type == "DAILY LIST"
+        assert report.listed == 1
 
-    def test_a_case_in_a_non_daily_list_is_found_too(self, advocate, day):
+    def test_a_case_in_a_non_daily_list_is_found_too(self, advocate):
         """Parsing only DAILY LIST would miss 30 of the 58 documents."""
-        hearing = make_hearing(advocate, "CRLP/12410/2026")
-        apply_cause_list(day, [hearing])
+        hearing = hearing_for(advocate, "CRLP/12410/2026")
+        run_day([hearing])
 
         hearing.refresh_from_db()
         assert hearing.cause_list_status == Hearing.CAUSE_LIST_LISTED
         assert hearing.cause_list_court_hall == "13"
 
-    def test_a_case_that_is_NOT_listed_is_recorded_as_such(self, advocate, day):
-        hearing = make_hearing(advocate, "WP/99999/2099")
-        result = apply_cause_list(day, [hearing])
+    def test_a_case_that_is_NOT_listed_is_recorded_as_such(self, advocate):
+        hearing = hearing_for(advocate, "WP/99999/2099")
+        report = run_day([hearing])
 
         hearing.refresh_from_db()
         assert hearing.cause_list_status == Hearing.CAUSE_LIST_NOT_LISTED
         assert hearing.cause_list_item_number == ""
-        assert result["not_listed"] == 1
+        assert report.not_listed == 1
+        assert report.complete
 
-    def test_a_case_with_no_parseable_number_is_unmatchable_not_absent(
-        self, advocate, day
-    ):
+    def test_a_case_with_no_parseable_number_is_unmatchable_not_absent(self, advocate):
         """Absence proves nothing when there was no number to look for."""
-        hearing = make_hearing(advocate, "TSHC010051622026")
-        result = apply_cause_list(day, [hearing])
+        hearing = make_hearing(advocate, numberless_case(advocate), LIST_DATE)
+        report = run_day([hearing])
 
         hearing.refresh_from_db()
-        assert result["unmatchable"] == 1
+        assert report.untouched == 1
         assert hearing.cause_list_status != Hearing.CAUSE_LIST_NOT_LISTED
 
-    def test_alternate_spelling_still_matches(self, advocate, day):
-        hearing = make_hearing(advocate, "W.A./0102/2026")
-        apply_cause_list(day, [hearing])
+    def test_alternate_spelling_still_matches(self, advocate):
+        hearing = hearing_for(advocate, "W.A./0102/2026")
+        run_day([hearing])
 
         hearing.refresh_from_db()
         assert hearing.cause_list_status == Hearing.CAUSE_LIST_LISTED
         assert hearing.cause_list_item_number == "1"
 
-    def test_a_tagged_wt_item_matches_with_its_wt_number(self, advocate, day):
-        hearing = make_hearing(advocate, "WP/21946/2024")
-        apply_cause_list(day, [hearing])
+    def test_a_tagged_wt_item_matches_with_its_wt_number(self, advocate):
+        hearing = hearing_for(advocate, "WP/21946/2024")
+        run_day([hearing])
 
         hearing.refresh_from_db()
         assert hearing.cause_list_status == Hearing.CAUSE_LIST_LISTED
         assert hearing.cause_list_item_number == "wt4"
 
-    def test_result_reports_documents_and_halls(self, advocate, day):
-        result = apply_cause_list(day, [make_hearing(advocate, "WA/102/2026")])
-        assert result["documents"] == 8
-        assert result["court_halls"] == ["1", "10", "13", "4", "6"]
+    def test_result_reports_all_documents_read(self, advocate):
+        report = run_day([hearing_for(advocate, "WA/102/2026")])
+        assert report.docs_ok == 8 and report.docs_total == 8
 
     def test_candidate_keys_reads_more_than_case_number(self, advocate):
-        hearing = make_hearing(advocate, "TSHC010051622026")
-        hearing.case.tracking_config = {
-            "court_type": "high_court",
-            "case_type": "WA",
-            "case_number": "102",
-            "year": "2026",
-        }
-        hearing.case.save()
-        assert ("WA", "102", "2026") in candidate_keys_for_case(hearing.case)
+        case = make_case(
+            advocate,
+            "HBHC010051622026",
+            tracking_config={
+                "hc_court_code": "telangana",
+                "case_type": "WA",
+                "case_number": "102",
+                "year": "2026",
+            },
+        )
+        assert ("WA", "102", "2026") in identity_for_case(case, "telangana_hc").keys
+
+    def test_the_match_row_keeps_the_bench_and_list_type(self, advocate):
+        hearing = hearing_for(advocate, "WA/102/2026")
+        run_day([hearing])
+        match = hearing.cause_list_matches.get()
+        assert match.is_primary and match.item_number == "1"
+        assert match.list_type == "DAILY LIST"
+        assert match.owner_id == advocate.id
 
 
 # ---------------------------------------------------------------------------
@@ -457,8 +495,8 @@ class TestApplyCauseList:
 @pytest.mark.django_db
 class TestNotPublished:
     def test_marks_hearings_not_yet_listed(self, advocate):
-        hearing = make_hearing(advocate, "WA/102/2026")
-        assert mark_not_published([hearing]) == 1
+        hearing = hearing_for(advocate, "WA/102/2026")
+        run_day([hearing], docs=[], status="none_available", doc_total=0)
 
         hearing.refresh_from_db()
         assert hearing.cause_list_status == Hearing.CAUSE_LIST_NOT_PUBLISHED
@@ -466,74 +504,79 @@ class TestNotPublished:
     def test_an_already_listed_hearing_is_never_downgraded(self, advocate):
         """Once an item number is known, a later failed fetch must not
         erase it."""
-        hearing = make_hearing(advocate, "WA/102/2026")
+        hearing = hearing_for(advocate, "WA/102/2026")
         hearing.cause_list_status = Hearing.CAUSE_LIST_LISTED
         hearing.cause_list_item_number = "1"
         hearing.save()
 
-        assert mark_not_published([hearing]) == 0
+        run_day([hearing], docs=[], status="none_available", doc_total=0)
         hearing.refresh_from_db()
         assert hearing.cause_list_status == Hearing.CAUSE_LIST_LISTED
         assert hearing.cause_list_item_number == "1"
 
-    @patch("core.services.cause_list.telangana_hc.fetch_cause_list_day")
-    def test_unpublished_date_records_not_yet_listed(self, fetch, advocate):
-        fetch.side_effect = CauseListNotPublishedError("nothing for that date")
-        hearing = make_hearing(advocate, "WA/102/2026")
+    def test_unpublished_date_records_not_yet_listed(self, advocate):
+        hearing = hearing_for(advocate, "WA/102/2026")
+        with patch.object(
+            type(get_adapter()), "fetch", return_value=base.FetchResult(status="none_available")
+        ):
+            report = service.run([LIST_DATE], adapter_keys=["telangana_hc"])
 
-        result = check_cause_list_for_date(LIST_DATE)
-
-        assert result["status"] == "not_published"
+        assert report.groups[0].index_status == "none_available"
         hearing.refresh_from_db()
         assert hearing.cause_list_status == Hearing.CAUSE_LIST_NOT_PUBLISHED
 
-    @patch("core.services.cause_list.telangana_hc.fetch_cause_list_day")
-    def test_parse_failure_leaves_hearings_untouched(self, fetch, advocate):
-        """A parser break must NOT read as 'your case isn't listed'."""
-        fetch.side_effect = CauseListParseError("layout changed")
-        hearing = make_hearing(advocate, "WA/102/2026")
+    def test_parse_failure_is_couldnt_check_never_not_listed(self, advocate):
+        """A parser break must NOT read as 'your case is not listed'. (Before
+        the framework this left the hearing untouched; it now says so.)"""
+        hearing = hearing_for(advocate, "WA/102/2026")
 
-        result = check_cause_list_for_date(LIST_DATE)
+        def boom(doc):
+            raise CauseListParseError("layout changed")
 
-        assert result["status"] == "parse_error"
+        adapter = StaticAdapter("telangana_hc", fixture_docs(), boom)
+        service.process_group(adapter, target_of(adapter, "telangana_hc/1"), LIST_DATE, [hearing])
+
         hearing.refresh_from_db()
-        assert hearing.cause_list_status == Hearing.CAUSE_LIST_NOT_CHECKED
+        assert hearing.cause_list_status == Hearing.CAUSE_LIST_FETCH_FAILED
 
     def test_no_tracked_hearings_is_a_no_op(self, advocate, db):
-        result = check_cause_list_for_date(datetime.date(2026, 8, 4))
-        assert result["status"] == "no_hearings"
+        report = service.run([datetime.date(2026, 8, 4)], adapter_keys=["telangana_hc"])
+        assert report.groups == []
 
     def test_district_cases_are_not_checked_against_the_high_court(self, advocate):
         """A district case would always read 'not listed' here."""
-        make_hearing(advocate, "WA/102/2026", court_type="district")
-        result = check_cause_list_for_date(LIST_DATE)
-        assert result["status"] == "no_hearings"
+        hearing = hearing_for(advocate, "WA/102/2026", court_type="district")
+        service.run([LIST_DATE], adapter_keys=["telangana_hc"])
+        hearing.refresh_from_db()
+        assert hearing.cause_list_status != Hearing.CAUSE_LIST_NOT_LISTED
+        assert hearing.cause_list_status != Hearing.CAUSE_LIST_LISTED
 
-    def test_wrong_date_document_is_not_applied(self, advocate, day):
+    def test_wrong_date_document_is_not_applied(self, advocate):
         """The portal serving another day's list must not stamp wrong item
         numbers onto real hearings."""
-        make_hearing(advocate, "WA/102/2026")
-        assert check_cause_list_for_date(LIST_DATE, cause_list_day=day)["status"] == "applied"
-
-        other = CauseListDay(
-            list_date=datetime.date(2026, 8, 10), documents=day.documents
+        hearing = hearing_for(advocate, "WA/102/2026")
+        wrong_day = datetime.date(2026, 8, 10)
+        adapter = StaticAdapter("telangana_hc", fixture_docs(), get_adapter().parse)
+        report = service.process_group(
+            adapter, target_of(adapter, "telangana_hc/1"), wrong_day, [hearing]
         )
-        result = check_cause_list_for_date(LIST_DATE, cause_list_day=other)
-        assert result["status"] == "date_mismatch"
+        hearing.refresh_from_db()
+        assert report.docs_ok == 0 and report.docs_failed == 8
+        assert hearing.cause_list_status == Hearing.CAUSE_LIST_FETCH_FAILED
+        assert hearing.cause_list_item_number == ""
 
-    def test_end_to_end_against_the_real_fixtures(self, advocate, day):
+    def test_end_to_end_against_the_real_fixtures(self, advocate):
         """One listed case, one absent case, one unmatchable -- all
         resolved from the same real day's documents."""
-        listed = make_hearing(advocate, "WA/102/2026")
-        absent = make_hearing(advocate, "WP/99999/2099")
-        unmatchable = make_hearing(advocate, "TSHC010051622026")
+        listed = hearing_for(advocate, "WA/102/2026")
+        absent = hearing_for(advocate, "WP/99999/2099")
+        unmatchable = make_hearing(advocate, numberless_case(advocate), LIST_DATE)
 
-        result = check_cause_list_for_date(LIST_DATE, cause_list_day=day)
+        report = run_day([listed, absent, unmatchable])
 
-        assert result["status"] == "applied"
-        assert result["listed"] == 1
-        assert result["not_listed"] == 1
-        assert result["unmatchable"] == 1
+        assert report.listed == 1
+        assert report.not_listed == 1
+        assert report.untouched == 1
 
         listed.refresh_from_db()
         absent.refresh_from_db()
@@ -545,7 +588,7 @@ class TestNotPublished:
 
 
 # ---------------------------------------------------------------------------
-# The scheduled fetch: court registry + `manage.py fetch_cause_lists`
+# The scheduled fetch: `manage.py fetch_cause_lists`
 #
 # The systemd timer (deploy/systemd/case-intel-causelist@.timer) fires
 # `manage.py fetch_cause_lists --court <key>` twice a day. These tests
@@ -556,7 +599,7 @@ class TestNotPublished:
 
 @pytest.mark.django_db
 class TestScheduledFetchCommand:
-    def test_check_flag_passes_for_the_default_configured_court(self, capsys):
+    def test_check_flag_passes_for_the_default_configured_adapters(self, capsys):
         from django.core.management import call_command
 
         call_command("fetch_cause_lists", "--check")
@@ -565,53 +608,50 @@ class TestScheduledFetchCommand:
         assert "telangana_hc" in out
         assert "OK" in out
 
-    def test_check_flag_passes_for_every_configured_court(self, settings, capsys):
+    def test_check_flag_passes_for_every_configured_adapter(self, settings, capsys):
         from django.core.management import call_command
 
-        settings.CAUSE_LIST_COURTS = ["telangana_hc"]
+        settings.CAUSE_LIST_ADAPTERS = ["telangana_hc", "hcservices_generic", "district_ecourts"]
         call_command("fetch_cause_lists", "--check", "--court", "telangana_hc")
 
         assert "OK    telangana_hc" in capsys.readouterr().out
 
-    def test_check_flag_fails_for_an_unregistered_court(self):
+    def test_check_flag_fails_for_an_unregistered_adapter(self):
         from django.core.management import call_command
         from django.core.management.base import CommandError
 
         with pytest.raises(CommandError):
             call_command("fetch_cause_lists", "--check", "--court", "not_a_real_court")
 
-    def test_unknown_configured_court_is_a_loud_command_error(self, settings):
+    def test_unknown_configured_adapter_is_a_loud_command_error(self, settings):
         from django.core.management import call_command
         from django.core.management.base import CommandError
 
-        settings.CAUSE_LIST_COURTS = ["telangana_hc", "bogus_hc"]
+        settings.CAUSE_LIST_ADAPTERS = ["telangana_hc", "bogus_hc"]
         with pytest.raises(CommandError):
             call_command("fetch_cause_lists", "--check")
 
-    @patch("core.services.cause_list.telangana_hc.fetch_cause_list_day")
-    def test_command_runs_end_to_end_for_an_explicit_court(self, fetch, advocate):
+    def test_command_runs_end_to_end_for_an_explicit_adapter(self, advocate):
         """The timer's actual invocation form -- `--court <key> --date <d>` --
         resolves and runs without error (portal 'not published yet' path)."""
         from django.core.management import call_command
 
-        fetch.side_effect = CauseListNotPublishedError("not up yet")
-        hearing = make_hearing(advocate, "WA/102/2026")
-
-        call_command(
-            "fetch_cause_lists", "--court", "telangana_hc", "--date", "2026-08-03"
-        )
+        hearing = hearing_for(advocate, "WA/102/2026")
+        with patch.object(
+            type(get_adapter()), "fetch", return_value=base.FetchResult(status="none_available")
+        ):
+            call_command("fetch_cause_lists", "--court", "telangana_hc", "--date", "2026-08-03")
 
         hearing.refresh_from_db()
         assert hearing.cause_list_status == Hearing.CAUSE_LIST_NOT_PUBLISHED
 
-    def test_registry_default_matches_settings_default(self):
-        from core.services.cause_list.registry import (
-            configured_court_keys,
-            get_cause_list_court,
-        )
+    def test_dry_run_touches_nothing_and_makes_no_requests(self, advocate, capsys):
+        from django.core.management import call_command
 
-        keys = configured_court_keys()
-        assert "telangana_hc" in keys
-        for key in keys:
-            # Every configured key must resolve to a real registry entry.
-            assert get_cause_list_court(key).key == key
+        hearing = hearing_for(advocate, "WA/102/2026")
+        with patch.object(type(get_adapter()), "fetch") as fetch:
+            call_command("fetch_cause_lists", "--dry-run", "--date", "2026-08-03")
+        fetch.assert_not_called()
+        hearing.refresh_from_db()
+        assert hearing.cause_list_status == Hearing.CAUSE_LIST_NOT_CHECKED
+        assert "to fetch" in capsys.readouterr().out

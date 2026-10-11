@@ -27,7 +27,7 @@ import {
   useRefreshTracking,
   useUntrackTracking,
 } from "@/hooks/use-case-tracking";
-import type { Case, CourtType, Hearing, TrackingConfig, TrackingPreview } from "@/types";
+import type { Case, CauseListCoverage, CourtType, Hearing, TrackingConfig, TrackingPreview } from "@/types";
 
 const DISTRICT_PORTAL_URL = "https://services.ecourts.gov.in/ecourtindia_v6/";
 const HC_PORTAL_URL = "https://hcservices.ecourts.gov.in/hcservices/";
@@ -739,6 +739,9 @@ function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hea
               {caseItem.last_fetched_at ? formatRelativeTime(caseItem.last_fetched_at) : "Never"}
             </span>
           </Field>
+          <Field label="Cause lists">
+            <CauseListCoverageLine coverage={caseItem.cause_list_coverage} />
+          </Field>
         </div>
 
         {/* The hearing history used to be repeated here as its own table --
@@ -751,6 +754,42 @@ function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hea
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/** Is this case's court covered by the cause-list service? Says so plainly
+ * either way: "covered" means its list is checked before each hearing;
+ * "not covered" gives the reason and a link to the court's own page. */
+export function CauseListCoverageLine({ coverage }: { coverage?: CauseListCoverage }) {
+  if (!coverage || coverage.status === "unknown") {
+    return <span className="text-sm text-gray-500">—</span>;
+  }
+  if (coverage.status === "supported") {
+    return (
+      <span className="text-sm text-gray-900" title={coverage.label || undefined}>
+        Checked before each hearing
+      </span>
+    );
+  }
+  if (coverage.status === "pending") {
+    return (
+      <span className="text-sm text-gray-600" title={coverage.reason || undefined}>
+        Covered — starts after the next refresh
+      </span>
+    );
+  }
+  return (
+    <span className="text-sm text-gray-600">
+      Not covered{coverage.reason ? ` — ${coverage.reason}` : ""}
+      {coverage.url && (
+        <>
+          {" "}
+          <a href={coverage.url} target="_blank" rel="noreferrer" className="underline">
+            court&apos;s site
+          </a>
+        </>
+      )}
+    </span>
   );
 }
 

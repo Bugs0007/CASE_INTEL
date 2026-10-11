@@ -27,6 +27,37 @@ class HearingSerializer(serializers.ModelSerializer):
         source="get_cause_list_status_display", read_only=True
     )
     order_summary = serializers.SerializerMethodField()
+    # Where the matter sits in the court's list, with every place it appears
+    # (a main and a supplementary list, say) and a link to the court's own
+    # cause-list page for "verify on the court's site". Never a portal PDF
+    # link: hcservices/district PDF links are session-bound and would show
+    # the user "Order not uploaded".
+    cause_list_matches = serializers.SerializerMethodField()
+    cause_list_verify_url = serializers.SerializerMethodField()
+
+    def get_cause_list_matches(self, obj):
+        # Prefetched by the hearing views (one extra query for the page).
+        return [
+            {
+                "item_number": m.item_number,
+                "court_hall": m.court_hall,
+                "bench": m.bench or m.court_name,
+                "list_type": m.list_type,
+                "stage": m.stage,
+                "is_primary": m.is_primary,
+            }
+            for m in obj.cause_list_matches.all()
+        ]
+
+    def get_cause_list_verify_url(self, obj):
+        if obj.case_id is None or obj.cause_list_status in ("not_checked",):
+            return ""
+        try:
+            from core.services.causelists.registry import coverage_for
+
+            return coverage_for(obj.case).url
+        except Exception:  # noqa: BLE001 -- a link must never break the hearing list
+            return ""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -94,6 +125,12 @@ class HearingSerializer(serializers.ModelSerializer):
             "cause_list_court_hall",
             "cause_list_stage",
             "cause_list_checked_at",
+            "cause_list_bench",
+            "cause_list_list_type",
+            "cause_list_note",
+            "cause_list_source_url",
+            "cause_list_matches",
+            "cause_list_verify_url",
             "order_summary",
             "created_at",
             "updated_at",
@@ -111,4 +148,8 @@ class HearingSerializer(serializers.ModelSerializer):
             "cause_list_court_hall",
             "cause_list_stage",
             "cause_list_checked_at",
+            "cause_list_bench",
+            "cause_list_list_type",
+            "cause_list_note",
+            "cause_list_source_url",
         ]

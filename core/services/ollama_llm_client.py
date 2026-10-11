@@ -33,7 +33,10 @@ class OllamaLLMClient:
     ) -> None:
         self.model = model or settings.OLLAMA_MODEL
         self.base_url = base_url or settings.OLLAMA_BASE_URL
-        self._client = ollama.Client(host=self.base_url)
+        self._client = ollama.Client(
+            host=self.base_url,
+            timeout=getattr(settings, "OLLAMA_REQUEST_TIMEOUT_SECONDS", 120),
+        )
 
         # Verify connection on initialization
         self._verify_connection()
@@ -77,6 +80,7 @@ class OllamaLLMClient:
         messages: list[dict],
         temperature: float = 0.1,
         max_tokens: int = 4096,
+        timeout: Optional[float] = None,
     ) -> str:
         """Generate a chat completion.
 
@@ -84,6 +88,8 @@ class OllamaLLMClient:
             messages: List of message dicts with 'role' and 'content' keys.
             temperature: Sampling temperature (0 = deterministic).
             max_tokens: Maximum tokens in the response.
+            timeout: Accepted for interface parity with LLMClient; the
+                Ollama client uses its own OLLAMA_REQUEST_TIMEOUT_SECONDS.
 
         Returns:
             The assistant's response text.

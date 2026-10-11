@@ -899,8 +899,30 @@ def _apply_case_data(case: Case, data: CourtCaseData) -> None:
         if value and getattr(case, field) != value:
             setattr(case, field, value)
             update_fields.append(field)
+    locator = _updated_locator(case, data)
+    if locator is not None:
+        case.court_locator = locator
+        update_fields.append("court_locator")
     if update_fields:
         case.save(update_fields=update_fields)
+
+
+def _updated_locator(case: Case, data: CourtCaseData) -> dict | None:
+    """The case's court locator after this fetch, or None when unchanged.
+
+    Where the case is heard, in the terms the cause-list portals need (see
+    core/services/causelists/locator.py). Best-effort and never raises: a
+    locator is a convenience for cause lists, and must not be able to fail
+    a case refresh."""
+    try:
+        from core.services.causelists.locator import locator_from_hints
+
+        new = locator_from_hints(data.locator_hints, case.tracking_config, case.court_locator)
+        if new is not None and new != case.court_locator:
+            return new
+    except Exception:  # noqa: BLE001
+        logger.exception("Could not derive a court locator for case %s", case.pk)
+    return None
 
 
 def _upsert_hearings(case: Case, data: CourtCaseData) -> list:

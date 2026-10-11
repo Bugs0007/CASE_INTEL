@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge, StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CollapseToggle } from "@/components/ui/collapse-toggle";
-import { CauseListBadge } from "@/components/hearings/cause-list-badge";
+import { CauseListBadge, CauseListInfo } from "@/components/hearings/cause-list-badge";
 import { HearingBillingActions } from "@/components/hearings/hearing-billing-actions";
 import { HearingDigestDialog } from "@/components/hearings/hearing-digest-dialog";
 import { Collapsible } from "@/components/ui/collapsible";
@@ -350,6 +350,7 @@ function HearingItem({
             <FeeBadges fees={hearing.appearance_fees} />
             <TravelBadge bookings={hearing.travel_bookings} />
           </div>
+          <CauseListInfo hearing={hearing} />
 
           {hearing.outcome && (
             <div className="mt-3 text-sm text-gray-700 italic">

@@ -22,6 +22,7 @@ from .citation import Citation
 from .activity_log import ActivityLog
 from .task import Task
 from .hearing import Hearing
+from .cause_list import CauseListFetch, CauseListMatch
 from .court_fetch_log import CourtFetchLog
 from .court_order import CourtOrder
 from .court_tracking_preview import CourtTrackingPreview
@@ -59,6 +60,8 @@ __all__ = [
     "ActivityLog",
     "Task",
     "Hearing",
+    "CauseListFetch",
+    "CauseListMatch",
     "CourtFetchLog",
     "CourtOrder",
     "CourtTrackingPreview",

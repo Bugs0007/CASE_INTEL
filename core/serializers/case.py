@@ -163,6 +163,11 @@ class CaseDetailSerializer(CaseSerializer):
                           "X vs Y" title, plus which is ours/opposing
                           (core/services/parties.py -- the same answer the
                           document generator prints)
+      cause_list_coverage whether this case's court is covered by the
+                          cause-list service: supported / unsupported (with
+                          the reason) / pending (court location not known
+                          yet), plus the court's own cause-list page.
+                          Computed offline from the case's own data.
     """
 
     tracking_snapshot = serializers.SerializerMethodField()
@@ -170,6 +175,7 @@ class CaseDetailSerializer(CaseSerializer):
     disposal = serializers.SerializerMethodField()
     update_recipient_count = serializers.SerializerMethodField()
     parties = serializers.SerializerMethodField()
+    cause_list_coverage = serializers.SerializerMethodField()
 
     class Meta(CaseSerializer.Meta):
         fields = CaseSerializer.Meta.fields + [
@@ -180,6 +186,7 @@ class CaseDetailSerializer(CaseSerializer):
             "disposal",
             "update_recipient_count",
             "parties",
+            "cause_list_coverage",
         ]
         read_only_fields = CaseSerializer.Meta.read_only_fields + ["petitioner_name", "respondent_name"]
 
@@ -207,6 +214,21 @@ class CaseDetailSerializer(CaseSerializer):
 
         disposal = case_disposal(obj, snapshot=self._snapshot(obj) or {})
         return disposal.as_dict() if disposal else None
+
+    def get_cause_list_coverage(self, obj: Case) -> dict:
+        from core.services.causelists.registry import coverage_for
+
+        try:
+            cov = coverage_for(obj)
+        except Exception:  # noqa: BLE001 -- coverage is informational; never break the case page
+            return {"status": "unknown", "label": "", "reason": "", "url": ""}
+        return {
+            "status": cov.status,
+            "adapter": cov.adapter,
+            "label": cov.label,
+            "reason": cov.reason,
+            "url": cov.url,
+        }
 
     def get_parties(self, obj: Case) -> dict:
         from core.services.parties import case_parties

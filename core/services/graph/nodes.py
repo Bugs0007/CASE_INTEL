@@ -26,6 +26,8 @@ Changes:
 import logging
 import re
 
+from django.conf import settings
+
 from core.services.graph import config
 from core.services.graph.state import AgentState, ChunkData
 from core.services.vector_search_service import VectorSearchService
@@ -272,7 +274,14 @@ def hyde_expand(state: AgentState, llm) -> AgentState:
     ]
 
     try:
-        hyde_passage = llm.generate(messages, temperature=0.3, max_tokens=200)
+        # One short attempt: HyDE only improves retrieval and falls back to
+        # the raw query, so it must never be what eats the request's budget.
+        hyde_passage = llm.generate(
+            messages,
+            temperature=0.3,
+            max_tokens=200,
+            timeout=getattr(settings, "AI_HYDE_TIMEOUT_SECONDS", 10),
+        )
     except Exception:
         logger.warning("HyDE generation failed — falling back to raw query.", exc_info=True)
         hyde_passage = query

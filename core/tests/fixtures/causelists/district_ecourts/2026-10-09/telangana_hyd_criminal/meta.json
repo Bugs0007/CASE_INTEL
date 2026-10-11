@@ -1,0 +1,76 @@
+{
+ "state": "29",
+ "dist": "2",
+ "complex": "1290022",
+ "date": "09-10-2026",
+ "complex_name": "HYD, Criminal Court Complex",
+ "ests": [
+  "3",
+  "5",
+  "8",
+  "28"
+ ],
+ "needs_est": false,
+ "courts": {
+  "D": "MP MLA Court, Hyderabad - MSJ",
+  "3^1": "1-Smt P Aruna Kumari-Chief Metropolitan Magistrate",
+  "3^2": "2-Sri N SRIKANTH BABU-I Addl. Chief Metropolitan Magistrate",
+  "3^3": "3-Smt K Asha Rani-II Addl. Chief Metropolitan Magistrate",
+  "3^4": "4-Smt. V. Rajani-III Addl. Chief Metropolitan Magistrate, Nampally, Hyderabad",
+  "3^5": "5-Smt. Swarnalatha Alakuntla-IV Addl. Chief Metropolitan Magistrate",
+  "3^7": "7-PEDDI CHANDANA-VI Addl. Chief Metropolitan Magistrate",
+  "3^8": "8-M.Sai Kumar-VII Addl. Chief Metropolitan Magistrate",
+  "3^9": "9-CH SAMPATH-VIII Addl. Chief Metropolitan Magistrate",
+  "3^10": "10-Sri. K. Sudhakar-IX Addl. Chief Metropolitan Magistrate",
+  "3^13": "13-Ms. THIRUCHINAPALLI SP BHARGAVI-XII Addl. Chief Metropolitan Magistrate",
+  "3^14": "14-Ms. SHIRISHA KATKOJWALA-XIII Addl. Chief Metropolitan Magistrate",
+  "3^15": "15-Smt V Sowmya-XIV Addl. Chief Metropolitan Magistrate",
+  "3^16": "16-DEVAN AJAY KUMAR-XV Addl. Chief Metropolitan Magistrate",
+  "3^17": "17-Sri G Prabhakar-XVI Addl. Chief Metropolitan Magistrate",
+  "3^18": "18-Smt E. Bharathi-XVII Addl. Chief Metropolitan Magistrate",
+  "3^22": "22-Gopi Krishna Kumaram-XXI Addl. CMM cum Spl. Sessions Court",
+  "8^1": "1-K. SAI RAMA DEVI-Metropolitan Sessions Judge",
+  "8^2": "2-Sri G Venu-I Addl. Metropolitan Sessions Judge",
+  "8^3": "3-Sheetal D.B.-II Addl. Metropolitan Sessions Judge",
+  "8^5": "5-Sri J. Vikram-IV Addl. Metropolitan Sessions Judge",
+  "8^6": "6-Sri.K.Ajesh Kumar-V Addl. Metropolitan Sessions Judge",
+  "8^8": "8-Sri B.Sujay-VII Addl. Metropolitan Sessions Judge",
+  "8^10": "10-Sri.K.Ajesh Kumar(Incharge)-Addl. M.S.J for trial of JHCBBC",
+  "8^16": "16-Sri B.Sujay(Incharge)-Spl.Sessions Judge FTC forAttr against Women1 Hyd",
+  "8^19": "19-Ms. M. Archana Kumari-Special Court for the trial of the Protection of Children from Sexual Offences (POCSO) Act cases- cum-XII Addl. Metropolitan Sessions Judge",
+  "28^1": "1-D.B.Sheetal(Incharge)-SPl Sessions Court for trial of MPs/MLAs"
+ },
+ "results": [
+  {
+   "court": "3^1",
+   "label": "1-Smt P Aruna Kumari-Chief Metropolitan Magistrate",
+   "mode": "cri",
+   "keys": [
+    "case_data",
+    "status",
+    "div_captcha",
+    "app_token"
+   ],
+   "html_len": 0,
+   "secs": 6.6,
+   "status": 1,
+   "msg": ""
+  },
+  {
+   "court": "3^2",
+   "label": "2-Sri N SRIKANTH BABU-I Addl. Chief Metropolitan Magistrate",
+   "mode": "cri",
+   "keys": [
+    "case_data",
+    "status",
+    "div_captcha",
+    "app_token"
+   ],
+   "html_len": 0,
+   "secs": 5.7,
+   "status": 1,
+   "msg": ""
+  }
+ ],
+ "fetched_at": "2026-10-10T20:40:17.597810+05:30"
+}

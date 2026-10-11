@@ -91,6 +91,8 @@ export interface Case {
   /** What the latest successful eCourts fetch said, null if never fetched. */
   tracking_snapshot?: TrackingSnapshot | null;
   tracking_freshness?: TrackingFreshness;
+  /** Whether the cause-list service covers this case's court. */
+  cause_list_coverage?: CauseListCoverage;
   /** The case looks disposed of -- the page offers to close it. */
   disposal?: CaseDisposal | null;
   /** Contacts who can receive case-update emails. 0 = no drafts are written. */
@@ -116,6 +118,20 @@ export interface TrackingSnapshot {
   court_name: string | null;
   nature_of_disposal: string | null;
   next_hearing_date: string | null;
+}
+
+/** Is this case's court covered by the cause-list service? Computed
+ * offline on the server from the case's own data.
+ *   supported    its cause list is fetched before each hearing
+ *   unsupported  not covered; `reason` says why, `url` is the court's own page
+ *   pending      covered, but where the case sits is learned at its next
+ *                refresh from the court record */
+export interface CauseListCoverage {
+  status: "supported" | "unsupported" | "pending" | "unknown";
+  adapter?: string;
+  label: string;
+  reason: string;
+  url: string;
 }
 
 export interface TrackingFreshness {

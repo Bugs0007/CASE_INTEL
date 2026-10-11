@@ -33,16 +33,28 @@ class Hearing(OwnedModel):
     # means the matter genuinely isn't being heard. Collapsing the two
     # would show an advocate a confident "not listed" the evening before
     # a hearing purely because the court hadn't posted yet.
+    #
+    # Two more states cover the cases where absence says nothing either:
+    # "unsupported" (no cause-list source covers this case's court, so the
+    # honest answer is "not covered", never "not listed") and "fetch_failed"
+    # (we tried and couldn't get or read the list: CAPTCHA, timeout, an
+    # unreadable document). "not_listed" is reachable ONLY when every
+    # document the court's own index lists for the date was fetched and
+    # parsed -- see core/services/causelists/service.py.
     CAUSE_LIST_NOT_CHECKED = "not_checked"
     CAUSE_LIST_NOT_PUBLISHED = "not_published"
     CAUSE_LIST_LISTED = "listed"
     CAUSE_LIST_NOT_LISTED = "not_listed"
+    CAUSE_LIST_UNSUPPORTED = "unsupported"
+    CAUSE_LIST_FETCH_FAILED = "fetch_failed"
 
     CAUSE_LIST_STATUS_CHOICES = [
         (CAUSE_LIST_NOT_CHECKED, "Not checked"),
         (CAUSE_LIST_NOT_PUBLISHED, "Not yet listed"),
         (CAUSE_LIST_LISTED, "Listed"),
         (CAUSE_LIST_NOT_LISTED, "Not listed"),
+        (CAUSE_LIST_UNSUPPORTED, "Not covered"),
+        (CAUSE_LIST_FETCH_FAILED, "Couldn't check"),
     ]
 
     case = models.ForeignKey(
@@ -107,6 +119,32 @@ class Hearing(OwnedModel):
         blank=True,
         default="",
         help_text="Which court's cause list produced this, e.g. 'telangana_hc'.",
+    )
+    cause_list_bench = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Bench / judges the matter is listed before (primary match).",
+    )
+    cause_list_list_type = models.CharField(
+        max_length=120,
+        blank=True,
+        default="",
+        help_text="Which list the matter appears in, e.g. 'DAILY LIST'.",
+    )
+    cause_list_note = models.CharField(
+        max_length=200,
+        blank=True,
+        default="",
+        help_text="Why the state is what it is when that isn't obvious, e.g. "
+        "'3 of 58 lists not uploaded yet' or the reason a court is not covered.",
+    )
+    cause_list_source_url = models.CharField(
+        max_length=500,
+        blank=True,
+        default="",
+        help_text="A link to the source list that works WITHOUT a portal session "
+        "(Supreme Court only). Blank for portals whose PDF links are session-bound.",
     )
 
     class Meta:

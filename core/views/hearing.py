@@ -48,7 +48,7 @@ class HearingListCreateView(OwnerScopedMixin, generics.ListCreateAPIView):
         # court_orders is prefetched for the same reason as the fees (see
         # _FEES_OLDEST_FIRST), so get_order_summary can match in Python.
         qs = Hearing.objects.select_related("case").prefetch_related(
-            "case__court_orders", "travel_bookings", _FEES_OLDEST_FIRST
+            "case__court_orders", "travel_bookings", "cause_list_matches", _FEES_OLDEST_FIRST
         )
 
         # Filter by case
@@ -84,7 +84,7 @@ class HearingDetailView(OwnerScopedMixin, generics.RetrieveUpdateDestroyAPIView)
 
     serializer_class = HearingSerializer
     queryset = Hearing.objects.select_related("case").prefetch_related(
-        "case__court_orders", "travel_bookings", _FEES_OLDEST_FIRST
+        "case__court_orders", "travel_bookings", "cause_list_matches", _FEES_OLDEST_FIRST
     )
 
     def perform_update(self, serializer):

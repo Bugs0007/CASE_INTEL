@@ -52,3 +52,29 @@ def django_db_modify_db_settings(django_db_modify_db_settings_parallel_suffix):
     """Runs before pytest-django creates the test database -- the one point
     every DB-backed test passes through, and before any connection opens."""
     _refuse_non_local_test_db()
+
+
+# ---------------------------------------------------------------------------
+# File-storage guard
+# ---------------------------------------------------------------------------
+# Same hazard as the database host above, for files. settings.py reads
+# USE_S3 / AWS_* from .env, and a developer .env copied from the production
+# box has USE_S3=true and the production bucket -- so without this, every
+# test that writes through default_storage (document and travel uploads,
+# invoice and generated PDFs, order sync, the cleanup command's tests...)
+# wrote real objects into the production bucket, and the cleanup command's
+# tests listed it. Found 2026-10-08: a full run listed 38 real production
+# order PDFs; only a fixture error (S3 has no local path()) stopped
+# `cleanup_orphaned_order_files --delete` from treating them all as orphans.
+#
+# Every test therefore gets plain local-disk storage under a temp directory,
+# whatever .env says. Tests that want a different MEDIA_ROOT still set their
+# own; tests that mock storage still mock it.
+@pytest.fixture(autouse=True)
+def _tests_never_touch_real_file_storage(settings, tmp_path_factory):
+    settings.STORAGES = {
+        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+    }
+    settings.MEDIA_ROOT = str(tmp_path_factory.mktemp("media"))
+    yield

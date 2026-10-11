@@ -122,12 +122,19 @@ def _hearing_text(hearing: dict) -> str:
 
 def _cause_list_text(cause_list: dict) -> str:
     if cause_list["status"] != "listed":
-        return cause_list["status_display"] if cause_list["status"] != "not_checked" else ""
+        if cause_list["status"] == "not_checked":
+            return ""
+        note = cause_list.get("note") or ""
+        return f"{cause_list['status_display']} ({note})" if note else cause_list["status_display"]
     parts = []
     if cause_list["item_number"]:
         parts.append(f"Item {cause_list['item_number']}")
     if cause_list["court_hall"]:
         parts.append(f"Court hall {cause_list['court_hall']}")
+    if cause_list.get("bench"):
+        parts.append(cause_list["bench"])
+    if cause_list.get("list_type"):
+        parts.append(cause_list["list_type"])
     if cause_list["stage"]:
         parts.append(cause_list["stage"])
     return ", ".join(parts) or "Listed"
