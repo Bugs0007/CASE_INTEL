@@ -1,0 +1,112 @@
+{
+ "state": "29",
+ "dist": "2",
+ "complex": "1290019",
+ "date": "09-10-2026",
+ "complex_name": "HYD, City Civil Court Complex",
+ "ests": [
+  "2",
+  "6",
+  "11",
+  "20"
+ ],
+ "needs_est": false,
+ "courts": {
+  "D": "Commercial Court, Hyderabad - CCC",
+  "2^1": "1-SRI. S SASIDHAR REDDY-CHIEF JUDGE",
+  "2^3": "3-SMT. Y. PADMA-II ADDITIONAL CHIEF JUDGE",
+  "2^4": "4-MANISHA SRAVAN UNNAM(Incharge)-III ADDITIONAL CHIEF JUDGE",
+  "2^8": "8-SRI. CH. JITHENDHAR(Incharge)-IX ADDITIONAL CHIEF JUDGE",
+  "2^9": "9-SRI. CH. JITHENDHAR-X ADDITIONAL CHIEF JUDGE",
+  "2^10": "10-SMT. P.LAKSHMI KUMARI-XI ADDITIONAL CHIEF JUDGE",
+  "2^13": "13-SRI. D.V. NAGESWARA RAO(Incharge)-XIV ADDITIONAL CHIEF JUDGE",
+  "2^17": "17-MANISHA SRAVAN UNNAM-XXIV ADDL CHIEF JUDGE",
+  "2^18": "18-SRI. D.V. NAGESWARA RAO-XXV ADDL CHIEF JUDGE",
+  "2^20": "20-SMT. VEMPATI APARNA-XXVI ADDITIONAL CHIEF JUDGE",
+  "6^1": "1-SMT. PUTTA MOUNIKA(Incharge)-II JUNIOR CIVIL JUDGE",
+  "6^2": "2-SMT. PUTTA MOUNIKA-III JUNIOR CIVIL JUDGE",
+  "6^3": "3-Ms. K.Keerthana-IV JUNIOR CIVIL JUDGE",
+  "6^4": "4-Ms. G.Girija-V JUNIOR CIVIL JUDGE",
+  "6^5": "5-Ms. K.Bindu(Incharge)-VI JUNIOR CIVIL JUDGE",
+  "6^6": "6-Ms. K.Bindu-VII JUNIOR CIVIL JUDGE",
+  "6^7": "7-Ms. B.Manasa-VIII JUNIOR CIVIL JUDGE",
+  "6^8": "8-SMT. B. KALPANA-IX JUNIOR CIVIL JUDGE",
+  "6^9": "9-Ms. B.Manasa(Incharge)-X JUNIOR CIVIL JUDGE",
+  "6^11": "11-Ms. B.Manasa(Incharge)-XIX JUNIOR CIVIL JUDGE",
+  "6^12": "12-SMT. B. KALPANA(Incharge)-XX JUNIOR CIVIL JUDGE",
+  "6^13": "13-SMT. B. KALPANA(Incharge)-XXI JUNIOR CIVIL JUDGE",
+  "6^14": "14-Ms. G.Girija(Incharge)-XXII JUNIOR CIVIL JUDGE",
+  "11^1": "1-SRI C.SURESH-I SENIOR CIVIL JUDGE",
+  "11^2": "2-SMT. SHALINI LINGAM-II SENIOR CIVIL JUGDE",
+  "11^4": "4-Smt N MANJULA-IV SENIOR CIVIL JUDGE",
+  "11^5": "5-SRI. B. RAMA RAO-V SENIOR CIVIL JUDGE",
+  "11^7": "7-SMT. Khushboo Upadhyay-VII SENIOR CIVIL JUDGE",
+  "11^17": "17-SRI. RAMA CHANDRA RAO NADENDLA-XVII ADDL SENIOR CIVIL JUDGE",
+  "11^18": "18-SALMA FATIMA-XVIII ADDITIONAL SENIOR CIVIL JUDGE",
+  "20^1": "1-SRI. G. UDAY KUMAR-THE PRL. SPECIAL COURT IN THE CADRE OF DISTRICT JUDGE FOR TRIAL AND DISPOSAL OF COMMERCIAL DISPUTES HYDERABAD.",
+  "20^2": "2-SRI. N. VENKAT RAM-ADDL. SPECIAL COURT IN THE CADRE OF DISTRICT JUDGE FOR TRIAL AND DISPOSAL OF COMMERCIAL DISPUTES HYDERABAD."
+ },
+ "results": [
+  {
+   "court": "2^1",
+   "label": "1-SRI. S SASIDHAR REDDY-CHIEF JUDGE",
+   "mode": "civ",
+   "keys": [
+    "case_data",
+    "status",
+    "div_captcha",
+    "app_token"
+   ],
+   "html_len": 0,
+   "secs": 7.1,
+   "status": 1,
+   "msg": ""
+  },
+  {
+   "court": "2^1",
+   "label": "1-SRI. S SASIDHAR REDDY-CHIEF JUDGE",
+   "mode": "cri",
+   "keys": [
+    "case_data",
+    "status",
+    "div_captcha",
+    "app_token"
+   ],
+   "html_len": 0,
+   "secs": 5.3,
+   "status": 1,
+   "msg": ""
+  },
+  {
+   "court": "2^3",
+   "label": "3-SMT. Y. PADMA-II ADDITIONAL CHIEF JUDGE",
+   "mode": "civ",
+   "keys": [
+    "case_data",
+    "status",
+    "div_captcha",
+    "app_token"
+   ],
+   "html_len": 0,
+   "secs": 6.4,
+   "status": 1,
+   "msg": ""
+  },
+  {
+   "court": "2^3",
+   "label": "3-SMT. Y. PADMA-II ADDITIONAL CHIEF JUDGE",
+   "mode": "cri",
+   "keys": [
+    "case_data",
+    "status",
+    "div_captcha",
+    "app_token"
+   ],
+   "html_len": 0,
+   "secs": 5.2,
+   "status": 1,
+   "msg": ""
+  }
+ ],
+ "fetched_at": "2026-10-10T20:38:09.485889+05:30"
+}

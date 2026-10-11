@@ -1,0 +1,4 @@
+{
+  "_comment": "Per-court case-type aliases, applied AFTER dots/spaces/brackets/hyphens are stripped and upper-cased. Format: {\"<court key>\": {\"<alias type>\": \"<canonical type>\"}}; \"_all\" applies to every court. Add an entry only when a real list and a real portal record are seen to spell the same case type differently after stripping.",
+  "_all": {}
+}

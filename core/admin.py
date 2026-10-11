@@ -33,6 +33,8 @@ from core.models import (
     Folder,
     CourtFetchLog,
     CourtOrder,
+    CauseListFetch,
+    CauseListMatch,
     CourtTrackingPreview,
     GmailCredential,
     Hearing,
@@ -272,6 +274,22 @@ class HearingAdmin(admin.ModelAdmin):
     search_fields = ("location", "judge", "notes", "purpose")
     readonly_fields = ("created_at", "updated_at")
     date_hierarchy = "hearing_date"
+
+
+@admin.register(CauseListFetch)
+class CauseListFetchAdmin(admin.ModelAdmin):
+    list_display = ("adapter", "target_key", "list_date", "kind", "list_type", "status", "entry_count", "fetched_at")
+    list_filter = ("adapter", "kind", "status")
+    search_fields = ("target_key", "doc_key", "list_type", "error")
+    readonly_fields = ("fetched_at",)
+    date_hierarchy = "list_date"
+
+
+@admin.register(CauseListMatch)
+class CauseListMatchAdmin(admin.ModelAdmin):
+    list_display = ("hearing", "item_number", "court_hall", "list_type", "matched_by", "is_primary")
+    list_filter = ("matched_by", "is_primary")
+    raw_id_fields = ("hearing", "fetch")
 
 
 @admin.register(CourtFetchLog)

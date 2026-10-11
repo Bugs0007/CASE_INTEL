@@ -90,6 +90,19 @@ class Case(OwnedModel):
             "case_type/case_number/year."
         ),
     )
+    court_locator = models.JSONField(
+        blank=True,
+        null=True,
+        help_text=(
+            "Where this case is heard, in the terms the cause-list portals "
+            "need. District: {kind, state_code, dist_code, est_code, "
+            "complex_code, court_no}; High Court: {kind, hc_code, "
+            "bench_code}. Kept separate from tracking_config, which the "
+            "provider dispatches on. Written by the case-refresh flow "
+            "(court_tracking._apply_case_data) and manage.py "
+            "backfill_court_locators."
+        ),
+    )
     last_fetched_at = models.DateTimeField(blank=True, null=True)
     fetch_status = models.CharField(
         max_length=20, choices=FETCH_STATUS_CHOICES, default="never_fetched"
