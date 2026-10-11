@@ -329,6 +329,36 @@ def _extract_advocates(soup: BeautifulSoup, class_name: str) -> list[str]:
     return advocates
 
 
+_ACK_LINK_RE = re.compile(
+    r"display_case_acknowlegement\([^)]*?state_code=(\d+)&dist_code=(\d+)&court_code=(\d+)"
+)
+_COURT_NO_RE = re.compile(r"^\s*(\d{1,4})\s*[-–.)]")
+
+
+def extract_locator_hints(html: str, court_and_judge: str = "") -> dict:
+    """The court-location facts a District Courts case page carries.
+
+    The page's "View QR Code or Cause Title" link is
+    `...&state_code=29&dist_code=2&court_code=2&court_complex_code=&national_court_code=TSHC01`
+    -- `court_code` is the ESTABLISHMENT code, and the complex code is blank.
+    The court number is the leading number of `Court Number and Judge`
+    ("1-CHIEF JUDGE"). Returns {} unless all four facts are present, so a
+    partial page never produces a half-locator. (Verified on the real page
+    for CNR TSHC010030082026, core/tests/fixtures/causelists/district_ecourts.)
+    """
+    link = _ACK_LINK_RE.search(html or "")
+    court_no = _COURT_NO_RE.match(court_and_judge or "")
+    if not link or not court_no:
+        return {}
+    state_code, dist_code, est_code = link.groups()
+    return {
+        "state_code": state_code,
+        "dist_code": dist_code,
+        "est_code": est_code,
+        "court_no": court_no.group(1),
+    }
+
+
 def parse_case_history_html(html: str) -> CourtCaseData | None:
     """Parse an eCourts case-history response into a partial CourtCaseData.
 
@@ -402,6 +432,8 @@ def parse_case_history_html(html: str) -> CourtCaseData | None:
         heading_text = _clean(ch_heading.get_text())
         if heading_text:
             data.court_name = heading_text
+
+    data.locator_hints = extract_locator_hints(html, data.court_and_judge)
 
     # Hearing-history table: match by CSS class, not a header-keyword
     # heuristic (which previously matched the wrong table -- see module

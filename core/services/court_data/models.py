@@ -132,6 +132,11 @@ class CourtCaseData:
     # HTML that already yields petitioner/respondent (see
     # ecourts_provider._extract_advocates). Empty dict when the portal
     # response carried none.
+    locator_hints: dict = field(default_factory=dict)
+    # {"state_code", "dist_code", "est_code", "court_no"} read off the
+    # District Courts case page (see ecourts_parsing.extract_locator_hints);
+    # what the cause-list adapter needs to find the case's court. Empty for
+    # High Court pages and when the page carries no such link.
 
     def to_dict(self) -> dict:
         """JSON-safe representation for storage in a JSONField (dates
@@ -151,6 +156,7 @@ class CourtCaseData:
             "first_hearing_date": self.first_hearing_date.isoformat() if self.first_hearing_date else None,
             "nature_of_disposal": self.nature_of_disposal,
             "party_advocate_data": self.party_advocate_data,
+            "locator_hints": self.locator_hints,
             "hearing_history": [
                 {
                     "hearing_date": h.hearing_date.isoformat() if h.hearing_date else None,
@@ -180,6 +186,7 @@ class CourtCaseData:
             first_hearing_date=date.fromisoformat(payload["first_hearing_date"]) if payload.get("first_hearing_date") else None,
             nature_of_disposal=payload.get("nature_of_disposal", ""),
             party_advocate_data=payload.get("party_advocate_data", {}) or {},
+            locator_hints=payload.get("locator_hints", {}) or {},
             hearing_history=[
                 HearingRecord(
                     hearing_date=date.fromisoformat(h["hearing_date"]) if h.get("hearing_date") else None,

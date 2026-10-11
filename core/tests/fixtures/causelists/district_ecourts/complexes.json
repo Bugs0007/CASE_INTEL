@@ -1,0 +1,30 @@
+{
+ "telangana_hyderabad_ccc": {
+  "state_code": "29",
+  "dist_code": "2",
+  "complexes": {
+   "1290016@21,30,31@N": "HYD, CBI Court Complex",
+   "1290017@16,17,29@N": "HYD, City SmallCauses Court Complex",
+   "1290018@1,10,12,23,24,25,26@N": "SEC-BAD, CCC-CSCC-MSJ Court Complex",
+   "1290019@2,6,11,20@N": "HYD, City Civil Court Complex",
+   "1290022@3,5,8,28@N": "HYD, Criminal Court Complex",
+   "1290025@18@N": "HYD, V ACMM Juvanile Court Complex",
+   "1290026@22@N": "HYD, MM Court Complex",
+   "1290027@19@N": "HYD, II MM Railway Court Complex",
+   "1290227@32@N": "HACA Bhavan, POCSO Court Complex",
+   "1290228@27,33@N": "Hyd,Integrated Family Court Complex"
+  }
+ },
+ "karnataka_bengaluru": {
+  "state_code": "3",
+  "dist_code": "20",
+  "complexes": {
+   "1030134@2,5,10,11,12,13,14@Y": "CMM Court Complex, Bangalore",
+   "1030135@3@Y": "City Civil Court Complex, Bangalore",
+   "1030136@15,16,17,18,19,20,21,23@Y": "NyayaDegula Court Complex Bangalore",
+   "1030137@1@Y": "SmallCauses Court Complex,Bangalore",
+   "1030138@6,7,8,9@Y": "Mayo Hall Court Complex, Bangalore",
+   "1030210@22@Y": "COMMERCIAL COURT COMPLEX"
+  }
+ }
+}

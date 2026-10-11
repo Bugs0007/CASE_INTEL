@@ -416,14 +416,43 @@ else:
 TELANGANA_HC_COURT_KEY = config("TELANGANA_HC_COURT_KEY", default="telangana")
 TELANGANA_HC_BENCH_CODE = config("TELANGANA_HC_BENCH_CODE", default="1")
 
-# Which courts the scheduled cause-list fetch covers. Comma-separated
-# registry keys (see core/services/cause_list/registry.py). Each key also
-# names a systemd timer instance -- deploy/systemd/case-intel-causelist@.timer
-# -- so switching a court on is: add its key here + write a fetcher module +
-# register it + `systemctl enable --now case-intel-causelist@<key>.timer`.
-# Empty/unset falls back to just "telangana_hc" so existing deploys are
-# unaffected.
+# Which cause-list ADAPTERS the scheduled fetch covers (comma-separated keys
+# from core/services/causelists/registry.py: telangana_hc, hcservices_generic,
+# district_ecourts; supreme_court is dormant). The scheduled unit is
+# `manage.py fetch_cause_lists --court all` (systemd instance "all").
+# Courts are not listed here: which courts get fetched is DEMAND-DRIVEN, from
+# the hearings on the target dates.
+#
+# CAUSE_LIST_COURTS is the old name, kept readable but no longer consulted: a
+# stale `CAUSE_LIST_COURTS=telangana_hc` in an existing .env must not
+# silently keep the new adapters off.
+CAUSE_LIST_ADAPTERS = config(
+    "CAUSE_LIST_ADAPTERS",
+    default="telangana_hc,hcservices_generic,district_ecourts",
+    cast=Csv(),
+)
 CAUSE_LIST_COURTS = config("CAUSE_LIST_COURTS", default="telangana_hc", cast=Csv())
+
+# All cause-list dates are IST calendar days whatever the server clock says
+# (settings.TIME_ZONE is UTC; the evening run would otherwise compute "today"
+# a day early). See core/services/causelists/clock.py.
+CAUSE_LIST_TIMEZONE = config("CAUSE_LIST_TIMEZONE", default="Asia/Kolkata")
+
+# Run budgets and politeness (t3.small shared with gunicorn + the job
+# worker). A budget that cuts work leaves those hearings "Couldn't check",
+# never "Not listed".
+CAUSE_LIST_MAX_RUN_MINUTES = config("CAUSE_LIST_MAX_RUN_MINUTES", default=25, cast=int)
+CAUSE_LIST_MIN_REQUEST_GAP_SECONDS = config("CAUSE_LIST_MIN_REQUEST_GAP_SECONDS", default=1.5, cast=float)
+CAUSE_LIST_LOCK_WAIT_SECONDS = config("CAUSE_LIST_LOCK_WAIT_SECONDS", default=600, cast=int)
+CAUSE_LIST_LOCK_POLL_SECONDS = config("CAUSE_LIST_LOCK_POLL_SECONDS", default=30, cast=int)
+CAUSE_LIST_HCSERVICES_BUDGET_SECONDS = config("CAUSE_LIST_HCSERVICES_BUDGET_SECONDS", default=480, cast=int)
+CAUSE_LIST_DISTRICT_BUDGET_SECONDS = config("CAUSE_LIST_DISTRICT_BUDGET_SECONDS", default=240, cast=int)
+CAUSE_LIST_SCI_BUDGET_SECONDS = config("CAUSE_LIST_SCI_BUDGET_SECONDS", default=600, cast=int)
+CAUSE_LIST_CAPTCHA_ATTEMPTS_HC = config("CAUSE_LIST_CAPTCHA_ATTEMPTS_HC", default=5, cast=int)
+CAUSE_LIST_CAPTCHA_ATTEMPTS_DISTRICT = config("CAUSE_LIST_CAPTCHA_ATTEMPTS_DISTRICT", default=6, cast=int)
+CAUSE_LIST_MAX_DOCS_PER_TARGET = config("CAUSE_LIST_MAX_DOCS_PER_TARGET", default=200, cast=int)
+CAUSE_LIST_MAX_DISTRICT_COURTS_PER_RUN = config("CAUSE_LIST_MAX_DISTRICT_COURTS_PER_RUN", default=60, cast=int)
+CAUSE_LIST_MAX_DOC_BYTES = config("CAUSE_LIST_MAX_DOC_BYTES", default=40 * 1024 * 1024, cast=int)
 
 # Client-update drafts are news, not history: a hearing heard longer ago
 # than this gets no "your matter was heard on X" draft (a first order sync

@@ -1,0 +1,5 @@
+{
+  "_comment": "Which District Courts list a case type appears in. Only types SEEN in real lists (core/tests/fixtures/causelists/district_ecourts, 2026-10-09/12) are classified; anything else is fetched in both modes. Keys are canonical case types (dots, spaces and brackets stripped, upper-cased).",
+  "criminal": ["CC", "PRC", "STC"],
+  "civil": ["OS", "AS", "EP", "MVOP", "OP", "OOP", "GWOP", "TROP", "CMA", "ARBOP", "MISC"]
+}

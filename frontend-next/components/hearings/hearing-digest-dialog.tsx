@@ -160,13 +160,15 @@ function DigestBody({
       ? [
           cause.item_number && `Item ${cause.item_number}`,
           cause.court_hall && `Court hall ${cause.court_hall}`,
+          cause.bench,
+          cause.list_type,
           cause.stage,
         ]
           .filter(Boolean)
           .join(" · ") || "Listed"
       : cause.status === "not_checked"
         ? ""
-        : cause.status_display;
+        : [cause.status_display, cause.note].filter(Boolean).join(" · ");
 
   const facts: [string, string][] = [
     ["For", digest.purposes.join("; ")],
