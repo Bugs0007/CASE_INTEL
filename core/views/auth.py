@@ -184,12 +184,14 @@ class LogoutView(APIView):
 
 
 def _session_row(session: AuthSession, current: AuthSession | None) -> dict:
+    # No ip_address here, on purpose: it is stored (visible in Django admin
+    # for security review) but never returned. The shared recruiter account
+    # is public, so any visitor could otherwise read every other visitor's IP.
     return {
         "id": session.id,
         "source": session.source,
         "source_display": session.get_source_display(),
         "user_agent": session.user_agent,
-        "ip_address": session.ip_address,
         "created_at": session.created_at,
         "last_used_at": session.last_used_at,
         "expires_at": session.expires_at,
@@ -203,11 +205,16 @@ class SessionListView(APIView):
     GET  /api/auth/sessions/          -> active sessions, current one flagged
     POST /api/auth/sessions/revoke-others/ is SessionRevokeOthersView.
 
-    Always scoped to request.user -- there's no id to guess.
+    Always scoped to request.user -- there's no id to guess. For a
+    credentials-locked account (the shared demo login) only the caller's own
+    session is listed: other visitors' devices and activity are none of a
+    visitor's business.
     """
 
     def get(self, request, *args, **kwargs):
         rows = auth_sessions.active_sessions(request.user).order_by("-last_used_at", "-id")
+        if is_credentials_locked(request.user):
+            rows = rows.filter(id=request.auth.id)
         return Response([_session_row(s, request.auth) for s in rows])
 
 
@@ -219,6 +226,10 @@ class SessionDetailView(APIView):
         session = AuthSession.objects.filter(id=pk, user=request.user, revoked_at__isnull=True).first()
         if session is None:
             return Response({"detail": "Session not found."}, status=status.HTTP_404_NOT_FOUND)
+        # Locked (shared demo) account: a visitor may sign out their own
+        # session but not other visitors'.
+        if session.id != request.auth.id and is_credentials_locked(request.user):
+            return _credentials_locked_response()
         auth_sessions.revoke(session)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -228,6 +239,8 @@ class SessionRevokeOthersView(APIView):
     this one. Returns {"revoked": n}."""
 
     def post(self, request, *args, **kwargs):
+        if is_credentials_locked(request.user):
+            return _credentials_locked_response()
         revoked = auth_sessions.revoke_all(request.user, except_session=request.auth)
         return Response({"revoked": revoked})
 

@@ -701,6 +701,7 @@ _PUBLIC_VIEWS = {
     "auth.RegisterView",  # invite-token gated
     "auth.InviteValidateView",  # invite-token gated
     "auth.LoginView",
+    "google_auth.GoogleLoginView",  # verifies a Google ID token; matches by sub, never by email
     "gmail.GmailCallbackView",  # Google's redirect; owner comes from the signed OAuth state
 }
 
@@ -710,6 +711,9 @@ _NO_TENANT_ROWS_VIEWS = {
     "auth.LogoutView",
     "auth.ChangeUsernameView",
     "auth.ChangePasswordView",
+    "google_auth.GoogleLinkView",  # only request.user's SocialIdentity
+    "google_auth.SetPasswordView",
+    "google_auth.MeView",
     "case_tracking.CourtStructureView",
     "limitation.LimitationRulesView",  # statutory reference data
     "limitation.LimitationComputeView",  # pure computation

@@ -26,3 +26,10 @@ export function setUsername(username: string): void {
 export function clearUsername(): void {
   window.localStorage.removeItem(USERNAME_KEY);
 }
+
+/** Remember a fresh sign-in (password, invite registration or Google): the
+ * same two writes for all of them. */
+export function storeSession(auth: { token: string; username: string }): void {
+  setToken(auth.token);
+  setUsername(auth.username);
+}

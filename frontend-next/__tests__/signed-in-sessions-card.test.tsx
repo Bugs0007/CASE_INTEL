@@ -20,17 +20,17 @@ const SAFARI_IOS = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Apple
 
 function row(overrides: Partial<AuthSessionRow>): AuthSessionRow {
   return {
-    id: 1, source: "login", source_display: "Signed in", user_agent: CHROME_WIN, ip_address: "10.0.0.1",
+    id: 1, source: "login", source_display: "Signed in", user_agent: CHROME_WIN,
     created_at: new Date().toISOString(), last_used_at: new Date().toISOString(),
     expires_at: new Date(Date.now() + 7 * 86_400_000).toISOString(), current: false, ...overrides,
   };
 }
 
-function renderCard() {
+function renderCard(locked = false) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <SignedInSessionsCard />
+      <SignedInSessionsCard locked={locked} />
     </QueryClientProvider>,
   );
 }
@@ -70,6 +70,27 @@ describe("SignedInSessionsCard", () => {
     await user.click(await screen.findByRole("button", { name: /sign out all other devices/i }));
 
     await waitFor(() => expect(authSessionsApi.revokeOthers).toHaveBeenCalled());
+  });
+
+  it("never shows an IP address", async () => {
+    vi.mocked(authSessionsApi.list).mockResolvedValue([
+      { ...row({ id: 1, current: true }), ip_address: "203.0.113.7" } as AuthSessionRow,
+    ]);
+    renderCard();
+
+    await screen.findByText("This device");
+    expect(screen.queryByText(/203\.0\.113\.7/)).not.toBeInTheDocument();
+  });
+
+  it("locked (shared demo) account: no sign-out controls for other sessions", async () => {
+    vi.mocked(authSessionsApi.list).mockResolvedValue([
+      row({ id: 1, current: true }),
+      row({ id: 2, user_agent: SAFARI_IOS }),
+    ]);
+    renderCard(true);
+
+    await screen.findByText("This device");
+    expect(screen.queryByRole("button", { name: /sign out/i })).not.toBeInTheDocument();
   });
 
   it("describes common browsers", () => {

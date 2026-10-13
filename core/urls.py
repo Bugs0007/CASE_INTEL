@@ -46,6 +46,10 @@ from core.views import (
     CaseTrackingView,
     ChangePasswordView,
     ChangeUsernameView,
+    GoogleLinkView,
+    GoogleLoginView,
+    MeView,
+    SetPasswordView,
     ChatView,
     ClientContactDetailView,
     ClientContactListCreateView,
@@ -105,6 +109,12 @@ urlpatterns = [
     ),
     path("auth/login/", LoginView.as_view(), name="auth-login"),
     path("auth/logout/", LogoutView.as_view(), name="auth-logout"),
+    path("auth/me/", MeView.as_view(), name="auth-me"),
+    # Sign in with Google (ID token from Google Identity Services; see
+    # core/services/google_auth.py). Unrelated to the gmail/ routes below.
+    path("auth/google/", GoogleLoginView.as_view(), name="auth-google"),
+    path("auth/google/link/", GoogleLinkView.as_view(), name="auth-google-link"),
+    path("auth/set-password/", SetPasswordView.as_view(), name="auth-set-password"),
     # Signed-in sessions (one per login), each revocable on its own.
     path("auth/sessions/", SessionListView.as_view(), name="auth-sessions"),
     path(

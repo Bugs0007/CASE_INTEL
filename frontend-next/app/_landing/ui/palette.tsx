@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getToken } from "@/lib/auth";
 import { ScrollTrigger, getLenis, scrollToTarget } from "../motion";
-import { REQUEST_ACCESS } from "./bits";
 
 type Cmd = { id: string; group: string; label: string; hint: string; run: () => void };
 
@@ -53,7 +52,7 @@ export function CommandPalette({ open, setOpen }: { open: boolean; setOpen: (v: 
       { id: "g-top", group: "Go to", label: "19:02 · The cause list arrives", hint: "Top", run: () => scrollToTarget(0, { duration: 2 }) },
       { id: "g-trust", group: "Go to", label: "Whose file is it", hint: "Trust", run: () => scrollToTarget("#trust", { duration: 2 }) },
       { id: "g-fin", group: "Go to", label: "10:30 · Court", hint: "Finale", run: () => scrollToTarget("#finale", { duration: 2.4, offset: innerHeight * 0.9 }) },
-      { id: "a-req", group: "Act", label: "Request access", hint: "Email", run: () => (window.location.href = REQUEST_ACCESS) },
+      { id: "a-req", group: "Act", label: "Create an account", hint: "Google", run: () => router.push("/register") },
       {
         id: "a-login",
         group: "Act",
@@ -99,7 +98,7 @@ export function CommandPalette({ open, setOpen }: { open: boolean; setOpen: (v: 
           <input
             ref={input}
             value={query}
-            placeholder="Play a scene, jump to a time, request access…"
+            placeholder="Play a scene, jump to a time, create an account…"
             aria-label="Search commands"
             aria-controls="pal-list"
             aria-activedescendant={shown[active] ? `pal-${shown[active].id}` : undefined}

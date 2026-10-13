@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, KeyRound, Loader2, Save, ShieldAlert, UserCog } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,10 +10,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { showToast } from "@/components/ui/toaster";
 import { APIError } from "@/lib/api/client";
-import { changePassword, changeUsername } from "@/lib/api/auth";
+import { changePassword, changeUsername, googleAccountApi } from "@/lib/api/auth";
 import { setToken, setUsername as storeUsername } from "@/lib/auth";
 import { useAdvocateProfile, useUpdateAdvocateProfile } from "@/hooks/use-billing";
 import { SignedInSessionsCard } from "@/components/settings/signed-in-sessions-card";
+import { GoogleAccountCard } from "@/components/settings/google-account-card";
+import { SetPasswordCard } from "@/components/settings/set-password-card";
 
 /** The billing identity that appears on every generated invoice.
  *
@@ -29,6 +32,25 @@ import { SignedInSessionsCard } from "@/components/settings/signed-in-sessions-c
 export default function SettingsPage() {
   const { data: profile, isLoading } = useAdvocateProfile();
   const updateProfile = useUpdateAdvocateProfile();
+  const queryClient = useQueryClient();
+  // A 404 means the backend predates /auth/me/ (Vercel can finish deploying
+  // first): treat it as "no account info" -- the page then behaves exactly as
+  // it did before Google sign-in existed -- rather than as an error or a retry.
+  const { data: me } = useQuery({
+    queryKey: ["auth-me"],
+    queryFn: async () => {
+      try {
+        return await googleAccountApi.me();
+      } catch (error) {
+        if (error instanceof APIError && error.status === 404) return null;
+        throw error;
+      }
+    },
+  });
+  const refreshMe = () => queryClient.invalidateQueries({ queryKey: ["auth-me"] });
+  // A Google-only signup has no password: it sets one (rather than changing
+  // one), and can't change its username until it has.
+  const hasPassword = me ? me.has_password : true;
 
   const [letterheadName, setLetterheadName] = useState("");
   const [advocateName, setAdvocateName] = useState("");
@@ -271,14 +293,19 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {hasPassword && (
+        <div className="mt-6">
+          <ChangeUsernameCard />
+        </div>
+      )}
+      <div className="mt-6">{hasPassword ? <ChangePasswordCard /> : <SetPasswordCard onDone={refreshMe} />}</div>
+      {me && !me.credentials_locked && (
+        <div className="mt-6">
+          <GoogleAccountCard me={me} onChanged={refreshMe} />
+        </div>
+      )}
       <div className="mt-6">
-        <ChangeUsernameCard />
-      </div>
-      <div className="mt-6">
-        <ChangePasswordCard />
-      </div>
-      <div className="mt-6">
-        <SignedInSessionsCard />
+        <SignedInSessionsCard locked={me?.credentials_locked ?? false} />
       </div>
     </div>
   );

@@ -9,6 +9,7 @@ revocable on its own.
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import secrets
 from datetime import timedelta
 
@@ -34,13 +35,38 @@ def hash_key(raw_key: str) -> str:
     return hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
 
 
+def _valid_ip(value: str) -> str | None:
+    value = (value or "").strip()
+    try:
+        return str(ipaddress.ip_address(value)) if value else None
+    except ValueError:
+        return None
+
+
+def client_ip(meta) -> str | None:
+    """The caller's IP, without trusting anything the client can forge.
+
+    nginx sets X-Real-IP from $remote_addr (the socket peer), so it is the
+    first choice. Failing that, the LAST X-Forwarded-For entry: the proxy
+    appends ($proxy_add_x_forwarded_for), so the first entries are whatever
+    the client chose to send and can be spoofed. REMOTE_ADDR is last.
+    """
+    candidates = [meta.get("HTTP_X_REAL_IP") or ""]
+    forwarded = [part for part in (meta.get("HTTP_X_FORWARDED_FOR") or "").split(",") if part.strip()]
+    candidates.append(forwarded[-1] if forwarded else "")
+    candidates.append(meta.get("REMOTE_ADDR") or "")
+    for candidate in candidates:
+        ip = _valid_ip(candidate)
+        if ip:
+            return ip
+    return None
+
+
 def _client_details(request) -> dict:
     if request is None:
         return {}
     meta = getattr(request, "META", {})
-    forwarded = (meta.get("HTTP_X_FORWARDED_FOR") or "").split(",")[0].strip()
-    ip = forwarded or meta.get("REMOTE_ADDR") or None
-    return {"user_agent": (meta.get("HTTP_USER_AGENT") or "")[:255], "ip_address": ip}
+    return {"user_agent": (meta.get("HTTP_USER_AGENT") or "")[:255], "ip_address": client_ip(meta)}
 
 
 def create_session(user, request=None, *, source: str = AuthSession.SOURCE_LOGIN) -> tuple[AuthSession, str]:

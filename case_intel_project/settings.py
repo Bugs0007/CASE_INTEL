@@ -476,6 +476,16 @@ WORKER_MAX_JOBS = config("WORKER_MAX_JOBS", default=200, cast=int)
 # A signed-in session (core/models/auth_session.py) ends after this many
 # days without use; every request pushes it out again.
 AUTH_SESSION_IDLE_DAYS = config("AUTH_SESSION_IDLE_DAYS", default=7, cast=int)
+
+# "Sign in with Google" (core/services/google_auth.py): the web OAuth client id
+# the frontend's Google Identity Services button was issued. The ID token it
+# returns is verified against this audience. Unrelated to GMAIL_CLIENT_ID
+# below, which belongs to the old Gmail document-fetch integration. Empty
+# disables the Google endpoints (503 google_not_configured).
+GOOGLE_OAUTH_CLIENT_ID = config("GOOGLE_OAUTH_CLIENT_ID", default="")
+# "open": anyone may create an account by signing in with Google.
+# "invite": a brand-new Google user must present a valid InviteToken.
+SIGNUP_MODE = config("SIGNUP_MODE", default="open")
 WORKER_MAX_RSS_MB = config("WORKER_MAX_RSS_MB", default=300, cast=int)
 
 # ============================================================================

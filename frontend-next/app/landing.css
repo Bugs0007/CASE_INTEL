@@ -664,6 +664,9 @@ html.nb-day .nb-clock-m { color: var(--ci-ink-45); }
 .nb-foot-legal { flex: 1 1 320px; max-width: 64ch; color: var(--ci-ink-45); line-height: 1.55; }
 .nb-foot a { color: var(--ci-ink-70); text-decoration: none; font-size: 11.5px; letter-spacing: 0.06em; }
 .nb-foot a:hover { color: var(--ci-seal); }
+.nb-foot-credit { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 20px; padding-top: 14px; font-size: 11.5px; line-height: 1.5; color: var(--ci-ink-45); }
+.nb-foot-credit a { color: var(--ci-ink-70); text-decoration: underline; text-decoration-color: var(--ci-ink-14); text-underline-offset: 3px; }
+.nb-foot-credit a:hover { color: var(--ci-seal); text-decoration-color: currentColor; }
 
 /* ------------------------------------------------------------ cursor */
 .nb-cursor-dot, .nb-cursor-ring { display: none; position: fixed; left: 0; top: 0; z-index: 250; pointer-events: none; }
