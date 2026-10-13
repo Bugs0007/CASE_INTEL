@@ -29,12 +29,14 @@ class AuthSession(models.Model):
     SOURCE_PASSWORD_CHANGE = "password_change"
     SOURCE_LEGACY = "legacy"
     SOURCE_COMMAND = "command"
+    SOURCE_GOOGLE = "google"
     SOURCE_CHOICES = [
         (SOURCE_LOGIN, "Signed in"),
         (SOURCE_REGISTER, "Account created"),
         (SOURCE_PASSWORD_CHANGE, "Password changed"),
         (SOURCE_LEGACY, "Carried over from the old sign-in"),
         (SOURCE_COMMAND, "Created by a management command"),
+        (SOURCE_GOOGLE, "Signed in with Google"),
     ]
 
     id = models.BigAutoField(primary_key=True)

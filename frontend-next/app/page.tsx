@@ -10,7 +10,7 @@ import "./landing.css";
 export const metadata: Metadata = {
   title: "Case Intel · Tonight's cause list, already read",
   description:
-    "Case management for advocates practising before Indian courts: state-wide advocate search, order summaries that become tasks, Telangana High Court cause lists read every evening and morning, and a case-file assistant that cites its sources. Invite-only.",
+    "Case management for advocates practising before Indian courts: state-wide advocate search, order summaries that become tasks, cause lists from the Telangana High Court, most other High Courts and the District Courts read every evening and morning, and a case-file assistant that cites its sources. Sign up with Google.",
 };
 
 export default function Page() {

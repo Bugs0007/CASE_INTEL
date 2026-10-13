@@ -107,7 +107,7 @@ export function XRay() {
           <ul className="nb-points nb-hide-sm">
             <li>The real lists come in at least three layouts. No column position is hardcoded.</li>
             <li>&ldquo;None of your matters are listed&rdquo; is the one wrong answer this must never give.</li>
-            <li>Read at 19:00, read again at 06:30. Telangana High Court lists today.</li>
+            <li>Read at 19:00, read again at 06:30. The Telangana High Court, most other High Courts and the District Courts.</li>
           </ul>
         </div>
 

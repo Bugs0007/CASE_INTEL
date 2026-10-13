@@ -37,6 +37,13 @@ vi.mock("@/lib/api/billing", () => ({
 vi.mock("@/lib/api/auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api/auth")>()),
   authSessionsApi: { list: vi.fn().mockResolvedValue([]), revoke: vi.fn(), revokeOthers: vi.fn() },
+  googleAccountApi: {
+    me: vi.fn().mockResolvedValue({
+      id: 1, username: "alice", email: "", has_password: true, google_linked: false,
+      google_email: null, credentials_locked: false,
+    }),
+    link: vi.fn(), unlink: vi.fn(), setPassword: vi.fn(),
+  },
 }));
 
 vi.mock("@/components/ui/toaster", () => ({
@@ -49,6 +56,8 @@ vi.mock("@/components/ui/toaster", () => ({
 }));
 
 import { advocateProfileApi } from "@/lib/api/billing";
+import { googleAccountApi } from "@/lib/api/auth";
+import { APIError } from "@/lib/api/client";
 import { showToast } from "@/components/ui/toaster";
 
 function makeProfile(overrides: Partial<AdvocateProfile> = {}): AdvocateProfile {
@@ -82,6 +91,19 @@ beforeEach(() => {
 });
 
 describe("SettingsPage", () => {
+  it("falls back to the plain account cards when the backend has no /auth/me/ yet (404)", async () => {
+    vi.mocked(advocateProfileApi.get).mockResolvedValue(makeProfile());
+    vi.mocked(googleAccountApi.me).mockRejectedValue(new APIError(404, { detail: "Not found." }));
+
+    renderWithClient(<SettingsPage />);
+
+    await waitFor(() => expect(googleAccountApi.me).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole("button", { name: "Change Password" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Change Username" })).toBeInTheDocument();
+    expect(screen.queryByText("Google account")).not.toBeInTheDocument();
+    expect(screen.queryByText("Set a password")).not.toBeInTheDocument();
+  });
+
   it("loads the real advocate profile and pre-fills the form", async () => {
     vi.mocked(advocateProfileApi.get).mockResolvedValue(
       makeProfile({ letterhead_name: "S. Bhagath, Advocate", bar_registration_number: "AP/1234/2015" }),

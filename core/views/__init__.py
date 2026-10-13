@@ -36,6 +36,7 @@ from .auth import (
     SessionListView,
     SessionRevokeOthersView,
 )
+from .google_auth import GoogleLinkView, GoogleLoginView, MeView, SetPasswordView
 from .case import CaseDetailView, CaseListView
 from .case_tracking import (
     CaseCnrCreateView,
@@ -185,6 +186,10 @@ __all__ = [
     "LimitationComputeView",
     "LimitationRulesView",
     "LoginView",
+    "GoogleLinkView",
+    "GoogleLoginView",
+    "MeView",
+    "SetPasswordView",
     "LogoutView",
     "SessionDetailView",
     "SessionListView",

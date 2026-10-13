@@ -42,7 +42,7 @@ export function describeDevice(userAgent: string): string {
 /** Every browser signed in to this account, each its own session: signing
  * out here (or logging out there) ends only that one. Sessions end by
  * themselves after a week without use. */
-export function SignedInSessionsCard() {
+export function SignedInSessionsCard({ locked = false }: { locked?: boolean } = {}) {
   const queryClient = useQueryClient();
   const { data: sessions = [], isLoading } = useQuery({
     queryKey: sessionKeys.all,
@@ -56,7 +56,9 @@ export function SignedInSessionsCard() {
     mutationFn: () => authSessionsApi.revokeOthers(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: sessionKeys.all }),
   });
-  const others = sessions.filter((s) => !s.current);
+  // On the shared demo account (credentials locked) a visitor can't sign
+  // other visitors out -- the server refuses it, so don't offer it.
+  const others = locked ? [] : sessions.filter((s) => !s.current);
 
   async function handleRevoke(session: AuthSessionRow) {
     try {
@@ -109,11 +111,10 @@ export function SignedInSessionsCard() {
                     {session.current && <span className="ml-2 ci-chip ci-chip--ok align-middle">This device</span>}
                   </div>
                   <div className="text-xs text-gray-500">
-                    Active {formatRelativeTime(session.last_used_at)}
-                    {session.ip_address ? ` · ${session.ip_address}` : ""} · {session.source_display}
+                    Active {formatRelativeTime(session.last_used_at)} · {session.source_display}
                   </div>
                 </div>
-                {!session.current && (
+                {!session.current && !locked && (
                   <Button
                     variant="ghost"
                     size="sm"

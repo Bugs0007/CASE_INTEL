@@ -4,31 +4,42 @@ import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
-import { setToken, setUsername as storeUsername } from "@/lib/auth";
-import { register, validateInvite, type InviteValidation } from "@/lib/api/auth";
+import { storeSession } from "@/lib/auth";
+import { googleLogin, register, validateInvite, type InviteValidation } from "@/lib/api/auth";
 import { APIError } from "@/lib/api/client";
+import { GOOGLE_CLIENT_ID, googleErrorMessage } from "@/lib/google-auth";
+import { GoogleSignInButton, OrDivider } from "@/components/auth/google-sign-in";
 
 type InviteState =
   | { status: "checking" }
   | { status: "invalid"; reason: InviteValidation["reason"] }
   | { status: "valid" };
 
-function InviteOnlyNotice({ reason }: { reason: InviteValidation["reason"] }) {
-  const message =
+/** Shown when there is no (usable) invite link. Creating an account with
+ * Google needs no invite while sign-up is open; the password form below only
+ * exists behind an invite link. */
+function NoInviteCard({
+  reason,
+  googleButton,
+}: {
+  reason: InviteValidation["reason"];
+  googleButton: React.ReactNode;
+}) {
+  const inviteProblem =
     reason === "used"
-      ? "This invite link has already been used."
+      ? "That invite link has already been used."
       : reason === "expired"
-        ? "This invite link has expired."
-        : "Case Intel is open to a small set of practices right now.";
+        ? "That invite link has expired."
+        : reason === "not_found"
+          ? "That invite link isn't valid."
+          : null;
 
   return (
-    <div className="ci-card p-8 text-center">
-      <p className="text-sm text-gray-600 leading-relaxed">
-        {message} To request access, email{" "}
-        <a href="mailto:samallabhagath@gmail.com" className="text-accent font-semibold hover:underline">
-          samallabhagath@gmail.com
-        </a>{" "}
-        and you&apos;ll be sent an account once approved.
+    <div className="ci-card p-8">
+      {googleButton}
+      <p className="text-center text-sm text-gray-600 leading-relaxed" style={{ marginTop: googleButton ? 18 : 0 }}>
+        {inviteProblem ? `${inviteProblem} ` : ""}
+        Have an invite link? Open it to sign up with a username and password.
       </p>
     </div>
   );
@@ -51,6 +62,8 @@ export function RegisterClient() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [googleHidden, setGoogleHidden] = useState(false);
+  const showGoogle = Boolean(GOOGLE_CLIENT_ID) && !googleHidden;
 
   useEffect(() => {
     if (!token) return;
@@ -86,9 +99,7 @@ export function RegisterClient() {
 
     setLoading(true);
     try {
-      const data = await register(token, username, password, email);
-      setToken(data.token);
-      storeUsername(data.username);
+      storeSession(await register(token, username, password, email));
       router.push("/dashboard");
     } catch (err) {
       if (err instanceof APIError && err.data && typeof err.data === "object") {
@@ -104,13 +115,37 @@ export function RegisterClient() {
     }
   }
 
+  async function handleGoogle(credential: string) {
+    setError(null);
+    setLoading(true);
+    try {
+      // A valid invite link rides along so the invite is spent on this account.
+      storeSession(await googleLogin(credential, invite.status === "valid" ? token : undefined));
+      router.push("/dashboard");
+    } catch (err) {
+      const result = googleErrorMessage(err);
+      if (result.hideButton) setGoogleHidden(true);
+      else setError(result.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const googleButton = showGoogle ? (
+    <GoogleSignInButton
+      text="signup_with"
+      onCredential={handleGoogle}
+      onError={() => setError("Google sign-in didn't go through. Try again.")}
+    />
+  ) : null;
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-page">
       <div className="w-[400px] max-w-[calc(100vw-40px)]">
         <div className="text-center mb-7">
           <div className="font-serif text-[26px] text-gray-900">Case Intel</div>
           <div className="text-sm text-gray-500 mt-1.5">
-            {invite.status === "valid" ? "Create your workspace" : "Access is by invitation"}
+            {invite.status === "valid" ? "Create your workspace" : "Create your account"}
           </div>
         </div>
 
@@ -118,10 +153,21 @@ export function RegisterClient() {
           <div className="ci-card p-8 text-center text-sm text-gray-500">Checking your invite link…</div>
         )}
 
-        {invite.status === "invalid" && <InviteOnlyNotice reason={invite.reason} />}
+        {invite.status === "invalid" && (
+          <>
+            <NoInviteCard reason={invite.reason} googleButton={googleButton} />
+            {error && <div className="ci-error bg-status-alert-soft rounded px-3 py-2.5 mt-3">{error}</div>}
+          </>
+        )}
 
         {invite.status === "valid" && (
           <div className="ci-card p-8">
+            {googleButton && (
+              <>
+                {googleButton}
+                <OrDivider />
+              </>
+            )}
             <form onSubmit={handleSubmit} className="flex flex-col gap-[18px]">
               <div>
                 <label htmlFor="username" className="ci-label">
@@ -218,6 +264,11 @@ export function RegisterClient() {
           <Link href="/login" className="text-accent font-semibold hover:underline">
             Sign in
           </Link>
+          <div className="mt-2">
+            <Link href="/privacy" className="hover:underline">
+              Privacy
+            </Link>
+          </div>
         </div>
       </div>
     </div>

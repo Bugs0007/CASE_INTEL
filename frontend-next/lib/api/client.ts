@@ -16,6 +16,10 @@ export class APIError extends Error {
 
 interface RequestConfig extends RequestInit {
   params?: Record<string, string | number | boolean | undefined>;
+  /** A 401 from this call means the request itself was rejected (e.g. an
+   * invalid Google credential), not that the stored session ended: don't
+   * clear the token or redirect to /login. */
+  keepSessionOn401?: boolean;
 }
 
 /** Send `url` with the CURRENT token, and survive the one 401 that isn't
@@ -33,7 +37,12 @@ interface RequestConfig extends RequestInit {
  *
  * Before this, any 401 wiped the token and hard-redirected mid-click
  * ("one Generate click redirected to /login"). */
-async function authedFetch(url: string, init: RequestInit, headers: Record<string, string>): Promise<Response> {
+async function authedFetch(
+  url: string,
+  init: RequestInit,
+  headers: Record<string, string>,
+  keepSessionOn401 = false,
+): Promise<Response> {
   const sentToken = getToken();
   const withToken = (token: string | null) => ({
     ...init,
@@ -45,7 +54,7 @@ async function authedFetch(url: string, init: RequestInit, headers: Record<strin
     if (current && current !== sentToken) {
       response = await fetch(url, withToken(current));
     }
-    if (response.status === 401) signOutIfStillCurrent(current ?? sentToken);
+    if (response.status === 401 && !keepSessionOn401) signOutIfStillCurrent(current ?? sentToken);
   }
   return response;
 }
@@ -78,7 +87,7 @@ export function apiErrorDetail(error: unknown, fallback: string): string {
 
 export async function apiClient<T>(
   endpoint: string,
-  { params, ...config }: RequestConfig = {},
+  { params, keepSessionOn401, ...config }: RequestConfig = {},
 ): Promise<T> {
   const url = new URL(`${API_BASE_URL}${endpoint}`);
 
@@ -90,7 +99,7 @@ export async function apiClient<T>(
     });
   }
 
-  const response = await authedFetch(url.toString(), config, { "Content-Type": "application/json" });
+  const response = await authedFetch(url.toString(), config, { "Content-Type": "application/json" }, keepSessionOn401);
 
   if (!response.ok) {
     const data = await response.json().catch(() => null);
