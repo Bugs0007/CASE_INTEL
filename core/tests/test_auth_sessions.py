@@ -193,3 +193,106 @@ class TestExistingSignInsSurviveTheSwitch:
 def test_sessions_expire_after_the_configured_idle_days(settings):
     settings.AUTH_SESSION_IDLE_DAYS = 3
     assert auth_sessions.idle_window() == timedelta(days=3)
+
+
+# ---------------------------------------------------------------------------
+# The shared recruiter/demo account is public: don't leak visitors' IPs, don't
+# let one visitor see or sign out the others.
+# ---------------------------------------------------------------------------
+
+
+def _lock(user):
+    from core.models import AccountLock
+
+    AccountLock.objects.create(user=user, credentials_locked=True)
+
+
+@pytest.mark.django_db
+class TestIpAddressNotExposed:
+    def test_session_rows_never_contain_an_ip(self, user):
+        client = APIClient(HTTP_USER_AGENT="laptop", REMOTE_ADDR="203.0.113.7")
+        resp = client.post("/api/auth/login/", {"username": "session-user", "password": "Pass-word-123"}, format="json")
+        client.credentials(HTTP_AUTHORIZATION=f"Token {resp.data['token']}")
+
+        rows = client.get("/api/auth/sessions/").data
+
+        assert rows and all("ip_address" not in row for row in rows)
+        assert "203.0.113.7" not in str(rows)
+        # ...but it is still recorded, for Django admin.
+        assert AuthSession.objects.get(user=user).ip_address == "203.0.113.7"
+
+
+class TestClientIp:
+    def test_spoofed_forwarded_for_prefix_is_ignored_in_favour_of_real_ip(self):
+        meta = {
+            "HTTP_X_FORWARDED_FOR": "6.6.6.6, 203.0.113.9",
+            "HTTP_X_REAL_IP": "203.0.113.9",
+            "REMOTE_ADDR": "127.0.0.1",
+        }
+        assert auth_sessions.client_ip(meta) == "203.0.113.9"
+
+    def test_without_real_ip_the_last_forwarded_entry_wins_not_the_first(self):
+        meta = {"HTTP_X_FORWARDED_FOR": "6.6.6.6, 7.7.7.7, 203.0.113.9", "REMOTE_ADDR": "127.0.0.1"}
+        assert auth_sessions.client_ip(meta) == "203.0.113.9"
+
+    def test_falls_back_to_remote_addr(self):
+        assert auth_sessions.client_ip({"REMOTE_ADDR": "198.51.100.4"}) == "198.51.100.4"
+
+    def test_garbage_headers_are_skipped(self):
+        meta = {"HTTP_X_REAL_IP": "not-an-ip", "HTTP_X_FORWARDED_FOR": "<script>", "REMOTE_ADDR": "198.51.100.4"}
+        assert auth_sessions.client_ip(meta) == "198.51.100.4"
+
+    def test_ipv6_and_nothing_at_all(self):
+        assert auth_sessions.client_ip({"HTTP_X_REAL_IP": "2001:db8::1"}) == "2001:db8::1"
+        assert auth_sessions.client_ip({}) is None
+
+    @pytest.mark.django_db
+    def test_a_spoofed_header_does_not_reach_the_stored_session(self, user):
+        client = APIClient(HTTP_X_FORWARDED_FOR="6.6.6.6, 203.0.113.9", HTTP_X_REAL_IP="203.0.113.9")
+        resp = client.post("/api/auth/login/", {"username": "session-user", "password": "Pass-word-123"}, format="json")
+        assert resp.status_code == 200
+        assert AuthSession.objects.get(user=user).ip_address == "203.0.113.9"
+
+
+@pytest.mark.django_db
+class TestLockedAccountSessions:
+    def test_list_shows_only_the_callers_own_session(self, user):
+        _lock(user)
+        mine, _ = _login(agent="mine")
+        _login(agent="someone-elses")
+
+        rows = mine.get("/api/auth/sessions/").data
+
+        assert [r["user_agent"] for r in rows] == ["mine"]
+        assert rows[0]["current"] is True
+
+    def test_unlocked_account_still_lists_everything(self, user):
+        mine, _ = _login(agent="mine")
+        _login(agent="other")
+        assert len(mine.get("/api/auth/sessions/").data) == 2
+
+    def test_revoke_others_is_refused(self, user):
+        _lock(user)
+        mine, _ = _login(agent="mine")
+        theirs, _ = _login(agent="theirs")
+
+        resp = mine.post("/api/auth/sessions/revoke-others/")
+
+        assert resp.status_code == 403
+        assert resp.data["code"] == "credentials_locked"
+        assert theirs.get("/api/cases/").status_code == 200
+
+    def test_revoking_another_session_is_refused_but_your_own_is_allowed(self, user):
+        _lock(user)
+        mine, _ = _login(agent="mine")
+        theirs, _ = _login(agent="theirs")
+        theirs_id = AuthSession.objects.get(user=user, user_agent="theirs").id
+        mine_id = AuthSession.objects.get(user=user, user_agent="mine").id
+
+        resp = mine.delete(f"/api/auth/sessions/{theirs_id}/")
+        assert resp.status_code == 403
+        assert resp.data["code"] == "credentials_locked"
+        assert theirs.get("/api/cases/").status_code == 200
+
+        assert mine.delete(f"/api/auth/sessions/{mine_id}/").status_code == 204
+        assert mine.get("/api/cases/").status_code == 401

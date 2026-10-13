@@ -4,7 +4,7 @@ import { useRef } from "react";
 import { CAUSE_LIST } from "../data";
 import { gsap, SplitText, useGSAP, MOTION, DESKTOP, setClock } from "../motion";
 import { noiseOut, scramble } from "../fx/util";
-import { AuthLink, RequestAccess, SampleTag } from "../ui/bits";
+import { AuthLink, SampleTag, SignUpLink } from "../ui/bits";
 
 export function Hero() {
   const root = useRef<HTMLElement>(null);
@@ -80,14 +80,18 @@ export function Hero() {
             Tonight&apos;s cause list. <em>Already read.</em>
           </h1>
           <p className="nb-lede nb-fade">
-            Case Intel reads the Telangana High Court cause list at 19:00 and again at 06:30, finds your matters on it,
-            and carries each one forward: the order that followed, what your side must do, the fee it earned.
+            Case Intel reads the cause lists of the Telangana High Court, most other High Courts and the District Courts
+            at 19:00 and again at 06:30, finds your matters on them, and carries each one forward: the order that
+            followed, what your side must do, the fee it earned.
           </p>
           <div className="nb-cta nb-fade">
-            <RequestAccess />
+            <SignUpLink />
             <AuthLink className="nb-btn nb-btn--line" />
           </div>
-          <p className="nb-note nb-fade">Invite-only. Telangana High Court cause lists today; more courts as they are added.</p>
+          <p className="nb-note nb-fade">
+            Sign up with Google. Where a court&apos;s list can&apos;t be read, the matter says &ldquo;Not covered&rdquo;
+            instead of guessing.
+          </p>
         </div>
 
         <div className="nb-list-wrap">

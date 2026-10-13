@@ -14,6 +14,7 @@ from core.models import (
     AdvocateSearchPreference,
     AppearanceFee,
     AuthSession,
+    SocialIdentity,
     Case,
     CaseBriefing,
     CaseTag,
@@ -110,6 +111,14 @@ class AuthSessionAdmin(admin.ModelAdmin):
     list_filter = ("source",)
     search_fields = ("user__username", "user_agent")
     readonly_fields = ("key_hash", "created_at", "last_used_at", "user_agent", "ip_address", "source")
+
+
+@admin.register(SocialIdentity)
+class SocialIdentityAdmin(admin.ModelAdmin):
+    list_display = ("id", "user", "provider", "email", "created_at", "last_login_at")
+    list_filter = ("provider",)
+    search_fields = ("user__username", "email", "subject")
+    readonly_fields = ("created_at", "last_login_at")
 
 
 @admin.register(Client)

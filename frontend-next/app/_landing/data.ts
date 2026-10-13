@@ -16,8 +16,10 @@ export const ADVOCATE = "Adv. Meera Reddy";
 
 export type ListRow = { item: string; cn: string; parties: string; adv: string; mine?: boolean };
 
-// The cause list the hero "reads". Telangana High Court is the only court
-// whose cause lists Case Intel reads today (CLAUDE.md, Cause lists).
+// The cause list the hero "reads": a made-up Telangana High Court list, kept
+// as the illustration. Real coverage is wider -- Telangana, 17 other High
+// Courts and the District Courts; see scenes/hero.tsx and the "won't do" list
+// in scenes/trust.tsx for the courts that are not covered.
 export const CAUSE_LIST = {
   court: "High Court for the State of Telangana",
   hall: "Court Hall 3",

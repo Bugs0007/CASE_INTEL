@@ -4,8 +4,10 @@ import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
-import { setToken, setUsername as storeUsername } from "@/lib/auth";
-import { login } from "@/lib/api/auth";
+import { storeSession } from "@/lib/auth";
+import { googleLogin, login, type AuthResponse } from "@/lib/api/auth";
+import { GOOGLE_CLIENT_ID, googleErrorMessage } from "@/lib/google-auth";
+import { GoogleSignInButton, OrDivider } from "@/components/auth/google-sign-in";
 
 /** Where to go after signing in: the page a lapsed session was on (set by
  * lib/api/client.ts as ?next=). Same-site paths only -- never an open
@@ -24,6 +26,8 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // The server said Google sign-in isn't configured: drop the button.
+  const [googleHidden, setGoogleHidden] = useState(false);
   // Set by lib/api/client.ts when a request found the session gone (the
   // shared token was logged out elsewhere). Read after mount -- the page
   // is prerendered, so the query string isn't known at build time.
@@ -32,22 +36,41 @@ export default function LoginPage() {
     setSessionEnded(new URLSearchParams(window.location.search).get("expired") === "1");
   }, []);
 
+  /** Shared by the password and Google paths: remember the session, go on. */
+  function finishSignIn(data: AuthResponse) {
+    storeSession(data);
+    router.push(returnPath() ?? "/dashboard");
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
     try {
-      const data = await login(username, password);
-      setToken(data.token);
-      storeUsername(data.username);
-      router.push(returnPath() ?? "/dashboard");
+      finishSignIn(await login(username, password));
     } catch {
       setError("Invalid username or password.");
     } finally {
       setLoading(false);
     }
   }
+
+  async function handleGoogle(credential: string) {
+    setError(null);
+    setLoading(true);
+    try {
+      finishSignIn(await googleLogin(credential));
+    } catch (err) {
+      const result = googleErrorMessage(err);
+      if (result.hideButton) setGoogleHidden(true);
+      else setError(result.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const showGoogle = Boolean(GOOGLE_CLIENT_ID) && !googleHidden;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-page">
@@ -65,6 +88,15 @@ export default function LoginPage() {
         )}
 
         <div className="ci-card p-8">
+          {showGoogle && (
+            <>
+              <GoogleSignInButton
+                onCredential={handleGoogle}
+                onError={() => setError("Google sign-in didn't go through. Try again.")}
+              />
+              <OrDivider />
+            </>
+          )}
           <form onSubmit={handleSubmit} className="flex flex-col gap-[18px]">
             <div>
               <label htmlFor="username" className="ci-label">
@@ -116,8 +148,13 @@ export default function LoginPage() {
         <div className="text-center mt-[18px] text-[13px] text-gray-400">
           Don&apos;t have an account?{" "}
           <Link href="/register" className="text-accent font-semibold hover:underline">
-            Request access
+            Create an account
           </Link>
+          <div className="mt-2">
+            <Link href="/privacy" className="hover:underline">
+              Privacy
+            </Link>
+          </div>
         </div>
       </div>
     </div>

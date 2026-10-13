@@ -6,9 +6,9 @@ import { revealSplits } from "../fx/util";
 
 const PILLARS = [
   {
-    k: "Invite-only",
-    t: "Accounts open by invitation.",
-    b: "Each account starts from a single-use invite, issued by hand. There is no self-service sign-up.",
+    k: "Sign-in",
+    t: "One account, one advocate.",
+    b: "Sign up with Google, or from an invitation link with a username and password. Google sends Case Intel your name and verified email address, never your Google password.",
   },
   {
     k: "Per-advocate isolation",
@@ -23,7 +23,8 @@ const PILLARS = [
 ];
 
 const WONT = [
-  "It won't read cause lists beyond the Telangana High Court yet.",
+  "It won't read cause lists for seven High Courts (Allahabad, Gujarat, Himachal Pradesh, Jharkhand, Kerala, Madhya Pradesh, Punjab & Haryana) or the Madurai bench of Madras. The eCourts portal serves no usable list for them, so those matters say \u201cNot covered\u201d rather than \u201cNot listed.\u201d",
+  "It doesn't track Supreme Court cases.",
   "It won't tell two advocates with the same name apart. It shows the court's own record and lets you judge.",
   "It won't hard-block a conflict. It warns; you decide.",
   "It won't apply limitation exceptions for you. Sections 12(2), 4 and 5 stay as notes.",

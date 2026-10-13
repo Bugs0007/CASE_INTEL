@@ -6,6 +6,23 @@ export interface AuthResponse {
   username: string;
 }
 
+export interface GoogleAuthResponse extends AuthResponse {
+  /** True when this sign-in created the account. */
+  created: boolean;
+}
+
+/** GET /api/auth/me/ -- what Settings needs to decide which cards to show. */
+export interface AuthMe {
+  id: number;
+  username: string;
+  email: string;
+  has_password: boolean;
+  google_linked: boolean;
+  google_email: string | null;
+  /** An admin locked this account's credentials (the shared demo login). */
+  credentials_locked: boolean;
+}
+
 export interface InviteValidation {
   valid: boolean;
   reason: "not_found" | "used" | "expired" | null;
@@ -18,6 +35,33 @@ export function login(username: string, password: string): Promise<AuthResponse>
     body: JSON.stringify({ username, password }),
   });
 }
+
+/** Sign in (or sign up) with a Google ID token. A 401 here means the token was
+ * bad, not that a session ended, so it must not sign anyone out. */
+export function googleLogin(credential: string, inviteToken?: string): Promise<GoogleAuthResponse> {
+  return apiClient<GoogleAuthResponse>("/auth/google/", {
+    method: "POST",
+    keepSessionOn401: true,
+    body: JSON.stringify({ credential, ...(inviteToken ? { invite_token: inviteToken } : {}) }),
+  });
+}
+
+export const googleAccountApi = {
+  me: () => apiClient<AuthMe>("/auth/me/"),
+  link: (credential: string) =>
+    apiClient<{ google_email: string }>("/auth/google/link/", {
+      method: "POST",
+      keepSessionOn401: true,
+      body: JSON.stringify({ credential }),
+    }),
+  unlink: () => apiClient<void>("/auth/google/link/", { method: "DELETE" }),
+  /** For accounts with no password yet (Google-only signups). */
+  setPassword: (newPassword: string) =>
+    apiClient<{ revoked: number }>("/auth/set-password/", {
+      method: "POST",
+      body: JSON.stringify({ new_password: newPassword }),
+    }),
+};
 
 export function validateInvite(token: string): Promise<InviteValidation> {
   return apiClient<InviteValidation>(`/auth/invite/${encodeURIComponent(token)}/`);
@@ -62,7 +106,6 @@ export interface AuthSessionRow {
   source: string;
   source_display: string;
   user_agent: string;
-  ip_address: string | null;
   created_at: string;
   last_used_at: string;
   expires_at: string;

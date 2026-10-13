@@ -1,9 +1,10 @@
 "use client";
 
 import { useRef } from "react";
+import Link from "next/link";
 import { gsap, SplitText, useGSAP, MOTION, clockAt, setClock, scrollToTarget } from "../motion";
 import { createDawn } from "../fx/dawn";
-import { AuthLink, RequestAccess } from "../ui/bits";
+import { AuthLink, SignUpLink } from "../ui/bits";
 
 export function Finale() {
   const root = useRef<HTMLElement>(null);
@@ -81,15 +82,14 @@ export function Finale() {
               Court Hall 3. Item 14. <em>You&apos;re ready.</em>
             </h2>
             <p className="fin-sub fin-fade">
-              Case Intel is invite-only. Ask for an invitation, and bring your name or bar code. The search does the
-              rest.
+              Sign up with Google, and bring your name or bar code. The search does the rest.
             </p>
             <div className="fin-cta fin-fade">
-              <RequestAccess className="nb-btn nb-btn--solid nb-btn--xl" />
+              <SignUpLink className="nb-btn nb-btn--solid nb-btn--xl" />
               <AuthLink className="nb-btn nb-btn--line" />
             </div>
             <p className="fin-note fin-fade">
-              Or write to <a href="mailto:samallabhagath@gmail.com">samallabhagath@gmail.com</a>.
+              Questions? Write to <a href="mailto:samallabhagath@gmail.com">samallabhagath@gmail.com</a>.
             </p>
           </div>
         </div>
@@ -112,6 +112,18 @@ export function Finale() {
           >
             Back to 19:02 ↑
           </a>
+        </div>
+        <div className="nb-wrap nb-foot-credit">
+          <span>
+            Built by{" "}
+            <a href="https://www.linkedin.com/in/bhagath-samalla" target="_blank" rel="noopener noreferrer">
+              Bhagath Samalla
+            </a>
+          </span>
+          <a href="https://github.com/Bugs0007" target="_blank" rel="noopener noreferrer">
+            GitHub
+          </a>
+          <Link href="/privacy">Privacy</Link>
         </div>
       </footer>
     </>
