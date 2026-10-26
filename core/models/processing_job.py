@@ -32,6 +32,10 @@ class ProcessingJob(OwnedModel):
         ("queued", "Queued"),
         ("running", "Running"),
         ("succeeded", "Succeeded"),
+        # order_sync only: it ran to the end, but at least one listed order's
+        # PDF could not be downloaded (kept as pending, retried next sync).
+        # "failed" stays for real crashes -- a listing that never came back.
+        ("partial", "Partially succeeded"),
         ("failed", "Failed"),
         ("cancelled", "Cancelled"),
     ]

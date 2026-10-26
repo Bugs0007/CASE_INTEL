@@ -14,8 +14,12 @@ abuse-sensitive than the status pages we already hit):
     parallel;
   - at most MAX_DOWNLOADS_PER_SYNC new orders per sync -- a backlog
     catches up across future refreshes instead of burst-downloading;
-  - dedup via CourtOrder.dedup_key BEFORE downloading, so a re-fetch
-    never re-downloads (or duplicates) an already-ingested order;
+  - every listed order is saved as a PENDING CourtOrder row BEFORE its PDF
+    is fetched (dedup on dedup_key), so a failed download is visible as
+    "pending" and a later sync finishes the same row -- never a duplicate;
+  - transient download errors (CAPTCHA, portal, dropped connection) are
+    retried twice, 5 s then 15 s apart; a definite answer ("no longer
+    listed") is not; two orders in a row failing stops the sync;
   - the portal's order NUMBER is a position, not an identity: HC Services
     numbers the Orders table 1..n by date at render time, so an order
     uploaded late (the 13 Aug order appearing after the 14 Aug one) shifts
@@ -44,14 +48,38 @@ from datetime import date
 
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
+from django.db import transaction
 
 from core.models import ActivityLog, Case, CourtOrder, Document, ProcessingJob
-from core.services.court_data import CourtDataError, CourtOrderRecord, get_provider
+from core.services.court_data import (
+    CaptchaSolveError,
+    CourtDataError,
+    CourtOrderRecord,
+    CourtPortalError,
+    get_provider,
+)
+
+try:  # bharat-courts' transport; a dropped connection mid-download is transient
+    import httpx
+
+    _NETWORK_ERRORS: tuple = (httpx.HTTPError, OSError, TimeoutError)
+except ImportError:  # pragma: no cover
+    _NETWORK_ERRORS = (OSError, TimeoutError)
+_TRANSIENT_ERRORS = (CaptchaSolveError, CourtPortalError, *_NETWORK_ERRORS)
 
 logger = logging.getLogger(__name__)
 
 DOWNLOAD_DELAY_SECONDS = 5
 MAX_DOWNLOADS_PER_SYNC = 5
+# Waits before the 1st and 2nd retry of one order's download (so at most
+# three tries); only for transient errors.
+RETRY_BACKOFF_SECONDS = (5, 15)
+# Two orders in a row failing after all their retries means the portal is
+# unwell: stop and leave the rest pending rather than keep hammering it.
+MAX_CONSECUTIVE_PORTAL_FAILURES = 2
+# A pending order that has failed this many whole syncs is marked failed and
+# left alone (requeue_order_sync --retry-failed puts it back).
+MAX_TOTAL_DOWNLOAD_ATTEMPTS = 6
 
 ORDER_STORAGE_DIR = "documents/court_orders"
 
@@ -231,18 +259,102 @@ def _same_order_redated(
     return candidates[0]
 
 
-def sync_case_orders(case: Case, progress_callback=None) -> dict:
-    """Fetch newly-listed orders for a tracked case. Worker entry point.
+class _DownloadFailed(Exception):
+    """One order's PDF could not be fetched after the allowed retries."""
 
-    Returns {"listed": int, "new": int, "downloaded": int, "failed": int,
-    "relabelled": int}.
+    def __init__(self, cause: Exception, *, transient: bool):
+        super().__init__(str(cause))
+        self.cause = cause
+        self.transient = transient
+
+
+def error_kind(exc_or_text) -> str:
+    """"captcha" | "portal" | "other" -- the only thing about a sync failure
+    that ever reaches the case page (never the raw message, which can quote
+    the portal's own text)."""
+    if isinstance(exc_or_text, CaptchaSolveError):
+        return "captcha"
+    if isinstance(exc_or_text, (CourtPortalError, *_NETWORK_ERRORS)):
+        return "portal"
+    text = str(exc_or_text or "").lower()
+    if "captcha" in text:
+        return "captcha"
+    if any(
+        marker in text
+        for marker in ("disconnect", "timed out", "timeout", "unrecognized", "portal", "connection", "server")
+    ):
+        return "portal"
+    return "other"
+
+
+def _download_with_retries(provider, config: dict, record: CourtOrderRecord) -> bytes:
+    """download_order(), retried only for transient trouble: 1 try + up to
+    len(RETRY_BACKOFF_SECONDS) retries, waiting 5 s then 15 s. "No longer
+    listed" and other definite answers are not retried -- asking again
+    cannot change them, and every attempt costs the portal a CAPTCHA'd
+    search."""
+    for attempt in range(len(RETRY_BACKOFF_SECONDS) + 1):
+        try:
+            return provider.download_order(config, record)
+        except _TRANSIENT_ERRORS as exc:
+            if attempt >= len(RETRY_BACKOFF_SECONDS):
+                raise _DownloadFailed(exc, transient=True) from exc
+            logger.info(
+                "Order download for %s hit a transient error (%s); retrying in %ds.",
+                record.dedup_key, type(exc).__name__, RETRY_BACKOFF_SECONDS[attempt],
+            )
+            time.sleep(RETRY_BACKOFF_SECONDS[attempt])
+        except CourtDataError as exc:
+            raise _DownloadFailed(exc, transient=False) from exc
+    raise AssertionError("unreachable")  # pragma: no cover
+
+
+def _ensure_row(case: Case, record: CourtOrderRecord) -> tuple[CourtOrder, bool]:
+    """The CourtOrder for a listed order, created PENDING if new. Idempotent
+    on (case, dedup_key), so a re-listing never makes a second row."""
+    return CourtOrder.objects.get_or_create(
+        case=case,
+        dedup_key=record.dedup_key,
+        defaults={
+            "owner": case.owner,
+            "order_number": record.order_number,
+            "order_date": record.order_date,
+            "description": record.description,
+            "judge": record.judge,
+            "source": "ecourts",
+            "download_status": CourtOrder.DOWNLOAD_PENDING,
+        },
+    )
+
+
+def _empty_result() -> dict:
+    return {
+        "listed": 0, "new": 0, "downloaded": 0, "failed": 0,
+        "pending": 0, "relabelled": 0, "stopped_early": False, "reason": "",
+    }
+
+
+def sync_case_orders(case: Case, progress_callback=None) -> dict:
+    """List the orders the portal shows for a tracked case and fetch their
+    PDFs. Worker entry point.
+
+    Every listed order becomes a CourtOrder row immediately (PENDING), and
+    every PENDING row -- new, or left over from an earlier sync -- is worked
+    on, MAX_DOWNLOADS_PER_SYNC at a time. A download that keeps failing
+    leaves its row pending with the error noted, to be finished in place on
+    a later sync; it never makes a second row.
+
+    Returns {"listed", "new", "downloaded", "failed", "pending",
+    "relabelled", "stopped_early", "reason"}: the job's recorded result.
+    `failed` is downloads that failed THIS run; `pending` is rows still
+    waiting for a PDF afterwards (some only because of the per-sync cap).
 
     Raises CourtDataError only if the LISTING itself fails (nothing to
-    work with); individual download failures are logged and skipped.
+    work with); individual download failures are recorded, not raised.
     """
     if not case.tracking_enabled or not case.tracking_config:
         logger.info("Order sync skipped for case %s: tracking not enabled/configured.", case.id)
-        return {"listed": 0, "new": 0, "downloaded": 0, "failed": 0, "relabelled": 0}
+        return _empty_result()
 
     config = dict(case.tracking_config)
     # Cascade-shaped configs carry no CNR; the portals' order listing is
@@ -251,39 +363,79 @@ def sync_case_orders(case: Case, progress_callback=None) -> dict:
         config["cnr"] = case.cnr_number
     if not config.get("cnr"):
         logger.info("Order sync skipped for case %s: no CNR known yet.", case.id)
-        return {"listed": 0, "new": 0, "downloaded": 0, "failed": 0, "relabelled": 0}
+        return _empty_result()
 
     provider = get_provider()
     records = provider.list_orders(config)
+    by_key = {r.dedup_key: r for r in records}
+    listed_keys = set(by_key)
 
-    listed_keys = {r.dedup_key for r in records}
     new_records, relabelled = reconcile_renumbered(case, records)
-    to_download = new_records[:MAX_DOWNLOADS_PER_SYNC]
-    if len(new_records) > MAX_DOWNLOADS_PER_SYNC:
+    for record in new_records:
+        _ensure_row(case, record)
+
+    # Orders we were still waiting for that the portal has stopped listing:
+    # nothing to fetch any more.
+    CourtOrder.objects.filter(case=case, download_status=CourtOrder.DOWNLOAD_PENDING).exclude(
+        dedup_key__in=listed_keys
+    ).update(
+        download_status=CourtOrder.DOWNLOAD_FAILED,
+        last_download_error="No longer listed on the court portal.",
+    )
+
+    work = list(
+        CourtOrder.objects.filter(
+            case=case, download_status=CourtOrder.DOWNLOAD_PENDING, dedup_key__in=listed_keys
+        ).order_by("-order_date", "-id")
+    )
+    to_download = work[:MAX_DOWNLOADS_PER_SYNC]
+    if len(work) > MAX_DOWNLOADS_PER_SYNC:
         logger.info(
-            "Order sync for case %s: %d new orders, capping this sync at %d "
-            "(the rest catch up on future refreshes).",
-            case.id, len(new_records), MAX_DOWNLOADS_PER_SYNC,
+            "Order sync for case %s: %d orders waiting, capping this sync at %d "
+            "(the rest are picked up on later syncs).",
+            case.id, len(work), MAX_DOWNLOADS_PER_SYNC,
         )
 
     downloaded = 0
     failed = 0
+    consecutive_portal_failures = 0
+    stopped_early = False
+    reason = ""
     total = len(to_download)
     if progress_callback:
         progress_callback(0, total)
 
-    for i, record in enumerate(to_download):
+    for i, row in enumerate(to_download):
+        if consecutive_portal_failures >= MAX_CONSECUTIVE_PORTAL_FAILURES:
+            stopped_early = True
+            logger.warning(
+                "Order sync for case %s stopped after %d portal failures in a row; "
+                "%d order(s) left pending for the next sync.",
+                case.id, consecutive_portal_failures, total - i,
+            )
+            break
         if i > 0:
             time.sleep(DOWNLOAD_DELAY_SECONDS)
+        record = by_key[row.dedup_key]
         try:
-            pdf_bytes = provider.download_order(config, record)
-        except CourtDataError as exc:
+            pdf_bytes = _download_with_retries(provider, config, record)
+        except _DownloadFailed as exc:
             failed += 1
+            row.download_attempts += 1
+            row.last_download_error = str(exc.cause)[:300]
+            if row.download_attempts >= MAX_TOTAL_DOWNLOAD_ATTEMPTS:
+                row.download_status = CourtOrder.DOWNLOAD_FAILED
+            row.save(update_fields=["download_attempts", "last_download_error", "download_status"])
+            consecutive_portal_failures = consecutive_portal_failures + 1 if exc.transient else 0
+            reason = error_kind(exc.cause)
             logger.warning(
-                "Order sync for case %s: download failed for %s: %s",
-                case.id, record.dedup_key, exc,
+                "Order sync for case %s: download failed for %s (attempt %d): %s",
+                case.id, record.dedup_key, row.download_attempts, exc.cause,
             )
+            if progress_callback:
+                progress_callback(downloaded + failed, total)
             continue
+        consecutive_portal_failures = 0
 
         redated = _same_order_redated(case, record, pdf_bytes, listed_keys)
         if redated is not None:
@@ -292,39 +444,33 @@ def sync_case_orders(case: Case, progress_callback=None) -> dict:
                 "same text, relabelling instead of storing it twice.",
                 case.id, record.order_number, redated.order_date, record.order_date,
             )
+            row.delete()  # the pending row just made for the new date
             _relabel(redated, record)
             relabelled += 1
             if progress_callback:
-                progress_callback(downloaded + failed + relabelled, total)
+                progress_callback(downloaded + failed + 1, total)
             continue
 
         filename = _order_filename(case, record)
-        saved_name = default_storage.save(
-            f"{ORDER_STORAGE_DIR}/{filename}", ContentFile(pdf_bytes)
-        )
-        document = Document.objects.create(
-            owner=case.owner,
-            case=case,
-            filename=filename,
-            file_path=saved_name,
-            file_type="pdf",
-            file_size=len(pdf_bytes),
-            document_type="court_order",
-            document_date=record.order_date,
-            processing_status="pending",
-            content_hash=hashlib.sha256(pdf_bytes).hexdigest(),
-        )
-        CourtOrder.objects.create(
-            owner=case.owner,
-            case=case,
-            order_number=record.order_number,
-            order_date=record.order_date,
-            description=record.description,
-            judge=record.judge,
-            source="ecourts",
-            dedup_key=record.dedup_key,
-            document=document,
-        )
+        saved_name = default_storage.save(f"{ORDER_STORAGE_DIR}/{filename}", ContentFile(pdf_bytes))
+        with transaction.atomic():
+            document = Document.objects.create(
+                owner=case.owner,
+                case=case,
+                filename=filename,
+                file_path=saved_name,
+                file_type="pdf",
+                file_size=len(pdf_bytes),
+                document_type="court_order",
+                document_date=record.order_date,
+                processing_status="pending",
+                content_hash=hashlib.sha256(pdf_bytes).hexdigest(),
+            )
+            row.document = document
+            row.download_status = CourtOrder.DOWNLOAD_DOWNLOADED
+            row.download_attempts += 1
+            row.last_download_error = ""
+            row.save(update_fields=["document", "download_status", "download_attempts", "last_download_error"])
         ProcessingJob.enqueue(document)
         downloaded += 1
         if progress_callback:
@@ -350,5 +496,8 @@ def sync_case_orders(case: Case, progress_callback=None) -> dict:
         "new": len(new_records),
         "downloaded": downloaded,
         "failed": failed,
+        "pending": CourtOrder.objects.filter(case=case, download_status=CourtOrder.DOWNLOAD_PENDING).count(),
         "relabelled": relabelled,
+        "stopped_early": stopped_early,
+        "reason": reason,
     }
