@@ -9,6 +9,7 @@ import { StatusBadge, PriorityBadge } from "@/components/ui/badge";
 import { MoreVertical, Trash2 } from "lucide-react";
 import { cn, hasPlaceholderTitle, pluralize, staggerDelay, primaryClientContact } from "@/lib/utils";
 import type { UrgencyReason } from "@/lib/case-urgency";
+import { orderCheckMarker } from "./order-sync-status";
 import type { Case } from "@/types";
 
 interface CaseCardProps {
@@ -26,6 +27,7 @@ interface CaseCardProps {
 export function CaseCard({ case: caseItem, onDelete, isDeleting, urgencyReason, index = 0 }: CaseCardProps) {
   const router = useRouter();
   const client = primaryClientContact(caseItem.client_contacts);
+  const orderMarker = orderCheckMarker(caseItem);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
@@ -139,6 +141,11 @@ export function CaseCard({ case: caseItem, onDelete, isDeleting, urgencyReason, 
       <div className="flex items-center gap-3.5 pt-3 border-t border-gray-100 text-xs text-gray-400">
         <span>{pluralize(caseItem.document_count, "doc")}</span>
         <span>{pluralize(caseItem.hearing_count, "hearing")}</span>
+        {orderMarker && (
+          <span className="ci-chip ci-chip--pending ml-auto" data-testid="order-check-marker">
+            {orderMarker}
+          </span>
+        )}
       </div>
     </Card>
   );

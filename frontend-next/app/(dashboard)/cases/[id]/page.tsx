@@ -24,6 +24,7 @@ import { UploadDocumentDialog } from "@/components/documents/upload-document-dia
 import { GenerateDocumentDialog } from "@/components/documents/generate-document-dialog";
 import { CaseClientUpdatesCard } from "@/components/client-updates/case-client-updates-card";
 import { RecentDocumentsCard } from "@/components/documents/recent-documents-card";
+import { OrderSyncStatusLine } from "@/components/cases/order-sync-status";
 import { showToast } from "@/components/ui/toaster";
 import {
   useProcessDocument,
@@ -240,6 +241,10 @@ export default function CaseDetailPage() {
 
             {/* Court Tracking */}
             <CourtTrackingCard caseItem={caseItem} hearings={hearings} />
+
+            {/* Order check status -- so an empty documents list is never
+                a silent zero: "none on the portal" vs "check failed". */}
+            <OrderSyncStatusLine caseItem={caseItem} />
 
             {/* Case Documents */}
             <RecentDocumentsCard

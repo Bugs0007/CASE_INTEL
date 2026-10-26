@@ -48,6 +48,9 @@ function makeCase(overrides: Partial<Case> = {}): Case {
     needs_attention: false,
     next_hearing_date: null,
     fee_summary: {} as Case["fee_summary"],
+    order_sync: {
+      state: "ok", last_checked_at: null, last_success_at: null, found: 0, downloaded: 0, reason: null,
+    },
     tracking_snapshot: {
       case_status: "Pending", case_stage: "FOR ADMISSION", court_and_judge: "APARESH KUMAR SINGH",
       court_name: "", nature_of_disposal: "", next_hearing_date: null,
