@@ -375,13 +375,16 @@ def sync_case_orders(case: Case, progress_callback=None) -> dict:
         _ensure_row(case, record)
 
     # Orders we were still waiting for that the portal has stopped listing:
-    # nothing to fetch any more.
-    CourtOrder.objects.filter(case=case, download_status=CourtOrder.DOWNLOAD_PENDING).exclude(
-        dedup_key__in=listed_keys
-    ).update(
-        download_status=CourtOrder.DOWNLOAD_FAILED,
-        last_download_error="No longer listed on the court portal.",
-    )
+    # nothing to fetch any more. Only when the portal listed SOMETHING -- an
+    # empty answer is as likely a blank page or a glitch as "all withdrawn",
+    # and giving up on the strength of it would be permanent.
+    if records:
+        CourtOrder.objects.filter(case=case, download_status=CourtOrder.DOWNLOAD_PENDING).exclude(
+            dedup_key__in=listed_keys
+        ).update(
+            download_status=CourtOrder.DOWNLOAD_FAILED,
+            last_download_error="No longer listed on the court portal.",
+        )
 
     work = list(
         CourtOrder.objects.filter(

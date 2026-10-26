@@ -4,6 +4,7 @@ Driven with a fake provider over the captured District Courts page (so the
 listing is the real parser's output) -- no live portal, no real storage.
 """
 
+from datetime import timedelta
 from io import StringIO
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -210,13 +211,26 @@ class TestRetriesAndPending:
         run_sync(case, portal)  # failed rows are left alone
         assert len(portal.downloads) == calls
 
+    def test_an_empty_listing_never_gives_up_on_pending_orders(self, case, sleeps):
+        portal = FakePortal(1, script=[CourtPortalError("x")] * 3)
+        run_sync(case, portal)
+        portal.records = []  # a blank page / glitch, not "all withdrawn"
+        run_sync(case, portal)
+        (row,) = CourtOrder.objects.filter(case=case)
+        assert row.download_status == "pending"
+
     def test_a_pending_order_the_portal_stopped_listing_is_marked_failed(self, case, sleeps):
         portal = FakePortal(1, script=[CourtPortalError("x")] * 3)
         run_sync(case, portal)
-        portal.records = []
+        (waiting,) = CourtOrder.objects.filter(case=case)
+        # The portal now lists a different order only (another date: the same
+        # date would read as the same order renumbered).
+        first = portal.records[0]
+        other = type(first)(cnr=CNR, order_number="9", order_date=first.order_date + timedelta(days=30))
+        portal.records = [other]
         result = run_sync(case, portal)
-        (row,) = CourtOrder.objects.filter(case=case)
-        assert row.download_status == "failed" and "No longer listed" in row.last_download_error
+        waiting.refresh_from_db()
+        assert waiting.download_status == "failed" and "No longer listed" in waiting.last_download_error
         assert result["pending"] == 0
 
 
