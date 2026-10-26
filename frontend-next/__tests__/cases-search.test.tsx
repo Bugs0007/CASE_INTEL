@@ -76,6 +76,9 @@ function makeCase(overrides: Partial<Case> = {}): Case {
       outstanding_amount: "0.00",
       total_amount: "0.00",
     },
+    order_sync: {
+      state: "ok", last_checked_at: null, last_success_at: null, found: 0, downloaded: 0, reason: null,
+    },
     ...overrides,
   };
 }

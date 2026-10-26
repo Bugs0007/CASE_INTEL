@@ -54,6 +54,24 @@ export interface ClientContactInput {
   address?: string;
 }
 
+/** Where the case's order check (the court portal's order list) stands --
+ * from GET /api/cases/ and /api/cases/<id>/. `reason` is one of three fixed
+ * labels ("CAPTCHA not read", "court portal didn't answer", "other"), never
+ * raw error text. document_count is saved Document rows only; this says
+ * what the order check found. */
+export type OrderSyncState = "never" | "queued" | "running" | "ok" | "partial" | "failed";
+
+export interface OrderSyncStatus {
+  state: OrderSyncState;
+  last_checked_at: string | null;
+  last_success_at: string | null;
+  /** Orders the portal listed (saved rows, downloaded or not). */
+  found: number;
+  /** Of those, how many PDFs are saved. */
+  downloaded: number;
+  reason: string | null;
+}
+
 export interface Case {
   id: number;
   case_number: string;
@@ -84,6 +102,7 @@ export interface Case {
   needs_attention: boolean;
   next_hearing_date: string | null;
   fee_summary: CaseFeeSummary;
+  order_sync: OrderSyncStatus;
   // --- Case detail only (GET /api/cases/<id>/, CaseDetailSerializer) ---
   /** The parties as the court record gives them (set on every fetch). */
   petitioner_name?: string;

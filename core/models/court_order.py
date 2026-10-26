@@ -65,6 +65,31 @@ class CourtOrder(OwnedModel):
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
+    # --- Download state (order sync) ---
+    # The row is saved the moment the portal lists the order, BEFORE its PDF
+    # is fetched, so "3 orders found, 1 downloaded" is knowable and a later
+    # sync finishes the SAME row (dedup_key) instead of starting over.
+    #   pending     listed, no PDF yet -- retried on every sync
+    #   downloaded  PDF saved (document is set)
+    #   failed      given up: the portal no longer lists it, or it failed
+    #               MAX_TOTAL_DOWNLOAD_ATTEMPTS times; requeue_order_sync
+    #               --retry-failed puts it back to pending
+    # Rows written before this column existed all have their PDF (or lost
+    # it to SET_NULL, which is not a reason to fetch again): "downloaded".
+    DOWNLOAD_PENDING = "pending"
+    DOWNLOAD_DOWNLOADED = "downloaded"
+    DOWNLOAD_FAILED = "failed"
+    DOWNLOAD_STATUS_CHOICES = [
+        (DOWNLOAD_PENDING, "Pending download"),
+        (DOWNLOAD_DOWNLOADED, "Downloaded"),
+        (DOWNLOAD_FAILED, "Download failed"),
+    ]
+    download_status = models.CharField(
+        max_length=12, choices=DOWNLOAD_STATUS_CHOICES, default=DOWNLOAD_DOWNLOADED
+    )
+    download_attempts = models.PositiveSmallIntegerField(default=0)
+    last_download_error = models.CharField(max_length=300, blank=True, default="")
+
     # --- Order Overview summary (generated once at ingest) ---
     summary_status = models.CharField(
         max_length=20, choices=SUMMARY_STATUS_CHOICES, default=SUMMARY_PENDING

@@ -285,9 +285,10 @@ class Command(BaseCommand):
                 updated_at=timezone.now(),
             )
 
+        final_status, final_error = "succeeded", ""
         try:
             if job.job_type == "order_sync":
-                self._run_order_sync(job, report_progress)
+                final_status, final_error = self._run_order_sync(job, report_progress)
             elif job.job_type == "advocate_import":
                 run_advocate_import(job, progress_callback=report_progress)
             elif job.job_type == "advocate_search":
@@ -315,8 +316,11 @@ class Command(BaseCommand):
             logger.exception("Job %d failed", job.id)
             self._finish(job, "failed", error=str(exc)[:2000])
         else:
-            self._finish(job, "succeeded")
-            self.stdout.write(self.style.SUCCESS(f"Job {job.id} succeeded."))
+            self._finish(job, final_status, error=final_error)
+            if final_status == "succeeded":
+                self.stdout.write(self.style.SUCCESS(f"Job {job.id} succeeded."))
+            else:
+                self.stdout.write(self.style.WARNING(f"Job {job.id} {final_status}: {final_error}"))
         finally:
             stop_heartbeat.set()
             heartbeat.join(timeout=5)
@@ -403,17 +407,31 @@ class Command(BaseCommand):
         except Exception:  # noqa: BLE001
             logger.exception("Client update draft failed for order %d.", order.id)
 
-    def _run_order_sync(self, job: ProcessingJob, report_progress) -> None:
+    def _run_order_sync(self, job: ProcessingJob, report_progress) -> tuple[str, str]:
         """Fetch new court-order PDFs for the job's case. Each downloaded
         PDF gets its own document ProcessingJob, so this worker loop picks
-        the files up for the normal extract/OCR/embed pipeline next."""
+        the files up for the normal extract/OCR/embed pipeline next.
+
+        The sync's summary is recorded on the job (payload["result"]) -- it
+        used to exist only in this log line -- and a run in which any
+        download failed ends "partial", not "succeeded". Returns
+        (final status, message for job.error)."""
         case = Case.objects.get(id=job.case_id)
         result = sync_case_orders(case, progress_callback=report_progress)
+        job.payload = {**(job.payload or {}), "result": result}
+        job.save(update_fields=["payload", "updated_at"])
         self.stdout.write(
             f"Order sync for case {case.id}: {result['listed']} listed, "
             f"{result['new']} new, {result['downloaded']} downloaded, "
-            f"{result['failed']} failed, {result.get('relabelled', 0)} renumbered on the portal."
+            f"{result['failed']} failed, {result['pending']} pending, "
+            f"{result.get('relabelled', 0)} renumbered on the portal."
         )
+        if result["failed"]:
+            return "partial", (
+                f"{result['failed']} order PDF(s) could not be downloaded "
+                f"({result['pending']} still pending); they are retried on the next sync."
+            )
+        return "succeeded", ""
 
     @staticmethod
     def _finish(job: ProcessingJob, status: str, error: str = "") -> None:

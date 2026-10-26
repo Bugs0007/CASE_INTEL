@@ -56,6 +56,8 @@ export interface CourtOrder {
   source: CourtOrderSource;
   /** False when the underlying Document row is gone -- not openable. */
   has_file: boolean;
+  /** "pending" = listed by the portal, PDF not saved yet (retried on sync). */
+  download_status: "pending" | "downloaded" | "failed";
   filename: string | null;
   file_size: number | null;
   processing_status: ProcessingStatus | null;
