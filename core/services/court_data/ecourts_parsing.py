@@ -504,19 +504,16 @@ def parse_case_history_html(html: str) -> CourtCaseData | None:
 # displayPdf(normal_v, case_val, court_code, filename, appFlag) onclick
 # links when orders are uploaded (per the live portal's own components.js
 # displayPdf(), which POSTs home/display_pdf and GETs the returned path).
-# NOT yet observed live -- every real case checked in the spike (the
-# tracked case + 3 others at the same court) listed zero orders, so the
-# district download leg below is best-effort: built from the portal's own
-# JS, exercised only when a district case with uploaded orders appears.
+# Observed live once: a real captured page with an Interim Orders table
+# (core/tests/fixtures/causelists/district_ecourts/cnr_case_page/), and one
+# real order downloaded end to end in production. Every other real case
+# checked listed zero orders, so Final Orders markup and other courts'
+# variants are still unverified; _parse_district_orders is defensive and
+# logs a WARNING instead of returning [] silently when it cannot parse.
 # ---------------------------------------------------------------------------
 
 _HC_ORDERS_BASE = "https://hcservices.ecourts.gov.in/hcservices/"
 _DC_ORDERS_BASE = "https://services.ecourts.gov.in/ecourtindia_v6/"
-
-_DC_DISPLAYPDF_RE = re.compile(
-    r"""displayPdf\(\s*'?([^,'\)]*)'?\s*,\s*'([^']*)'\s*,\s*'?([^,'\)]*)'?\s*,\s*'([^']*)'\s*(?:,\s*'([^']*)')?\s*\)"""
-)
-
 
 def _strip_pdf_prefix(raw: bytes) -> bytes:
     """Both portals have been observed to prepend junk (a UTF-8 BOM on HC
@@ -560,44 +557,114 @@ def _parse_hc_orders(html: str, cnr: str) -> list[tuple[CourtOrderRecord, str]]:
     return results
 
 
+_DC_ARG_RE = re.compile(r"""\s*(?:'([^']*)'|"([^"]*)"|([^,'")\s][^,)]*?))\s*(?:,|$)""")
+_DC_SECTION_RE = re.compile(r"\b(interim|final)\s+orders?\b", re.I)
+
+
+def _displaypdf_args(target: str) -> list[str] | None:
+    """The arguments of the first displayPdf(...) call in `target`, however
+    they are quoted ('a', "a" or bare a); None if there is no call or fewer
+    than the four the portal's own JS passes (normal_v, case_val,
+    court_code, filename[, appFlag])."""
+    match = re.search(r"displayPdf\(\s*(.*?)\s*\)", target, re.S)
+    if not match:
+        return None
+    inner = match.group(1)
+    args = []
+    pos = 0
+    while pos <= len(inner) and inner[pos:].strip() != "":
+        arg = _DC_ARG_RE.match(inner, pos)
+        if arg is None:
+            break
+        args.append(next((g for g in arg.groups() if g is not None), ""))
+        pos = arg.end()
+    return args if len(args) >= 4 else None
+
+
+def _order_section(row) -> str:
+    """"interim" / "final" from the nearest heading above this order row, or
+    "" when the page carries no such heading."""
+    heading = row.find_previous(
+        lambda tag: tag.name in ("h1", "h2", "h3", "h4", "h5", "caption")
+        and _DC_SECTION_RE.search(tag.get_text(" "))
+    )
+    if heading is None:
+        return ""
+    return _DC_SECTION_RE.search(heading.get_text(" ")).group(1).lower()
+
+
 def _parse_district_orders(html: str, cnr: str) -> list[tuple[CourtOrderRecord, dict]]:
     """Parse district-court order rows into (record, displayPdf-args) pairs.
 
-    Best-effort (see module comment above): matches rows containing a
-    displayPdf(...) onclick and reads order number/date from the row's
-    cells by position, mirroring the HC layout. Returns [] when no
-    displayPdf links exist -- the verified-common case.
+    Matches every row carrying a displayPdf(...) call -- as an onclick
+    attribute (quoted or unquoted, single/double/bare arguments) or a
+    javascript: href -- and reads the order number and date from the row's
+    cells. Interim and Final orders are separate tables on the portal; the
+    record's `section` says which, so an interim "1" and a final "1" on one
+    date keep distinct dedup keys.
+
+    Never fails silently. A row with a link but an empty number cell is kept
+    under a date-based number ("2026-09-15", then "2026-09-15-2"), because
+    dropping it would hide a real order. When the page has an order table or
+    an Interim/Final Orders heading and rows were present but none parsed, a
+    WARNING with the CNR and counts (no party names) is logged: that is what
+    "the portal's markup changed" looks like.
+
+    Observed on one real page only (an Interim Orders table, see
+    core/tests/fixtures/causelists/district_ecourts/cnr_case_page/) and on
+    one live order download (case 43) -- everything else here is defensive.
     """
-    if "displayPdf" not in html:
-        return []
-    soup = BeautifulSoup(html, "lxml")
+    soup = BeautifulSoup(html or "", "lxml")
+    tables = soup.find_all("table", class_="order_table")
+    headings = [
+        h for h in soup.find_all(["h1", "h2", "h3", "h4", "h5"]) if _DC_SECTION_RE.search(h.get_text(" "))
+    ]
+    mentions = (html or "").count("displayPdf")
+
     results: list[tuple[CourtOrderRecord, dict]] = []
+    seen_rows = 0
+    unparsed_rows = 0
+    fallback_counter: dict[tuple[str, str], int] = {}
     for row in soup.find_all("tr"):
-        onclick_el = row.find(attrs={"onclick": re.compile(r"displayPdf\(")})
-        if onclick_el is None:
-            link = row.find("a", href=re.compile(r"displayPdf\("))
-            onclick_el = link
-        if onclick_el is None:
+        link = row.find(attrs={"onclick": re.compile(r"displayPdf")}) or row.find(
+            "a", href=re.compile(r"displayPdf")
+        )
+        if link is None:
             continue
-        target = onclick_el.get("onclick") or onclick_el.get("href") or ""
-        match = _DC_DISPLAYPDF_RE.search(target)
-        if not match:
+        # A <tr> that contains another table's rows (the portal's HTML is
+        # malformed and nests the orders table) is not itself an order row.
+        if row.find("tr") is not None:
             continue
-        normal_v, case_val, court_code, ofilename, app_flag = match.groups()
+        seen_rows += 1
+        target = link.get("onclick") or link.get("href") or ""
+        args = _displaypdf_args(target)
+        if args is None:
+            unparsed_rows += 1
+            continue
+        normal_v, case_val, court_code, ofilename = args[:4]
+        app_flag = args[4] if len(args) > 4 else ""
+
         cells = [_clean(c.get_text()) for c in row.find_all("td")]
-        order_number = cells[0] if cells else ""
         order_date = None
         for cell in cells:
             order_date = _parse_date(cell)
             if order_date:
                 break
-        if not order_number:
-            continue
+        section = _order_section(row)
+        order_number = cells[0] if cells else ""
+        if not order_number or _parse_date(order_number):
+            # The number cell is empty (or the first cell is the date).
+            base = order_date.isoformat() if order_date else "undated"
+            count = fallback_counter.get((section, base), 0) + 1
+            fallback_counter[(section, base)] = count
+            order_number = base if count == 1 else f"{base}-{count}"
+        label = {"interim": "Interim order", "final": "Final order"}.get(section, "Order")
         record = CourtOrderRecord(
             cnr=cnr,
             order_number=order_number,
             order_date=order_date,
-            description=f"Order {order_number}" + (f" on {case_val}" if case_val else ""),
+            description=f"{label} {order_number}",
+            section=section,
         )
         results.append((
             record,
@@ -609,6 +676,22 @@ def _parse_district_orders(html: str, cnr: str) -> list[tuple[CourtOrderRecord, 
                 "appFlag": app_flag or "",
             },
         ))
+
+    if not results and (tables or headings or mentions):
+        data_rows = sum(1 for t in tables for r in t.find_all("tr") if r.find("td"))
+        counts = (
+            f"order_tables={len(tables)} section_headings={len(headings)} "
+            f"data_rows={data_rows} displayPdf_mentions={mentions} "
+            f"rows_with_link={seen_rows} rows_unparsed={unparsed_rows}"
+        )
+        if data_rows or mentions:
+            logger.warning(
+                "District order listing for %s found an orders section but parsed 0 orders (%s); "
+                "the portal markup may have changed.",
+                cnr, counts,
+            )
+        else:
+            logger.info("District order listing for %s: orders section is empty (%s).", cnr, counts)
     return results
 
 
