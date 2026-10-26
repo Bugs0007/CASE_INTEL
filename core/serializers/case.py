@@ -9,9 +9,27 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from core.models import AppearanceFee, Case
+from core.services.order_sync_status import order_sync_summary
 
 from .client import ClientSummarySerializer, scope_client_field
 from .client_contact import ClientContactSerializer
+
+
+def fee_totals_by_case(case_ids) -> dict:
+    """{case_id: {status: (amount, count)}} for the given cases -- one query,
+    however many cases."""
+    rows = (
+        AppearanceFee.objects.filter(hearing__case_id__in=list(case_ids))
+        .values("hearing__case_id", "status")
+        .annotate(total=Sum("amount"), count=Count("id"))
+    )
+    out: dict = {}
+    for row in rows:
+        out.setdefault(row["hearing__case_id"], {})[row["status"]] = (
+            row["total"] or Decimal("0.00"),
+            row["count"],
+        )
+    return out
 
 
 class CaseSerializer(serializers.ModelSerializer):
@@ -23,6 +41,7 @@ class CaseSerializer(serializers.ModelSerializer):
     next_hearing_date = serializers.SerializerMethodField()
     client_contacts = ClientContactSerializer(many=True, read_only=True)
     fee_summary = serializers.SerializerMethodField()
+    order_sync = serializers.SerializerMethodField()
     client_detail = ClientSummarySerializer(source="client", read_only=True)
 
     def __init__(self, *args, **kwargs):
@@ -62,6 +81,7 @@ class CaseSerializer(serializers.ModelSerializer):
             "needs_attention",
             "next_hearing_date",
             "fee_summary",
+            "order_sync",
         ]
         read_only_fields = [
             "id",
@@ -73,11 +93,22 @@ class CaseSerializer(serializers.ModelSerializer):
             "party_advocate_data",
         ]
 
+    # document_count / hearing_count / order_sync come from queryset
+    # annotations on the case list and detail views (one query for all
+    # cases); a case serialized outside them (e.g. right after POST) falls
+    # back to a direct query. document_count is Document rows only -- an
+    # order the portal listed but whose PDF is not saved yet is not a document;
+    # order_sync says what the order check found.
     def get_document_count(self, obj: Case) -> int:
-        return obj.documents.count()
+        count = getattr(obj, "_document_count", None)
+        return count if count is not None else obj.documents.count()
 
     def get_hearing_count(self, obj: Case) -> int:
-        return obj.hearings.count()
+        count = getattr(obj, "_hearing_count", None)
+        return count if count is not None else obj.hearings.count()
+
+    def get_order_sync(self, obj: Case) -> dict:
+        return order_sync_summary(obj)
 
     def get_next_hearing_date(self, obj: Case):
         # Populated via queryset annotation (see core/views/case.py) when
@@ -100,23 +131,20 @@ class CaseSerializer(serializers.ModelSerializer):
         still distinguish "not billed yet" from "billed, awaiting
         payment".
 
-        One aggregate query per case. That is fine for the case DETAIL
-        page (a single case), which is where this is rendered; a future
-        list view that wants these totals should annotate the queryset
-        rather than relying on this per-row.
+        The case list computes every case's totals in ONE grouped query
+        (fee_totals_by_case) and hands them over in the serializer context
+        as "fee_summaries"; a single case (the detail page) runs the same
+        query for itself.
         """
-        rows = (
-            AppearanceFee.objects.filter(hearing__case=obj)
-            .values("status")
-            .annotate(total=Sum("amount"), count=Count("id"))
-        )
+        by_case = self.context.get("fee_summaries")
+        if by_case is None:
+            by_case = fee_totals_by_case([obj.id])
         totals = {
             AppearanceFee.STATUS_PENDING: (Decimal("0.00"), 0),
             AppearanceFee.STATUS_INVOICED: (Decimal("0.00"), 0),
             AppearanceFee.STATUS_PAID: (Decimal("0.00"), 0),
         }
-        for row in rows:
-            totals[row["status"]] = (row["total"] or Decimal("0.00"), row["count"])
+        totals.update(by_case.get(obj.id, {}))
 
         pending_amount, pending_count = totals[AppearanceFee.STATUS_PENDING]
         invoiced_amount, invoiced_count = totals[AppearanceFee.STATUS_INVOICED]
