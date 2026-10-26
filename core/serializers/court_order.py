@@ -38,6 +38,7 @@ class CourtOrderSerializer(serializers.ModelSerializer):
             "judge",
             "source",
             "has_file",
+            "download_status",
             "filename",
             "file_size",
             "processing_status",

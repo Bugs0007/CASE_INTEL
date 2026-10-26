@@ -6,6 +6,7 @@ from datetime import timedelta
 
 from django.db import IntegrityError
 from django.db.models import BooleanField, Count, Exists, OuterRef, Subquery, Value
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from rest_framework import generics, status
@@ -13,12 +14,14 @@ from rest_framework.response import Response
 
 from core.models import Case, Document, Hearing
 from core.serializers import CaseCreateSerializer, CaseDetailSerializer, CaseSerializer
+from core.serializers.case import fee_totals_by_case
 from core.services.conflict_check import (
     conflict_response_body,
     find_conflicts,
     is_acknowledged,
     record_acknowledgement,
 )
+from core.services.order_sync_status import annotate_order_sync
 from core.services.tasks.from_orders import sync_order_tasks_for_case
 from core.views.mixins import OwnerScopedMixin
 
@@ -61,6 +64,25 @@ def _annotate_next_hearing_date(qs):
         .values("hearing_date")[:1]
     )
     return qs.annotate(_next_hearing_date=Subquery(next_hearing))
+
+
+def _count_subquery(model, **filters):
+    """COUNT(*) of `model` rows for the outer case, as a correlated
+    subquery: a plain Count() join would multiply against the other joins
+    already on these querysets."""
+    rows = model.objects.filter(case=OuterRef("pk"), **filters).order_by().values("case")
+    return Coalesce(Subquery(rows.annotate(n=Count("id")).values("n")[:1]), 0)
+
+
+def _annotate_case_list_extras(qs):
+    """What the case serializer would otherwise query per case: document and
+    hearing counts and the order-check status (CaseSerializer reads these
+    `_`-prefixed annotations when present)."""
+    qs = qs.annotate(
+        _document_count=_count_subquery(Document),
+        _hearing_count=_count_subquery(Hearing),
+    )
+    return annotate_order_sync(qs)
 
 
 class CaseListView(OwnerScopedMixin, generics.ListCreateAPIView):
@@ -138,10 +160,26 @@ class CaseListView(OwnerScopedMixin, generics.ListCreateAPIView):
         headers = self.get_success_headers(output)
         return Response(output, status=status.HTTP_201_CREATED, headers=headers)
 
+    def list(self, request, *args, **kwargs):
+        # Same as ListModelMixin.list, plus every case's fee totals in one
+        # query (CaseSerializer.get_fee_summary reads them from the context).
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        cases = page if page is not None else list(queryset)
+        context = {**self.get_serializer_context(), "fee_summaries": fee_totals_by_case(c.id for c in cases)}
+        serializer = self.get_serializer(cases, many=True, context=context)
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)
+
     def get_base_queryset(self):
-        qs = Case.objects.prefetch_related("client_contacts").annotate(
-            thread_count=Count("emails__gmail_thread_id", distinct=True),
-            conversation_count=Count("conversations", distinct=True),
+        qs = (
+            Case.objects.select_related("client")
+            .prefetch_related("client_contacts")
+            .annotate(
+                thread_count=Count("emails__gmail_thread_id", distinct=True),
+                conversation_count=Count("conversations", distinct=True),
+            )
         )
 
         # Filter by status
@@ -162,7 +200,7 @@ class CaseListView(OwnerScopedMixin, generics.ListCreateAPIView):
         qs = _annotate_needs_attention(qs, self.request.query_params.get("since"))
         qs = _annotate_next_hearing_date(qs)
 
-        return qs
+        return _annotate_case_list_extras(qs)
 
 
 class CaseDetailView(OwnerScopedMixin, generics.RetrieveUpdateDestroyAPIView):
@@ -179,11 +217,15 @@ class CaseDetailView(OwnerScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     serializer_class = CaseDetailSerializer
 
     def get_base_queryset(self):
-        qs = Case.objects.prefetch_related("client_contacts").annotate(
-            thread_count=Count("emails__gmail_thread_id", distinct=True),
-            conversation_count=Count("conversations", distinct=True),
+        qs = (
+            Case.objects.select_related("client")
+            .prefetch_related("client_contacts")
+            .annotate(
+                thread_count=Count("emails__gmail_thread_id", distinct=True),
+                conversation_count=Count("conversations", distinct=True),
+            )
         )
-        return _annotate_next_hearing_date(qs)
+        return _annotate_case_list_extras(_annotate_next_hearing_date(qs))
 
     def perform_update(self, serializer):
         previous_role = serializer.instance.user_party_role

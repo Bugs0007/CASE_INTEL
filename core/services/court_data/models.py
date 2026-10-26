@@ -33,18 +33,26 @@ class CourtOrderRecord:
 
     dedup_key is the stable identity of an order across fetches:
     "<cnr>:<order_number>:<order_date iso>". The portal's encrypted
-    download token is NOT part of it (it changes per session)."""
+    download token is NOT part of it (it changes per session).
+
+    `section` is "interim" or "final" on the District Courts portal, which
+    lists the two kinds in separate tables that can each carry an order "1"
+    on the same date; "" where the portal has no such split (High Courts).
+    Only "final" extends the key (":final"), so every key already saved --
+    all of them written before sections existed -- keeps matching."""
 
     cnr: str
     order_number: str
     order_date: date | None = None
     description: str = ""
     judge: str = ""
+    section: str = ""
 
     @property
     def dedup_key(self) -> str:
         date_part = self.order_date.isoformat() if self.order_date else "unknown"
-        return f"{self.cnr}:{self.order_number}:{date_part}"
+        key = f"{self.cnr}:{self.order_number}:{date_part}"
+        return f"{key}:final" if self.section == "final" else key
 
 
 @dataclass
