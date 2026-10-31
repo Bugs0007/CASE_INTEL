@@ -1,0 +1,71 @@
+<template>
+  <style>
+    @font-face{font-family:'Newsreader';src:url('assets/fonts/Newsreader.woff2') format('woff2');font-weight:200 800;font-style:normal}
+    @font-face{font-family:'Newsreader';src:url('assets/fonts/Newsreader-Italic.woff2') format('woff2');font-weight:200 800;font-style:italic}
+    @font-face{font-family:'Public Sans';src:url('assets/fonts/PublicSans.woff2') format('woff2');font-weight:400 800}
+    @font-face{font-family:'IBM Plex Mono';src:url('assets/fonts/IBMPlexMono.woff2') format('woff2');font-weight:400}
+    #scene04{position:absolute;inset:0;width:100%;height:100%;color:#0B131B;overflow:hidden;font-family:'Public Sans',sans-serif}
+    #scene04 *{box-sizing:border-box}
+    #s04-bg{position:absolute;inset:0;background:#F1F0EA}
+    #s04-world{position:absolute;inset:0}
+    #s04-headline{position:absolute;left:192px;top:114px;font-family:'Newsreader',serif;font-size:110px;font-weight:400;letter-spacing:-2px;line-height:1.04;margin:0}
+    #s04-nextline{position:absolute;left:192px;top:114px;font-family:'Newsreader',serif;font-size:110px;font-weight:400;letter-spacing:-2px;line-height:1.04;margin:0}
+    #s04-order{position:absolute;left:192px;top:306px;width:1536px}
+    #s04-file{font-family:'IBM Plex Mono',monospace;font-size:28px;letter-spacing:.3px;padding-bottom:28px;border-bottom:1px solid #8E9696;color:#47535C}
+    #s04-case{font-size:32px;line-height:1.4;margin-top:27px;color:#47535C}
+    #s04-extract{position:relative;margin:47px 0 0;font-family:'Newsreader',serif;font-size:59px;line-height:1.27;max-width:1460px}
+    #s04-phrase{display:block;font-style:italic;position:relative;z-index:1}
+    #s04-highlight{position:absolute;left:0;top:83px;height:78px;width:1510px;transform-origin:0 50%;background:#E8C9A8;z-index:0}
+    #s04-quoteend{display:block}
+    #s04-source{font-family:'IBM Plex Mono',monospace;font-size:27px;line-height:1.3;margin-top:36px;color:#47535C}
+    #s04-tasks{position:absolute;left:192px;top:306px;width:1536px}
+    #s04-taskcase{font-family:'IBM Plex Mono',monospace;font-size:28px;padding-bottom:28px;border-bottom:1px solid #8E9696;color:#47535C}
+    #scene04 .s04-task{position:relative;min-height:192px;border-bottom:1px solid #AFB4B2;padding:30px 340px 28px 86px}
+    #scene04 .s04-check{position:absolute;left:0;top:38px;width:48px;height:48px;border:1px solid #5A6F65;display:flex;align-items:center;justify-content:center;color:#365845;font-size:32px}
+    #scene04 .s04-tasktitle{font-family:'Newsreader',serif;font-size:62px;line-height:1.15;letter-spacing:-.5px}
+    #scene04 .s04-taskdetail{font-size:31px;line-height:1.4;color:#47535C;margin-top:14px}
+    #scene04 .s04-date{position:absolute;right:0;top:40px;min-width:285px;border-left:1px solid #A3AAA6;padding-left:35px;font-family:'IBM Plex Mono',monospace}
+    #scene04 .s04-duelabel{font-size:28px;line-height:1.3;color:#47535C}
+    #scene04 .s04-day{font-family:'Newsreader',serif;font-size:70px;line-height:1.1;color:#0B131B;margin-top:8px;white-space:nowrap}
+    #s04-caption{position:absolute;left:192px;bottom:98px;font-size:28px;line-height:1.4;color:#58636A}
+    #s04-night{position:absolute;inset:0;background:#0B131B;transform-origin:0% 50%}
+  </style>
+  <div data-hf-id="hf-5fpr" id="scene04" data-composition-id="scene04" data-width="1920" data-height="1080" data-duration="6">
+    <div data-hf-id="hf-4qwj" id="s04-bg" class="clip" data-start="0" data-duration="6" data-track-index="0"></div>
+    <div data-hf-id="hf-buup" id="s04-world" class="clip" data-start="0" data-duration="6" data-track-index="1">
+      <h2 data-hf-id="hf-mozl" id="s04-headline">From orders</h2>
+      <h2 data-hf-id="hf-ewu0" id="s04-nextline">to what comes next</h2>
+      <div data-hf-id="hf-3jff" id="s04-order">
+        <div data-hf-id="hf-t7e4" id="s04-file">order_2026-07-29.pdf</div>
+        <div data-hf-id="hf-ow47" id="s04-case">Ramesh Kumar vs. TSSPDCL · WP/14562/2024</div>
+        <blockquote data-hf-id="hf-imcu" id="s04-extract"><div data-hf-id="hf-f7xs" id="s04-highlight" data-layout-ignore></div><span data-hf-id="hf-6d86">The petitioner is directed to</span><span data-hf-id="hf-svwp" id="s04-phrase">deposit 50% of the disputed arrears</span><span data-hf-id="hf-q4v5" id="s04-quoteend">with the Registry within four weeks</span></blockquote>
+        <div data-hf-id="hf-zbhf" id="s04-source">Extract from the order · 29 Jul 2026</div>
+      </div>
+      <div data-hf-id="hf-otbh" id="s04-tasks">
+        <div data-hf-id="hf-dbfw" id="s04-taskcase">WP/14562/2024 · next actions</div>
+        <div data-hf-id="hf-zhdn" id="s04-task1" class="s04-task"><div data-hf-id="hf-tgpt" class="s04-check">✓</div><div data-hf-id="hf-3hfd" class="s04-tasktitle">Deposit Rs. 1,84,000</div><div data-hf-id="hf-370q" class="s04-taskdetail">50% of disputed arrears · with the Registry</div><div data-hf-id="hf-pllo" class="s04-date"><div data-hf-id="hf-llx6" class="s04-duelabel">DUE</div><div data-hf-id="hf-yzmx" class="s04-day">26 Aug</div></div></div>
+        <div data-hf-id="hf-qths" id="s04-task2" class="s04-task"><div data-hf-id="hf-mxh1" class="s04-check">✓</div><div data-hf-id="hf-l5zi" class="s04-tasktitle">File proof of deposit</div><div data-hf-id="hf-j258" class="s04-taskdetail">Before the next date of hearing</div><div data-hf-id="hf-43v8" class="s04-date"><div data-hf-id="hf-rj4r" class="s04-duelabel">BEFORE</div><div data-hf-id="hf-nq8k" class="s04-day">02 Sep</div></div></div>
+      </div>
+      <div data-hf-id="hf-dxbb" id="s04-caption">Illustrative case data</div>
+      <div data-hf-id="hf-f9ma" id="s04-night" data-layout-ignore></div>
+    </div>
+  </div>
+  <script>
+    (()=>{
+      const tl=gsap.timeline({paused:true});
+      tl.fromTo('#s04-headline',{opacity:0},{opacity:1,duration:.28},.04);
+      tl.fromTo('#s04-order',{y:70,opacity:0},{y:0,opacity:1,duration:.7,ease:'power3.out'},.18);
+      tl.fromTo('#s04-highlight',{scaleX:0},{scaleX:1,duration:.75,ease:'power3.inOut'},.9);
+      tl.to('#s04-headline',{opacity:0,duration:.2},2.18);
+      tl.fromTo('#s04-nextline',{opacity:0},{opacity:1,duration:.25},2.4);
+      tl.to('#s04-order',{y:-28,opacity:0,duration:.48,ease:'power2.inOut'},2.18);
+      tl.fromTo('#s04-tasks',{opacity:0},{opacity:1,duration:.2},2.55);
+      tl.fromTo('#s04-taskcase',{opacity:0},{opacity:1,duration:.25},2.55);
+      tl.fromTo('#s04-task1',{x:-45,opacity:0},{x:0,opacity:1,duration:.75,ease:'power2.out'},2.55);
+      tl.fromTo('#s04-task2',{x:-45,opacity:0},{x:0,opacity:1,duration:.75,ease:'power2.out'},3.2);
+      tl.fromTo('#s04-night',{scaleX:0},{scaleX:1,duration:.7,ease:'power2.inOut'},5.3);
+      window.__timelines['scene04']=tl;
+    })();
+  </script>
+</template>
+

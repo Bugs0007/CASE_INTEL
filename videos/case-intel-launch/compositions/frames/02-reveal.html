@@ -1,0 +1,89 @@
+<template>
+  <style>
+    @font-face{font-family:Newsreader;src:url('assets/fonts/Newsreader.woff2') format('woff2');font-style:normal;font-weight:200 800}
+    @font-face{font-family:Newsreader;src:url('assets/fonts/Newsreader-Italic.woff2') format('woff2');font-style:italic;font-weight:200 800}
+    @font-face{font-family:'Public Sans';src:url('assets/fonts/PublicSans.woff2') format('woff2');font-style:normal;font-weight:400 800}
+    @font-face{font-family:'IBM Plex Mono';src:url('assets/fonts/IBMPlexMono.woff2') format('woff2');font-style:normal;font-weight:400}
+    #scene02{position:absolute;inset:0;width:100%;height:100%;overflow:hidden;color:#F1F0EA;font-family:'Public Sans',sans-serif}
+    #scene02 *{box-sizing:border-box}
+    #scene02 .s2-layer{position:absolute;inset:0}
+    #scene02 .s2-ground{background:#0B131B}
+    #scene02 .s2-stage{position:absolute;inset:0;perspective:1200px;perspective-origin:70% 50%}
+    #scene02 .s2-backpaper{position:absolute;left:1000px;top:204px;width:710px;height:700px;background:#E6E5DC;border:1px solid #B9B9B0;padding:48px;color:#14202C;box-shadow:0 25px 80px rgba(0,0,0,.4);backface-visibility:hidden}
+    #scene02 .s2-backpaper h3{font:400 46px/1.1 Newsreader,serif;margin:0 0 30px}
+    #scene02 .s2-backpaper p{font:400 28px/1.5 'IBM Plex Mono',monospace;margin:0 0 26px}
+    #scene02 .s2-backpaper-rules{height:390px;background:repeating-linear-gradient(180deg,rgba(20,32,44,.14) 0,rgba(20,32,44,.14) 3px,transparent 3px,transparent 36px)}
+    #scene02 .s2-sheet{position:absolute;left:968px;top:199px;width:760px;height:656px;background:#101B26;border:1px solid rgba(241,240,234,.24);box-shadow:0 42px 90px rgba(0,0,0,.36);padding:34px 32px;backface-visibility:hidden}
+    #scene02 .s2-sheet-head{border-bottom:1px solid rgba(241,240,234,.18);padding-bottom:24px;display:flex;justify-content:space-between;gap:20px}
+    #scene02 .s2-sheet-title{font:400 28px/1.35 'IBM Plex Mono',monospace;color:#E8C9A8;letter-spacing:.02em}
+    #scene02 .s2-fetched{font:400 28px/1.35 'IBM Plex Mono',monospace;color:#7FD3AC;text-align:right;white-space:nowrap}
+    #scene02 .s2-sheet-label{font:400 28px/1.3 'Public Sans',sans-serif;margin:20px 0 12px;color:rgba(241,240,234,.7)}
+    #scene02 .s2-row{position:relative;display:flex;align-items:center;gap:24px;min-height:79px;padding:14px 12px;border-bottom:1px solid rgba(241,240,234,.1);font:400 28px/1.3 'IBM Plex Mono',monospace;color:rgba(241,240,234,.47)}
+    #scene02 .s2-row .s2-item{width:48px;flex-shrink:0}
+    #scene02 .s2-row .s2-cn{width:260px;flex-shrink:0}
+    #scene02 .s2-row .s2-court{font-family:'Public Sans',sans-serif}
+    #scene02 .s2-row-mine{color:#F1F0EA;min-height:111px;border:0;margin:2px -12px;padding:17px 24px;display:block}
+    #scene02 .s2-highlight{position:absolute;inset:0;background:linear-gradient(90deg,rgba(232,201,168,.22),rgba(232,201,168,.04));border-left:3px solid #E8C9A8;transform-origin:0 50%}
+    #scene02 .s2-row-top{display:flex;align-items:center;gap:22px;position:relative}
+    #scene02 .s2-mine-label{margin-left:auto;color:#0B131B;background:#E8C9A8;font:400 28px/1 'IBM Plex Mono',monospace;padding:9px 11px;text-transform:uppercase;letter-spacing:.04em}
+    #scene02 .s2-parties{position:relative;display:block;font:400 30px/1.3 'Public Sans',sans-serif;padding-left:70px;margin-top:10px}
+    #scene02 .s2-sheet-foot{font:400 28px/1.3 'IBM Plex Mono',monospace;padding:22px 12px 0;color:#E8C9A8;white-space:nowrap}
+    #scene02 .s2-copy{position:absolute;left:192px;top:268px;width:740px}
+    #scene02 .s2-title-mask{overflow:hidden;padding-bottom:12px}
+    #scene02 h1{font:400 108px/.99 Newsreader,serif;letter-spacing:-2.6px;margin:0;white-space:nowrap}
+    #scene02 .s2-read{font-size:116px;font-style:italic;color:#E8C9A8;margin-top:17px}
+    #scene02 .s2-brand{position:absolute;left:196px;top:740px;font:400 72px/1 Newsreader,serif;letter-spacing:-1.8px;color:#F1F0EA;display:flex;align-items:center;gap:28px}
+    #scene02 .s2-brand-rule{display:block;width:84px;height:1px;background:#E8C9A8;transform-origin:0 50%}
+    #scene02 .s2-proof{position:absolute;left:968px;top:893px;font:400 28px/1.3 'IBM Plex Mono',monospace;color:rgba(241,240,234,.54)}
+    #scene02 .s2-topline{position:absolute;left:192px;top:155px;font:400 28px/1.2 'IBM Plex Mono',monospace;color:rgba(241,240,234,.66);letter-spacing:.08em;text-transform:uppercase}
+    #scene02 .s2-topline b{font-weight:400;color:#E8C9A8}
+  </style>
+  <div data-hf-id="hf-t7z7" id="scene02" data-composition-id="scene02" data-width="1920" data-height="1080" data-duration="6">
+    <div data-hf-id="hf-p7lq" id="s2-bg" class="clip s2-layer" data-start="0" data-duration="6" data-track-index="0"><div data-hf-id="hf-e726" class="s2-layer s2-ground"></div></div>
+    <div data-hf-id="hf-hk3d" id="s2-paper-layer" class="clip s2-layer" data-start="0" data-duration="6" data-track-index="1" data-layout-allow-overlap="true" data-layout-allow-overflow="true">
+      <div data-hf-id="hf-rfk6" class="s2-stage">
+        <article data-hf-id="hf-8nlu" id="s2-back-a" class="s2-backpaper" data-layout-ignore="true"><h3 data-hf-id="hf-mynz">High Court of Telangana</h3><p data-hf-id="hf-vh3s">WP/14562/2024</p><div data-hf-id="hf-rqev" class="s2-backpaper-rules"></div></article>
+        <article data-hf-id="hf-4pht" id="s2-back-b" class="s2-backpaper" data-layout-ignore="true"><h3 data-hf-id="hf-a1r5">Cause list</h3><p data-hf-id="hf-1ftx">Court Hall 3 · Item 14</p><div data-hf-id="hf-ayrb" class="s2-backpaper-rules"></div></article>
+        <article data-hf-id="hf-3xu0" id="s2-back-c" class="s2-backpaper" data-layout-ignore="true"><h3 data-hf-id="hf-bu46">Ramesh Kumar vs. TSSPDCL</h3><p data-hf-id="hf-cbee">Adv. Meera Reddy</p><div data-hf-id="hf-akga" class="s2-backpaper-rules"></div></article>
+        <div data-hf-id="hf-cmke" id="s2-sheet" class="s2-sheet">
+          <div data-hf-id="hf-6qp4" class="s2-sheet-head"><div data-hf-id="hf-73c6" class="s2-sheet-title">CAUSE LIST<br data-hf-id="hf-x5px">Court Hall 3</div><div data-hf-id="hf-0xuq" class="s2-fetched">Fetched<br data-hf-id="hf-rsrt">19:02</div></div>
+          <div data-hf-id="hf-lp3g" class="s2-sheet-label">High Court for the State of Telangana</div>
+          <div data-hf-id="hf-dy6g" class="s2-row"><span data-hf-id="hf-3nvt" class="s2-item">12</span><span data-hf-id="hf-e0y8" class="s2-cn">WP/9930/2026</span><span data-hf-id="hf-hs8d" class="s2-court">A. Fathima</span></div>
+          <div data-hf-id="hf-j0e8" class="s2-row"><span data-hf-id="hf-426u" class="s2-item">13</span><span data-hf-id="hf-dis2" class="s2-cn">CMA/415/2023</span><span data-hf-id="hf-zsin" class="s2-court">United Insurance</span></div>
+          <div data-hf-id="hf-3ecc" class="s2-row s2-row-mine"><div data-hf-id="hf-vg3a" id="s2-highlight" class="s2-highlight"></div><div data-hf-id="hf-747u" class="s2-row-top"><span data-hf-id="hf-2v9r" class="s2-item">14</span><span data-hf-id="hf-rmt1" class="s2-cn">WP/14562/2024</span><span data-hf-id="hf-zfs7" id="s2-yours" class="s2-mine-label">Yours</span></div><span data-hf-id="hf-xifj" class="s2-parties">Ramesh Kumar vs. TSSPDCL</span></div>
+          <div data-hf-id="hf-hth5" class="s2-row"><span data-hf-id="hf-39ks" class="s2-item">15</span><span data-hf-id="hf-cmye" class="s2-cn">WP/3318/2026</span><span data-hf-id="hf-ospk" class="s2-court">M. Rajitha</span></div>
+          <div data-hf-id="hf-egdu" class="s2-sheet-foot">Your matter. Already found.</div>
+        </div>
+      </div>
+    </div>
+    <div data-hf-id="hf-ptht" id="s2-type-layer" class="clip s2-layer" data-start="0" data-duration="6" data-track-index="2">
+      <div data-hf-id="hf-4zeh" id="s2-topline" class="s2-topline">The night, <b data-hf-id="hf-ll19">put in order.</b></div>
+      <div data-hf-id="hf-lpar" class="s2-copy"><div data-hf-id="hf-2gyb" class="s2-title-mask"><h1 data-hf-id="hf-ulj1" id="s2-tonight">Tonight’s</h1></div><div data-hf-id="hf-0ofn" class="s2-title-mask"><h1 data-hf-id="hf-a0a7" id="s2-causelist">cause list.</h1></div><div data-hf-id="hf-0a4m" class="s2-title-mask"><h1 data-hf-id="hf-ecd2" id="s2-already" class="s2-read">Already read.</h1></div></div>
+      <div data-hf-id="hf-w3sq" id="s2-brand" class="s2-brand"><span data-hf-id="hf-peo3" id="s2-brand-rule" class="s2-brand-rule"></span><span data-hf-id="hf-v5hf" id="s2-brand-name">Case Intel</span></div>
+      <div data-hf-id="hf-h0qw" id="s2-proof" class="s2-proof">Illustrative case data</div>
+    </div>
+  </div>
+  <script>
+    (function(){
+      const tl=gsap.timeline({paused:true});
+      tl.fromTo('#s2-back-a',{x:-600,y:-180,z:100,rotationY:28,rotationZ:-24,opacity:.1},{x:25,y:0,z:-100,rotationY:0,rotationZ:-4,opacity:.8,duration:1.45,ease:'power2.inOut'},0);
+      tl.fromTo('#s2-back-b',{x:350,y:-350,z:30,rotationY:-35,rotationZ:26,opacity:.1},{x:12,y:0,z:-70,rotationY:0,rotationZ:3,opacity:.8,duration:1.45,ease:'power2.inOut'},.12);
+      tl.fromTo('#s2-back-c',{x:180,y:400,z:-180,rotationY:-20,rotationZ:17,opacity:.1},{x:0,y:0,z:-50,rotationY:0,rotationZ:-1,opacity:.8,duration:1.45,ease:'power2.inOut'},.24);
+      tl.fromTo('#s2-sheet',{x:150,y:40,z:-140,rotationY:-14,rotationZ:5,opacity:0},{x:0,y:0,z:0,rotationY:0,rotationZ:0,opacity:1,duration:1.45,ease:'power2.inOut'},.45);
+      tl.fromTo(['#s2-back-a','#s2-back-b','#s2-back-c'],{opacity:.8},{opacity:0,duration:.45,ease:'sine.inOut',immediateRender:false},1.75);
+      tl.fromTo('#s2-topline',{opacity:0},{opacity:1,duration:.6,ease:'power3.out'},.3);
+      tl.fromTo('#s2-tonight',{y:120,opacity:0},{y:0,opacity:1,duration:.65,ease:'power3.out'},1.0);
+      tl.fromTo('#s2-causelist',{y:120,opacity:0},{y:0,opacity:1,duration:.65,ease:'power3.out'},1.12);
+      tl.fromTo('#s2-already',{y:130,opacity:0},{y:0,opacity:1,duration:.8,ease:'power3.out'},1.65);
+      tl.fromTo('#s2-highlight',{scaleX:0},{scaleX:1,duration:.72,ease:'power3.out'},2.3);
+      tl.fromTo('#s2-yours',{opacity:0,y:7},{opacity:1,y:0,duration:.4,ease:'power3.out'},2.75);
+      tl.fromTo('#s2-brand-rule',{scaleX:0},{scaleX:1,duration:.65,ease:'power3.out'},3.15);
+      tl.fromTo('#s2-brand-name',{opacity:0,y:16},{opacity:1,y:0,duration:.65,ease:'power3.out'},3.32);
+      tl.fromTo('#s2-proof',{opacity:0},{opacity:1,duration:.4},1.6);
+      tl.to({}, {duration:2.03},3.97);
+      window.__timelines=window.__timelines||{};
+      window.__timelines.scene02=tl;
+    })();
+  </script>
+</template>
+

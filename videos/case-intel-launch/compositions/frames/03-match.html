@@ -1,0 +1,76 @@
+<template>
+  <style>
+    @font-face{font-family:'Newsreader';src:url('assets/fonts/Newsreader.woff2') format('woff2');font-weight:200 800;font-style:normal}
+    @font-face{font-family:'Newsreader';src:url('assets/fonts/Newsreader-Italic.woff2') format('woff2');font-weight:200 800;font-style:italic}
+    @font-face{font-family:'Public Sans';src:url('assets/fonts/PublicSans.woff2') format('woff2');font-weight:400 800}
+    @font-face{font-family:'IBM Plex Mono';src:url('assets/fonts/IBMPlexMono.woff2') format('woff2');font-weight:400}
+    #scene03{position:absolute;inset:0;width:100%;height:100%;color:#F1F0EA;overflow:hidden;font-family:'Public Sans',sans-serif}
+    #scene03 *{box-sizing:border-box}
+    #s03-bg{position:absolute;inset:0;background:#0B131B}
+    #s03-world{position:absolute;inset:0}
+    #s03-headline{position:absolute;left:192px;top:100px;margin:0;font-family:'Newsreader',serif;font-weight:400;font-size:110px;line-height:1.05;letter-spacing:-2px}
+    #s03-found{display:inline-block;color:#E8C9A8;font-style:italic;margin-left:16px}
+    #s03-list{position:absolute;left:192px;top:280px;width:1536px;height:600px;background:#101B26;border-top:2px solid #E8C9A8;border-bottom:1px solid #4D5660;padding:30px 38px}
+    #s03-listhead{display:flex;justify-content:space-between;align-items:center;padding:0 0 28px;border-bottom:1px solid #58616A;font-size:29px;line-height:1.3;color:#D5D7D6}
+    #s03-court{max-width:940px}
+    #s03-hall{font-family:'IBM Plex Mono',monospace;color:#E8C9A8}
+    #s03-columns{display:grid;grid-template-columns:100px 350px 1fr;gap:24px;font-family:'IBM Plex Mono',monospace;font-size:28px;padding:26px 16px 18px;color:#AEB6BB}
+    #scene03 .s03-row{display:grid;grid-template-columns:100px 350px 1fr;gap:24px;align-items:center;padding:17px 16px;height:91px;border-top:1px solid #34414D;font-size:31px;line-height:1.2;position:relative}
+    #scene03 .s03-num,#scene03 .s03-cn{font-family:'IBM Plex Mono',monospace;font-size:29px}
+    #s03-row14{background:#E8C9A8;color:#0B131B}
+    #s03-beam{position:absolute;left:0;top:168px;height:3px;width:1536px;background:#E8B86A;box-shadow:0 0 22px 3px rgba(232,184,106,.32);pointer-events:none}
+    #s03-result{position:absolute;inset:0}
+    #s03-numberbox{position:absolute;left:192px;top:343px;width:480px;height:425px;border-top:2px solid #E8C9A8}
+    #s03-itemlabel{font-family:'IBM Plex Mono',monospace;font-size:28px;letter-spacing:3px;position:absolute;left:3px;top:25px;color:#E8C9A8}
+    #s03-item14{position:absolute;top:63px;left:-10px;font-family:'Newsreader',serif;font-size:350px;line-height:.9;color:#E8C9A8;letter-spacing:-13px}
+    #s03-caseblock{position:absolute;left:794px;top:376px;width:885px}
+    #s03-caseid{font-family:'IBM Plex Mono',monospace;font-size:30px;color:#E8C9A8;margin-bottom:30px}
+    #s03-case{font-family:'Newsreader',serif;font-size:72px;line-height:1.1;letter-spacing:-1px;max-width:870px}
+    #s03-party{display:block}
+    #s03-matched{display:flex;align-items:center;gap:16px;margin-top:35px;font-size:32px;color:#7FD3AC}
+    #s03-tick{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border:1px solid #7FD3AC;border-radius:50%;font-size:25px}
+    #s03-courtresult{font-family:'IBM Plex Mono',monospace;font-size:29px;line-height:1.4;margin-top:24px;color:#CFD2D0}
+    #s03-caption{position:absolute;left:192px;bottom:98px;font-size:28px;line-height:1.4;color:#AFB6BA}
+    #s03-paper{position:absolute;inset:0;background:#F1F0EA;transform-origin:100% 50%}
+  </style>
+  <div data-hf-id="hf-31dj" id="scene03" data-composition-id="scene03" data-width="1920" data-height="1080" data-duration="6">
+    <div data-hf-id="hf-4e8m" id="s03-bg" class="clip" data-start="0" data-duration="6" data-track-index="0"></div>
+    <div data-hf-id="hf-jroi" id="s03-world" class="clip" data-start="0" data-duration="6" data-track-index="1">
+      <h2 data-hf-id="hf-0gzg" id="s03-headline">Your matters<span data-hf-id="hf-eluz" id="s03-found">Found</span></h2>
+      <div data-hf-id="hf-bldh" id="s03-list" data-layout-allow-overflow>
+        <div data-hf-id="hf-gfou" id="s03-listhead"><span data-hf-id="hf-p4ho" id="s03-court">High Court for the State of Telangana</span><span data-hf-id="hf-9cct" id="s03-hall">Court Hall 3</span></div>
+        <div data-hf-id="hf-krbl" id="s03-columns"><span data-hf-id="hf-wq0q">ITEM</span><span data-hf-id="hf-3vtq">CASE NUMBER</span><span data-hf-id="hf-ifwz">PARTIES</span></div>
+        <div data-hf-id="hf-h41d" id="s03-row12" class="s03-row"><span data-hf-id="hf-uqhn" class="s03-num">12</span><span data-hf-id="hf-h5yn" class="s03-cn">WP/9930/2026</span><span data-hf-id="hf-sl1f">A. Fathima vs. TSRTC</span></div>
+        <div data-hf-id="hf-gcdk" id="s03-row13" class="s03-row"><span data-hf-id="hf-v4so" class="s03-num">13</span><span data-hf-id="hf-wpx9" class="s03-cn">CMA/415/2023</span><span data-hf-id="hf-f2cn">United Insurance vs. B. Anjaiah</span></div>
+        <div data-hf-id="hf-ce9j" id="s03-row14" class="s03-row"><span data-hf-id="hf-scnh" class="s03-num">14</span><span data-hf-id="hf-qt80" class="s03-cn">WP/14562/2024</span><span data-hf-id="hf-5b9f">Ramesh Kumar vs. TSSPDCL</span></div>
+        <div data-hf-id="hf-8g5i" id="s03-row15" class="s03-row"><span data-hf-id="hf-sqyi" class="s03-num">15</span><span data-hf-id="hf-234h" class="s03-cn">WP/3318/2026</span><span data-hf-id="hf-ytqt">M. Rajitha vs. Union of India</span></div>
+        <div data-hf-id="hf-x20o" id="s03-beam" data-layout-ignore></div>
+      </div>
+      <div data-hf-id="hf-8p9n" id="s03-result">
+        <div data-hf-id="hf-urqq" id="s03-numberbox"><div data-hf-id="hf-d5s6" id="s03-itemlabel">COURT HALL 3 · ITEM</div><div data-hf-id="hf-fiu3" id="s03-item14">14</div></div>
+        <div data-hf-id="hf-8d4n" id="s03-caseblock"><div data-hf-id="hf-58to" id="s03-caseid">WP/14562/2024</div><div data-hf-id="hf-2p8s" id="s03-case">Ramesh Kumar<span data-hf-id="hf-s21h" id="s03-party">vs. TSSPDCL</span></div><div data-hf-id="hf-ldmo" id="s03-matched"><span data-hf-id="hf-lhe1" id="s03-tick">✓</span><span data-hf-id="hf-8o95">Adv. Meera Reddy · matched</span></div><div data-hf-id="hf-dxg7" id="s03-courtresult">02 Sep 2026 · final arguments</div></div>
+      </div>
+      <div data-hf-id="hf-7o70" id="s03-caption">Illustrative case data</div>
+      <div data-hf-id="hf-aqu9" id="s03-paper" data-layout-ignore></div>
+    </div>
+  </div>
+  <script>
+    (()=>{
+      const tl=gsap.timeline({paused:true});
+      tl.fromTo('#s03-found',{opacity:0},{opacity:1,duration:.24},3.05);
+      tl.fromTo('#s03-list',{x:100,opacity:0},{x:0,opacity:1,duration:.6,ease:'power3.out'},0);
+      tl.fromTo('#s03-row12,#s03-row13,#s03-row14,#s03-row15',{x:42,opacity:0},{x:0,opacity:1,stagger:.12,duration:.46,ease:'power3.out'},.3);
+      tl.fromTo('#s03-row14',{backgroundColor:'#101B26',color:'#F1F0EA'},{backgroundColor:'#E8C9A8',color:'#0B131B',duration:.28},1.6);
+      tl.fromTo('#s03-beam',{y:0,opacity:0},{y:202,opacity:1,duration:1.1,ease:'power2.inOut'},.65);
+      tl.to('#s03-beam',{opacity:0,duration:.2},1.8);
+      tl.to('#s03-list',{x:-120,opacity:0,duration:.6,ease:'power2.inOut'},2.3);
+      tl.fromTo('#s03-result',{opacity:0},{opacity:1,duration:.2},2.83);
+      tl.fromTo('#s03-item14',{x:-60,scale:.78},{x:0,scale:1,duration:.95,ease:'power3.out'},2.75);
+      tl.fromTo('#s03-numberbox',{opacity:0},{opacity:1,duration:.3},2.83);
+      tl.fromTo('#s03-caseid,#s03-case,#s03-matched,#s03-courtresult',{x:45,opacity:0},{x:0,opacity:1,duration:.65,stagger:.12,ease:'power3.out'},2.8);
+      tl.fromTo('#s03-paper',{scaleX:0},{scaleX:1,duration:.7,ease:'power2.inOut'},5.3);
+      window.__timelines['scene03']=tl;
+    })();
+  </script>
+</template>
+

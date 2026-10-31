@@ -1,0 +1,11 @@
+{
+  "name": "case-intel-launch",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npx --yes hyperframes@0.8.211 preview",
+    "check": "npx --yes hyperframes@0.8.211 check",
+    "render": "npx --yes hyperframes@0.8.211 render",
+    "publish": "npx --yes hyperframes@0.8.211 publish"
+  }
+}

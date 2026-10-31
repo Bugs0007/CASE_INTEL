@@ -14,6 +14,10 @@ ENV/
 .env.local
 .env.*.local
 
+# Local credentials and temporary review/probe files
+secrets/
+/tmp/
+
 # Django
 *.log
 db.sqlite3
@@ -46,3 +50,7 @@ docs/codebase-console.html
 
 #brag
 brag-output
+
+# Generated video preview caches
+videos/**/.hyperframes/
+videos/**/.thumbnails/

@@ -1,0 +1,387 @@
+[a] Skip to the features
+[a] Case Intel
+[span] 19:40
+[span] searching the state
+[p] For advocates practising before Indian courts
+[div] Tonight's
+[div] cause list.
+[em] Already
+[em] read.
+[p] Case Intel reads the cause lists of the Telangana High Court, most other High Courts and the District Courts at 19:00 and again at 06:30, finds your matters on them, and carries each one forward: the order that followed, what your side must do, the fee it earned.
+[span] Create an account
+[a] Log in
+[p] Sign up with Google. Where a court's list can't be read, the matter says “Not covered” instead of guessing.
+[span] Cause list ·
+[span] Court Hall 3
+[span] High Court for the State of Telangana
+[span] fetched
+[span] 19:02
+[span] Sample data
+[span] Item
+[span] Case
+[span] Parties
+[span] Advocate
+[span] WP/20417/2025
+[span] P. Srinivas vs. State of Telangana
+[span] Adv. K. Rao
+[span] CRP/1182/2024
+[span] Sai Agencies vs. N. Laxmi
+[span] Adv. S. Begum
+[span] WA/772/2025
+[span] GHMC vs. R. Venkatesh
+[span] Standing Counsel
+[span] WP/9930/2026
+[span] A. Fathima vs. TSRTC
+[span] Adv. P. Naidu
+[span] CMA/415/2023
+[span] United Insurance vs. B. Anjaiah
+[span] Adv. V. Kumar
+[span] WP/14562/2024
+[span] Ramesh Kumar vs. TSSPDCL
+[span] Adv. Meera Reddy
+[b] yours
+[span] WP/3318/2026
+[span] M. Rajitha vs. Union of India
+[span] Adv. D. Prasad
+[span] AS/208/2022
+[span] K. Bhaskar vs. K. Sudha
+[span] Adv. R. Iyer
+[span] WP/18840/2025
+[span] Telangana Dairy vs. State
+[span] Adv. A. Khan
+[span] CA/2231/2023
+[span] Lakshmi Traders vs. Union of India
+[span] Adv. Meera Reddy
+[b] yours
+[span] CRLP/5521/2026
+[span] S. Ravi vs. State of Telangana
+[span] Public Prosecutor
+[span] WP/7004/2024
+[span] N. Gopal vs. HMDA
+[span] Adv. T. Reddy
+[span] For
+[span] 02 Sep 2026
+[span] Your matters ·
+[b] Item 14
+[b] Item 18
+[span] Scroll
+[em] One search.
+[p] 01 · Find your matters
+[div] Search the whole state.
+[em] Not one court at a time.
+[p] The eCourts advocate search covers one court complex at a time. Case Intel runs your name or bar code through every district and complex in the state, in the background, and hands you one list to import.
+[li] One complex fails, the run carries on. Retry just the gaps later.
+[li] Progress is saved after every district, so nothing found is lost.
+[li] Every row is checked against the name you searched. Rows that can't be checked say so.
+[span] Abstract, not a map
+[span] Sample run
+[text] Adv. Meera Reddy
+[span] Scanning Medchal · Kukatpally, Malkajgiri
+[span] Found under your name
+[span] Sample data
+[p] Matches land here as each district finishes…
+[div] CRLP/887/2024
+[div] City Civil Court, Hyderabad
+[div] State vs. Suresh Chandra
+[div] Court record:
+[span] MEERA REDDY
+[span] Name match
+[div] OS/556/2021
+[div] City Civil Court, Hyderabad
+[div] Bhavani Enterprises vs. Narsimha Rao
+[div] Court record:
+[span] M. MEERA REDDY
+[span] Name match
+[div] OS/1120/2023
+[div] L.B. Nagar
+[div] K. Padma vs. S. Anil
+[div] Court record:
+[span] (advocate cell blank)
+[span] Not verified
+[div] MC/64/2025
+[div] Nalgonda
+[div] R. Kavitha vs. R. Mahesh
+[div] Court record:
+[span] MEERA REDDY K
+[span] Name match
+[span] 1 complex failed
+[span] Retry failed districts
+[p] 02 · Read the order
+[div] The order arrives
+[div] as a scan.
+[em] You get
+[em] what you must do.
+[p] Each order PDF is summarised once, when it arrives: what the court did, then your side's directions, kept apart from the other side's. Your directions become tasks with due dates.
+[li] Due dates come from a fixed table of phrases like “within four weeks”, not from the AI.
+[li] Unreadable, very short or routine adjournment orders skip the AI entirely.
+[li] Only your side's directions become tasks, and only once your party role is known.
+[div] IN THE HIGH COURT FOR THE STATE OF TELANGANA
+[div] AT HYDERABAD
+[div] (Special Original Jurisdiction)
+[div] WEDNESDAY, THE TWENTY NINTH DAY OF JULY, TWO THOUSAND AND TWENTY SIX
+[div] PRESENT:
+[div] HON'BLE SRI JUSTICE K. SARATH
+[div] WRIT PETITION No. 14562 OF 2024
+[span] Ramesh Kumar
+[i] …Petitioner
+[span] AND
+[span] TSSPDCL
+[i] …Respondent
+[div] ORDER:
+[p] Heard the learned counsel for the petitioner and the learned Standing Counsel for the respondent on I.A. No. 2 of 2026.
+[p] The interim order dated 03.06.2026 restraining the respondent from disconnecting the supply is extended until the next date of hearing, subject to the condition below.
+[p] The petitioner is directed to deposit 50% of the disputed arrears, i.e. Rs. 1,84,000/-, with the Registry within four weeks from today, and shall file proof of such deposit before the next date of hearing.
+[p] The respondent shall not disconnect the power supply in the meantime, subject to compliance with the above.
+[p] List on 02.09.2026 for final arguments.
+[span] SD/- K.S.J · //TRUE COPY//
+[div] CERTIFIED
+[div] COPY
+[span] W.P. No. 14562 of 2024
+[b] ORDER
+[span] dt. 29.07.2026
+[i] Certified copy · sample
+[div] IN THE HIGH COURT FOR THE STATE OF TELANGANA
+[div] AT HYDERABAD
+[div] (Special Original Jurisdiction)
+[div] WEDNESDAY, THE TWENTY NINTH DAY OF JULY, TWO THOUSAND AND TWENTY SIX
+[div] PRESENT:
+[div] HON'BLE SRI JUSTICE K. SARATH
+[div] WRIT PETITION No. 14562 OF 2024
+[span] Ramesh Kumar
+[i] …Petitioner
+[span] AND
+[span] TSSPDCL
+[i] …Respondent
+[div] ORDER:
+[p] Heard the learned counsel for the petitioner and the learned Standing Counsel for the respondent on I.A. No. 2 of 2026.
+[p] The interim order dated 03.06.2026 restraining the respondent from disconnecting the supply is extended until the next date of hearing, subject to the condition below.
+[p] The petitioner is directed to deposit 50% of the disputed arrears, i.e. Rs. 1,84,000/-, with the Registry within four weeks from today, and shall file proof of such deposit before the next date of hearing.
+[p] The respondent shall not disconnect the power supply in the meantime, subject to compliance with the above.
+[p] List on 02.09.2026 for final arguments.
+[span] SD/- K.S.J · //TRUE COPY//
+[div] CERTIFIED
+[div] COPY
+[div] IN THE HIGH COURT FOR THE STATE OF TELANGANA
+[div] AT HYDERABAD
+[div] (Special Original Jurisdiction)
+[div] WEDNESDAY, THE TWENTY NINTH DAY OF JULY, TWO THOUSAND AND TWENTY SIX
+[div] PRESENT:
+[div] HON'BLE SRI JUSTICE K. SARATH
+[div] WRIT PETITION No. 14562 OF 2024
+[span] Ramesh Kumar
+[i] …Petitioner
+[span] AND
+[span] TSSPDCL
+[i] …Respondent
+[div] ORDER:
+[p] Heard the learned counsel for the petitioner and the learned Standing Counsel for the respondent on I.A. No. 2 of 2026.
+[p] The interim order dated 03.06.2026 restraining the respondent from disconnecting the supply is extended until the next date of hearing, subject to the condition below.
+[p] The petitioner is directed to deposit 50% of the disputed arrears, i.e. Rs. 1,84,000/-, with the Registry within four weeks from today, and shall file proof of such deposit before the next date of hearing.
+[p] The respondent shall not disconnect the power supply in the meantime, subject to compliance with the above.
+[p] List on 02.09.2026 for final arguments.
+[span] SD/- K.S.J · //TRUE COPY//
+[div] CERTIFIED
+[div] COPY
+[span] Sample order
+[span] Order overview ·
+[span] 29 Jul 2026
+[span] Sample data
+[p] Stay on disconnection extended to the next date, on condition that the petitioner deposits half the disputed arrears.
+[div] You ·
+[div] Petitioner
+[span] Deposit 50% of disputed arrears (Rs. 1,84,000) with the Registry
+[b] 26 Aug
+[i] within four weeks
+[span] File proof of deposit
+[b] 02 Sep
+[i] before the next date
+[div] Respondent · not your task
+[span] Shall not disconnect the power supply until the next date
+[div] Next date
+[span] 02 Sep 2026 · final arguments
+[span] Tasks · your side only
+[span] 24 Aug – 06 Sep 2026
+[span] Mon
+[span] Tue
+[span] Wed
+[span] Thu
+[span] Fri
+[span] Sat
+[span] Sun
+[span] Mon
+[span] Tue
+[span] Wed
+[span] Hearing
+[span] Thu
+[span] Fri
+[span] Sat
+[span] Sun
+[p] 03 · 06:30, the list is read again
+[div] A misread column
+[div] looks exactly like
+[em] “not listed.”
+[p] So the cause-list PDF isn't read in text order. Every character is placed by its position on the page, the columns are found afresh in each document, and each serial number is paired with its case by height.
+[li] The real lists come in at least three layouts. No column position is hardcoded.
+[li] “None of your matters are listed” is the one wrong answer this must never give.
+[li] Read at 19:00, read again at 06:30. The Telangana High Court, most other High Courts and the District Courts.
+[span] Read in text order
+[span] 12 13 14 15 16 17
+[span] WP/9930/2026 CMA/415/2023 WP/14562/2024 WP/3318/2026 AS/208/2022 WP/18840/2025
+[span] CAUSE LIST ·
+[span] COURT HALL 3
+[span] 02.09.2026
+[span] S.NO.
+[span] CASE NO.
+[span] PARTIES
+[span] WP/9930/2026
+[span] A. Fathima vs. TSRTC
+[span] CMA/415/2023
+[span] United Insurance vs. B. Anjaiah
+[span] WP/14562/2024
+[span] Ramesh Kumar vs. TSSPDCL
+[span] WP/3318/2026
+[span] M. Rajitha vs. Union of India
+[span] AS/208/2022
+[span] K. Bhaskar vs. K. Sudha
+[span] WP/18840/2025
+[span] Telangana Dairy vs. State
+[span] Listed
+[b] Item 14
+[span] Court Hall 3
+[span] WP/14562/2024
+[span] Sample data
+[p] 04 · Ask the file
+[div] Ask your case file
+[div] a question.
+[em] Get the
+[em] page it came from.
+[p] Case Bot answers from the documents uploaded to your case, with citations back to the passages it used. It searches by meaning and by keyword together, then reranks what it found.
+[li] Every retrieval step is filtered to your own documents, not just the screen you see.
+[li] If the owner filter is missing, the search refuses to run at all.
+[li] When the best match is weak, the answer says so.
+[span] Case Bot ·
+[span] WP/14562/2024
+[span] order_2026-07-29.pdf
+[span] …directed to deposit 50% of the disputed arrears, i.e. Rs. 1,84,000/-, with the Registry within four weeks…
+[span] writ_petition.pdf
+[span] …the disputed arrears of Rs. 3,68,000/- raised without notice…
+[span] counter_affidavit.pdf
+[span] ia_2_of_2026.pdf
+[span] Another advocate's documents
+[span] never searched · never cited
+[span] Answer
+[span] Sample data
+[p] 05 · The rest of the desk
+[div] Everything else the
+[div] morning needs.
+[em] Already on the
+[em] hearing.
+[p] Five more things that used to live in a diary, a folder and the margin of a cause list.
+[span] Keep scrolling →
+[span] Hearing prep sheet
+[b] Prep sheet
+[span] WP/14562/2024
+[dt] Cause list
+[dd] Item 14 · Court Hall 3
+[dt] Last order
+[dd] Stay on disconnection extended to the next date, on condition that the petitioner deposits half the disputed arrears.
+[dt] Open tasks
+[dd] File proof of deposit ·
+[span] 02 Sep
+[span] State of the matter
+[span] Sample data
+[h3] One page before you walk in.
+[p] The cause-list slot, the last order, open tasks and documents on one PDF, with a short state-of-the-matter paragraph. It is cached, and written again only when the facts change.
+[span] Conflict check at intake
+[span] New matter · your client
+[b] S. Anil
+[span] Possible conflict
+[b] S. Anil
+[p] is the
+[u] opposite party
+[p] in your
+[span] OS/1120/2023
+[span] I've reviewed this. Continue.
+[span] Sample data
+[h3] Same party, other side. You hear about it first.
+[p] A new matter's parties are compared with your own cases for the same party on opposite sides. It warns and asks you to acknowledge; it never hard-blocks, and never looks at another advocate's cases.
+[span] Limitation deadlines
+[span] Earliest possible date
+[b] 14 Oct 2026
+[span] s.12(2)
+[li] Time to obtain a certified copy: noted, not added
+[span] s.4
+[li] Court closed on the last day: noted, not applied
+[span] s.5
+[li] Condonation of delay: noted, not assumed
+[span] Sample data
+[h3] The earliest possible date, not the most hopeful one.
+[p] Periods come from a rules table written into the code. The computation is conservative: the earliest possible date, with Section 12(2), 4 and 5 caveats stated as notes rather than applied. You add them; nothing fires on its own.
+[span] Appearance-fee invoices
+[span] Pending
+[span] Invoiced
+[span] Paid
+[b] Invoice
+[span] INV-0007
+[span] Appearance ·
+[span] 02 Sep 2026
+[span] ₹5,000
+[span] Bill to
+[span] Ramesh Kumar
+[span] PDF
+[span] Sample data
+[h3] Every appearance ends as a PDF you can send.
+[p] A fee moves Pending, Invoiced, Paid, and each invoice is numbered in your own running series. Appearance, hotel, flight or other, several to a hearing.
+[span] Travel
+[span] Train
+[span] Secunderabad → Hyderabad Deccan
+[span] irctc-ticket-02sep.pdf
+[span] Hotel
+[span] Hotel Minerva Grand · 1 night
+[span] hotel-confirmation.pdf
+[div] Upload against
+[span] 02 Sep 2026
+[span] Sample data
+[h3] The ticket lives with the hearing.
+[p] Tickets and stays uploaded against the hearing, so everything for an outstation date sits in one place.
+[p] 06 · Whose file is it
+[div] Every matter has
+[div] an owner.
+[em] Every
+[em] query asks who's
+[em] asking.
+[span] each square, one record ·
+[b] lit: yours
+[span] · dark: someone else's, never returned
+[span] Sign-in
+[h3] One account, one advocate.
+[p] Sign up with Google, or from an invitation link with a username and password. Google sends Case Intel your name and verified email address, never your Google password.
+[span] Per-advocate isolation
+[h3] Every record has an owner.
+[p] Cases, documents, hearings, fees: each row carries its owner, and every list, view and edit is filtered to the advocate signed in. A test fails if a new endpoint is added without being scoped or deliberately reviewed.
+[span] Owner-scoped retrieval
+[h3] Case Bot only searches your documents.
+[p] The search takes the owner as a required input and filters every leg by it, meaning and keyword alike. Narrowing to one case narrows within your documents; it never replaces the owner filter.
+[h3] What it won't do
+[li] It won't read cause lists for seven High Courts (Allahabad, Gujarat, Himachal Pradesh, Jharkhand, Kerala, Madhya Pradesh, Punjab & Haryana) or the Madurai bench of Madras. The eCourts portal serves no usable list for them, so those matters say “Not covered” rather than “Not listed.”
+[li] It doesn't track Supreme Court cases.
+[li] It won't tell two advocates with the same name apart. It shows the court's own record and lets you judge.
+[li] It won't hard-block a conflict. It warns; you decide.
+[li] It won't apply limitation exceptions for you. Sections 12(2), 4 and 5 stay as notes.
+[li] It won't send routine adjournment orders to the AI at all.
+[li] It won't file anything on your behalf.
+[li] It isn't affiliated with eCourts or with any court.
+[div] Court Hall 3.
+[div] Item 14.
+[em] You're
+[em] ready.
+[span] Create an account
+[a] Log in
+[a] samallabhagath@gmail.com
+[span] CASE INTEL · HYDERABAD
+[span] Every name, case number, amount and document on this page is sample data. Case Intel is not affiliated with eCourts or with any court.
+[a] Back to 19:02 ↑
+[span] Built by
+[a] Bhagath Samalla
+[div] Overruled.
+[div] The objection is noted. Please continue scrolling, counsel.

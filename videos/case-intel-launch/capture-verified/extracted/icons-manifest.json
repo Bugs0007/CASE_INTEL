@@ -1,0 +1,52 @@
+{
+  "schema": "hyperframes.capture.icons.v1",
+  "headline": {
+    "file": "assets/favicon.png",
+    "source": "assets/icon-apple-touch-icon-unsized.png",
+    "rank": 0,
+    "shape": "badge",
+    "reason": "no bare-mark candidate among 4 icon(s); used the best-ranked badge"
+  },
+  "icons": [
+    {
+      "file": "assets/icon-apple-touch-icon-unsized.png",
+      "url": "https://case-intel.vercel.app/apple-touch-icon-180x180.png",
+      "rel": "apple-touch-icon",
+      "sizes": null,
+      "type": null,
+      "rank": 0,
+      "shape": "badge",
+      "shapeReason": "4 of 4 edge midpoints are opaque, so the drawing carries a backdrop"
+    },
+    {
+      "file": "assets/icon-icon-32x32.png",
+      "url": "https://case-intel.vercel.app/favicon-32x32.png",
+      "rel": "icon",
+      "sizes": "32x32",
+      "type": "image/png",
+      "rank": 1,
+      "shape": "badge",
+      "shapeReason": "4 of 4 edge midpoints are opaque, so the drawing carries a backdrop"
+    },
+    {
+      "file": "assets/icon-icon-16x16.png",
+      "url": "https://case-intel.vercel.app/favicon-16x16.png",
+      "rel": "icon",
+      "sizes": "16x16",
+      "type": "image/png",
+      "rank": 2,
+      "shape": "badge",
+      "shapeReason": "4 of 4 edge midpoints are opaque, so the drawing carries a backdrop"
+    },
+    {
+      "file": "assets/icon-icon-16x16-2.ico",
+      "url": "https://case-intel.vercel.app/favicon.ico",
+      "rel": "icon",
+      "sizes": "16x16",
+      "type": "image/x-icon",
+      "rank": 3,
+      "shape": "unknown",
+      "shapeReason": "image format could not be decoded for inspection"
+    }
+  ]
+}
