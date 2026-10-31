@@ -1,0 +1,53 @@
+◆  Capturing review frames (beats, seams, phone) from case-intel-launch
+
+   Fonts: 10 loaded
+   Review: 12 beat(s) and 5 seam(s) within 0–36s
+   Revision: none (inputs-changed)
+   State: C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\video-state.json
+
+◇  37 snapshots saved to C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\beat-01-at-0.3s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\beat-02-at-3s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\beat-03-at-6.3s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\beat-04-at-9s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\beat-05-at-12.3s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\beat-06-at-15s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\beat-07-at-18.3s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\beat-08-at-21s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\beat-09-at-24.3s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\beat-10-at-27s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\beat-11-at-30.3s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\beat-12-at-33s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\seam-01-1-at-5.8s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\seam-01-2-at-5.9s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\seam-01-3-at-6s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\seam-01-4-at-6.1s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\seam-01-5-at-6.2s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\seam-02-1-at-11.8s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\seam-02-2-at-11.9s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\seam-02-3-at-12s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\seam-02-4-at-12.1s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\seam-02-5-at-12.2s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\seam-03-1-at-17.8s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\seam-03-2-at-17.9s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\seam-03-3-at-18s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\seam-03-4-at-18.1s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\seam-03-5-at-18.2s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\seam-04-1-at-23.8s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\seam-04-2-at-23.9s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\seam-04-3-at-24s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\seam-04-4-at-24.1s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\seam-04-5-at-24.2s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\seam-05-1-at-29.8s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\seam-05-2-at-29.9s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\seam-05-3-at-30s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\seam-05-4-at-30.1s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\seam-05-5-at-30.2s.png
+   Beat sheet (settled frame per scene): C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\review-beats.jpg
+     0.3s scene01 · 3s scene01 mid · 6.3s scene02 · 9s scene02 mid · 12.3s scene03 · 15s scene03 mid · 18.3s scene04 · 21s scene04 mid · 24.3s scene05 · 27s scene05 mid · 30.3s scene06 · 33s scene06 mid
+   Seam 1 at 6s (scene01 -> scene02): C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\review-seam-01.jpg
+   Seam 2 at 12s (scene02 -> scene03): C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\review-seam-02.jpg
+   Seam 3 at 18s (scene03 -> scene04): C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\review-seam-03.jpg
+   Seam 4 at 24s (scene04 -> scene05): C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\review-seam-04.jpg
+   Seam 5 at 30s (scene05 -> scene06): C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\review-seam-05.jpg
+   Phone sheet (beats at 360 px wide): C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\7888eddf-564a-47a8-8085-d63a13eea56f\review-phone.jpg

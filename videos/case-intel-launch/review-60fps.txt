@@ -1,0 +1,25 @@
+◆  Capturing 14 frames at [3s, 7.2s, 9s, 16.3s, 17.5s, 17.75s, 17.95s, 22.5s, 23.5s, 23.75s, 28s, 32.6s, 33.5s, 35.5s] from case-intel-launch
+
+   Fonts: 10 loaded
+   Note: added an end-of-timeline frame at 35.75s. Short beats between your --at times may still be skipped — pass them explicitly.
+   Revision: none (inputs-changed)
+   State: C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\video-state.json
+
+◇  15 snapshots saved to C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\8db8b300-0c5e-4780-a53f-cd93f65ef580
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\8db8b300-0c5e-4780-a53f-cd93f65ef580\frame-00-at-3s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\8db8b300-0c5e-4780-a53f-cd93f65ef580\frame-01-at-7.2s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\8db8b300-0c5e-4780-a53f-cd93f65ef580\frame-02-at-9s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\8db8b300-0c5e-4780-a53f-cd93f65ef580\frame-03-at-16.3s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\8db8b300-0c5e-4780-a53f-cd93f65ef580\frame-04-at-17.5s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\8db8b300-0c5e-4780-a53f-cd93f65ef580\frame-05-at-17.75s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\8db8b300-0c5e-4780-a53f-cd93f65ef580\frame-06-at-17.95s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\8db8b300-0c5e-4780-a53f-cd93f65ef580\frame-07-at-22.5s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\8db8b300-0c5e-4780-a53f-cd93f65ef580\frame-08-at-23.5s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\8db8b300-0c5e-4780-a53f-cd93f65ef580\frame-09-at-23.75s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\8db8b300-0c5e-4780-a53f-cd93f65ef580\frame-10-at-28s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\8db8b300-0c5e-4780-a53f-cd93f65ef580\frame-11-at-32.6s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\8db8b300-0c5e-4780-a53f-cd93f65ef580\frame-12-at-33.5s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\8db8b300-0c5e-4780-a53f-cd93f65ef580\frame-13-at-35.5s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\8db8b300-0c5e-4780-a53f-cd93f65ef580\frame-14-at-35.75s.png
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\8db8b300-0c5e-4780-a53f-cd93f65ef580\contact-sheet-1.jpg (grid view for AI review)
+   C:\Users\Bhagath\OneDrive\Desktop\CASE_INTEL\videos\case-intel-launch\.hyperframes\artifacts\snapshots\8db8b300-0c5e-4780-a53f-cd93f65ef580\contact-sheet-2.jpg (grid view for AI review)

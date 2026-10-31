@@ -1,0 +1,110 @@
+{
+  "summary": {
+    "webAnimations": 2,
+    "cssDeclarations": 18,
+    "scrollTargets": 7,
+    "cdpAnimations": 27,
+    "canvases": 2
+  },
+  "namedAnimations": [
+    "nb-pulse",
+    "nb-cue"
+  ],
+  "scrollTriggeredElements": 7,
+  "representativeAnimations": [
+    {
+      "type": "CSSAnimation",
+      "playState": "running",
+      "animationName": "nb-pulse",
+      "targetSelector": "i.nb-pulse",
+      "targetRect": {
+        "x": 1437.7664794921875,
+        "y": 206.5958251953125,
+        "width": 7.9425048828125,
+        "height": 6.3135986328125,
+        "top": 206.5958251953125,
+        "right": 1445.708984375,
+        "bottom": 212.909423828125,
+        "left": 1437.7664794921875
+      },
+      "keyframes": [
+        {
+          "offset": 0,
+          "easing": "ease",
+          "composite": "replace",
+          "opacity": "1",
+          "computedOffset": 0
+        },
+        {
+          "offset": 0.5,
+          "easing": "ease",
+          "composite": "auto",
+          "opacity": "0.25",
+          "computedOffset": 0.5
+        },
+        {
+          "offset": 1,
+          "easing": "ease",
+          "composite": "replace",
+          "opacity": "1",
+          "computedOffset": 1
+        }
+      ],
+      "timing": {
+        "duration": 2000,
+        "delay": 0,
+        "iterations": null,
+        "easing": "linear",
+        "direction": "normal"
+      }
+    },
+    {
+      "type": "CSSAnimation",
+      "playState": "running",
+      "animationName": "nb-cue",
+      "targetSelector": "i",
+      "targetRect": {
+        "x": 959.5,
+        "y": 1024,
+        "width": 1,
+        "height": 34,
+        "top": 1024,
+        "right": 960.5,
+        "bottom": 1058,
+        "left": 959.5
+      },
+      "keyframes": [
+        {
+          "offset": 0,
+          "easing": "ease-in-out",
+          "composite": "auto",
+          "transform": "scaleY(0)",
+          "opacity": "1",
+          "computedOffset": 0
+        },
+        {
+          "offset": 0.5,
+          "easing": "ease-in-out",
+          "composite": "auto",
+          "transform": "scaleY(1)",
+          "computedOffset": 0.5
+        },
+        {
+          "offset": 1,
+          "easing": "ease-in-out",
+          "composite": "auto",
+          "transform": "scaleY(1)",
+          "opacity": "0",
+          "computedOffset": 1
+        }
+      ],
+      "timing": {
+        "duration": 2200,
+        "delay": 0,
+        "iterations": null,
+        "easing": "linear",
+        "direction": "normal"
+      }
+    }
+  ]
+}

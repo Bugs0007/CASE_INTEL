@@ -9,7 +9,7 @@ import * as THREE from "three";
 
 type Flight = { setProgress: (p: number) => void; setActive: (on: boolean) => void; dispose: () => void };
 
-const PAPER = "#EFEDE4";
+const PAPER = "#FFFFFF";
 const INK = "rgba(20,32,44,";
 
 function sheetTexture(seed: number, size: number) {
@@ -66,7 +66,9 @@ export function createDocFlight(canvas: HTMLCanvasElement, { lite }: { lite: boo
   renderer.setClearColor(0x000000, 0);
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0x0b131b, 3, lite ? 16 : 22);
+  // Match the landing page so distant sheets dissolve into paper, not black.
+  const paper = getComputedStyle(canvas).getPropertyValue("--nb-paper").trim() || "#F8F6F0";
+  scene.fog = new THREE.Fog(paper, 3, lite ? 16 : 22);
   const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 60);
 
   const COUNT = lite ? 10 : 36;

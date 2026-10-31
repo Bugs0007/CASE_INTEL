@@ -1,0 +1,85 @@
+<template>
+  <style>
+    @font-face{font-family:Newsreader;src:url('assets/fonts/Newsreader.woff2') format('woff2');font-style:normal;font-weight:200 800}
+    @font-face{font-family:Newsreader;src:url('assets/fonts/Newsreader-Italic.woff2') format('woff2');font-style:italic;font-weight:200 800}
+    @font-face{font-family:'Public Sans';src:url('assets/fonts/PublicSans.woff2') format('woff2');font-style:normal;font-weight:400 800}
+    @font-face{font-family:'IBM Plex Mono';src:url('assets/fonts/IBMPlexMono.woff2') format('woff2');font-style:normal;font-weight:400}
+    #scene01{position:absolute;inset:0;width:100%;height:100%;overflow:hidden;color:#F1F0EA;font-family:'Public Sans',sans-serif}
+    #scene01 *{box-sizing:border-box}
+    #scene01 .s1-layer{position:absolute;inset:0}
+    #scene01 .s1-ground{background:#0B131B}
+    #scene01 .s1-horizon{position:absolute;left:0;right:0;top:700px;height:380px;background:radial-gradient(ellipse at 77% 100%,rgba(232,201,168,.085),transparent 65%)}
+    #scene01 .s1-rig{position:absolute;inset:0;perspective:1200px;perspective-origin:50% 48%}
+    #scene01 .s1-camera{position:absolute;inset:0;transform-style:preserve-3d}
+    #scene01 .s1-paper{position:absolute;width:550px;height:760px;background:#E6E5DC;color:#14202C;border:1px solid #B9B9B0;padding:52px 44px;box-shadow:0 40px 90px rgba(0,0,0,.45);backface-visibility:hidden;transform-style:preserve-3d}
+    #scene01 .s1-paper-top{font-family:'IBM Plex Mono',monospace;font-size:28px;line-height:1.3;text-transform:uppercase;letter-spacing:.01em;border-bottom:2px solid rgba(20,32,44,.3);padding-bottom:24px;margin-bottom:28px}
+    #scene01 .s1-paper-case{font-family:'IBM Plex Mono',monospace;font-size:28px;line-height:1.4;margin:0 0 25px}
+    #scene01 .s1-paper h3{font-family:Newsreader,serif;font-size:44px;font-weight:400;line-height:1.08;margin:0 0 35px}
+    #scene01 .s1-paper p{font-size:28px;line-height:1.45;margin:0 0 26px}
+    #scene01 .s1-paper-rules{height:155px;background:repeating-linear-gradient(180deg,rgba(20,32,44,.15) 0,rgba(20,32,44,.15) 3px,transparent 3px,transparent 26px)}
+    #scene01 .s1-seal{position:absolute;right:44px;bottom:45px;width:114px;height:114px;border:3px solid rgba(168,58,44,.5);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#A83A2C;font-family:'IBM Plex Mono',monospace;font-size:28px}
+    #scene01 #s1-paper-a{left:-260px;top:110px}
+    #scene01 #s1-paper-b{left:1420px;top:-180px}
+    #scene01 #s1-paper-c{left:1150px;top:635px}
+    #scene01 #s1-paper-d{left:30px;top:740px}
+    #scene01 #s1-paper-e{left:1450px;top:310px}
+    #scene01 .s1-reading-ground{position:absolute;inset:0;background:linear-gradient(90deg,rgba(11,19,27,.82) 0%,rgba(11,19,27,.92) 28%,rgba(11,19,27,.94) 51%,rgba(11,19,27,.55) 74%,rgba(11,19,27,.12) 100%)}
+    #scene01 .s1-time{position:absolute;left:192px;top:154px;font:400 42px/1 'IBM Plex Mono',monospace;color:#E8C9A8;letter-spacing:.03em}
+    #scene01 .s1-time-rule{display:inline-block;width:82px;height:1px;background:#E8C9A8;vertical-align:middle;margin-left:34px}
+    #scene01 .s1-context{position:absolute;left:192px;top:218px;font:400 28px/1.35 'IBM Plex Mono',monospace;letter-spacing:.075em;text-transform:uppercase;color:rgba(241,240,234,.65)}
+    #scene01 .s1-copy{position:absolute;left:192px;top:355px;width:1510px}
+    #scene01 .s1-title-mask{overflow:hidden;padding-bottom:12px}
+    #scene01 h1{font:400 132px/.99 Newsreader,serif;letter-spacing:-3.2px;margin:0;white-space:nowrap}
+    #scene01 .s1-tonight{font-style:italic;color:#E8C9A8}
+    #scene01 .s1-sub{position:absolute;left:200px;top:685px;width:940px;font:400 34px/1.4 'Public Sans',sans-serif;color:rgba(241,240,234,.75);margin:0}
+    #scene01 .s1-footer{position:absolute;left:192px;top:905px;font:400 28px/1.2 'IBM Plex Mono',monospace;color:rgba(241,240,234,.53)}
+    #scene01 .s1-seam{position:absolute;inset:0;background:#0B131B}
+  </style>
+  <div data-hf-id="hf-zd9n" id="scene01" data-composition-id="scene01" data-width="1920" data-height="1080" data-duration="6">
+    <div data-hf-id="hf-lphm" id="s1-bg" class="clip s1-layer" data-start="0" data-duration="6" data-track-index="0"><div data-hf-id="hf-p5h4" class="s1-layer s1-ground"></div><div data-hf-id="hf-7lra" class="s1-horizon"></div></div>
+    <div data-hf-id="hf-kgyt" id="s1-world" class="clip s1-layer" data-start="0" data-duration="6" data-track-index="1" data-layout-allow-overflow="true" data-layout-allow-overlap="true">
+      <!-- Perspective / panel construction adapted from camera-rig-depth-stack. -->
+      <div data-hf-id="hf-xv99" class="s1-rig"><div data-hf-id="hf-mwhq" id="s1-camera" class="s1-camera">
+        <article data-hf-id="hf-smzc" id="s1-paper-a" class="s1-paper" data-layout-ignore="true"><div data-hf-id="hf-w78f" class="s1-paper-top">High Court<br data-hf-id="hf-x5px">Telangana</div><div data-hf-id="hf-apej" class="s1-paper-case">WP/14562/2024</div><h3 data-hf-id="hf-qhu6">Ramesh Kumar<br data-hf-id="hf-rsrt">vs. TSSPDCL</h3><div data-hf-id="hf-ytvb" class="s1-paper-rules"></div><div data-hf-id="hf-cz62" class="s1-seal">ORDER</div></article>
+        <article data-hf-id="hf-1av7" id="s1-paper-b" class="s1-paper" data-layout-ignore="true"><div data-hf-id="hf-evk1" class="s1-paper-top">Cause list<br data-hf-id="hf-szow">Court Hall 3</div><div data-hf-id="hf-pxcq" class="s1-paper-case">02 SEP 2026</div><h3 data-hf-id="hf-otho">Item 14</h3><p data-hf-id="hf-uu33">Ramesh Kumar<br data-hf-id="hf-sldv">vs. TSSPDCL</p><div data-hf-id="hf-4zhz" class="s1-paper-rules"></div></article>
+        <article data-hf-id="hf-xcr6" id="s1-paper-c" class="s1-paper" data-layout-ignore="true"><div data-hf-id="hf-tm67" class="s1-paper-top">Case file</div><div data-hf-id="hf-os4b" class="s1-paper-case">WP/14562/2024</div><h3 data-hf-id="hf-kx8m">Writ petition</h3><p data-hf-id="hf-m2un">Ramesh Kumar<br data-hf-id="hf-qluq">vs. TSSPDCL</p><div data-hf-id="hf-4l6y" class="s1-paper-rules"></div></article>
+        <article data-hf-id="hf-el1h" id="s1-paper-d" class="s1-paper" data-layout-ignore="true"><div data-hf-id="hf-1hr3" class="s1-paper-top">High Court<br data-hf-id="hf-q7jp">Telangana</div><div data-hf-id="hf-obfe" class="s1-paper-case">29 JUL 2026</div><h3 data-hf-id="hf-442a">Order directions</h3><p data-hf-id="hf-6pc5">Within four weeks</p><div data-hf-id="hf-46vx" class="s1-paper-rules"></div><div data-hf-id="hf-m8yc" class="s1-seal">FILE</div></article>
+        <article data-hf-id="hf-dtdo" id="s1-paper-e" class="s1-paper" data-layout-ignore="true"><div data-hf-id="hf-ib11" class="s1-paper-top">Cause list<br data-hf-id="hf-regs">Court Hall 3</div><div data-hf-id="hf-kbu6" class="s1-paper-case">WP/14562/2024</div><h3 data-hf-id="hf-6l3p">Adv. Meera Reddy</h3><div data-hf-id="hf-6z14" class="s1-paper-rules"></div><div data-hf-id="hf-8efr" class="s1-seal">14</div></article>
+      </div></div>
+    </div>
+    <div data-hf-id="hf-nw0q" id="s1-copy-layer" class="clip s1-layer" data-start="0" data-duration="6" data-track-index="2">
+      <div data-hf-id="hf-v7ro" class="s1-reading-ground" data-layout-ignore="true"></div>
+      <div data-hf-id="hf-svl4" id="s1-time" class="s1-time">19:02<span data-hf-id="hf-szy8" class="s1-time-rule"></span></div>
+      <div data-hf-id="hf-oyqj" id="s1-context" class="s1-context">For advocates practising before Indian courts</div>
+      <div data-hf-id="hf-wqca" class="s1-copy">
+        <div data-hf-id="hf-qo3m" class="s1-title-mask"><h1 data-hf-id="hf-fd5p" id="s1-tomorrow">Tomorrow’s court.</h1></div>
+        <div data-hf-id="hf-pvja" class="s1-title-mask"><h1 data-hf-id="hf-ymag" id="s1-tonight" class="s1-tonight">Tonight’s work.</h1></div>
+      </div>
+      <p data-hf-id="hf-522g" id="s1-sub" class="s1-sub">Every matter. Every order. The morning ahead.</p>
+      <div data-hf-id="hf-1bq4" id="s1-footer" class="s1-footer">Illustrative case data</div>
+    </div>
+    <div data-hf-id="hf-zatf" id="s1-transition" class="clip s1-layer" data-start="0" data-duration="6" data-track-index="3"><div data-hf-id="hf-l6b4" id="s1-seam" class="s1-seam"></div></div>
+  </div>
+  <script>
+    (function(){
+      const tl = gsap.timeline({paused:true});
+      tl.fromTo('#s1-tomorrow',{y:0,opacity:1},{y:0,opacity:1,duration:.1},0);
+      tl.fromTo('#s1-tonight',{y:148,opacity:0},{y:0,opacity:1,duration:.8,ease:'power3.out'},.82);
+      tl.fromTo('#s1-context',{opacity:.72},{opacity:1,duration:.6,ease:'power3.out'},.12);
+      tl.fromTo('#s1-sub',{opacity:0,y:18},{opacity:1,y:0,duration:.7,ease:'power3.out'},1.6);
+      tl.fromTo('#s1-footer',{opacity:0},{opacity:1,duration:.4},.35);
+      tl.fromTo('#s1-paper-a',{x:0,y:0,z:-150,rotationY:24,rotationZ:-17,opacity:.48},{x:-340,y:-160,z:550,rotationY:36,rotationZ:-24,opacity:0,duration:2.4,ease:'power1.inOut'},.25);
+      tl.fromTo('#s1-paper-b',{x:0,y:0,z:-170,rotationY:-21,rotationZ:16,opacity:.47},{x:400,y:-250,z:540,rotationY:-33,rotationZ:23,opacity:0,duration:2.5,ease:'power1.inOut'},.7);
+      tl.fromTo('#s1-paper-c',{x:0,y:0,z:-480,rotationX:15,rotationY:-26,rotationZ:12,opacity:.65},{x:500,y:250,z:400,rotationX:3,rotationY:-35,rotationZ:18,opacity:0,duration:2.6,ease:'power1.inOut'},1.4);
+      tl.fromTo('#s1-paper-d',{x:0,y:0,z:-650,rotationX:-24,rotationY:18,rotationZ:-16,opacity:.5},{x:-400,y:10,z:480,rotationX:-5,rotationY:26,rotationZ:-25,opacity:0,duration:2.8,ease:'power1.inOut'},2.0);
+      tl.fromTo('#s1-paper-e',{x:0,y:0,z:-950,rotationY:-25,rotationZ:15,opacity:0},{x:-140,y:-60,z:-170,rotationY:-8,rotationZ:5,opacity:.65,duration:1.4,ease:'power2.inOut'},3.1);
+      tl.fromTo('#s1-paper-e',{x:-140,y:-60,z:-170,rotationY:-8,rotationZ:5,opacity:.65},{x:-160,y:-85,z:-100,rotationY:-4,rotationZ:2,opacity:.35,duration:.75,ease:'power2.inOut',immediateRender:false},4.5);
+      tl.fromTo('#s1-copy-layer > .s1-reading-ground',{opacity:1},{opacity:.85,duration:.8,ease:'power2.inOut'},4.1);
+      tl.fromTo('#s1-seam',{opacity:0},{opacity:1,duration:.48,ease:'sine.inOut'},5.4);
+      tl.to({}, {duration:.09},5.91);
+      window.__timelines = window.__timelines || {};
+      window.__timelines.scene01 = tl;
+    })();
+  </script>
+</template>
+
