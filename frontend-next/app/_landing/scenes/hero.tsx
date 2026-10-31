@@ -33,7 +33,7 @@ export function Hero() {
         // every row decodes; the advocate's own rows lock last and light up
         others.forEach((row, i) => {
           row.querySelectorAll<HTMLElement>("[data-scramble]").forEach((c) => intro.add(scramble(c, { duration: 0.9 }), 0.5 + i * 0.05));
-          intro.to(row, { opacity: 0.38, duration: 0.6 }, 1.1 + i * 0.04);
+          intro.to(row, { opacity: 1, duration: 0.6 }, 1.1 + i * 0.04);
         });
         mine.forEach((row, i) => {
           row.querySelectorAll<HTMLElement>("[data-scramble]").forEach((c) => intro.add(scramble(c, { duration: 1.2, settle: 0.7 }), 1.0 + i * 0.25));

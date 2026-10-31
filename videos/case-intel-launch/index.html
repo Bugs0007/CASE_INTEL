@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en" data-composition-variables='[{"id":"brand-name","type":"string","label":"Brand","default":"Case Intel"},{"id":"brand-night","type":"color","label":"Night","default":"#0B131B"},{"id":"brand-paper","type":"color","label":"Paper","default":"#F1F0EA"},{"id":"brand-warm","type":"color","label":"Warm accent","default":"#E8C9A8"}]'>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1920, height=1080" />
+<title>Case Intel — Tonight's work. Tomorrow's readiness.</title>
+<script src="assets/gsap.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1920px;height:1080px;overflow:hidden;background:#0B131B}
+#root{position:relative;width:100%;height:100%;overflow:hidden;background:var(--brand-night,#0B131B)}
+#root>.clip{position:absolute;inset:0;width:100%;height:100%}
+</style>
+</head>
+<body>
+<div data-hf-id="hf-nh7l" id="root" data-composition-id="main" data-start="0" data-duration="36" data-fps="60" data-width="1920" data-height="1080">
+<div data-hf-id="hf-1vwv" id="scene01" class="clip" data-composition-id="scene01" data-composition-src="compositions/frames/01-night.html" data-start="0" data-duration="6" data-width="1920" data-height="1080" data-track-index="1" data-track-kind="graphics"></div>
+<div data-hf-id="hf-hzk5" id="scene02" class="clip" data-composition-id="scene02" data-composition-src="compositions/frames/02-reveal.html" data-start="6" data-duration="6" data-width="1920" data-height="1080" data-track-index="1" data-track-kind="graphics"></div>
+<div data-hf-id="hf-iovd" id="scene03" class="clip" data-composition-id="scene03" data-composition-src="compositions/frames/03-match.html" data-start="12" data-duration="6" data-width="1920" data-height="1080" data-track-index="1" data-track-kind="graphics"></div>
+<div data-hf-id="hf-iwme" id="scene04" class="clip" data-composition-id="scene04" data-composition-src="compositions/frames/04-orders.html" data-start="18" data-duration="6" data-width="1920" data-height="1080" data-track-index="1" data-track-kind="graphics"></div>
+<div data-hf-id="hf-b1jo" id="scene05" class="clip" data-composition-id="scene05" data-composition-src="compositions/frames/05-answers.html" data-start="24" data-duration="6" data-width="1920" data-height="1080" data-track-index="1" data-track-kind="graphics"></div>
+<div data-hf-id="hf-fnp4" id="scene06" class="clip" data-composition-id="scene06" data-composition-src="compositions/frames/06-dawn.html" data-start="30" data-duration="6" data-width="1920" data-height="1080" data-track-index="1" data-track-kind="graphics" data-hold></div>
+</div>
+<script>
+const tl = gsap.timeline({paused:true});
+window.__timelines['main'] = tl;
+</script>
+</body>
+</html>
+

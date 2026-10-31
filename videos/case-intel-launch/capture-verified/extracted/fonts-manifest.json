@@ -1,0 +1,255 @@
+{
+  "files": [
+    {
+      "file": "011e180705008d6f-s.woff2",
+      "family": "IBM Plex Mono",
+      "rawFamily": "IBM Plex Mono",
+      "subfamily": "Regular",
+      "postscript": "IBMPlexMono-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "4b9bb515ce6d026f-s.p.woff2",
+      "family": "Newsreader 16pt 16pt",
+      "rawFamily": "Newsreader 16pt 16pt",
+      "subfamily": "Italic",
+      "postscript": "Newsreader16pt16pt-Italic",
+      "weight": 400,
+      "style": "italic",
+      "variationAxes": [
+        "wght"
+      ],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "5611c55482296524-s.p.woff2",
+      "family": "Newsreader 16pt 16pt",
+      "rawFamily": "Newsreader 16pt 16pt",
+      "subfamily": "Regular",
+      "postscript": "Newsreader16pt16pt-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [
+        "wght"
+      ],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "58f386aa6b1a2a92-s.woff2",
+      "family": "IBM Plex Mono",
+      "rawFamily": "IBM Plex Mono",
+      "subfamily": "Regular",
+      "postscript": "IBMPlexMono-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "665e920483964785-s.woff2",
+      "family": "Newsreader 16pt 16pt",
+      "rawFamily": "Newsreader 16pt 16pt",
+      "subfamily": "Regular",
+      "postscript": "Newsreader16pt16pt-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [
+        "wght"
+      ],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "7088c2b12ccac062-s.woff2",
+      "family": "Newsreader 16pt 16pt",
+      "rawFamily": "Newsreader 16pt 16pt",
+      "subfamily": "Regular",
+      "postscript": "Newsreader16pt16pt-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [
+        "wght"
+      ],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "7ba5fb2a8c88521c-s.woff2",
+      "family": "IBM Plex Mono",
+      "rawFamily": "IBM Plex Mono",
+      "subfamily": "Regular",
+      "postscript": "IBMPlexMono-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "8bf7b2ceda89477b-s.p.woff2",
+      "family": "Public Sans",
+      "rawFamily": "Public Sans Thin",
+      "subfamily": "Regular",
+      "postscript": "PublicSans-Thin",
+      "weight": 100,
+      "style": "normal",
+      "variationAxes": [
+        "wght"
+      ],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "92eeb95d069020cc-s.woff2",
+      "family": "IBM Plex Mono",
+      "rawFamily": "IBM Plex Mono",
+      "subfamily": "Regular",
+      "postscript": "IBMPlexMono-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "98baa4a7809fbf72-s.woff2",
+      "family": "Public Sans",
+      "rawFamily": "Public Sans Thin",
+      "subfamily": "Regular",
+      "postscript": "PublicSans-Thin",
+      "weight": 100,
+      "style": "normal",
+      "variationAxes": [
+        "wght"
+      ],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "d3ebbfd689654d3a-s.p.woff2",
+      "family": "IBM Plex Mono",
+      "rawFamily": "IBM Plex Mono",
+      "subfamily": "Regular",
+      "postscript": "IBMPlexMono-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "e92f802bb57ccffe-s.woff2",
+      "family": "Newsreader 16pt 16pt",
+      "rawFamily": "Newsreader 16pt 16pt",
+      "subfamily": "Italic",
+      "postscript": "Newsreader16pt16pt-Italic",
+      "weight": 400,
+      "style": "italic",
+      "variationAxes": [
+        "wght"
+      ],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "eb251072d3b5478c-s.woff2",
+      "family": "Newsreader 16pt 16pt",
+      "rawFamily": "Newsreader 16pt 16pt",
+      "subfamily": "Italic",
+      "postscript": "Newsreader16pt16pt-Italic",
+      "weight": 400,
+      "style": "italic",
+      "variationAxes": [
+        "wght"
+      ],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "ef4d5661765d0e49-s.woff2",
+      "family": "IBM Plex Mono",
+      "rawFamily": "IBM Plex Mono Medium",
+      "subfamily": "Regular",
+      "postscript": "IBMPlexMono-Medium",
+      "weight": 500,
+      "style": "normal",
+      "variationAxes": [],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "f7650dfaa438c37c-s.woff2",
+      "family": "Public Sans",
+      "rawFamily": "Public Sans Thin",
+      "subfamily": "Regular",
+      "postscript": "PublicSans-Thin",
+      "weight": 100,
+      "style": "normal",
+      "variationAxes": [
+        "wght"
+      ],
+      "identified": true,
+      "isIcon": false
+    }
+  ],
+  "families": [
+    {
+      "family": "IBM Plex Mono",
+      "weights": [
+        400,
+        500
+      ],
+      "variable": false,
+      "fileCount": 6,
+      "files": [
+        "011e180705008d6f-s.woff2",
+        "58f386aa6b1a2a92-s.woff2",
+        "7ba5fb2a8c88521c-s.woff2",
+        "92eeb95d069020cc-s.woff2",
+        "d3ebbfd689654d3a-s.p.woff2",
+        "ef4d5661765d0e49-s.woff2"
+      ]
+    },
+    {
+      "family": "Newsreader 16pt 16pt",
+      "weights": [
+        400
+      ],
+      "variable": true,
+      "fileCount": 6,
+      "files": [
+        "4b9bb515ce6d026f-s.p.woff2",
+        "5611c55482296524-s.p.woff2",
+        "665e920483964785-s.woff2",
+        "7088c2b12ccac062-s.woff2",
+        "e92f802bb57ccffe-s.woff2",
+        "eb251072d3b5478c-s.woff2"
+      ]
+    },
+    {
+      "family": "Public Sans",
+      "weights": [
+        100
+      ],
+      "variable": true,
+      "fileCount": 3,
+      "files": [
+        "8bf7b2ceda89477b-s.p.woff2",
+        "98baa4a7809fbf72-s.woff2",
+        "f7650dfaa438c37c-s.woff2"
+      ]
+    }
+  ],
+  "unidentified": [],
+  "meta": {
+    "generatedAt": "2026-10-28T07:51:15.861Z",
+    "tool": "fontkit"
+  }
+}

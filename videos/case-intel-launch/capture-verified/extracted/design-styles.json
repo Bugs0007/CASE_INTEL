@@ -1,0 +1,325 @@
+{
+  "typography": [
+    {
+      "role": "display",
+      "fontFamily": "Newsreader",
+      "fontSize": "118px",
+      "fontWeight": "400",
+      "lineHeight": "110.92px",
+      "letterSpacing": "-3.54px",
+      "color": "#F1F0EA",
+      "sampleText": "Tonight's cause list. Already read."
+    },
+    {
+      "role": "body",
+      "fontFamily": "Newsreader",
+      "fontSize": "112px",
+      "fontWeight": "400",
+      "lineHeight": "112px",
+      "letterSpacing": "-2.8px",
+      "color": "#F1F0EA",
+      "sampleText": "Every district.Every court complex.One search."
+    },
+    {
+      "role": "heading",
+      "fontFamily": "Newsreader",
+      "fontSize": "62px",
+      "fontWeight": "400",
+      "lineHeight": "63.24px",
+      "letterSpacing": "-1.364px",
+      "color": "#F1F0EA",
+      "sampleText": "The order arrives as a scan. You get what you must do."
+    },
+    {
+      "role": "heading-2",
+      "fontFamily": "Newsreader",
+      "fontSize": "54px",
+      "fontWeight": "400",
+      "lineHeight": "55.08px",
+      "letterSpacing": "-1.188px",
+      "color": "#F1F0EA",
+      "sampleText": "Search the whole state. Not one court at a time."
+    },
+    {
+      "role": "heading-3",
+      "fontFamily": "Newsreader",
+      "fontSize": "27px",
+      "fontWeight": "400",
+      "lineHeight": "29.7px",
+      "letterSpacing": "-0.405px",
+      "color": "#F1F0EA",
+      "sampleText": "One page before you walk in."
+    },
+    {
+      "role": "link",
+      "fontFamily": "Newsreader",
+      "fontSize": "22px",
+      "fontWeight": "400",
+      "lineHeight": "33px",
+      "letterSpacing": "-0.44px",
+      "color": "#14202C",
+      "sampleText": "Case Intel"
+    },
+    {
+      "role": "label",
+      "fontFamily": "Public Sans",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "lineHeight": "24px",
+      "letterSpacing": "normal",
+      "color": "#F1F0EA",
+      "sampleText": "Abstract, not a mapSample runMedchalHyderabadNizamabadSiddip"
+    },
+    {
+      "role": "code",
+      "fontFamily": "IBM Plex Mono",
+      "fontSize": "15px",
+      "fontWeight": "500",
+      "lineHeight": "22.5px",
+      "letterSpacing": "0.15px",
+      "color": "#14202C",
+      "sampleText": "10:30"
+    }
+  ],
+  "spacing": {
+    "observed": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      8,
+      9,
+      10,
+      11,
+      12,
+      14,
+      16,
+      18,
+      22
+    ],
+    "baseUnit": 8
+  },
+  "radius": [
+    "2px",
+    "4px"
+  ],
+  "shadows": [
+    {
+      "value": "rgba(0, 0, 0, 0.85) 0px 40px 70px -40px",
+      "count": 5
+    },
+    {
+      "value": "rgba(0, 0, 0, 0.8) 0px 24px 40px -24px",
+      "count": 4
+    },
+    {
+      "value": "rgba(0, 0, 0, 0.35) 0px -10px 14px -12px inset",
+      "count": 1
+    },
+    {
+      "value": "rgba(0, 0, 0, 0.35) 0px 10px 14px -12px inset",
+      "count": 1
+    },
+    {
+      "value": "rgba(0, 0, 0, 0.8) 0px 40px 70px -40px",
+      "count": 1
+    }
+  ],
+  "buttons": [
+    {
+      "label": "Create an accountLog in",
+      "background": "transparent",
+      "backgroundImage": "",
+      "backdropFilter": "",
+      "color": "#F1F0EA",
+      "padding": "0px",
+      "borderRadius": "0px",
+      "border": "0px solid rgba(20, 32, 44, 0.14)",
+      "boxShadow": "none",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "height": "52.5px"
+    },
+    {
+      "label": "Create an account",
+      "background": "#F1F0EA",
+      "backgroundImage": "",
+      "backdropFilter": "",
+      "color": "#0B131B",
+      "padding": "14px 22px",
+      "borderRadius": "2px",
+      "border": "1px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "fontSize": "15px",
+      "fontWeight": "500",
+      "height": "52.5px"
+    },
+    {
+      "label": "Log in",
+      "background": "transparent",
+      "backgroundImage": "",
+      "backdropFilter": "",
+      "color": "#F1F0EA",
+      "padding": "14px 22px",
+      "borderRadius": "2px",
+      "border": "1px solid rgba(241, 240, 234, 0.28)",
+      "boxShadow": "none",
+      "fontSize": "15px",
+      "fontWeight": "500",
+      "height": "52.5px"
+    },
+    {
+      "label": "Create an account",
+      "background": "#14202C",
+      "backgroundImage": "",
+      "backdropFilter": "",
+      "color": "#F1F0EA",
+      "padding": "20px 32px",
+      "borderRadius": "2px",
+      "border": "1px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "fontSize": "21px",
+      "fontWeight": "500",
+      "height": "73.5px"
+    },
+    {
+      "label": "Log in",
+      "background": "transparent",
+      "backgroundImage": "",
+      "backdropFilter": "",
+      "color": "#14202C",
+      "padding": "14px 22px",
+      "borderRadius": "2px",
+      "border": "1px solid rgba(20, 32, 44, 0.14)",
+      "boxShadow": "none",
+      "fontSize": "15px",
+      "fontWeight": "500",
+      "height": "73.5px"
+    }
+  ],
+  "cards": [
+    {
+      "label": "card",
+      "background": "transparent",
+      "backgroundImage": "",
+      "backdropFilter": "",
+      "color": "#F1F0EA",
+      "padding": "0px",
+      "borderRadius": "0px",
+      "border": "0px solid rgba(20, 32, 44, 0.14)",
+      "boxShadow": "none",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "height": "452.062px"
+    },
+    {
+      "label": "card",
+      "background": "transparent",
+      "backgroundImage": "linear-gradient(rgba(27, 42, 56, 0.85), rgba(16, 27, 38, 0.85))",
+      "backdropFilter": "",
+      "color": "#F1F0EA",
+      "padding": "18px",
+      "borderRadius": "4px",
+      "border": "1px solid rgba(241, 240, 234, 0.12)",
+      "boxShadow": "rgba(0, 0, 0, 0.85) 0px 40px 70px -40px",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "height": "452.062px"
+    }
+  ],
+  "nav": {
+    "label": "navigation",
+    "background": "transparent",
+    "backgroundImage": "",
+    "backdropFilter": "",
+    "color": "#F1F0EA",
+    "padding": "0px",
+    "borderRadius": "0px",
+    "border": "0px solid rgba(20, 32, 44, 0.14)",
+    "boxShadow": "none",
+    "fontSize": "16px",
+    "fontWeight": "400",
+    "height": "64px"
+  },
+  "chips": [
+    {
+      "label": "Abstract, not a mapSampl",
+      "background": "transparent",
+      "color": "#F1F0EA",
+      "padding": "0px",
+      "borderRadius": "0px",
+      "border": "0px solid rgba(20, 32, 44, 0.14)",
+      "boxShadow": "none",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "height": "22.25px"
+    },
+    {
+      "label": "Name match",
+      "background": "#7FD3AC",
+      "color": "#7FD3AC",
+      "padding": "4px 8px",
+      "borderRadius": "2px",
+      "border": "1px solid rgba(127, 211, 172, 0.35)",
+      "boxShadow": "none",
+      "fontSize": "10px",
+      "fontWeight": "400",
+      "height": "25px"
+    },
+    {
+      "label": "Not verified",
+      "background": "#E8B86A",
+      "color": "#E8B86A",
+      "padding": "4px 8px",
+      "borderRadius": "2px",
+      "border": "1px solid rgba(232, 184, 106, 0.4)",
+      "boxShadow": "none",
+      "fontSize": "10px",
+      "fontWeight": "400",
+      "height": "25px"
+    },
+    {
+      "label": "1 complex failed",
+      "background": "#E0705F",
+      "color": "#E0705F",
+      "padding": "4px 8px",
+      "borderRadius": "2px",
+      "border": "1px solid rgba(224, 112, 95, 0.4)",
+      "boxShadow": "none",
+      "fontSize": "10px",
+      "fontWeight": "400",
+      "height": "25px"
+    }
+  ],
+  "statCells": [],
+  "tabs": [],
+  "backgrounds": [
+    {
+      "value": "radial-gradient(90% 55% at 50% 118%, rgba(232, 184, 106, 0.32), rgba(0, 0, 0, 0) 70%), linear-gradient(rgb(22, 35, 47), rgb(36, 50, 62) 60%, rgb(58, 59, 58))",
+      "area": 2073600
+    },
+    {
+      "value": "radial-gradient(1px 1px at 20px 30px, rgba(241, 240, 234, 0.5), rgba(0, 0, 0, 0) 60%), radial-gradient(1px 1px at 140px 90px, rgba(241, 240, 234, 0.35), rgba(0, 0, 0, 0) 60%), radial-gradient(1.4px 1.4px at 260px 180px, rgba(232, 201, 168, 0.5), rgba(0, 0, 0, 0) 60%), radial-gradient(1px 1px at 330px 40px, rgba(241, 240, 234, 0.25), rgba(0, 0, 0, 0) 60%)",
+      "area": 2695680
+    },
+    {
+      "value": "radial-gradient(60% 50% at 18% 8%, rgba(232, 201, 168, 0.07), rgba(0, 0, 0, 0) 70%), radial-gradient(70% 60% at 90% 110%, rgba(46, 106, 80, 0.06), rgba(0, 0, 0, 0) 70%), none",
+      "area": 2073600
+    },
+    {
+      "value": "linear-gradient(rgb(17, 28, 39), rgb(23, 38, 52) 70%, rgb(30, 46, 60))",
+      "area": 2073600
+    },
+    {
+      "value": "linear-gradient(rgba(27, 42, 56, 0.85), rgba(16, 27, 38, 0.85))",
+      "area": 968883
+    },
+    {
+      "value": "repeating-linear-gradient(rgba(0, 0, 0, 0) 0px, rgba(0, 0, 0, 0) 45px, rgba(168, 58, 44, 0.14) 45px, rgba(168, 58, 44, 0.14) 46px), repeating-linear-gradient(90deg, rgba(0, 0, 0, 0) 0px, rgba(0, 0, 0, 0) calc(5% - 1px), rgba(20, 32, 44, 0.05) calc(5% - 1px), rgba(20, 32, 44, 0.05) 5%)",
+      "area": 194974
+    }
+  ],
+  "glass": []
+}
