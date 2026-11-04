@@ -101,6 +101,11 @@ export interface AdvocateProfile {
   last_invoice_sequence: number;
   /** Days before a payment-reminder draft is prepared (1-90, default 15). */
   reminder_after_days: number;
+  /** Hearing-reminder emails to the advocate themself (not payment
+   * reminders): the master switch, then the two lead times. */
+  hearing_reminders_enabled: boolean;
+  hearing_reminder_two_days: boolean;
+  hearing_reminder_one_day: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -115,6 +120,9 @@ export interface AdvocateProfileUpdateInput {
   contact_email?: string;
   default_fee_amount?: string;
   invoice_prefix?: string;
+  hearing_reminders_enabled?: boolean;
+  hearing_reminder_two_days?: boolean;
+  hearing_reminder_one_day?: boolean;
 }
 
 /** POST /api/appearance-fees/<id>/send/ -- returns 200 with sent=false

@@ -153,6 +153,11 @@ class Command(BaseCommand):
             except (InvalidOperation, ValueError):
                 raise CommandError(f"--default-fee must be a number, got {options['default_fee']!r}.")
 
+        # The recruiter demo account must never get hearing-reminder emails.
+        # Unlike the letterhead values above this is enforced on every run.
+        if profile.hearing_reminders_enabled:
+            updates["hearing_reminders_enabled"] = False
+
         if updates:
             for field, value in updates.items():
                 setattr(profile, field, value)

@@ -18,6 +18,7 @@ import { CaseDetailSkeleton } from "@/components/cases/case-detail-skeleton";
 import { CourtTrackingCard } from "@/components/cases/court-tracking-card";
 import { HearingsList } from "@/components/hearings/hearings-list";
 import { TasksCard } from "@/components/tasks/tasks-card";
+import { CaseCalendarCard } from "@/components/calendar/case-calendar-card";
 import { HearingDialog } from "@/components/hearings/hearing-dialog";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { UploadDocumentDialog } from "@/components/documents/upload-document-dialog";
@@ -222,6 +223,15 @@ export default function CaseDetailPage() {
               caseId={caseId}
               courtType={caseItem.court_type}
               latestOrder={latestDatedOrder}
+            />
+
+            {/* Calendar -- this case's hearings, deadlines (including the
+                ones read from orders) and the advocate's own events. */}
+            <CaseCalendarCard
+              caseId={caseId}
+              hearings={hearings}
+              partyRole={caseItem.user_party_role}
+              onEditDetails={() => setIsDetailsDialogOpen(true)}
             />
 
             {/* Client emails drafted from the latest order / hearing date,
