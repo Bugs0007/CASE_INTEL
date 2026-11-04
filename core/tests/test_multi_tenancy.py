@@ -864,6 +864,88 @@ class TestTaskIsolation:
         assert Task.objects.get(id=resp.data["id"]).owner == user_a
 
 
+@pytest.mark.django_db
+class TestCaseEventIsolation:
+    def _event(self, owner, case, title):
+        from datetime import date
+
+        from core.models import CaseEvent
+
+        return CaseEvent.objects.create(
+            owner=owner, case=case, title=title, date=date(2026, 11, 10)
+        )
+
+    def test_list_excludes_other_users_events_even_with_their_case_id(
+        self, user_a, user_b, client_a, case_a, case_b
+    ):
+        self._event(user_a, case_a, "Alice event")
+        self._event(user_b, case_b, "Bob event")
+
+        titles = [e["title"] for e in client_a.get("/api/case-events/").data]
+        assert titles == ["Alice event"]
+
+        resp = client_a.get("/api/case-events/", {"case_id": case_b.id})
+        assert resp.status_code == 200
+        assert resp.data == []
+
+        resp = client_a.get(
+            "/api/case-events/", {"date_from": "2026-01-01", "date_to": "2026-12-31"}
+        )
+        assert [e["title"] for e in resp.data] == ["Alice event"]
+
+    def test_retrieve_update_delete_other_users_event_404s(self, user_b, client_a, case_b):
+        from core.models import CaseEvent
+
+        event_b = self._event(user_b, case_b, "Bob event")
+
+        assert client_a.get(f"/api/case-events/{event_b.id}/").status_code == 404
+        assert (
+            client_a.patch(
+                f"/api/case-events/{event_b.id}/", {"title": "hijacked"}, format="json"
+            ).status_code
+            == 404
+        )
+        assert client_a.delete(f"/api/case-events/{event_b.id}/").status_code == 404
+        event_b.refresh_from_db()
+        assert event_b.title == "Bob event"
+        assert CaseEvent.objects.filter(id=event_b.id).exists()
+
+    def test_cannot_attach_event_to_other_users_case(self, client_a, case_b):
+        from core.models import CaseEvent
+
+        resp = client_a.post(
+            "/api/case-events/",
+            {"case": case_b.id, "title": "x", "date": "2026-11-10"},
+            format="json",
+        )
+        assert resp.status_code == 400
+        assert "case" in resp.data
+        assert not CaseEvent.objects.filter(case=case_b).exists()
+
+    def test_cannot_move_own_event_onto_other_users_case(
+        self, user_a, client_a, case_a, case_b
+    ):
+        event_a = self._event(user_a, case_a, "Alice event")
+
+        resp = client_a.patch(
+            f"/api/case-events/{event_a.id}/", {"case": case_b.id}, format="json"
+        )
+        assert resp.status_code == 400
+        event_a.refresh_from_db()
+        assert event_a.case_id == case_a.id
+
+    def test_create_ignores_client_supplied_owner(self, client_a, user_a, user_b, case_a):
+        from core.models import CaseEvent
+
+        resp = client_a.post(
+            "/api/case-events/",
+            {"case": case_a.id, "title": "mine", "date": "2026-11-10", "owner": user_b.id},
+            format="json",
+        )
+        assert resp.status_code == 201
+        assert CaseEvent.objects.get(id=resp.data["id"]).owner == user_a
+
+
 # ---------------------------------------------------------------------------
 # Tier 2 endpoints: clients, billing portfolio, client-message drafts, the
 # sent-message audit log, document generation, and refresh-all. One

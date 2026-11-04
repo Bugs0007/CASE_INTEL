@@ -38,6 +38,8 @@ from core.views import (
     CaseCnrCreateView,
     CaseCnrLookupView,
     CaseDetailView,
+    CaseEventDetailView,
+    CaseEventListCreateView,
     CaseListView,
     CaseOrdersView,
     CaseTrackingConfirmView,
@@ -396,6 +398,11 @@ urlpatterns = [
     # deadlines in one list (see core/models/task.py)
     path("tasks/", TaskListCreateView.as_view(), name="task-list"),
     path("tasks/<int:pk>/", TaskDetailView.as_view(), name="task-detail"),
+
+    # Case events -- the advocate's own appointments on a case's calendar
+    # (arbitration, mediation, client meetings; see core/models/case_event.py)
+    path("case-events/", CaseEventListCreateView.as_view(), name="case-event-list"),
+    path("case-events/<int:pk>/", CaseEventDetailView.as_view(), name="case-event-detail"),
 
     # Documents
     path("documents/", DocumentListView.as_view(), name="document-list"),

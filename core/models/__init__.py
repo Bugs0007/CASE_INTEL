@@ -3,6 +3,7 @@ from .advocate_profile import AdvocateProfile
 from .appearance_fee import AppearanceFee
 from .case import Case
 from .case_briefing import CaseBriefing
+from .case_event import CaseEvent
 from .case_tag import CaseTag, CaseTagMap
 from .client import Client
 from .client_contact import ClientContact
@@ -22,6 +23,7 @@ from .citation import Citation
 from .activity_log import ActivityLog
 from .task import Task
 from .hearing import Hearing
+from .hearing_reminder import HearingReminder
 from .cause_list import CauseListFetch, CauseListMatch
 from .court_fetch_log import CourtFetchLog
 from .court_order import CourtOrder
@@ -40,6 +42,7 @@ __all__ = [
     "AppearanceFee",
     "Case",
     "CaseBriefing",
+    "CaseEvent",
     "CaseTag",
     "CaseTagMap",
     "Client",
@@ -62,6 +65,7 @@ __all__ = [
     "ActivityLog",
     "Task",
     "Hearing",
+    "HearingReminder",
     "CauseListFetch",
     "CauseListMatch",
     "CourtFetchLog",
