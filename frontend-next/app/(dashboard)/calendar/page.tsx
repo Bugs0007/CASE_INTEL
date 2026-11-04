@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useHearings } from "@/hooks/use-hearings";
 import { useCases } from "@/hooks/use-cases";
+import { useTasks } from "@/hooks/use-tasks";
+import { useCaseEvents } from "@/hooks/use-case-events";
+import { ALL_KINDS, type CalendarKind } from "@/lib/calendar";
 import { CalendarMonth } from "@/components/calendar/calendar-month";
 import { CalendarByCourt } from "@/components/calendar/calendar-by-court";
 import { CalendarSkeleton } from "@/components/calendar/calendar-skeleton";
@@ -23,6 +26,18 @@ export default function CalendarPage() {
   }, []);
   const { data: hearings = [], isLoading: hearingsLoading, error: hearingsError } = useHearings();
   const { data: cases = [], isLoading: casesLoading } = useCases("all");
+  // Deadlines and the advocate's own events ride along on the month grid.
+  // They never gate the page: if either fails to load, hearings still show.
+  const { data: tasks = [] } = useTasks();
+  const { data: events = [] } = useCaseEvents();
+  const [kinds, setKinds] = useState<ReadonlySet<CalendarKind>>(() => new Set(ALL_KINDS));
+  const toggleKind = (kind: CalendarKind) =>
+    setKinds((current) => {
+      const next = new Set(current);
+      if (next.has(kind)) next.delete(kind);
+      else next.add(kind);
+      return next;
+    });
 
   const caseMeta = useMemo(() => {
     const map = new Map<number, { caseNumber: string; documentCount: number }>();
@@ -93,7 +108,14 @@ export default function CalendarPage() {
       </div>
 
       {view === "calendar" ? (
-        <CalendarMonth hearings={hearings} caseMeta={caseMeta} />
+        <CalendarMonth
+          hearings={hearings}
+          caseMeta={caseMeta}
+          tasks={tasks}
+          events={events}
+          kinds={kinds}
+          onToggleKind={toggleKind}
+        />
       ) : (
         <CalendarByCourt hearings={upcomingHearings} caseMeta={caseMeta} />
       )}

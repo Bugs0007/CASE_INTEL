@@ -38,6 +38,7 @@ from .auth import (
 )
 from .google_auth import GoogleLinkView, GoogleLoginView, MeView, SetPasswordView
 from .case import CaseDetailView, CaseListView
+from .case_event import CaseEventDetailView, CaseEventListCreateView
 from .case_tracking import (
     CaseCnrCreateView,
     CaseCnrLookupView,
@@ -146,6 +147,8 @@ __all__ = [
     "CaseCnrCreateView",
     "CaseCnrLookupView",
     "CaseDetailView",
+    "CaseEventDetailView",
+    "CaseEventListCreateView",
     "CaseListView",
     "CaseOrdersView",
     "CaseTrackingConfirmView",

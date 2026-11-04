@@ -17,6 +17,7 @@ from core.models import (
     SocialIdentity,
     Case,
     CaseBriefing,
+    CaseEvent,
     CaseTag,
     CaseTagMap,
     Citation,
@@ -39,6 +40,7 @@ from core.models import (
     CourtTrackingPreview,
     GmailCredential,
     Hearing,
+    HearingReminder,
     InviteToken,
     Message,
     ProcessingJob,
@@ -276,6 +278,15 @@ class TaskAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at", "updated_at", "completed_at")
 
 
+@admin.register(CaseEvent)
+class CaseEventAdmin(admin.ModelAdmin):
+    list_display = ("title", "case", "event_type", "date", "start_time", "status")
+    list_filter = ("event_type", "status")
+    search_fields = ("title", "location", "notes")
+    readonly_fields = ("created_at", "updated_at")
+    date_hierarchy = "date"
+
+
 @admin.register(Hearing)
 class HearingAdmin(admin.ModelAdmin):
     list_display = ("case", "hearing_type", "hearing_date", "source", "location", "judge", "status", "created_at")
@@ -283,6 +294,14 @@ class HearingAdmin(admin.ModelAdmin):
     search_fields = ("location", "judge", "notes", "purpose")
     readonly_fields = ("created_at", "updated_at")
     date_hierarchy = "hearing_date"
+
+
+@admin.register(HearingReminder)
+class HearingReminderAdmin(admin.ModelAdmin):
+    list_display = ("hearing", "lead_days", "hearing_date", "recipient", "delivery", "attempts", "sent_at")
+    list_filter = ("delivery", "lead_days")
+    search_fields = ("recipient", "error")
+    readonly_fields = ("created_at", "sent_at")
 
 
 @admin.register(CauseListFetch)

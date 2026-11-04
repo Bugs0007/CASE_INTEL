@@ -20,6 +20,9 @@ class AdvocateProfileSerializer(serializers.ModelSerializer):
             "invoice_prefix",
             "last_invoice_sequence",
             "reminder_after_days",
+            "hearing_reminders_enabled",
+            "hearing_reminder_two_days",
+            "hearing_reminder_one_day",
             "created_at",
             "updated_at",
         ]

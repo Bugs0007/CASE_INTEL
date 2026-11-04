@@ -75,6 +75,18 @@ class AdvocateProfile(OwnedModel):
             "is prepared, and the gap between reminders (at most 3)."
         ),
     )
+    # Hearing-reminder emails to the advocate themself (see
+    # core/services/notifications/hearing_reminders.py) -- unrelated to
+    # reminder_after_days above, which is about unpaid invoices.
+    hearing_reminders_enabled = models.BooleanField(
+        default=True, help_text="Master switch for hearing reminder emails."
+    )
+    hearing_reminder_two_days = models.BooleanField(
+        default=True, help_text="Email two days before a hearing."
+    )
+    hearing_reminder_one_day = models.BooleanField(
+        default=True, help_text="Email the day before a hearing."
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
