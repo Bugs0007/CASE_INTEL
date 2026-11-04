@@ -61,6 +61,9 @@ export default function SettingsPage() {
   const [contactEmail, setContactEmail] = useState("");
   const [defaultFee, setDefaultFee] = useState("");
   const [invoicePrefix, setInvoicePrefix] = useState("");
+  const [remindersOn, setRemindersOn] = useState(true);
+  const [remindTwoDays, setRemindTwoDays] = useState(true);
+  const [remindOneDay, setRemindOneDay] = useState(true);
 
   // Seed the form once the profile lands. Keyed on the profile object so
   // a refetch doesn't stomp edits the user is midway through typing.
@@ -75,7 +78,17 @@ export default function SettingsPage() {
     setContactEmail(profile.contact_email);
     setDefaultFee(profile.default_fee_amount);
     setInvoicePrefix(profile.invoice_prefix);
+    setRemindersOn(profile.hearing_reminders_enabled ?? true);
+    setRemindTwoDays(profile.hearing_reminder_two_days ?? true);
+    setRemindOneDay(profile.hearing_reminder_one_day ?? true);
   }, [profile]);
+
+  // Where hearing reminders go: the contact email as typed, else the login
+  // email (the same fallback the server applies). Only warn once /auth/me/
+  // has answered, so the line doesn't flash while it loads.
+  const reminderAddress = contactEmail.trim() || me?.email || "";
+  const reminderAddressIsContact = !!contactEmail.trim();
+  const noReminderAddress = !!me && !reminderAddress;
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -90,6 +103,9 @@ export default function SettingsPage() {
         contact_email: contactEmail,
         default_fee_amount: defaultFee,
         invoice_prefix: invoicePrefix,
+        hearing_reminders_enabled: remindersOn,
+        hearing_reminder_two_days: remindTwoDays,
+        hearing_reminder_one_day: remindOneDay,
       });
       showToast.success("Billing profile saved", "New invoices will use these details.");
     } catch (error) {
@@ -270,6 +286,60 @@ export default function SettingsPage() {
                 An invoice unpaid this long gets a reminder draft in Client Messages for you to review
                 and send (at most 3, the same gap apart; never once it&apos;s marked paid). 1 to 90.
               </p>
+            </div>
+
+            <div>
+              <span className="mb-1 block text-sm font-medium text-gray-700">Hearing Reminders</span>
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  id="hearing_reminders_enabled"
+                  checked={remindersOn}
+                  onChange={(e) => setRemindersOn(e.target.checked)}
+                />
+                Email me before my hearings
+              </label>
+              <div className="mt-1.5 ml-6 space-y-1.5">
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    id="hearing_reminder_two_days"
+                    checked={remindTwoDays}
+                    disabled={!remindersOn}
+                    onChange={(e) => setRemindTwoDays(e.target.checked)}
+                  />
+                  Two days before
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    id="hearing_reminder_one_day"
+                    checked={remindOneDay}
+                    disabled={!remindersOn}
+                    onChange={(e) => setRemindOneDay(e.target.checked)}
+                  />
+                  The day before
+                </label>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                One email at a time with all your hearings that day, plus anything else due. Not the
+                same as the payment reminder above, which is about unpaid invoices.
+              </p>
+              {reminderAddress && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Reminders go to <span className="font-medium text-gray-700">{reminderAddress}</span>{" "}
+                  ({reminderAddressIsContact ? "your contact email" : "your login email"}).
+                </p>
+              )}
+              {noReminderAddress && (
+                <div className="mt-1.5 flex items-start gap-2 rounded-lg bg-status-pending-soft p-2.5 text-xs text-status-pending">
+                  <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                  <span>
+                    No email address on file, so reminders can&apos;t be sent. Add a contact email
+                    above.
+                  </span>
+                </div>
+              )}
             </div>
 
             {profile && profile.last_invoice_sequence > 0 && (

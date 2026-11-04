@@ -73,6 +73,9 @@ function makeProfile(overrides: Partial<AdvocateProfile> = {}): AdvocateProfile 
     default_fee_amount: "0.00",
     invoice_prefix: "INV",
     last_invoice_sequence: 0,
+    hearing_reminders_enabled: true,
+    hearing_reminder_two_days: true,
+    hearing_reminder_one_day: true,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
     ...overrides,
@@ -215,6 +218,87 @@ describe("SettingsPage", () => {
         "Could not save",
         expect.stringContaining("Enter a valid email address."),
       );
+    });
+  });
+
+  describe("hearing reminders", () => {
+    const meWithEmail = (email: string) => ({
+      id: 1, username: "alice", email, has_password: true, google_linked: false,
+      google_email: null, credentials_locked: false,
+    });
+
+    it("shows the three switches as the profile has them", async () => {
+      vi.mocked(advocateProfileApi.get).mockResolvedValue(
+        makeProfile({ hearing_reminder_two_days: false }),
+      );
+      renderWithClient(<SettingsPage />);
+
+      expect(await screen.findByLabelText(/email me before my hearings/i)).toBeChecked();
+      expect(screen.getByLabelText(/two days before/i)).not.toBeChecked();
+      expect(screen.getByLabelText(/the day before/i)).toBeChecked();
+    });
+
+    it("greys out the two lead times while the master switch is off", async () => {
+      const user = userEvent.setup();
+      vi.mocked(advocateProfileApi.get).mockResolvedValue(makeProfile());
+      renderWithClient(<SettingsPage />);
+
+      await user.click(await screen.findByLabelText(/email me before my hearings/i));
+      expect(screen.getByLabelText(/two days before/i)).toBeDisabled();
+      expect(screen.getByLabelText(/the day before/i)).toBeDisabled();
+    });
+
+    it("saves the switches with the rest of the profile", async () => {
+      const user = userEvent.setup();
+      vi.mocked(advocateProfileApi.get).mockResolvedValue(makeProfile());
+      vi.mocked(advocateProfileApi.update).mockResolvedValue(makeProfile());
+      renderWithClient(<SettingsPage />);
+
+      await user.click(await screen.findByLabelText(/two days before/i));
+      await user.click(screen.getByRole("button", { name: /save changes/i }));
+
+      await waitFor(() => {
+        expect(advocateProfileApi.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            hearing_reminders_enabled: true,
+            hearing_reminder_two_days: false,
+            hearing_reminder_one_day: true,
+          }),
+        );
+      });
+    });
+
+    it("says reminders go to the contact email, following what is typed", async () => {
+      const user = userEvent.setup();
+      vi.mocked(googleAccountApi.me).mockResolvedValue(meWithEmail("login@example.com"));
+      vi.mocked(advocateProfileApi.get).mockResolvedValue(
+        makeProfile({ contact_email: "chambers@example.com" }),
+      );
+      renderWithClient(<SettingsPage />);
+
+      expect(await screen.findByText("chambers@example.com", { selector: "span" })).toBeInTheDocument();
+      expect(screen.getByText(/reminders go to/i)).toHaveTextContent(/\(your contact email\)/i);
+
+      await user.clear(screen.getByLabelText(/contact email/i));
+      expect(await screen.findByText("login@example.com", { selector: "span" })).toBeInTheDocument();
+      expect(screen.getByText(/reminders go to/i)).toHaveTextContent(/\(your login email\)/i);
+    });
+
+    it("warns when there is neither a contact email nor a login email", async () => {
+      vi.mocked(googleAccountApi.me).mockResolvedValue(meWithEmail(""));
+      vi.mocked(advocateProfileApi.get).mockResolvedValue(makeProfile());
+      renderWithClient(<SettingsPage />);
+
+      expect(await screen.findByText(/no email address on file/i)).toBeInTheDocument();
+    });
+
+    it("does not warn when the login email is there", async () => {
+      vi.mocked(googleAccountApi.me).mockResolvedValue(meWithEmail("login@example.com"));
+      vi.mocked(advocateProfileApi.get).mockResolvedValue(makeProfile());
+      renderWithClient(<SettingsPage />);
+
+      await screen.findByText("login@example.com", { selector: "span" });
+      expect(screen.queryByText(/no email address on file/i)).not.toBeInTheDocument();
     });
   });
 

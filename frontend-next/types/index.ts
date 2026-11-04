@@ -1,5 +1,6 @@
 export * from "./billing";
 export * from "./case";
+export * from "./case-event";
 export * from "./document";
 export * from "./hearing";
 export * from "./court-order";
