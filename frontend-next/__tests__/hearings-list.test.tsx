@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HearingsList } from "@/components/hearings/hearings-list";
 import type { AdvocateProfile, Hearing, NestedAppearanceFee } from "@/types";
@@ -146,14 +146,37 @@ describe("HearingsList", () => {
     expect(screen.getByText("Add charge")).toBeInTheDocument();
   });
 
-  it("does not mount past hearings until the Past section is opened", () => {
-    const hearing = makeHearing({ hearing_date: "2020-01-01T05:00:00Z", status: "completed" });
+  it("previews the next hearing and the 2 most recent past ones; older ones are in the expanded view", () => {
+    const past = (id: number, month: string, judge: string) =>
+      makeHearing({
+        id,
+        hearing_date: `2020-${month}-01T05:00:00Z`,
+        status: "completed",
+        judge,
+      });
+    const hearings = [
+      past(1, "01", "Judge Oldest"),
+      past(2, "02", "Judge Middle"),
+      past(3, "03", "Judge Newest"),
+      makeHearing({ id: 4, judge: "Judge Upcoming" }),
+    ];
 
-    renderWithClient(<HearingsList caseId={CASE_ID} hearings={[hearing]} />);
+    renderWithClient(<HearingsList caseId={CASE_ID} hearings={hearings} />);
 
-    expect(screen.queryByText("Justice Rao")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByText("Expand"));
-    expect(screen.getByText("Justice Rao")).toBeInTheDocument();
+    expect(screen.getByText("Judge Upcoming")).toBeInTheDocument();
+    expect(screen.getByText("Judge Newest")).toBeInTheDocument();
+    expect(screen.getByText("Judge Middle")).toBeInTheDocument();
+    expect(screen.queryByText("Judge Oldest")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "View all (4)" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand Hearings & Orders" }));
+    expect(within(screen.getByRole("dialog")).getByText("Judge Oldest")).toBeInTheDocument();
+  });
+
+  it("never folds: there is no collapse toggle on the card", () => {
+    renderWithClient(<HearingsList caseId={CASE_ID} hearings={[makeHearing()]} />);
+    expect(screen.queryByText("Collapse")).not.toBeInTheDocument();
+    expect(screen.queryByText("Expand")).not.toBeInTheDocument();
   });
 
   it("lets a past hearing be billed: Record fee opens the add-charge form", () => {
@@ -162,7 +185,6 @@ describe("HearingsList", () => {
     const hearing = makeHearing({ hearing_date: "2020-01-01T05:00:00Z", status: "completed" });
 
     renderWithClient(<HearingsList caseId={CASE_ID} hearings={[hearing]} />);
-    fireEvent.click(screen.getByText("Expand"));
 
     expect(screen.queryByText("Add charge")).not.toBeInTheDocument();
     fireEvent.click(screen.getByText("Record fee"));
@@ -181,7 +203,6 @@ describe("HearingsList", () => {
     });
 
     renderWithClient(<HearingsList caseId={CASE_ID} hearings={[hearing]} />);
-    fireEvent.click(screen.getByText("Expand"));
 
     expect(screen.getByRole("button", { name: "Mark Paid (Appearance Fee)" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "View PDF (Appearance Fee)" })).toBeInTheDocument();
@@ -199,13 +220,15 @@ describe("HearingsList", () => {
 
     renderWithClient(<HearingsList caseId={CASE_ID} hearings={hearings} />);
 
-    // Collapsed by default -- expand the Past section first.
-    fireEvent.click(screen.getByText("Expand"));
+    // The card previews just the 2 most recent.
+    expect(screen.getAllByText("Justice Rao")).toHaveLength(2);
 
-    expect(screen.getAllByText("Justice Rao")).toHaveLength(25);
-    const loadMore = screen.getByText(/Load more \(35 remaining\)/);
-    fireEvent.click(loadMore);
-    expect(screen.getAllByText("Justice Rao")).toHaveLength(50);
+    fireEvent.click(screen.getByRole("button", { name: "Expand Hearings & Orders" }));
+    const dialog = within(screen.getByRole("dialog"));
+
+    expect(dialog.getAllByText("Justice Rao")).toHaveLength(25);
+    fireEvent.click(dialog.getByText(/Load more \(35 remaining\)/));
+    expect(dialog.getAllByText("Justice Rao")).toHaveLength(50);
   });
 });
 

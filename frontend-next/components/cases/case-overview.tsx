@@ -30,7 +30,11 @@ function PartyValue({ name, isOurs }: { name: string; isOurs: boolean }) {
   );
 }
 
-/** Two different "client" ideas live on a case, and they are shown apart:
+/** The case's parties, side, client and filing date (the right-hand rail of
+ * the case page). The people on the case are listed in the Client contacts
+ * card beside it, not here.
+ *
+ * Two different "client" ideas live on a case, and they are shown apart:
  *   - the PARTY you act for (petitioner or respondent, per the court
  *     record or the title), and
  *   - who you talk to and bill: the primary CONTACT (a person on this
@@ -89,15 +93,13 @@ export function CaseOverview({ case: caseItem, onEditDetails }: CaseOverviewProp
       ),
     },
     { label: "Practice Area", value: caseItem.case_type || "N/A" },
-    { label: "Case Status", value: caseItem.status },
-    { label: "Priority", value: caseItem.priority },
     { label: "Filing Date", value: caseItem.filing_date || "N/A" },
   ];
 
   return (
     <Card>
       <CardHeader className="flex items-center justify-between">
-        <CardTitle>Case Overview</CardTitle>
+        <CardTitle>Case details</CardTitle>
         <Button variant="secondary" size="sm" onClick={onEditDetails}>
           <Pencil className="h-3.5 w-3.5" />
           Edit Details
@@ -115,34 +117,6 @@ export function CaseOverview({ case: caseItem, onEditDetails }: CaseOverviewProp
             </div>
           ))}
         </div>
-
-        {caseItem.client_contacts.length > 1 && (
-          <div className="mt-2 pt-4 border-t border-gray-100">
-            <dt className="text-sm font-medium text-gray-500 mb-2">
-              Client Contacts
-            </dt>
-            <dd>
-              <ul className="space-y-1.5">
-                {caseItem.client_contacts.map((c) => (
-                  <li key={c.id} className="text-sm text-gray-700 flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-gray-900">{c.name}</span>
-                    <span className="text-xs text-gray-400 capitalize">{c.role}</span>
-                    {c.is_billing_contact && (
-                      <span className="ci-chip ci-chip--none">
-                        Billing
-                      </span>
-                    )}
-                    {(c.email || c.phone) && (
-                      <span className="text-xs text-gray-400">
-                        {[c.email, c.phone].filter(Boolean).join(" · ")}
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </dd>
-          </div>
-        )}
 
         {caseItem.notes && (
           <div className="mt-6 pt-6 border-t border-gray-100">

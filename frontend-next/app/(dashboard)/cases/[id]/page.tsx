@@ -1,18 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useParams } from "next/navigation";
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCase } from "@/hooks/use-cases";
 import { useDocuments } from "@/hooks/use-documents";
 import { useDeleteHearing, useHearings } from "@/hooks/use-hearings";
 import { useCaseOrders, useViewOrder } from "@/hooks/use-court-orders";
 import { useClientMessages } from "@/hooks/use-clients";
+import { useSidePanel } from "@/hooks/use-side-panel";
 import { CaseDetailHeader } from "@/components/cases/case-detail-header";
 import { CaseOverview } from "@/components/cases/case-overview";
 import { CaseDetailsDialog } from "@/components/cases/case-details-dialog";
 import { DisposalBanner, UpdateRecipientsNote } from "@/components/cases/case-banners";
-import { CaseFeeSummaryCard } from "@/components/cases/case-fee-summary";
+import { CaseFeesCard } from "@/components/cases/case-fees-card";
+import { ClientContactsCard } from "@/components/cases/client-contacts-card";
+import { NextHearingCard } from "@/components/cases/next-hearing-card";
 import { OrderOverviewCard } from "@/components/cases/order-overview";
 import { CaseDetailSkeleton } from "@/components/cases/case-detail-skeleton";
 import { CourtTrackingCard } from "@/components/cases/court-tracking-card";
@@ -23,44 +26,29 @@ import { HearingDialog } from "@/components/hearings/hearing-dialog";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { UploadDocumentDialog } from "@/components/documents/upload-document-dialog";
 import { GenerateDocumentDialog } from "@/components/documents/generate-document-dialog";
+import { DocumentViewer } from "@/components/documents/document-viewer";
 import { CaseClientUpdatesCard } from "@/components/client-updates/case-client-updates-card";
 import { RecentDocumentsCard } from "@/components/documents/recent-documents-card";
 import { OrderSyncStatusLine } from "@/components/cases/order-sync-status";
 import { showToast } from "@/components/ui/toaster";
-import {
-  useProcessDocument,
-  useDeleteDocument,
-  useViewDocument,
-} from "@/hooks/use-documents";
-import type { Hearing } from "@/types";
+import { useProcessDocument, useDeleteDocument } from "@/hooks/use-documents";
+import { documentForOrder } from "@/lib/viewer-source";
+import { cn } from "@/lib/utils";
+import type { Citation, Hearing } from "@/types";
 
 export default function CaseDetailPage() {
   const params = useParams();
   const caseId = Number(params.id);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const sidePanel = useSidePanel();
   const [showChat, setShowChat] = useState(false);
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [isGenerateDialogOpen, setIsGenerateDialogOpen] = useState(false);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [isHearingDialogOpen, setIsHearingDialogOpen] = useState(false);
   const [editingHearing, setEditingHearing] = useState<Hearing | null>(null);
-
-  // Below `lg`, Case Bot is a true full-screen overlay portaled to
-  // document.body -- position:fixed alone isn't enough because
-  // (dashboard)/template.tsx's page-transition wrapper uses `transform`,
-  // which per spec makes it the containing block for fixed descendants,
-  // silently shrinking "fixed inset-0" down to that wrapper's box (leaving
-  // the Header and bottom MobileNav visibly poking out above/below it,
-  // still tappable, instead of a real modal takeover). A portal escapes
-  // that ancestor entirely. At `lg`+, Case Bot stays the persistent flex
-  // sibling column it's always been.
-  const [isDesktop, setIsDesktop] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 1024px)");
-    setIsDesktop(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
 
   const { data: caseItem, isLoading: caseLoading } = useCase(caseId);
   const { data: documents = [], isLoading: docsLoading } = useDocuments({
@@ -87,9 +75,34 @@ export default function CaseDetailPage() {
 
   const processDocument = useProcessDocument();
   const deleteDocument = useDeleteDocument();
-  const viewDocument = useViewDocument();
   const deleteHearing = useDeleteHearing();
   const viewOrder = useViewOrder();
+
+  // The viewer lives in the URL (?doc=<id>) so a document can be linked and
+  // the browser's Back button closes it. Opening pushes an entry; switching
+  // documents inside the viewer replaces it, so one Back always returns to
+  // the page.
+  const viewerDocId = Number(searchParams.get("doc")) || null;
+  const openedByPush = useRef(false);
+
+  const openDocument = (documentId: number) => {
+    setShowChat(false);
+    openedByPush.current = true;
+    router.push(`${pathname}?doc=${documentId}`, { scroll: false });
+  };
+
+  const switchDocument = (documentId: number) => {
+    router.replace(`${pathname}?doc=${documentId}`, { scroll: false });
+  };
+
+  const closeViewer = () => {
+    if (openedByPush.current) {
+      openedByPush.current = false;
+      router.back();
+    } else {
+      router.replace(pathname, { scroll: false });
+    }
+  };
 
   // Order Overview and the client-update drafts sit at the TOP of the page
   // and only render once their own queries answer. Showing the page before
@@ -138,22 +151,33 @@ export default function CaseDetailPage() {
     }
   };
 
-  const handleViewDocument = (docId: number) => {
-    viewDocument.mutate(docId, {
-      onError: (error) => {
-        console.error("Failed to open document:", error);
-        showToast.error("Could not open document", "Try again in a moment.");
-      },
-    });
-  };
-
+  // An order opens in the viewer through the document that holds its PDF.
+  // When that document can't be told apart from the case's others (or isn't
+  // listed), fall back to the PDF in a new tab, as before.
   const handleViewOrder = (orderId: number) => {
+    const order = courtOrders.find((o) => o.id === orderId);
+    const orderDocument = order ? documentForOrder(order, documents) : null;
+    if (orderDocument) {
+      openDocument(orderDocument.id);
+      return;
+    }
     viewOrder.mutate(orderId, {
       onError: (error) => {
         console.error("Failed to open order:", error);
         showToast.error("Could not open order", "Try again in a moment.");
       },
     });
+  };
+
+  // A Case Bot source opens its document in the viewer. The citation carries
+  // a document and a passage but no page number, so it opens at page 1.
+  const handleOpenCitation = (citation: Citation) => {
+    if (citation.document_id === null) return;
+    if (documents.some((d) => d.id === citation.document_id)) {
+      openDocument(citation.document_id);
+    } else {
+      showToast.error("Document unavailable", "That source is no longer on this case.");
+    }
   };
 
   const handleAddHearing = () => {
@@ -178,38 +202,33 @@ export default function CaseDetailPage() {
     }
   };
 
+  const openEditDetails = () => setIsDetailsDialogOpen(true);
+
   return (
     <div className="h-full overflow-hidden flex flex-col">
       {/* Header */}
       <CaseDetailHeader
         case={caseItem}
         onToggleChat={() => setShowChat((v) => !v)}
-        onEditDetails={() => setIsDetailsDialogOpen(true)}
+        sidePanelOpen={sidePanel.open}
+        onToggleSidePanel={sidePanel.toggle}
+        onEditDetails={openEditDetails}
       />
 
-      {/* Main Content — a real flex row, not an overlay: the chat panel is a
-          persistent sibling column with its own height from this flex
-          container, so it never depends on position:fixed/sticky (and the
-          containing-block bugs that come with those) to stay put while the
-          left column scrolls. Below `lg`, there's no room for a 3-column
-          layout at all, so Case Bot instead renders as a fixed full-screen
-          overlay (see its wrapper below) and this row is effectively just
-          the single main column. */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        {/* Left/Main Section — @container so CaseOverview/CourtTrackingCard
-            can key their internal grids off the ACTUAL space this column
-            has (which shrinks a lot once Case Bot + History are open), not
-            the viewport's width. min-w only enforced at lg+: below that,
-            this is the sole column and always full-width. */}
-        <div className="flex-1 overflow-y-auto min-w-0 lg:min-w-[400px]">
-          <div className="@container max-w-[900px] mx-auto px-4 sm:px-7 pt-6 pb-[var(--mobile-nav-height)] lg:pb-[60px] space-y-5">
+      {/* Below 1100px this is one scrolling page (main column, then the
+          rail). From 1100px it is two columns that scroll on their own, so
+          the rail starts under the header and stays put while the main
+          column scrolls. Each column is a @container: cards size their
+          inner grids off the width they are actually given. */}
+      <div className="flex-1 min-h-0 overflow-y-auto pb-[var(--mobile-nav-height)] lg:pb-10 min-[1100px]:flex min-[1100px]:overflow-hidden min-[1100px]:pb-0">
+        <div className="@container min-w-0 min-[1100px]:flex-1 min-[1100px]:overflow-y-auto min-[1100px]:pb-[60px]">
+          <div className="px-4 sm:px-7 pt-6 pb-6 min-[1100px]:pb-0 space-y-5">
             {/* The case looks disposed of: offer to close it (never
                 automatic). */}
             <DisposalBanner caseItem={caseItem} />
 
-            {/* Order Overview -- the AI summary of the most recent
-                order, deliberately above Case Overview: it is the
-                "what just happened" the advocate opened the page for. */}
+            {/* Order Overview -- the AI summary of the most recent order,
+                the "what just happened" the advocate opened the page for. */}
             <OrderOverviewCard
               orders={courtOrders}
               currentNextHearing={caseItem.next_hearing_date}
@@ -217,62 +236,12 @@ export default function CaseDetailPage() {
               viewingOrderId={viewOrder.isPending ? viewOrder.variables : undefined}
             />
 
-            {/* Tasks & deadlines -- what the advocate has to do next,
-                right under what just happened. */}
-            <TasksCard
-              caseId={caseId}
-              courtType={caseItem.court_type}
-              latestOrder={latestDatedOrder}
-            />
-
-            {/* Calendar -- this case's hearings, deadlines (including the
-                ones read from orders) and the advocate's own events. */}
-            <CaseCalendarCard
-              caseId={caseId}
-              hearings={hearings}
-              partyRole={caseItem.user_party_role}
-              onEditDetails={() => setIsDetailsDialogOpen(true)}
-            />
-
             {/* Client emails drafted from the latest order / hearing date,
                 waiting for review. Renders nothing when there are none. */}
             <CaseClientUpdatesCard caseId={caseId} />
-            <UpdateRecipientsNote
-              caseItem={caseItem}
-              onEditDetails={() => setIsDetailsDialogOpen(true)}
-            />
+            <UpdateRecipientsNote caseItem={caseItem} onEditDetails={openEditDetails} />
 
-            {/* Case Overview */}
-            <CaseOverview case={caseItem} onEditDetails={() => setIsDetailsDialogOpen(true)} />
-
-            {/* Appearance fee position -- renders nothing until the case
-                has at least one fee recorded. */}
-            <CaseFeeSummaryCard summary={caseItem.fee_summary} />
-
-            {/* Court Tracking */}
-            <CourtTrackingCard caseItem={caseItem} hearings={hearings} />
-
-            {/* Order check status -- so an empty documents list is never
-                a silent zero: "none on the portal" vs "check failed". */}
-            <OrderSyncStatusLine caseItem={caseItem} />
-
-            {/* Case Documents */}
-            <RecentDocumentsCard
-              documents={documents}
-              isLoading={docsLoading}
-              onUploadClick={() => setIsUploadDialogOpen(true)}
-              onGenerateClick={() => setIsGenerateDialogOpen(true)}
-              onProcess={handleProcessDocument}
-              onDelete={handleDeleteDocument}
-              onView={handleViewDocument}
-              isProcessPending={processDocument.isPending}
-              processingDocId={processDocument.variables}
-              isDeletePending={deleteDocument.isPending}
-              isViewPending={viewDocument.isPending}
-              viewingDocId={viewDocument.variables}
-            />
-
-            {/* Hearings */}
+            {/* Hearings & Orders */}
             <HearingsList
               caseId={caseId}
               hearings={hearings}
@@ -285,35 +254,94 @@ export default function CaseDetailPage() {
               onViewOrder={handleViewOrder}
               viewingOrderId={viewOrder.isPending ? viewOrder.variables : undefined}
             />
+
+            {/* Calendar -- this case's hearings, deadlines (including the
+                ones read from orders) and the advocate's own events. */}
+            <CaseCalendarCard
+              caseId={caseId}
+              hearings={hearings}
+              partyRole={caseItem.user_party_role}
+              onEditDetails={openEditDetails}
+            />
+
+            {/* Court Tracking */}
+            <CourtTrackingCard caseItem={caseItem} hearings={hearings} />
           </div>
         </div>
 
-        {/* Right Chat Panel — a persistent flex sibling at lg+ (flexes
-            between a 380px floor and a 720px cap, sharing space fairly with
-            the main column instead of rigidly claiming 720px and squeezing
-            main content to nothing). Below `lg` there's no space to share at
-            all, so it becomes a fixed full-screen overlay instead.
+        {sidePanel.open && (
+          <aside
+            aria-label="Case side panel"
+            className={cn(
+              "@container min-w-0 px-4 sm:px-7 pb-6 space-y-5",
+              "min-[1100px]:w-[400px] min-[1100px]:flex-shrink-0 min-[1100px]:overflow-y-auto",
+              "min-[1100px]:border-l min-[1100px]:border-gray-100 min-[1100px]:px-5 min-[1100px]:pt-6",
+            )}
+          >
+            <NextHearingCard hearings={hearings} />
 
-            The min-width jumps from 380 to 630 (380 + History's 250) at the
-            same min-[1300px] breakpoint where ChatPanel's History rail
-            switches itself on -- otherwise the outer flex split has no idea
-            History is about to eat 250px from *inside* this column, and
-            starves the actual chat thread down to a sliver. */}
-        {showChat && isDesktop && (
-          <div className="flex-1 min-w-[380px] max-w-[720px] min-[1300px]:min-w-[630px] min-h-0 animate-slide-in-right motion-reduce:animate-none">
-            <ChatPanel caseId={caseId} onClose={() => setShowChat(false)} className="h-full" />
-          </div>
+            <TasksCard
+              caseId={caseId}
+              courtType={caseItem.court_type}
+              latestOrder={latestDatedOrder}
+            />
+
+            <CaseOverview case={caseItem} onEditDetails={openEditDetails} />
+
+            {/* Order check status -- so an empty documents list is never
+                a silent zero: "none on the portal" vs "check failed". */}
+            <OrderSyncStatusLine caseItem={caseItem} />
+
+            <RecentDocumentsCard
+              documents={documents}
+              isLoading={docsLoading}
+              onUploadClick={() => setIsUploadDialogOpen(true)}
+              onGenerateClick={() => setIsGenerateDialogOpen(true)}
+              onProcess={handleProcessDocument}
+              onDelete={handleDeleteDocument}
+              onView={openDocument}
+              isProcessPending={processDocument.isPending}
+              processingDocId={processDocument.variables}
+              isDeletePending={deleteDocument.isPending}
+            />
+
+            <CaseFeesCard caseId={caseId} summary={caseItem.fee_summary} hearings={hearings} />
+
+            <ClientContactsCard contacts={caseItem.client_contacts} onEditDetails={openEditDetails} />
+          </aside>
         )}
-        {showChat &&
-          !isDesktop &&
-          typeof document !== "undefined" &&
-          createPortal(
-            <div className="fixed inset-0 z-40 bg-white animate-slide-in-right motion-reduce:animate-none">
-              <ChatPanel caseId={caseId} onClose={() => setShowChat(false)} className="h-full" />
-            </div>,
-            document.body,
-          )}
       </div>
+
+      {/* Case Bot -- a slide-over from the right at every width. Portaled to
+          document.body: (dashboard)/template.tsx's page-transition wrapper
+          uses `transform`, which per spec makes it the containing block for
+          fixed descendants and would shrink "fixed inset-y-0" to that
+          wrapper's box (leaving the Header and bottom MobileNav poking out
+          around it). */}
+      {showChat &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div className="fixed inset-y-0 right-0 z-40 w-full sm:w-[min(680px,100vw)] bg-white shadow-2xl animate-slide-in-right motion-reduce:animate-none">
+            <ChatPanel
+              caseId={caseId}
+              onClose={() => setShowChat(false)}
+              onOpenCitation={handleOpenCitation}
+              className="h-full"
+            />
+          </div>,
+          document.body,
+        )}
+
+      {viewerDocId !== null && !docsLoading && (
+        <DocumentViewer
+          caseId={caseId}
+          documentId={viewerDocId}
+          documents={documents}
+          orders={courtOrders}
+          onSelectDocument={switchDocument}
+          onClose={closeViewer}
+        />
+      )}
 
       {/* Upload Document Dialog */}
       <UploadDocumentDialog

@@ -160,11 +160,33 @@ describe("CaseCalendarCard", () => {
     await waitFor(() => expect(day).toHaveAccessibleName(/1 hearing, 1 event, 1 deadline/));
     await user.click(day);
 
-    expect(screen.getByText("Friday, November 6")).toBeInTheDocument();
-    expect(screen.getByText("FOR ADMISSION")).toBeInTheDocument();
-    expect(screen.getByText("Mediation sitting")).toBeInTheDocument();
-    expect(screen.getByText("3:00 PM – 4:30 PM")).toBeInTheDocument();
-    expect(screen.getByText("File counter affidavit")).toBeInTheDocument();
+    // The day's own panel; the grid cell also names its first items.
+    const panel = within(screen.getByRole("region", { name: "Friday, November 6" }));
+    expect(panel.getByText("Friday, November 6")).toBeInTheDocument();
+    expect(panel.getByText("FOR ADMISSION")).toBeInTheDocument();
+    expect(panel.getByText("Mediation sitting")).toBeInTheDocument();
+    expect(panel.getByText("3:00 PM – 4:30 PM")).toBeInTheDocument();
+    expect(panel.getByText("File counter affidavit")).toBeInTheDocument();
+  });
+
+  it("names a day's first two items in its cell and counts the rest as '+n more'", async () => {
+    const user = userEvent.setup();
+    renderCard();
+
+    const day = await dayButton();
+    await waitFor(() => expect(day).toHaveAccessibleName(/1 hearing, 1 event, 1 deadline/));
+    // Three items on the 6th: the hearing and the event are named, the
+    // deadline is behind "+1 more".
+    expect(within(day).getByText("Other")).toBeInTheDocument();
+    expect(within(day).getByText("Mediation sitting")).toBeInTheDocument();
+    expect(within(day).queryByText("File counter affidavit")).not.toBeInTheDocument();
+
+    // "+1 more" opens the expanded view on that day, with the deadline listed.
+    await user.click(screen.getByRole("button", { name: "1 more on Friday 6 November" }));
+    const dialog = await screen.findByRole("dialog", { name: "Calendar" });
+    const panel = within(within(dialog).getByRole("region", { name: "Friday, November 6" }));
+    expect(panel.getByText("File counter affidavit")).toBeInTheDocument();
+    expect(panel.getByText("Mediation sitting")).toBeInTheDocument();
   });
 
   it("shows how an order deadline's date was arrived at, and that it is a suggestion", async () => {

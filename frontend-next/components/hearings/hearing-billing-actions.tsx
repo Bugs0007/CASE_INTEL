@@ -22,7 +22,7 @@ import type { BookingType, FeeCategory, Hearing, NestedAppearanceFee } from "@/t
 
 /** What each kind of charge is called in the picker, in the order it is
  * offered. Mirrors AppearanceFee.CATEGORY_CHOICES on the server. */
-const CATEGORY_OPTIONS: { value: FeeCategory; label: string }[] = [
+export const CATEGORY_OPTIONS: { value: FeeCategory; label: string }[] = [
   { value: "appearance", label: "Appearance Fee" },
   { value: "hotel", label: "Hotel" },
   { value: "flight", label: "Flight" },
@@ -34,7 +34,7 @@ const CATEGORY_OPTIONS: { value: FeeCategory; label: string }[] = [
  * failure. The lifecycle endpoints answer {detail: "..."} on 4xx; a
  * rejected form field (say a malformed amount) answers {field: ["..."]},
  * so fall back to the first of those before giving up. */
-function errorDetail(error: unknown, fallback: string): string {
+export function errorDetail(error: unknown, fallback: string): string {
   if (error instanceof APIError && error.data && typeof error.data === "object") {
     const body = error.data as Record<string, unknown>;
     if (typeof body.detail === "string" && body.detail) return body.detail;
@@ -278,7 +278,7 @@ interface ChargeRowProps {
  * Its own component, so every row owns its own mutations: generating the
  * hotel invoice shows a spinner on the hotel row only, and never disables
  * the appearance fee's buttons next to it. */
-function ChargeRow({ fee, caseId, canSend }: ChargeRowProps) {
+export function ChargeRow({ fee, caseId, canSend }: ChargeRowProps) {
   const generateInvoice = useGenerateInvoice(caseId);
   const sendInvoice = useSendInvoice(caseId);
   const markPaid = useMarkPaid(caseId);
