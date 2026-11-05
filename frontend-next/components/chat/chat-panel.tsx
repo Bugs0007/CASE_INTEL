@@ -30,6 +30,13 @@ interface ChatPanelProps {
   caseId: number;
   className?: string;
   onClose?: () => void;
+  /** Docked in a narrow column (the document viewer) rather than filling a
+   * slide-over: no persistent History rail -- History is the same
+   * full-width swap the phone layout uses. */
+  compact?: boolean;
+  /** A source was clicked: the citation under "Sources", or an inline
+   * [Doc N] marker that could be matched to one. */
+  onOpenCitation?: (citation: Citation) => void;
 }
 
 interface PendingChatRequest {
@@ -61,7 +68,13 @@ function extractErrorMessage(error: unknown): string {
   return "Something went wrong while contacting the server.";
 }
 
-export function ChatPanel({ caseId, className, onClose }: ChatPanelProps) {
+export function ChatPanel({
+  caseId,
+  className,
+  onClose,
+  compact = false,
+  onOpenCitation,
+}: ChatPanelProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
@@ -290,10 +303,11 @@ export function ChatPanel({ caseId, className, onClose }: ChatPanelProps) {
     >
       <aside
         className={cn(
-          "w-full shrink-0 flex-col border-r border-gray-200 bg-gray-50 lg:w-[250px]",
+          "w-full shrink-0 flex-col border-r border-gray-200 bg-gray-50",
           "hidden",
-          mobileHistoryView && "max-lg:flex",
-          "min-[1300px]:flex",
+          compact
+            ? mobileHistoryView && "flex"
+            : ["lg:w-[250px]", mobileHistoryView && "max-lg:flex", "min-[1300px]:flex"],
         )}
       >
         <div className="border-b border-gray-200 px-4 py-4">
@@ -302,11 +316,14 @@ export function ChatPanel({ caseId, className, onClose }: ChatPanelProps) {
               type="button"
               onClick={() => setMobileHistoryView(false)}
               aria-label="Back to chat"
-              className="-ml-1 flex h-11 w-11 items-center justify-center text-gray-500 lg:hidden"
+              className={cn(
+                "-ml-1 flex h-11 w-11 items-center justify-center text-gray-500",
+                !compact && "lg:hidden",
+              )}
             >
               <ChevronLeft className="h-5 w-5" />
             </button>
-            <History className="hidden h-4 w-4 text-gray-500 lg:block" />
+            {!compact && <History className="hidden h-4 w-4 text-gray-500 lg:block" />}
             <h3 className="text-sm font-semibold text-gray-900">History</h3>
           </div>
           <Button
@@ -366,7 +383,12 @@ export function ChatPanel({ caseId, className, onClose }: ChatPanelProps) {
         </div>
       </aside>
 
-      <div className={cn("flex min-w-0 flex-1 flex-col", mobileHistoryView && "max-lg:hidden")}>
+      <div
+        className={cn(
+          "flex min-w-0 flex-1 flex-col",
+          mobileHistoryView && (compact ? "hidden" : "max-lg:hidden"),
+        )}
+      >
         <div className="border-b border-gray-200 bg-white px-4 py-4">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="min-w-0">
@@ -392,7 +414,7 @@ export function ChatPanel({ caseId, className, onClose }: ChatPanelProps) {
               <Button
                 variant="secondary"
                 size="sm"
-                className="lg:hidden w-11 flex-shrink-0"
+                className={cn("w-11 flex-shrink-0", !compact && "lg:hidden")}
                 onClick={() => setMobileHistoryView(true)}
                 aria-label="View conversation history"
               >
@@ -401,13 +423,13 @@ export function ChatPanel({ caseId, className, onClose }: ChatPanelProps) {
               <Button
                 variant="secondary"
                 size="sm"
-                className="lg:hidden"
+                className={cn(!compact && "lg:hidden")}
                 onClick={startNewChat}
               >
                 <Plus className="h-4 w-4" />
                 New Chat
               </Button>
-              <div className="hidden items-center gap-2 sm:flex">
+              <div className={cn("hidden items-center gap-2", !compact && "sm:flex")}>
                 <Select
                   value={exportFormat}
                   onChange={(e) =>
@@ -442,7 +464,7 @@ export function ChatPanel({ caseId, className, onClose }: ChatPanelProps) {
               <Button
                 variant="secondary"
                 size="sm"
-                className="sm:hidden w-11 flex-shrink-0"
+                className={cn("w-11 flex-shrink-0", !compact && "sm:hidden")}
                 onClick={() => void handleExport()}
                 disabled={!activeConversationId || isExporting}
                 aria-label="Export conversation"
@@ -501,7 +523,7 @@ export function ChatPanel({ caseId, className, onClose }: ChatPanelProps) {
           ) : (
             <div className="space-y-4">
               {messages.map((message) => (
-                <MessageItem key={message.id} message={message} />
+                <MessageItem key={message.id} message={message} onOpenCitation={onOpenCitation} />
               ))}
               {isSending && <TypingIndicator elapsedSeconds={elapsedSeconds} />}
             </div>
@@ -557,14 +579,44 @@ export function ChatPanel({ caseId, className, onClose }: ChatPanelProps) {
 
 interface MessageItemProps {
   message: Message;
+  onOpenCitation?: (citation: Citation) => void;
 }
 
-function MessageItem({ message }: MessageItemProps) {
+const DOC_MARKER_RE = /\[Doc(?:ument)?\s+(\d+)\]/gi;
+
+/** Which citation each inline [Doc N] marker stands for.
+ *
+ * N is the position of the passage among those retrieved for the question,
+ * which the API does not send -- only the citations that were actually
+ * cited, in the order their markers first appear. So a marker can be matched
+ * to its citation only when every distinct marker produced exactly one
+ * citation (equal counts). If the counts differ, some marker was dropped
+ * server-side (a number out of range, or two markers for one passage) and
+ * the rest can no longer be told apart: nothing is linked rather than risk
+ * opening the wrong document. The "Sources" list below the answer is always
+ * exact. */
+export function matchDocMarkers(content: string, citations: Citation[]): Map<number, Citation> {
+  const distinct: number[] = [];
+  for (const match of content.matchAll(DOC_MARKER_RE)) {
+    const n = Number(match[1]);
+    if (!distinct.includes(n)) distinct.push(n);
+  }
+  const matched = new Map<number, Citation>();
+  if (distinct.length === 0 || distinct.length !== citations.length) return matched;
+  distinct.forEach((n, i) => matched.set(n, citations[i]));
+  return matched;
+}
+
+function MessageItem({ message, onOpenCitation }: MessageItemProps) {
   const isUser = message.role === "user";
   const displayContent =
     message.citations && message.citations.length > 0
       ? stripEmbeddedSources(message.content)
       : message.content;
+  const markerCitations =
+    onOpenCitation && message.citations
+      ? matchDocMarkers(displayContent, message.citations)
+      : undefined;
 
   return (
     <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
@@ -576,7 +628,11 @@ function MessageItem({ message }: MessageItemProps) {
             : "border border-gray-200 bg-white text-gray-900",
         )}
       >
-        <RenderedMessageContent content={displayContent} />
+        <RenderedMessageContent
+          content={displayContent}
+          markerCitations={markerCitations}
+          onOpenCitation={onOpenCitation}
+        />
 
         {message.citations && message.citations.length > 0 && (
           <div className="mt-4 border-t border-gray-100 pt-3">
@@ -585,7 +641,11 @@ function MessageItem({ message }: MessageItemProps) {
             </div>
             <div className="space-y-1">
               {message.citations.map((citation) => (
-                <CitationBadge key={citation.id} citation={citation} />
+                <CitationBadge
+                  key={citation.id}
+                  citation={citation}
+                  onOpen={onOpenCitation}
+                />
               ))}
             </div>
           </div>
@@ -604,12 +664,26 @@ function MessageItem({ message }: MessageItemProps) {
   );
 }
 
-function CitationBadge({ citation }: { citation: Citation }) {
+function CitationBadge({
+  citation,
+  onOpen,
+}: {
+  citation: Citation;
+  onOpen?: (citation: Citation) => void;
+}) {
+  const label = citation.citation_text || `${citation.source_type} ${citation.document_id}`;
+  if (!onOpen || citation.document_id === null) {
+    return <div className="rounded-lg border bg-gray-100 px-2 py-1 text-xs text-gray-700">{label}</div>;
+  }
   return (
-    <div className="rounded-lg border bg-gray-100 px-2 py-1 text-xs text-gray-700">
-      {citation.citation_text ||
-        `${citation.source_type} ${citation.document_id}`}
-    </div>
+    <button
+      type="button"
+      onClick={() => onOpen(citation)}
+      title="Open this document"
+      className="block w-full rounded-lg border bg-gray-100 px-2 py-1 text-left text-xs text-gray-700 hover:border-gray-300 hover:bg-gray-200"
+    >
+      {label}
+    </button>
   );
 }
 
@@ -633,7 +707,16 @@ function TypingIndicator({ elapsedSeconds }: { elapsedSeconds: number }) {
   );
 }
 
-function RenderedMessageContent({ content }: { content: string }) {
+function RenderedMessageContent({
+  content,
+  markerCitations,
+  onOpenCitation,
+}: {
+  content: string;
+  markerCitations?: Map<number, Citation>;
+  onOpenCitation?: (citation: Citation) => void;
+}) {
+  const inline = (text: string) => renderInlineFormatting(text, markerCitations, onOpenCitation);
   const blocks = content.replace(/\r\n/g, "\n").split(/\n{2,}/).filter(Boolean);
 
   if (blocks.length === 0) {
@@ -651,7 +734,7 @@ function RenderedMessageContent({ content }: { content: string }) {
             <ul key={`${block}-${index}`} className="list-disc space-y-1 pl-5">
               {lines.map((line, lineIndex) => (
                 <li key={`${line}-${lineIndex}`}>
-                  {renderInlineFormatting(line.replace(/^[-*]\s+/, ""))}
+                  {inline(line.replace(/^[-*]\s+/, ""))}
                 </li>
               ))}
             </ul>
@@ -660,7 +743,7 @@ function RenderedMessageContent({ content }: { content: string }) {
 
         return (
           <p key={`${block}-${index}`} className="whitespace-pre-wrap">
-            {renderInlineFormatting(block)}
+            {inline(block)}
           </p>
         );
       })}
@@ -668,11 +751,30 @@ function RenderedMessageContent({ content }: { content: string }) {
   );
 }
 
-function renderInlineFormatting(text: string) {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
+function renderInlineFormatting(
+  text: string,
+  markerCitations?: Map<number, Citation>,
+  onOpenCitation?: (citation: Citation) => void,
+) {
+  const parts = text.split(/(\*\*[^*]+\*\*|\[Doc(?:ument)?\s+\d+\])/gi).filter(Boolean);
   return parts.map((part, index) => {
     if (part.startsWith("**") && part.endsWith("**")) {
       return <strong key={`${part}-${index}`}>{part.slice(2, -2)}</strong>;
+    }
+    const marker = /^\[Doc(?:ument)?\s+(\d+)\]$/i.exec(part);
+    const citation = marker ? markerCitations?.get(Number(marker[1])) : undefined;
+    if (citation && onOpenCitation && citation.document_id !== null) {
+      return (
+        <button
+          key={`${part}-${index}`}
+          type="button"
+          onClick={() => onOpenCitation(citation)}
+          title="Open this source"
+          className="font-medium text-accent underline underline-offset-2 hover:text-gray-900"
+        >
+          {part}
+        </button>
+      );
     }
     return <span key={`${part}-${index}`}>{part}</span>;
   });
