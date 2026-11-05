@@ -12,7 +12,7 @@ import {
   useStartRefreshAll,
 } from "@/hooks/use-clients";
 import { APIError, apiErrorDetail } from "@/lib/api/client";
-import { formatRelativeTime } from "@/lib/utils";
+import { cn, formatRelativeTime } from "@/lib/utils";
 import type { RefreshRun } from "@/types";
 
 function summary(run: RefreshRun): string {
@@ -49,7 +49,7 @@ export function lastRunLine(run: RefreshRun): string {
  * fetched in the last hour are skipped (the per-case limit still holds),
  * and only one refresh can run on the server at a time. Picks a running
  * refresh back up after a page reload. */
-export function RefreshAllButton() {
+export function RefreshAllButton({ compact = false }: { compact?: boolean }) {
   const [jobId, setJobId] = useState<number | null>(null);
   const latest = useLatestRefreshRun();
   const run = useRefreshRun(jobId);
@@ -114,9 +114,9 @@ export function RefreshAllButton() {
   const lastRun = [current, latestRun].find((r): r is RefreshRun => !!r && !isRunActive(r)) ?? null;
 
   return (
-    <div className="mb-5 flex flex-wrap items-center gap-3">
+    <div className={cn("flex flex-wrap items-center gap-3", !compact && "mb-5")}>
       {active && current ? (
-        <div className="flex flex-1 min-w-[240px] items-center gap-3">
+        <div className={cn("flex min-w-[240px] items-center gap-3", compact ? "w-[320px] max-w-full" : "flex-1")}>
           <Loader2 className="h-4 w-4 animate-spin text-gray-500 flex-shrink-0" />
           <div className="flex-1">
             <div className="flex justify-between text-xs text-gray-600 mb-1">
@@ -145,15 +145,23 @@ export function RefreshAllButton() {
         </div>
       ) : (
         <>
-          <Button variant="secondary" size="sm" onClick={handleStart} disabled={start.isPending}>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleStart}
+            disabled={start.isPending}
+            title="Checks eCourts for every open tracked case, one at a time. Cases checked in the last hour are skipped."
+          >
             {start.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
             Refresh all tracked cases
           </Button>
-          <span className="text-xs text-gray-500">
-            Checks eCourts for every open tracked case, one at a time. Cases checked in the last hour are skipped.
-          </span>
+          {!compact && (
+            <span className="text-xs text-gray-500">
+              Checks eCourts for every open tracked case, one at a time. Cases checked in the last hour are skipped.
+            </span>
+          )}
           {lastRun && (
-            <span className="basis-full text-xs text-gray-600" data-testid="refresh-last-run">
+            <span className={cn("text-xs text-gray-600", !compact && "basis-full")} data-testid="refresh-last-run">
               {lastRunLine(lastRun)}
             </span>
           )}
