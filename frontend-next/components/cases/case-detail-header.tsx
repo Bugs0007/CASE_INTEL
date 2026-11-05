@@ -1,13 +1,16 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, PriorityBadge } from "@/components/ui/badge";
-import { Bot, Calendar, ChevronLeft, Pencil } from "lucide-react";
+import { Bot, Calendar, ChevronLeft, PanelRight, Pencil } from "lucide-react";
 import { hasPlaceholderTitle } from "@/lib/utils";
 import type { Case } from "@/types";
 
 interface CaseDetailHeaderProps {
   case: Case;
   onToggleChat?: () => void;
+  /** Shows or hides the side rail; the choice is the page's to remember. */
+  sidePanelOpen?: boolean;
+  onToggleSidePanel?: () => void;
   /** Opens Edit Details -- offered when the case has no real title yet. */
   onEditDetails?: () => void;
 }
@@ -15,6 +18,8 @@ interface CaseDetailHeaderProps {
 export function CaseDetailHeader({
   case: caseItem,
   onToggleChat,
+  sidePanelOpen = true,
+  onToggleSidePanel,
   onEditDetails,
 }: CaseDetailHeaderProps) {
   const untitled = hasPlaceholderTitle(caseItem);
@@ -42,6 +47,19 @@ export function CaseDetailHeader({
           </span>
         </div>
         <div className="flex items-center gap-2.5">
+          {onToggleSidePanel && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onToggleSidePanel}
+              aria-pressed={sidePanelOpen}
+              aria-label="Side panel"
+              title={sidePanelOpen ? "Hide the side panel" : "Show the side panel"}
+            >
+              <PanelRight className="h-4 w-4" />
+              <span className="hidden sm:inline">Side panel</span>
+            </Button>
+          )}
           <Button variant="primary" size="sm" onClick={onToggleChat}>
             <Bot className="h-4 w-4" />
             Case Bot

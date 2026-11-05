@@ -21,60 +21,36 @@ export function CaseDetailSkeleton() {
         <Skeleton className="h-7 w-2/5" />
       </div>
 
-      <div className="flex-1 overflow-y-auto min-w-0">
-        <div className="max-w-[900px] mx-auto px-7 pt-6 pb-[60px] space-y-5">
-          {/* Case Overview */}
-          <Card>
-            <CardHeader>
-              <Skeleton className="h-5 w-32" />
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="space-y-2">
-                    <Skeleton className="h-3 w-24" />
-                    <Skeleton className="h-4 w-32" />
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+      <div className="flex-1 min-h-0 overflow-y-auto min-[1100px]:flex min-[1100px]:overflow-hidden">
+        {/* Main column: Order Overview, Hearings & Orders, Calendar */}
+        <div className="min-w-0 min-[1100px]:flex-1 min-[1100px]:overflow-y-auto">
+          <div className="px-4 sm:px-7 pt-6 pb-6 space-y-5">
+            {["h-36", "h-28", "h-32"].map((height, i) => (
+              <Card key={i}>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <Skeleton className="h-5 w-40" />
+                  <Skeleton className="h-9 w-32 rounded-lg" />
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Skeleton className={`w-full rounded-lg ${height}`} />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
 
-          {/* Court Tracking */}
-          <Card>
-            <CardHeader>
-              <Skeleton className="h-5 w-36" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-24 w-full rounded-lg" />
-            </CardContent>
-          </Card>
-
-          {/* Case Documents */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <Skeleton className="h-5 w-40" />
-              <Skeleton className="h-9 w-40 rounded-lg" />
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-14 w-full rounded-lg" />
-              ))}
-            </CardContent>
-          </Card>
-
-          {/* Hearings */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <Skeleton className="h-5 w-40" />
-              <Skeleton className="h-9 w-32 rounded-lg" />
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {Array.from({ length: 2 }).map((_, i) => (
-                <Skeleton key={i} className="h-20 w-full rounded-lg" />
-              ))}
-            </CardContent>
-          </Card>
+        {/* Side rail: Next hearing, Tasks, Case details, Documents, Fees, Contacts */}
+        <div className="px-4 sm:px-7 pb-6 space-y-5 min-[1100px]:w-[400px] min-[1100px]:flex-shrink-0 min-[1100px]:overflow-y-auto min-[1100px]:border-l min-[1100px]:border-gray-100 min-[1100px]:px-5 min-[1100px]:pt-6">
+          {["h-20", "h-24", "h-36", "h-24", "h-20", "h-16"].map((height, i) => (
+            <Card key={i}>
+              <CardHeader>
+                <Skeleton className="h-5 w-36" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className={`w-full rounded-lg ${height}`} />
+              </CardContent>
+            </Card>
+          ))}
         </div>
       </div>
     </div>

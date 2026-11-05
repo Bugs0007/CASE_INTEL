@@ -2,20 +2,15 @@
 
 import { useState, type FormEvent } from "react";
 import { CheckCircle2, Circle, ListChecks, Plus, RotateCcw, Scale, Trash2, X } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ExpandableCard } from "@/components/ui/expandable-card";
 import { Input } from "@/components/ui/input";
 import { showToast } from "@/components/ui/toaster";
 import { LimitationDeadlineForm } from "@/components/tasks/limitation-deadline-form";
 import { useCreateTask, useDeleteTask, useTasks, useUpdateTask } from "@/hooks/use-tasks";
+import { expandedTasks, matchesQuery, previewTasks } from "@/lib/case-previews";
 import { formatHearingDate } from "@/lib/utils";
-import {
-  DUE_DATE_BASIS_NOTE,
-  daysUntilDate,
-  dueChipVariant,
-  dueLabel,
-  isOpenTask,
-} from "@/lib/tasks";
+import { DUE_DATE_BASIS_NOTE, daysUntilDate, dueChipVariant, dueLabel } from "@/lib/tasks";
 import type { CourtType, Task, TaskInput } from "@/types";
 
 interface TasksCardProps {
@@ -28,7 +23,11 @@ interface TasksCardProps {
 }
 
 /** Everything due on this case: the advocate's own tasks, directions from
- * court orders, and limitation deadlines -- one list, soonest first.
+ * court orders, and limitation deadlines.
+ *
+ * The card shows the three that need attention first (overdue, then soonest
+ * due); the expanded view lists every open task and, below them, the
+ * completed and dismissed ones.
  *
  * Always rendered (unlike the fee card), because it is also where a
  * manual task is added. */
@@ -42,10 +41,9 @@ export function TasksCard({ caseId, courtType, latestOrder }: TasksCardProps) {
   const [isAddingLimitation, setIsAddingLimitation] = useState(false);
   const [title, setTitle] = useState("");
   const [dueDate, setDueDate] = useState("");
-  const [showClosed, setShowClosed] = useState(false);
 
-  const openTasks = tasks.filter(isOpenTask);
-  const closedTasks = tasks.filter((task) => !isOpenTask(task));
+  const { open: openTasks, closed: closedTasks } = expandedTasks(tasks);
+  const previewed = previewTasks(tasks);
 
   const busyId =
     (updateTask.isPending ? updateTask.variables?.id : undefined) ??
@@ -94,135 +92,147 @@ export function TasksCard({ caseId, courtType, latestOrder }: TasksCardProps) {
     });
   }
 
+  const actions =
+    !isAdding && !isAddingLimitation ? (
+      <>
+        <Button variant="secondary" size="sm" onClick={() => setIsAddingLimitation(true)}>
+          <Scale className="h-4 w-4 mr-1" />
+          Limitation
+        </Button>
+        <Button variant="secondary" size="sm" onClick={() => setIsAdding(true)}>
+          <Plus className="h-4 w-4 mr-1" />
+          Add task
+        </Button>
+      </>
+    ) : null;
+
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
-        <CardTitle className="flex items-center gap-2">
-          <ListChecks className="h-4 w-4" />
-          Tasks &amp; Deadlines
-          {openTasks.length > 0 && (
-            <span className="ci-chip ci-chip--none">{openTasks.length} open</span>
-          )}
-        </CardTitle>
-        {!isAdding && !isAddingLimitation && (
-          <div className="flex gap-2">
-            <Button variant="secondary" size="sm" onClick={() => setIsAddingLimitation(true)}>
-              <Scale className="h-4 w-4 mr-1" />
-              Limitation
-            </Button>
-            <Button variant="secondary" size="sm" onClick={() => setIsAdding(true)}>
-              <Plus className="h-4 w-4 mr-1" />
-              Add task
-            </Button>
-          </div>
-        )}
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {isAddingLimitation && (
-          <LimitationDeadlineForm
-            caseId={caseId}
-            courtType={courtType}
-            latestOrder={latestOrder}
-            onDone={() => setIsAddingLimitation(false)}
-          />
-        )}
+    <ExpandableCard
+      title="Tasks & Deadlines"
+      icon={<ListChecks className="h-4 w-4" />}
+      titleExtra={
+        openTasks.length > 0 ? (
+          <span className="ci-chip ci-chip--none">{openTasks.length} open</span>
+        ) : null
+      }
+      count={tasks.length}
+      actions={actions}
+      viewAll={{ total: tasks.length, shown: previewed.length }}
+      expandable={tasks.length > 0}
+      bodyClassName="space-y-3"
+    >
+      {({ expanded, isOpen, query }) => {
+        // The add forms live wherever the advocate is looking: on the card,
+        // or in the dialog while it is open.
+        const showForms = expanded === isOpen;
+        const searchTask = (task: Task) =>
+          matchesQuery(query, task.title, task.description, task.source_text, task.kind_display);
+        const visibleOpen = expanded ? openTasks.filter(searchTask) : previewed;
+        const visibleClosed = expanded ? closedTasks.filter(searchTask) : [];
 
-        {isAdding && (
-          <form onSubmit={handleAdd} className="flex flex-col @md:flex-row gap-2">
-            <Input
-              autoFocus
-              aria-label="Task"
-              placeholder="e.g. Collect certified copy of the order"
-              value={title}
-              maxLength={255}
-              onChange={(e) => setTitle(e.target.value)}
-              className="@md:flex-1"
-            />
-            <Input
-              type="date"
-              aria-label="Due date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              className="@md:w-44"
-            />
-            <div className="flex gap-2">
-              <Button type="submit" size="sm" disabled={!title.trim() || createTask.isPending}>
-                Add
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setIsAdding(false);
-                  setTitle("");
-                  setDueDate("");
-                }}
-              >
-                Cancel
-              </Button>
-            </div>
-          </form>
-        )}
-
-        {isLoading ? (
-          <p className="text-sm text-gray-400 py-2">Loading tasks…</p>
-        ) : openTasks.length === 0 ? (
-          !isAdding && (
-            <p className="text-sm text-gray-500 py-2">Nothing due on this case.</p>
-          )
-        ) : (
-          <ul className="divide-y divide-gray-100">
-            {openTasks.map((task) => (
-              <TaskRow
-                key={task.id}
-                task={task}
-                busy={busyId === task.id}
-                onToggle={() => update(task, { status: "completed" })}
-                onConfirm={() => update(task, { needs_review: false })}
-                onRemove={() => remove(task)}
+        return (
+          <>
+            {showForms && isAddingLimitation && (
+              <LimitationDeadlineForm
+                caseId={caseId}
+                courtType={courtType}
+                latestOrder={latestOrder}
+                onDone={() => setIsAddingLimitation(false)}
               />
-            ))}
-          </ul>
-        )}
+            )}
 
-        {closedTasks.length > 0 && (
-          <div>
-            <button
-              type="button"
-              onClick={() => setShowClosed((v) => !v)}
-              className="text-xs text-gray-500 hover:text-gray-900"
-            >
-              {showClosed ? "Hide" : "Show"} {closedTasks.length} completed or dismissed
-            </button>
-            {showClosed && (
-              <ul className="mt-2 divide-y divide-gray-100">
-                {closedTasks.map((task) => (
-                  <li key={task.id} className="flex items-center gap-3 py-2">
-                    <CheckCircle2 className="h-4 w-4 text-gray-300 flex-shrink-0" />
-                    <span className="flex-1 min-w-0 text-sm text-gray-400 line-through truncate">
-                      {task.title}
-                    </span>
-                    <span className="text-xs text-gray-400">
-                      {task.status === "cancelled" ? "Dismissed" : "Done"}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={busyId === task.id}
-                      onClick={() => update(task, { status: "pending" })}
-                      aria-label={`Reopen ${task.title}`}
-                    >
-                      <RotateCcw className="h-3.5 w-3.5" />
-                    </Button>
-                  </li>
+            {showForms && isAdding && (
+              <form onSubmit={handleAdd} className="flex flex-col @md:flex-row gap-2">
+                <Input
+                  autoFocus
+                  aria-label="Task"
+                  placeholder="e.g. Collect certified copy of the order"
+                  value={title}
+                  maxLength={255}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="@md:flex-1"
+                />
+                <Input
+                  type="date"
+                  aria-label="Due date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  className="@md:w-44"
+                />
+                <div className="flex gap-2">
+                  <Button type="submit" size="sm" disabled={!title.trim() || createTask.isPending}>
+                    Add
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setIsAdding(false);
+                      setTitle("");
+                      setDueDate("");
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            )}
+
+            {isLoading ? (
+              <p className="text-sm text-gray-400 py-2">Loading tasks…</p>
+            ) : openTasks.length === 0 ? (
+              !isAdding && <p className="text-sm text-gray-500 py-2">Nothing due on this case.</p>
+            ) : visibleOpen.length === 0 ? (
+              <p className="text-sm text-gray-500 py-2">No open tasks match.</p>
+            ) : (
+              <ul className="divide-y divide-gray-100">
+                {visibleOpen.map((task) => (
+                  <TaskRow
+                    key={task.id}
+                    task={task}
+                    busy={busyId === task.id}
+                    onToggle={() => update(task, { status: "completed" })}
+                    onConfirm={() => update(task, { needs_review: false })}
+                    onRemove={() => remove(task)}
+                  />
                 ))}
               </ul>
             )}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+
+            {visibleClosed.length > 0 && (
+              <div>
+                <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                  Completed or dismissed ({visibleClosed.length})
+                </h4>
+                <ul className="divide-y divide-gray-100">
+                  {visibleClosed.map((task) => (
+                    <li key={task.id} className="flex items-center gap-3 py-2">
+                      <CheckCircle2 className="h-4 w-4 text-gray-300 flex-shrink-0" />
+                      <span className="flex-1 min-w-0 text-sm text-gray-400 line-through truncate">
+                        {task.title}
+                      </span>
+                      <span className="text-xs text-gray-400">
+                        {task.status === "cancelled" ? "Dismissed" : "Done"}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={busyId === task.id}
+                        onClick={() => update(task, { status: "pending" })}
+                        aria-label={`Reopen ${task.title}`}
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
+        );
+      }}
+    </ExpandableCard>
   );
 }
 

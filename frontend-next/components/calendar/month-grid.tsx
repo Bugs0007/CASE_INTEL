@@ -10,6 +10,7 @@ import {
   type CalendarItem,
   type CalendarKind,
 } from "@/lib/calendar";
+import { dayCellSummary } from "@/lib/case-previews";
 import { cn } from "@/lib/utils";
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -94,6 +95,13 @@ export function CalendarLegend({ kinds, onToggle, className }: CalendarLegendPro
   );
 }
 
+/** One line for an item inside a day cell. */
+function cellItemLabel(item: CalendarItem): string {
+  if (item.kind === "hearing") return item.hearing.hearing_type_display || "Hearing";
+  if (item.kind === "task") return item.task.title;
+  return item.event.title;
+}
+
 interface MonthGridProps {
   /** First day of the month on display. */
   cursor: Date;
@@ -102,6 +110,14 @@ interface MonthGridProps {
   selectedKey: string;
   onSelectDay: (key: string) => void;
   itemsByDay: ReadonlyMap<string, CalendarItem[]>;
+  /** "markers" (default): bars and dots per kind -- the global calendar.
+   * "items": each cell names its first items, and a day with more than the
+   * limit ends in "+n more". */
+  cellMode?: "markers" | "items";
+  /** "+n more" was pressed on this day (items mode). */
+  onMoreClick?: (key: string) => void;
+  /** Taller cells, for the large month in the expanded view. */
+  large?: boolean;
 }
 
 /** The month header, previous/next buttons and 7-column day grid -- the part
@@ -113,6 +129,9 @@ export function MonthGrid({
   selectedKey,
   onSelectDay,
   itemsByDay,
+  cellMode = "markers",
+  onMoreClick,
+  large = false,
 }: MonthGridProps) {
   const cells = useMemo(() => {
     const monthStart = startOfMonth(cursor);
@@ -175,6 +194,78 @@ export function MonthGrid({
             const dayKey = dateToDayKey(cell.date);
             const counts = dayMarkerCounts(itemsByDay.get(dayKey));
             const selected = dayKey === selectedKey;
+
+            if (cellMode === "items") {
+              const { visible, hidden } = dayCellSummary(itemsByDay.get(dayKey));
+              const dayName = format(cell.date, "EEEE d MMMM");
+              return (
+                <div
+                  key={dayKey}
+                  className={cn(
+                    "flex flex-col rounded-lg border transition-colors min-w-0",
+                    large ? "min-h-[104px]" : "min-h-[84px]",
+                    selected ? "border-primary bg-gray-100" : "border-transparent hover:bg-gray-50",
+                  )}
+                >
+                  <button
+                    type="button"
+                    onClick={() => onSelectDay(dayKey)}
+                    aria-label={`${dayName}${describeCounts(counts)}`}
+                    aria-pressed={selected}
+                    className="w-full min-w-0 flex-1 rounded-lg px-1 py-1.5 text-left"
+                  >
+                    <div
+                      className={cn(
+                        "mb-1 text-center text-[12px] sm:text-[13px]",
+                        selected ? "font-bold text-primary" : "text-gray-700",
+                      )}
+                    >
+                      {format(cell.date, "d")}
+                    </div>
+                    {visible.length > 0 && (
+                      <ul className="space-y-0.5">
+                        {visible.map((item) => (
+                          <li
+                            key={item.key}
+                            className="hidden items-center gap-1 text-[10px] leading-4 text-gray-700 sm:flex"
+                          >
+                            <KindMarker
+                              kind={item.kind}
+                              className="!h-1.5 flex-shrink-0 !w-2"
+                            />
+                            <span className="truncate">{cellItemLabel(item)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {/* Below `sm` the cell is too narrow for text: markers. */}
+                    {visible.length > 0 && (
+                      <div className="mt-1 flex justify-center gap-[3px] sm:hidden">
+                        {visible.map((item) => (
+                          <KindMarker key={item.key} kind={item.kind} className="!h-1.5 !w-1.5" />
+                        ))}
+                      </div>
+                    )}
+                  </button>
+                  {hidden > 0 &&
+                    (onMoreClick ? (
+                      <button
+                        type="button"
+                        onClick={() => onMoreClick(dayKey)}
+                        aria-label={`${hidden} more on ${dayName}`}
+                        className="px-1 pb-1 text-left text-[10px] font-medium text-gray-600 underline underline-offset-2 hover:text-gray-900"
+                      >
+                        +{hidden} more
+                      </button>
+                    ) : (
+                      <span className="px-1 pb-1 text-[10px] font-medium text-gray-600">
+                        +{hidden} more
+                      </span>
+                    ))}
+                </div>
+              );
+            }
+
             return (
               <button
                 key={dayKey}

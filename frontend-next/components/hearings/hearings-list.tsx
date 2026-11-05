@@ -4,17 +4,18 @@ import { useMemo, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge, StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CollapseToggle } from "@/components/ui/collapse-toggle";
+import { ExpandableCard } from "@/components/ui/expandable-card";
 import { CauseListBadge, CauseListInfo } from "@/components/hearings/cause-list-badge";
 import { HearingBillingActions } from "@/components/hearings/hearing-billing-actions";
 import { HearingDigestDialog } from "@/components/hearings/hearing-digest-dialog";
-import { Collapsible } from "@/components/ui/collapsible";
 import { formatFeeAmount, formatHearingDate, isAwaitingUpdate, staggerDelay } from "@/lib/utils";
+import { matchesQuery, previewHearings, splitHearings } from "@/lib/case-previews";
 import { groupOrdersByDate, hearingDateKey } from "@/hooks/use-court-orders";
 import {
   Calendar,
   ClipboardCheck,
   ClipboardList,
+  Gavel,
   MapPin,
   User,
   Plus,
@@ -32,10 +33,8 @@ import type {
   NestedTravelBooking,
 } from "@/types";
 
-const DEFAULT_VISIBLE_COUNT = 5;
-// Past hearings can run into the hundreds on a long-running case, so
-// "show all" incrementally loads a page at a time instead of mounting
-// every row at once.
+// Past hearings can run into the hundreds on a long-running case, so the
+// expanded view loads a page at a time instead of mounting every row at once.
 const PAST_PAGE_SIZE = 25;
 
 interface HearingsListProps {
@@ -53,6 +52,21 @@ interface HearingsListProps {
   viewingOrderId?: number;
 }
 
+/** The text a hearing is searched by in the expanded view. */
+function hearingSearchText(hearing: Hearing): (string | null | undefined)[] {
+  return [
+    formatHearingDate(hearing.hearing_date),
+    hearing.hearing_type_display,
+    hearing.status_display,
+    hearing.location,
+    hearing.judge,
+    hearing.purpose,
+    hearing.notes,
+    hearing.outcome,
+    ...(hearing.appearance_fees ?? []).map((fee) => fee.category_display),
+  ];
+}
+
 export function HearingsList({
   caseId,
   hearings,
@@ -66,37 +80,14 @@ export function HearingsList({
   viewingOrderId,
 }: HearingsListProps) {
   const ordersByDate = useMemo(() => groupOrdersByDate(orders), [orders]);
-  const [sectionOpen, setSectionOpen] = useState(true);
-  const [upcomingShowAll, setUpcomingShowAll] = useState(false);
-  // Past hearings grow unbounded over a long case and are rarely what the
-  // user opened the page to see, so this subsection defaults collapsed.
-  const [pastOpen, setPastOpen] = useState(false);
-  // Collapsible keeps its children mounted while closed, so the past rows
-  // would render on every page load even though nobody opened them. Mount
-  // them the first time the section opens, then keep them (so closing it
-  // again still animates).
-  const [pastMounted, setPastMounted] = useState(false);
   const [pastVisibleCount, setPastVisibleCount] = useState(PAST_PAGE_SIZE);
   const [prepHearingId, setPrepHearingId] = useState<number | null>(null);
-
-  const now = new Date();
-  // Hearing model default ordering is ascending by hearing_date, so this is
-  // already soonest-first -- exactly what "Upcoming" wants.
-  const upcomingHearings = hearings.filter(
-    (h) => new Date(h.hearing_date) >= now && h.status === "scheduled",
-  );
-  // Reversed to most-recent-first for "Past", since that's the useful
-  // default view on a long-running case.
-  const pastHearings = hearings
-    .filter((h) => new Date(h.hearing_date) < now || h.status !== "scheduled")
-    .slice()
-    .reverse();
 
   if (isLoading) {
     return (
       <Card id="hearings">
         <CardHeader>
-          <CardTitle>Hearings</CardTitle>
+          <CardTitle>Hearings &amp; Orders</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -109,148 +100,140 @@ export function HearingsList({
     );
   }
 
-  const visibleUpcoming = upcomingShowAll
-    ? upcomingHearings
-    : upcomingHearings.slice(0, DEFAULT_VISIBLE_COUNT);
-  const visiblePast = pastHearings.slice(0, pastVisibleCount);
+  const now = new Date();
+  const { upcoming, past } = splitHearings(hearings, now);
+  const { next, recent } = previewHearings(hearings, now);
+  const shown = (next ? 1 : 0) + recent.length;
+
+  const renderItem = (hearing: Hearing, index: number, isUpcoming: boolean) => (
+    <HearingItem
+      key={hearing.id}
+      hearing={hearing}
+      caseId={caseId}
+      index={index}
+      isUpcoming={isUpcoming}
+      onPrepare={isUpcoming ? setPrepHearingId : undefined}
+      onEdit={onEditHearing}
+      onDelete={onDeleteHearing}
+      isDeleting={deletingId === hearing.id}
+      orders={ordersByDate.get(hearingDateKey(hearing.hearing_date))}
+      onViewOrder={onViewOrder}
+      viewingOrderId={viewingOrderId}
+    />
+  );
 
   return (
-    <Card id="hearings" className="scroll-mt-4">
-      <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
-        <CardTitle>
-          Hearings{hearings.length > 0 ? ` (${hearings.length})` : ""}
-        </CardTitle>
-        <div className="flex items-center gap-2">
-          <CollapseToggle isOpen={sectionOpen} onToggle={() => setSectionOpen((v) => !v)} />
+    <>
+      <ExpandableCard
+        id="hearings"
+        title="Hearings & Orders"
+        icon={<Gavel className="h-4 w-4" />}
+        count={hearings.length}
+        actions={
           <Button variant="secondary" size="sm" onClick={onAddHearing}>
             <Plus className="h-4 w-4" />
             Add Hearing
           </Button>
-        </div>
-      </CardHeader>
-      <Collapsible isOpen={sectionOpen}>
-        <CardContent>
-          {/* Upcoming Hearings */}
-          {upcomingHearings.length > 0 && (
-            <div className="mb-6">
-              <h4 className="text-sm font-medium text-gray-700 mb-3 uppercase tracking-wide">
-                Upcoming ({upcomingHearings.length})
-              </h4>
-              <div
-                className={
-                  upcomingShowAll ? "max-h-[480px] overflow-y-auto pr-1 space-y-3" : "space-y-3"
-                }
-              >
-                {visibleUpcoming.map((hearing, i) => (
-                  <HearingItem
-                    key={hearing.id}
-                    hearing={hearing}
-                    caseId={caseId}
-                    index={i}
-                    isUpcoming
-                    onPrepare={setPrepHearingId}
-                    onEdit={onEditHearing}
-                    onDelete={onDeleteHearing}
-                    isDeleting={deletingId === hearing.id}
-                    orders={ordersByDate.get(hearingDateKey(hearing.hearing_date))}
-                    onViewOrder={onViewOrder}
-                    viewingOrderId={viewingOrderId}
-                  />
-                ))}
-              </div>
-              {upcomingHearings.length > DEFAULT_VISIBLE_COUNT && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full mt-2"
-                  onClick={() => setUpcomingShowAll((v) => !v)}
-                >
-                  {upcomingShowAll ? "Show less" : `Show all (${upcomingHearings.length})`}
+        }
+        viewAll={{ total: hearings.length, shown }}
+        expandable={hearings.length > 0}
+        bodyClassName="space-y-4"
+      >
+        {({ expanded, query }) => {
+          if (hearings.length === 0) {
+            return (
+              <div className="text-center py-8">
+                <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                <p className="text-gray-500 text-sm">No hearings scheduled</p>
+                <Button variant="secondary" size="sm" className="mt-3" onClick={onAddHearing}>
+                  <Plus className="h-4 w-4" />
+                  Schedule First Hearing
                 </Button>
-              )}
-            </div>
-          )}
-
-          {/* Past Hearings -- collapsed by default */}
-          {pastHearings.length > 0 && (
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-sm font-medium text-gray-700 uppercase tracking-wide">
-                  Past ({pastHearings.length})
-                </h4>
-                <CollapseToggle
-                  isOpen={pastOpen}
-                  onToggle={() => {
-                    setPastMounted(true);
-                    setPastOpen((v) => !v);
-                  }}
-                />
               </div>
-              <Collapsible isOpen={pastOpen}>
-                {pastMounted && (
-                <>
-                <div
-                  className={
-                    pastVisibleCount > PAST_PAGE_SIZE
-                      ? "max-h-[480px] overflow-y-auto pr-1 space-y-3"
-                      : "space-y-3"
-                  }
-                >
-                  {visiblePast.map((hearing, i) => (
-                    <HearingItem
-                      key={hearing.id}
-                      hearing={hearing}
-                      caseId={caseId}
-                      index={i}
-                      onEdit={onEditHearing}
-                      onDelete={onDeleteHearing}
-                      isDeleting={deletingId === hearing.id}
-                      orders={ordersByDate.get(hearingDateKey(hearing.hearing_date))}
-                      onViewOrder={onViewOrder}
-                      viewingOrderId={viewingOrderId}
-                    />
-                  ))}
-                </div>
-                {pastHearings.length > PAST_PAGE_SIZE && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full mt-2"
-                    onClick={() =>
-                      setPastVisibleCount((v) =>
-                        v >= pastHearings.length ? PAST_PAGE_SIZE : v + PAST_PAGE_SIZE,
-                      )
-                    }
-                  >
-                    {pastVisibleCount >= pastHearings.length
-                      ? "Show less"
-                      : `Load more (${pastHearings.length - pastVisibleCount} remaining)`}
-                  </Button>
-                )}
-                </>
-                )}
-              </Collapsible>
-            </div>
-          )}
+            );
+          }
 
-          {/* Empty State */}
-          {hearings.length === 0 && (
-            <div className="text-center py-8">
-              <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-              <p className="text-gray-500 text-sm">No hearings scheduled</p>
-              <Button variant="secondary" size="sm" className="mt-3" onClick={onAddHearing}>
-                <Plus className="h-4 w-4" />
-                Schedule First Hearing
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Collapsible>
+          if (!expanded) {
+            return (
+              <>
+                {next && (
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 mb-3 uppercase tracking-wide">
+                      Next hearing
+                    </h4>
+                    {renderItem(next, 0, true)}
+                  </div>
+                )}
+                {recent.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 mb-3 uppercase tracking-wide">
+                      Recent
+                    </h4>
+                    <div className="space-y-3">
+                      {recent.map((hearing, i) => renderItem(hearing, i, false))}
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          }
+
+          const matches = (h: Hearing) => matchesQuery(query, ...hearingSearchText(h));
+          const visibleUpcoming = upcoming.filter(matches);
+          const matchingPast = past.filter(matches);
+          const visiblePast = matchingPast.slice(0, pastVisibleCount);
+
+          return (
+            <>
+              {visibleUpcoming.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 mb-3 uppercase tracking-wide">
+                    Upcoming ({visibleUpcoming.length})
+                  </h4>
+                  <div className="space-y-3">
+                    {visibleUpcoming.map((hearing, i) => renderItem(hearing, i, true))}
+                  </div>
+                </div>
+              )}
+              {matchingPast.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 mb-3 uppercase tracking-wide">
+                    Past ({matchingPast.length})
+                  </h4>
+                  <div className="space-y-3">
+                    {visiblePast.map((hearing, i) => renderItem(hearing, i, false))}
+                  </div>
+                  {matchingPast.length > PAST_PAGE_SIZE && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full mt-2"
+                      onClick={() =>
+                        setPastVisibleCount((v) =>
+                          v >= matchingPast.length ? PAST_PAGE_SIZE : v + PAST_PAGE_SIZE,
+                        )
+                      }
+                    >
+                      {pastVisibleCount >= matchingPast.length
+                        ? "Show less"
+                        : `Load more (${matchingPast.length - pastVisibleCount} remaining)`}
+                    </Button>
+                  )}
+                </div>
+              )}
+              {visibleUpcoming.length === 0 && matchingPast.length === 0 && (
+                <p className="text-sm text-gray-500 py-2">No hearings match.</p>
+              )}
+            </>
+          );
+        }}
+      </ExpandableCard>
 
       <HearingDigestDialog hearingId={prepHearingId} onClose={() => setPrepHearingId(null)} />
-    </Card>
+    </>
   );
 }
+
 
 interface HearingItemProps {
   hearing: Hearing;
