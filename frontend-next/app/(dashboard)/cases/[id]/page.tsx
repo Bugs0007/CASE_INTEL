@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCase } from "@/hooks/use-cases";
@@ -34,6 +34,10 @@ import { showToast } from "@/components/ui/toaster";
 import { useProcessDocument, useDeleteDocument } from "@/hooks/use-documents";
 import { documentForOrder } from "@/lib/viewer-source";
 import { cn } from "@/lib/utils";
+import { APIError } from "@/lib/api/client";
+import { getUsername } from "@/lib/auth";
+import { caseDisplayTitle } from "@/lib/dashboard/adapt";
+import { pushRecentCase, removeRecentCase } from "@/lib/recent-cases";
 import type { Citation, Hearing } from "@/types";
 
 export default function CaseDetailPage() {
@@ -50,7 +54,18 @@ export default function CaseDetailPage() {
   const [isHearingDialogOpen, setIsHearingDialogOpen] = useState(false);
   const [editingHearing, setEditingHearing] = useState<Hearing | null>(null);
 
-  const { data: caseItem, isLoading: caseLoading } = useCase(caseId);
+  const { data: caseItem, isLoading: caseLoading, error: caseError } = useCase(caseId);
+
+  // The sidebar's "Recent cases": remember this case once it has loaded, and
+  // forget it if it no longer exists (a stale entry that led here).
+  const recentTitle = caseItem ? caseDisplayTitle(caseItem.title, caseItem.case_number) : null;
+  useEffect(() => {
+    if (recentTitle) pushRecentCase(getUsername(), { id: caseId, title: recentTitle });
+  }, [caseId, recentTitle]);
+  const caseNotFound = caseError instanceof APIError && caseError.status === 404;
+  useEffect(() => {
+    if (caseNotFound) removeRecentCase(getUsername(), caseId);
+  }, [caseId, caseNotFound]);
   const { data: documents = [], isLoading: docsLoading } = useDocuments({
     case_id: caseId,
   });

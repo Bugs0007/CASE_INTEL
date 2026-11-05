@@ -7,6 +7,7 @@ import { Search } from "lucide-react";
 import { CaseFilters } from "@/components/cases/case-filters";
 import { CaseGrid } from "@/components/cases/case-grid";
 import { CasesSkeleton } from "@/components/cases/cases-skeleton";
+import { CASES_TABS, SectionTabs } from "@/components/layout/section-tabs";
 import { showToast } from "@/components/ui/toaster";
 import { useCases, useDeleteCase } from "@/hooks/use-cases";
 import { useUpcomingHearings } from "@/hooks/use-dashboard";
@@ -130,6 +131,7 @@ export default function CasesPage() {
 
   return (
     <div className="px-4 sm:px-7 pt-5 sm:pt-7 pb-[60px] max-w-[1240px] mx-auto">
+      <SectionTabs tabs={CASES_TABS} />
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-[22px] gap-3">
         <div className="min-w-0">

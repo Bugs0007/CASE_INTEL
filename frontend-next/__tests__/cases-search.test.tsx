@@ -31,6 +31,8 @@ vi.mock("@/components/ui/toaster", () => ({
 // mounted" crash.
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), back: vi.fn(), refresh: vi.fn() }),
+  // The Cases / Documents tab strip at the top of the page reads the path.
+  usePathname: () => "/cases",
 }));
 
 import { useCases, useDeleteCase } from "@/hooks/use-cases";
