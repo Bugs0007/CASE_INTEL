@@ -24,7 +24,15 @@ import { useCourtStructure } from "@/hooks/use-case-tracking";
 import { caseKeys, useCases } from "@/hooks/use-cases";
 import { useNow } from "@/hooks/use-now";
 import { coverageOf } from "@/lib/hc-jurisdiction";
-import { applyFilters, filtersFromParams, filtersToParams, formatClock, type ResultFilters } from "@/lib/advocate-search-results";
+import {
+  activeFilterLabels,
+  applyFilters,
+  DEFAULT_FILTERS,
+  filtersFromParams,
+  filtersToParams,
+  formatClock,
+  type ResultFilters,
+} from "@/lib/advocate-search-results";
 import { cn, pluralize } from "@/lib/utils";
 import type { AdvocateFeatures, AdvocateResultRow, AdvocateSearchProfile } from "@/types";
 import { CourtComplexStatus } from "./court-complex-status";
@@ -163,6 +171,13 @@ export function AdvocateSearchV2({ features }: { features: AdvocateFeatures }) {
   const rows: AdvocateResultRow[] = useMemo(() => sj?.results ?? [], [sj]);
   const counts = sj?.match_counts ?? {};
   const shown = useMemo(() => applyFilters(rows, filters), [rows, filters]);
+  // What the filters (search, status, court, year, match) take out of the list, apart from the Show hidden switches.
+  const activeFilters = useMemo(() => activeFilterLabels(filters), [filters]);
+  const withoutFilters = useMemo(
+    () => applyFilters(rows, { ...DEFAULT_FILTERS, showExcluded: filters.showExcluded, showOther: filters.showOther }).length,
+    [rows, filters.showExcluded, filters.showOther],
+  );
+  const clearFilters = () => update({}, { ...DEFAULT_FILTERS, showExcluded: filters.showExcluded, showOther: filters.showOther });
   const cases = useCases();
   const inCases = useMemo(() => new Set((cases.data ?? []).map((c) => c.cnr_number).filter((n): n is string => !!n)), [cases.data]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -457,6 +472,11 @@ export function AdvocateSearchV2({ features }: { features: AdvocateFeatures }) {
                 <span>
                   <b className="text-[15px] font-semibold text-gray-900">{hiddenExcluded}</b> hidden (Not me)
                 </span>
+                {activeFilters.length > 0 && (
+                  <span className="text-status-pending" data-testid="filtered-count">
+                    Showing <b className="text-[15px] font-semibold">{shown.length}</b> of {withoutFilters} (filtered)
+                  </span>
+                )}
               </p>
               <Button variant="secondary" size="sm" onClick={newSearch}>
                 <RotateCcw className="h-3 w-3" />
@@ -561,6 +581,9 @@ export function AdvocateSearchV2({ features }: { features: AdvocateFeatures }) {
                     }
                     onNameAction={onNameAction}
                     showStatus={rows.some((r) => !!r.status)}
+                    activeFilters={activeFilters}
+                    hiddenByFilters={withoutFilters - shown.length}
+                    onClearFilters={clearFilters}
                   />
                   <ImportBar
                     selectedCount={chosen.length}
