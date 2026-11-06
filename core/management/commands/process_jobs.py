@@ -74,6 +74,7 @@ from core.services.advocate_import import run_advocate_import
 from core.services.advocate_search import AdvocateSearchCancelled, run_advocate_search
 from core.services.bulk_refresh import BulkRefreshCancelled, run_tracking_refresh
 from core.services.court_order_sync import sync_case_orders
+from core.services.daily_status import sync_case_business
 from core.services.document_processor import DocumentProcessor
 from core.services.hearing_digest import generate_case_briefing
 from core.services.process_memory import current_rss_mb
@@ -440,6 +441,9 @@ class Command(BaseCommand):
         (final status, message for job.error)."""
         case = Case.objects.get(id=job.case_id)
         result = sync_case_orders(case, progress_callback=report_progress)
+        # District daily status (Business on Date) rides on the same job;
+        # it never raises and never changes the job's final status.
+        result["daily_status"] = sync_case_business(case)
         job.payload = {**(job.payload or {}), "result": result}
         job.save(update_fields=["payload", "updated_at"])
         self.stdout.write(

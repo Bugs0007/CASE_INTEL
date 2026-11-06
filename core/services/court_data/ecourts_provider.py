@@ -157,6 +157,8 @@ from core.services.court_data.ecourts_parsing import (
     _parse_hc_orders,
     _strip_pdf_prefix,
     parse_advocate_search_html,
+    parse_business_html,
+    parse_business_links,
     parse_case_history_html,
     parse_hc_advocate_search,
     split_bar_code,
@@ -167,7 +169,13 @@ from core.services.court_data.exceptions import (
     CourtDataError,
     CourtPortalError,
 )
-from core.services.court_data.models import AdvocateSearchHit, CourtCaseData, CourtOrderRecord
+from core.services.court_data.models import (
+    AdvocateSearchHit,
+    BusinessLink,
+    BusinessRecord,
+    CourtCaseData,
+    CourtOrderRecord,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -408,6 +416,56 @@ class _AdvocateSearchSession:
         )
 
 
+class _BusinessSession:
+    """One District Courts session for reading a case's Daily Status pages
+    (see CourtDataProvider.business_session). Owns a private event loop for
+    the same reason _AdvocateSearchSession does: the httpx client is bound
+    to the loop it first ran on. Every portal call is wrapped in the same
+    COURT_PORTAL_CALL_TIMEOUT_SECONDS budget _run_bounded applies."""
+
+    def __init__(self, provider: "EcourtsProvider", cnr: str) -> None:
+        self._provider = provider
+        self._cnr = cnr
+        self._loop = asyncio.new_event_loop()
+        self._client = _TokenSeedingDistrictClient()
+        self.links: list[BusinessLink] = []
+
+    def _bounded(self, coro, label: str):
+        budget = getattr(settings, "COURT_PORTAL_CALL_TIMEOUT_SECONDS", 90)
+        try:
+            return self._loop.run_until_complete(asyncio.wait_for(coro, timeout=budget))
+        except asyncio.TimeoutError as exc:
+            raise CourtPortalError(
+                f"The court portal did not answer within {budget:.0f} seconds ({label})."
+            ) from exc
+
+    def __enter__(self) -> "_BusinessSession":
+        try:
+            self._loop.run_until_complete(self._client.__aenter__())
+            html = self._bounded(self._provider._district_cnr_search(self._client, self._cnr), "CNR search")
+        except BaseException:
+            try:
+                self._loop.run_until_complete(self._client.__aexit__(None, None, None))
+            finally:
+                self._loop.close()
+            raise
+        self.links = parse_business_links(html)
+        return self
+
+    def __exit__(self, *exc_info) -> None:
+        try:
+            self._loop.run_until_complete(self._client.__aexit__(*exc_info))
+        finally:
+            self._loop.close()
+
+    def fetch(self, link: BusinessLink) -> BusinessRecord | None:
+        # The portal's own JS posts exactly link.form plus ajax_req/app_token,
+        # which the client's _post_ajax adds (and an errormsg raises).
+        result = self._bounded(self._client._post_ajax("home/viewBusiness", dict(link.form)), "daily status")
+        html = result.get("data_list", "") if isinstance(result, dict) else ""
+        return parse_business_html(html or "", link.business_date)
+
+
 class EcourtsProvider(CourtDataProvider):
     """CourtDataProvider backed by bharat-courts against the live eCourts
     portals. Public methods are synchronous; asyncio.run() bridges into
@@ -590,6 +648,12 @@ class EcourtsProvider(CourtDataProvider):
         if court_type == "district":
             return asyncio.run(self._download_district_order(cnr, order))
         return asyncio.run(self._download_hc_order(cnr, order))
+
+    def business_session(self, tracking_config: dict) -> _BusinessSession:
+        cnr, court_type = self._order_identity(tracking_config)
+        if court_type != "district":
+            raise ValueError("Daily status is a District Courts page; High Courts publish orders instead.")
+        return _BusinessSession(self, cnr)
 
     def fetch_order_page_html(self, tracking_config: dict) -> str:
         """The raw CNR-search page the order listing is read from, unparsed.
