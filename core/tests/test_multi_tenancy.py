@@ -717,6 +717,7 @@ _NO_TENANT_ROWS_VIEWS = {
     "case_tracking.CourtStructureView",
     "limitation.LimitationRulesView",  # statutory reference data
     "limitation.LimitationComputeView",  # pure computation
+    "advocate_search_profile.AdvocateSearchFeaturesView",  # two settings flags, no rows
 }
 
 # Plain APIViews that scope every query to request.user by hand. Reviewed

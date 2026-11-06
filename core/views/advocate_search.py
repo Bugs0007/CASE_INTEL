@@ -19,8 +19,9 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.models import AdvocateSearchPreference, JobAlreadyRunningError, ProcessingJob
+from core.models import AdvocateSearchPreference, AdvocateSearchProfile, JobAlreadyRunningError, ProcessingJob
 from core.services.advocate_quick_search import quick_search_summary, remembered_complexes
+from core.services.advocate_results import annotate_rows
 
 _BAR_CODE_RE = re.compile(r"^[A-Za-z]{2,3}/\d+/\d{4}$")
 MAX_IMPORT_BATCH = 100
@@ -61,6 +62,18 @@ def _parse_name_or_bar_code(raw: str) -> tuple[str, str, str | None]:
         "Enter an advocate name (at least 3 characters) or a bar code in "
         "STATE/NUMBER/YEAR format (e.g. MAH/1234/2015).",
     )
+
+
+def _profile_for(request, payload: dict):
+    """The caller's own search profile for a results read: `?profile_id=` wins
+    over the one the job was started with. Owner-scoped, so another advocate's
+    id (or a deleted one) reads as no profile."""
+    raw = request.query_params.get("profile_id") or payload.get("profile_id")
+    try:
+        profile_id = int(raw)
+    except (TypeError, ValueError):
+        return None
+    return AdvocateSearchProfile.objects.filter(pk=profile_id, owner=request.user).first()
 
 
 def _parse_districts(dist_code, dist_codes) -> tuple[list[str], str | None]:
@@ -226,6 +239,13 @@ class AdvocateSearchStatusView(APIView):
 
         payload = job.payload or {}
         all_results = payload.get("results", [])
+
+        # With a search profile (the redesigned search stores its id on the job,
+        # or the caller names one), every row is labelled from the profile's
+        # CURRENT name forms and Not me list, best match first, and the counts
+        # cover all rows. Without one the rows are returned exactly as stored.
+        profile = _profile_for(request, payload)
+        all_results, match_counts = annotate_rows(all_results, profile)
         results = all_results[:MAX_RESULTS_IN_RESPONSE]
 
         return Response(
@@ -235,6 +255,8 @@ class AdvocateSearchStatusView(APIView):
                 "progress_current": job.progress_current,
                 "progress_total": job.progress_total,
                 "error": job.error,
+                "profile_id": profile.id if profile else None,
+                "match_counts": match_counts,
                 "results": results,
                 # results_total is the real match count; results may be a
                 # truncated prefix of it. See MAX_RESULTS_IN_RESPONSE for why

@@ -17,6 +17,13 @@ from .advocate_search import (
     AdvocateSearchStatusView,
     AdvocateSearchView,
 )
+from .advocate_search_profile import (
+    AdvocateSearchFeaturesView,
+    AdvocateSearchProfileAddNameFormView,
+    AdvocateSearchProfileDetailView,
+    AdvocateSearchProfileExcludeView,
+    AdvocateSearchProfileListCreateView,
+)
 from .appearance_fee import (
     AppearanceFeeDetailView,
     AppearanceFeeInvoiceFileView,
@@ -144,6 +151,11 @@ __all__ = [
     "AdvocateSearchRetryFailedView",
     "AdvocateSearchStatusView",
     "AdvocateSearchView",
+    "AdvocateSearchFeaturesView",
+    "AdvocateSearchProfileAddNameFormView",
+    "AdvocateSearchProfileDetailView",
+    "AdvocateSearchProfileExcludeView",
+    "AdvocateSearchProfileListCreateView",
     "CaseCnrCreateView",
     "CaseCnrLookupView",
     "CaseDetailView",

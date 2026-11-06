@@ -29,6 +29,11 @@ from core.views import (
     AdvocateSearchRetryFailedView,
     AdvocateSearchStatusView,
     AdvocateSearchView,
+    AdvocateSearchFeaturesView,
+    AdvocateSearchProfileAddNameFormView,
+    AdvocateSearchProfileDetailView,
+    AdvocateSearchProfileExcludeView,
+    AdvocateSearchProfileListCreateView,
     AppearanceFeeDetailView,
     AppearanceFeeInvoiceFileView,
     AppearanceFeeInvoiceView,
@@ -299,6 +304,35 @@ urlpatterns = [
     # Advocate billing profile (invoice letterhead + default fee). A
     # singleton per user -- no id in the path, see AdvocateProfileView.
     path("advocate-profile/", AdvocateProfileView.as_view(), name="advocate-profile"),
+
+    # Advocate SEARCH profiles (name forms, Not me list, bar codes) -- plural
+    # and with ids, unlike the billing profile above. See
+    # views/advocate_search_profile.py.
+    path(
+        "advocate-profiles/",
+        AdvocateSearchProfileListCreateView.as_view(),
+        name="advocate-search-profile-list",
+    ),
+    path(
+        "advocate-profiles/<int:pk>/",
+        AdvocateSearchProfileDetailView.as_view(),
+        name="advocate-search-profile-detail",
+    ),
+    path(
+        "advocate-profiles/<int:pk>/exclude/",
+        AdvocateSearchProfileExcludeView.as_view(),
+        name="advocate-search-profile-exclude",
+    ),
+    path(
+        "advocate-profiles/<int:pk>/add-name-form/",
+        AdvocateSearchProfileAddNameFormView.as_view(),
+        name="advocate-search-profile-add-name-form",
+    ),
+    path(
+        "advocate-search/features/",
+        AdvocateSearchFeaturesView.as_view(),
+        name="advocate-search-features",
+    ),
 
     # Appearance fees + invoicing. The literal "invoice/file/" route is
     # listed before "invoice/" only for readability; they can't shadow

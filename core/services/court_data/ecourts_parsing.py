@@ -142,7 +142,7 @@ _ADVOCATE_HEADER_RE = re.compile(r"\badvocate\b", re.I)
 
 
 def parse_advocate_search_html(
-    html: str, *, advocate_name: str = "",
+    html: str, *, advocate_name: str = "", keep_all: bool = False,
 ) -> list[AdvocateSearchHit]:
     """Parse casestatus/submitAdvName's "adv_data" HTML, dropping rows
     that don't actually match the search and flagging the rest as
@@ -193,6 +193,12 @@ def parse_advocate_search_html(
     search (eCourts never exposes bar codes in this grid -- see
     party_role.py's docstring for the same gap). Pretending those are
     verified would be worse than admitting they aren't.
+
+    keep_all=True (the redesigned search) never drops a row: every row the
+    portal returned is kept with the Advocate cell as listed, and which rows
+    are the advocate's own is decided later, against their profile, by
+    core/services/advocate_results.py. `advocate_match_verified` is still
+    computed, but only as information.
     """
     soup = BeautifulSoup(html, "lxml")
     table = soup.find("table")
@@ -231,12 +237,19 @@ def parse_advocate_search_html(
         cnr = _extract_cnr(row)
 
         advocate_text = None
+        advocate_segments: list[str] = []
         if advocate_col_index is not None and advocate_col_index < len(cols):
             # Space-joined: the live markup is "APP<br>G.Ramesh kumar", and a
             # bare get_text() fuses that to "APPG.Ramesh kumar" -- worse, a
             # cell listing two advocates on separate lines would fuse their
-            # tokens together and defeat the name match.
-            advocate_text = _clean(cols[advocate_col_index].get_text(" ")) or None
+            # tokens together and defeat the name match. A <br> also ends one
+            # advocate (or a designation) and starts the next, so the parts
+            # are kept apart for classification.
+            cell = cols[advocate_col_index]
+            for br in cell.find_all("br"):
+                br.replace_with("\n")
+            advocate_segments = [s for s in (_clean(p) for p in cell.get_text(" ").split("\n")) if s]
+            advocate_text = _clean(" ".join(advocate_segments)) or None
 
         verified = False
         if can_check_name and advocate_text:
@@ -244,9 +257,10 @@ def parse_advocate_search_html(
                 matches_by_text[advocate_text] = (
                     name_similarity(query_tokens, advocate_tokens(advocate_text)) > 0
                 )
-            if not matches_by_text[advocate_text]:
+            if matches_by_text[advocate_text]:
+                verified = True
+            elif not keep_all:
                 continue  # portal matched something the Advocate field doesn't back up
-            verified = True
 
         hits.append(
             AdvocateSearchHit(
@@ -257,6 +271,8 @@ def parse_advocate_search_html(
                 respondent=respondent,
                 advocate_match_verified=verified,
                 matched_advocate_text=advocate_text,
+                listed_advocate_name=advocate_text or "",
+                listed_advocates=advocate_segments,
             )
         )
     return hits
