@@ -282,6 +282,16 @@ class TestWorkerV2:
         assert row["listed_advocates"] == ["APP", "S Rambabu"]
         assert (row["dist_name"], row["complex_name"], row["complex_code"]) == ("Adilabad", "Adilabad Court Complex", "c1")
 
+    def test_a_row_is_pending_or_disposed_only_when_the_search_asked_for_it(self, user_a, profile_a):
+        asked = _job(user_a, profile_a, status_filter="Pending", districts_filter=["1"])
+        _run_worker(asked, FakeProvider([([hit("CNR1")], 1), ([], 1)]))
+        assert asked.payload["results"][0]["status"] == "Pending"
+        ProcessingJob.objects.filter(pk=asked.pk).update(status="succeeded")
+
+        both = _job(user_a, profile_a, status_filter="Both")
+        _run_worker(both, FakeProvider([([hit("CNR1")], 1), ([], 1)]))
+        assert both.payload["results"][0]["status"] == ""  # the grid has no status column: nothing to claim
+
     def test_courts_get_their_rows_before_the_search_reaches_them(self, user_a, profile_a):
         """A court is `running` while searched; an observer sees the later ones `pending`."""
         job = _job(user_a, profile_a)

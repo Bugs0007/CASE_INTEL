@@ -162,8 +162,12 @@ def _hierarchy(run: AdvocateSearchComplexRun, ctx: dict) -> dict:
     }
 
 
-def _row(hit, run: AdvocateSearchComplexRun, *, bar_mode: bool) -> dict:
+def _row(hit, run: AdvocateSearchComplexRun, *, bar_mode: bool, status_asked: str = "Both") -> dict:
     row = hit.to_dict()
+    if not row.get("status") and status_asked in ("Pending", "Disposed"):
+        # The portal sends no status per row. A search ASKED for Pending (or Disposed)
+        # returns only those, so that is what every row is; a search for both cannot say.
+        row["status"] = status_asked
     row.update(
         dist_code=run.dist_code,
         dist_name=run.dist_name,
@@ -256,7 +260,11 @@ def _run_court(searcher, run: AdvocateSearchComplexRun, ctx: dict, timings: _Tim
         status_filter=ctx["status_filter"],
     )
     elapsed = time.perf_counter() - started
-    rows = [_row(hit, run, bar_mode=ctx["bar_mode"]) for hit in result.hits if hit.cnr_number]
+    rows = [
+        _row(hit, run, bar_mode=ctx["bar_mode"], status_asked=ctx["status_filter"])
+        for hit in result.hits
+        if hit.cnr_number
+    ]
     visible = count_visible(rows, ctx["profile"])
     code = ""
     if result.error is None:
