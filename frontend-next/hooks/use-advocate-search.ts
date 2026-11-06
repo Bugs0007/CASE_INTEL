@@ -30,6 +30,8 @@ export function jobPollInterval(
 
 export const advocateSearchKeys = {
   preference: ["advocate-search", "preference"] as const,
+  quick: (nameOrBarCode: string, stateCode: string) =>
+    ["advocate-search", "preference", "quick", stateCode, nameOrBarCode] as const,
   searchJob: (jobId: number) => ["advocate-search", "search", jobId] as const,
   importJob: (jobId: number) => ["advocate-search", "import", jobId] as const,
 };
@@ -40,6 +42,20 @@ export function useAdvocateSearchPreference() {
     queryKey: advocateSearchKeys.preference,
     queryFn: () => advocateSearchApi.getPreference(),
     staleTime: 60 * 1000,
+  });
+}
+
+/** Whether a Quick search is available for this name in this state: the
+ * courts remembered from earlier searches. Pass an empty name or state to
+ * switch it off. */
+export function useQuickSearchAvailability(nameOrBarCode: string, stateCode: string) {
+  const name = nameOrBarCode.trim();
+  return useQuery({
+    queryKey: advocateSearchKeys.quick(name, stateCode),
+    queryFn: () => advocateSearchApi.getPreference({ nameOrBarCode: name, stateCode }),
+    enabled: name.length >= 3 && !!stateCode,
+    select: (preference) => preference?.quick_search ?? null,
+    staleTime: 30 * 1000,
   });
 }
 

@@ -20,11 +20,15 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.models import AdvocateSearchPreference, JobAlreadyRunningError, ProcessingJob
+from core.services.advocate_quick_search import quick_search_summary, remembered_complexes
 
 _BAR_CODE_RE = re.compile(r"^[A-Za-z]{2,3}/\d+/\d{4}$")
 MAX_IMPORT_BATCH = 100
 
 VALID_COURT_TYPES = ("district", "high_court")
+
+# A state has at most ~75 districts; this only stops an absurd request body.
+MAX_DISTRICTS_PER_SEARCH = 100
 
 # Hard cap on how many search results a single status response may carry.
 #
@@ -59,23 +63,47 @@ def _parse_name_or_bar_code(raw: str) -> tuple[str, str, str | None]:
     )
 
 
+def _parse_districts(dist_code, dist_codes) -> tuple[list[str], str | None]:
+    """The districts a search is limited to, as (codes, error). `dist_codes`
+    (a list) wins over the older single `dist_code`; neither means the whole
+    state, returned as []."""
+    if dist_codes is not None:
+        if not isinstance(dist_codes, list) or any(
+            not isinstance(code, (str, int)) or isinstance(code, bool) or not str(code).strip()
+            for code in dist_codes
+        ):
+            return [], "dist_codes must be a list of district codes."
+        codes = list(dict.fromkeys(str(code).strip() for code in dist_codes))
+        if len(codes) > MAX_DISTRICTS_PER_SEARCH:
+            return [], f"Pick at most {MAX_DISTRICTS_PER_SEARCH} districts."
+        return codes, None
+    if dist_code:
+        return [str(dist_code)], None
+    return [], None
+
+
 class AdvocateSearchView(APIView):
-    """Start an advocate search: state-wide (default, thorough) or scoped
-    to one district (fast -- for an advocate who knows they mainly
-    practice in one place).
+    """Start an advocate search: state-wide (default, thorough), scoped to
+    one or more districts (fast -- for an advocate who knows where they
+    practice), or a Quick search of only the court complexes that returned
+    cases for this advocate last time.
 
     POST /api/cases/search-advocate/
     Body: {
         "name_or_bar_code": "<name, min 3 chars> or <STATE/NUMBER/YEAR>",
         "court_type": "district",     # "high_court" not supported yet
         "state_code": "<eCourts state code>",
-        "dist_code": "<eCourts district code>",  # optional -- omit for
+        "dist_codes": ["<district code>", ...],  # optional -- omit for
                                                    # the full state
+        "dist_code": "<district code>",           # older single-district form
+        "mode": "full" | "quick",     # optional, default "full"; "quick"
+                                      # needs a remembered history (400
+                                      # code "no_quick_history" without one)
         "status_filter": "Pending" | "Disposed" | "Both",  # optional
     }
     Enqueues a ProcessingJob (job_type="advocate_search") that fans the
-    query out across every district/complex in the state (or just the one
-    district, if dist_code was given), and returns {"job_id": ...}, 202.
+    query out across every district/complex in the state (or just the chosen
+    districts, or the remembered complexes), and returns {"job_id": ...}, 202.
     Poll AdvocateSearchStatusView for progress and results.
     """
 
@@ -91,7 +119,15 @@ class AdvocateSearchView(APIView):
         if not state_code:
             return Response({"detail": "state_code is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        dist_code = request.data.get("dist_code")
+        districts, districts_error = _parse_districts(
+            request.data.get("dist_code"), request.data.get("dist_codes")
+        )
+        if districts_error:
+            return Response({"detail": districts_error}, status=status.HTTP_400_BAD_REQUEST)
+
+        mode = request.data.get("mode") or "full"
+        if mode not in ("full", "quick"):
+            return Response({"detail": "mode must be 'full' or 'quick'."}, status=status.HTTP_400_BAD_REQUEST)
 
         status_filter = request.data.get("status_filter") or "Both"
         if status_filter not in ("Pending", "Disposed", "Both"):
@@ -111,8 +147,26 @@ class AdvocateSearchView(APIView):
             "bar_code": bar_code,
             "status_filter": status_filter,
         }
-        if dist_code:
-            job_params["districts_filter"] = [str(dist_code)]
+        if mode == "quick":
+            remembered = remembered_complexes(request.user, advocate_name, bar_code, str(state_code))
+            if not remembered:
+                return Response(
+                    {
+                        "detail": "No courts are remembered for this advocate yet. Run a full search first.",
+                        "code": "no_quick_history",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            job_params["complexes_filter"] = [
+                {"dist_code": c["dist_code"], "complex_code": c["complex_code"], "est_code": c["est_code"]}
+                for c in remembered
+            ]
+            job_params["mode"] = "quick"
+        elif districts:
+            job_params["districts_filter"] = districts
+            job_params["mode"] = "districts"
+        else:
+            job_params["mode"] = "state"
 
         try:
             job = ProcessingJob.enqueue_advocate_search(request.user, job_params)
@@ -122,9 +176,19 @@ class AdvocateSearchView(APIView):
                 status=status.HTTP_409_CONFLICT,
             )
 
+        # Remember the state and the chosen districts, and keep the Quick
+        # search history that lives in the same row.
+        existing = AdvocateSearchPreference.objects.filter(owner=request.user).first()
+        config = dict(existing.hierarchy_config or {}) if existing else {}
+        config["state_code"] = str(state_code)
+        if mode != "quick":
+            if districts:
+                config["dist_codes"] = districts
+            else:
+                config.pop("dist_codes", None)
         AdvocateSearchPreference.objects.update_or_create(
             owner=request.user,
-            defaults={"court_type": court_type, "hierarchy_config": {"state_code": str(state_code)}},
+            defaults={"court_type": court_type, "hierarchy_config": config},
         )
 
         return Response({"job_id": job.id}, status=status.HTTP_202_ACCEPTED)
@@ -181,6 +245,15 @@ class AdvocateSearchStatusView(APIView):
                 "districts_total": payload.get("districts_total"),
                 "districts_status": payload.get("districts_status", {}),
                 "complexes_searched": payload.get("complexes_searched"),
+                # Live counters: court complexes attempted so far, and how
+                # many the districts listed so far hold (a district's count is
+                # known once it is listed, so the total grows as the run goes).
+                "complexes_done": payload.get("complexes_done"),
+                "complexes_total_known": payload.get("complexes_total_known"),
+                "current_district": payload.get("current_district", ""),
+                "mode": payload.get("mode", "state"),
+                "created_at": job.created_at,
+                "started_at": job.started_at,
             },
             status=status.HTTP_200_OK,
         )
@@ -299,21 +372,27 @@ class AdvocateSearchRetryFailedView(APIView):
             code: d for code, d in districts_status.items() if d.get("status") == "success"
         }
 
+        retry_params = {
+            "state_code": payload.get("state_code"),
+            "court_type": payload.get("court_type", "district"),
+            "advocate_name": payload.get("advocate_name", ""),
+            "bar_code": payload.get("bar_code", ""),
+            "status_filter": payload.get("status_filter", "Both"),
+            "districts_filter": failed_codes,
+            "seed_results": payload.get("results", []),
+            "seed_districts_status": seed_districts_status,
+            "retry_of": original.id,
+            "mode": payload.get("mode", "state"),
+        }
+        # A Quick search retries only its remembered complexes in the
+        # districts that fell short, never the whole district.
+        if payload.get("complexes_filter"):
+            retry_params["complexes_filter"] = [
+                c for c in payload["complexes_filter"] if str(c.get("dist_code")) in failed_codes
+            ]
+
         try:
-            job = ProcessingJob.enqueue_advocate_search(
-                request.user,
-                {
-                    "state_code": payload.get("state_code"),
-                    "court_type": payload.get("court_type", "district"),
-                    "advocate_name": payload.get("advocate_name", ""),
-                    "bar_code": payload.get("bar_code", ""),
-                    "status_filter": payload.get("status_filter", "Both"),
-                    "districts_filter": failed_codes,
-                    "seed_results": payload.get("results", []),
-                    "seed_districts_status": seed_districts_status,
-                    "retry_of": original.id,
-                },
-            )
+            job = ProcessingJob.enqueue_advocate_search(request.user, retry_params)
         except JobAlreadyRunningError as exc:
             return Response(
                 {"detail": str(exc), "code": "search_already_running"},
@@ -441,19 +520,32 @@ class AdvocateSearchImportStatusView(APIView):
 
 
 class AdvocateSearchPreferenceView(APIView):
-    """The caller's last-used state, for pre-filling the search page.
+    """The caller's last-used state and districts, for pre-filling the search
+    page, and whether a Quick search is available.
 
     GET /api/cases/search-advocate/preference/
+    GET /api/cases/search-advocate/preference/?name_or_bar_code=...&state_code=...
+
+    With the query, `quick_search` is {complexes, districts, updated_at} when
+    this advocate has remembered courts in that state, else null.
     """
 
     def get(self, request):
         preference = AdvocateSearchPreference.objects.filter(owner=request.user).first()
         if preference is None:
             return Response(None, status=status.HTTP_200_OK)
+        config = {k: v for k, v in (preference.hierarchy_config or {}).items() if k != "quick"}
+
+        quick = None
+        advocate_name, bar_code, error = _parse_name_or_bar_code(request.query_params.get("name_or_bar_code"))
+        state_code = request.query_params.get("state_code") or config.get("state_code")
+        if not error and state_code:
+            quick = quick_search_summary(request.user, advocate_name, bar_code, str(state_code))
         return Response(
             {
                 "court_type": preference.court_type,
-                "hierarchy_config": preference.hierarchy_config,
+                "hierarchy_config": config,
+                "quick_search": quick,
             },
             status=status.HTTP_200_OK,
         )

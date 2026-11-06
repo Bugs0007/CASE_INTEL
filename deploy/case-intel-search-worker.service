@@ -1,0 +1,39 @@
+# Case Intel advocate-search worker (manage.py process_jobs --lane search).
+#
+# OPTIONAL second worker. Reference copy with the default paths
+# (DEPLOY_USER=ubuntu, PROJECT_DIR=/home/ubuntu/CASE_INTEL).
+# deploy/provision.sh generates and installs the real unit when it is run with
+# ENABLE_SEARCH_WORKER=true -- edit provision.sh, not just this file, when
+# changing the unit.
+#
+# WHY: one advocate search runs 10-45 minutes, and a single worker serves every
+# job type, so while it runs no order check, refresh-all, upload or briefing is
+# picked up, and a refresh-all in front of a search delays the search. This
+# worker claims ONLY advocate_search and advocate_import; the main worker must
+# then be started with `--lane portal` (see case-intel-worker.service), or a
+# search could still be claimed by it.
+#
+# COST: each worker process holds its own copy of the CAPTCHA OCR model, so the
+# box needs memory for two. Do NOT enable this on a box that cannot spare it --
+# measure first (deploy/systemd/README.md, "Search worker"). Both workers keep
+# --max-rss-mb recycling: past WORKER_MAX_RSS_MB (settings.py, default 300) a
+# worker exits between jobs and systemd starts a fresh one.
+#
+# Run BOTH lanes or NEITHER: a lone `--lane search` worker leaves order sync,
+# uploads and the rest queued forever, and a lone `--lane portal` worker leaves
+# every search queued.
+
+[Unit]
+Description=Case Intel advocate-search worker
+After=network.target
+
+[Service]
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/CASE_INTEL
+ExecStart=/home/ubuntu/CASE_INTEL/.venv/bin/python manage.py process_jobs --lane search
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

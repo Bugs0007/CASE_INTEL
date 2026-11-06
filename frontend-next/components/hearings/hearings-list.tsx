@@ -255,7 +255,7 @@ interface HearingItemProps {
   viewingOrderId?: number;
 }
 
-function HearingItem({
+export function HearingItem({
   hearing,
   caseId,
   isUpcoming,

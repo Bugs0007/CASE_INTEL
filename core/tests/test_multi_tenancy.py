@@ -727,6 +727,7 @@ _MANUALLY_SCOPED_VIEWS = {
     "chat.ChatView",
     "conversation.ConversationExportView",
     "court_order.CaseOrdersView",
+    "court_order.CaseOrderCheckView",
     "court_order.CourtOrderFileView",
     "limitation.CaseLimitationDeadlineView",
     "hearing_digest.HearingDigestView",

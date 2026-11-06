@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { casesApi } from "@/lib/api/cases";
+import { ORDER_SYNC_POLL_MS, isOrderSyncActive } from "@/lib/order-sync";
 import type { CaseCreateInput, CaseUpdateInput, CaseStatus } from "@/types";
 
 export const caseKeys = {
@@ -25,6 +26,10 @@ export function useCase(id: number, enabled: boolean = true) {
     queryFn: () => casesApi.get(id),
     enabled: !!id && enabled,
     staleTime: 60 * 1000, // 1 minute
+    // While an order check is queued or running, re-read the case every 5
+    // seconds; the interval turns itself off the moment it settles.
+    refetchInterval: (query) =>
+      isOrderSyncActive(query.state.data?.order_sync?.state) ? ORDER_SYNC_POLL_MS : false,
   });
 }
 

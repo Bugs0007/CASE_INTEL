@@ -17,6 +17,11 @@ import { showSearch } from "@/lib/case-previews";
 const DURATION_MS = 280;
 const REDUCED_DURATION_MS = 160;
 const EASE_OUT = "cubic-bezier(0.22, 1, 0.36, 1)";
+// The "rise" look (case page): fade and lift from slightly below and smaller.
+const RISE_MS = 260;
+const RISE_BACKDROP_MS = 200;
+const RISE_EASE = "cubic-bezier(0.2, 0.8, 0.2, 1)";
+const RISE_FROM = "translateY(10px) scale(0.965)";
 
 function prefersReducedMotion(): boolean {
   return (
@@ -54,6 +59,14 @@ interface ExpandDialogProps {
   originRef?: RefObject<HTMLElement | null>;
   /** The expand button; focus goes back here on close. */
   returnFocusRef?: RefObject<HTMLElement | null>;
+  /** The case page's look: opens by rising 10px and scaling up from .965
+   * (260ms) instead of growing out of the card; a lighter, 6px-blurred
+   * backdrop; a 10px radius. */
+  rise?: boolean;
+  /** A band under the header for filter chips and a search box. */
+  toolbar?: ReactNode;
+  /** A one-line hint under the body. */
+  footer?: ReactNode;
   children: ReactNode;
 }
 
@@ -81,6 +94,9 @@ export function ExpandDialog({
   search,
   originRef,
   returnFocusRef,
+  rise = false,
+  toolbar,
+  footer,
   children,
 }: ExpandDialogProps) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -99,7 +115,9 @@ export function ExpandDialog({
       if (!panel || !backdrop) return;
 
       const reduced = prefersReducedMotion();
-      const duration = reduced ? REDUCED_DURATION_MS : DURATION_MS;
+      const duration = reduced ? REDUCED_DURATION_MS : rise ? RISE_MS : DURATION_MS;
+      const ease = rise ? RISE_EASE : EASE_OUT;
+      const backdropMs = reduced ? REDUCED_DURATION_MS : rise ? RISE_BACKDROP_MS : duration;
 
       // Measure the panel at its real size and position first.
       panel.style.transition = "none";
@@ -108,14 +126,20 @@ export function ExpandDialog({
       const finalRect = panel.getBoundingClientRect();
       const origin = originRef?.current?.getBoundingClientRect();
 
-      panel.style.transform = !reduced && origin ? originTransform(origin, finalRect) : "none";
+      panel.style.transform = reduced
+        ? "none"
+        : rise
+          ? RISE_FROM
+          : origin
+            ? originTransform(origin, finalRect)
+            : "none";
       panel.style.opacity = "0";
       backdrop.style.transition = "none";
       backdrop.style.opacity = "0";
       void panel.offsetWidth; // commit the starting state before animating
 
-      panel.style.transition = `transform ${duration}ms ${EASE_OUT}, opacity ${duration}ms ease-out`;
-      backdrop.style.transition = `opacity ${duration}ms ease-out`;
+      panel.style.transition = `transform ${duration}ms ${ease}, opacity ${duration}ms ease-out`;
+      backdrop.style.transition = `opacity ${backdropMs}ms ease-out`;
       panel.style.transform = "none";
       panel.style.opacity = "1";
       backdrop.style.opacity = "1";
@@ -133,12 +157,17 @@ export function ExpandDialog({
       return;
     }
     const reduced = prefersReducedMotion();
-    const duration = reduced ? REDUCED_DURATION_MS : DURATION_MS;
+    const duration = reduced ? REDUCED_DURATION_MS : rise ? RISE_MS : DURATION_MS;
     const origin = originRef?.current?.getBoundingClientRect();
-    panel.style.transition = `transform ${duration}ms ${EASE_OUT}, opacity ${duration}ms ease-out`;
-    backdrop.style.transition = `opacity ${duration}ms ease-out`;
-    panel.style.transform =
-      !reduced && origin ? originTransform(origin, panel.getBoundingClientRect()) : "none";
+    panel.style.transition = `transform ${duration}ms ${rise ? RISE_EASE : EASE_OUT}, opacity ${duration}ms ease-out`;
+    backdrop.style.transition = `opacity ${reduced ? REDUCED_DURATION_MS : rise ? RISE_BACKDROP_MS : duration}ms ease-out`;
+    panel.style.transform = reduced
+      ? "none"
+      : rise
+        ? RISE_FROM
+        : origin
+          ? originTransform(origin, panel.getBoundingClientRect())
+          : "none";
     panel.style.opacity = "0";
     backdrop.style.opacity = "0";
 
@@ -174,8 +203,10 @@ export function ExpandDialog({
         ref={backdropRef}
         data-testid="expand-dialog-backdrop"
         aria-hidden="true"
-        className="absolute inset-0 backdrop-blur-[8px]"
-        style={{ background: "color-mix(in srgb, var(--ci-ink) 45%, transparent)" }}
+        className={rise ? "absolute inset-0 backdrop-blur-[6px]" : "absolute inset-0 backdrop-blur-[8px]"}
+        style={{
+          background: rise ? "rgba(14, 26, 44, 0.34)" : "color-mix(in srgb, var(--ci-ink) 45%, transparent)",
+        }}
         onMouseDown={(event) => {
           // Without this the browser's own mousedown handling blurs the
           // button focus was just returned to.
@@ -190,10 +221,20 @@ export function ExpandDialog({
         aria-label={label}
         data-layer="45"
         tabIndex={-1}
-        className="relative flex flex-col overflow-hidden bg-surface outline-none will-change-transform max-sm:h-[100dvh] max-sm:w-full sm:w-[min(960px,90vw)] sm:max-h-[85vh] sm:rounded-lg sm:border sm:border-gray-200 sm:shadow-card"
+        className={
+          rise
+            ? "relative flex flex-col overflow-hidden bg-surface outline-none will-change-transform max-sm:h-[100dvh] max-sm:w-full sm:w-[min(960px,calc(100%-80px))] sm:max-h-[calc(100%-72px)] sm:rounded-[10px] sm:shadow-[0_30px_80px_rgba(8,16,32,0.38)]"
+            : "relative flex flex-col overflow-hidden bg-surface outline-none will-change-transform max-sm:h-[100dvh] max-sm:w-full sm:w-[min(960px,90vw)] sm:max-h-[85vh] sm:rounded-lg sm:border sm:border-gray-200 sm:shadow-card"
+        }
       >
         <div className="flex flex-shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-gray-100 px-4 py-3 sm:px-5 sm:py-3.5">
-          <h2 className="flex min-w-0 items-center gap-2 text-base font-semibold text-gray-900">
+          <h2
+            className={
+              rise
+                ? "flex min-w-0 items-center gap-2.5 font-serif text-xl font-bold text-gray-900"
+                : "flex min-w-0 items-center gap-2 text-base font-semibold text-gray-900"
+            }
+          >
             {title}
             {count !== undefined && <span className="ci-chip ci-chip--none">{count}</span>}
           </h2>
@@ -219,11 +260,19 @@ export function ExpandDialog({
             </button>
           </div>
         </div>
+        {toolbar && (
+          <div className="flex-shrink-0 border-b border-gray-100 bg-[#fbfaf7] px-4 py-2.5 sm:px-5">{toolbar}</div>
+        )}
         {/* @container: cards size their inner grids off the space they are
             given (`@md:`), and this body is its own container, not the page's. */}
         <div className="@container min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
           {children}
         </div>
+        {footer && (
+          <div className="flex-shrink-0 border-t border-gray-100 px-4 py-2.5 text-xs text-gray-500 sm:px-5">
+            {footer}
+          </div>
+        )}
       </div>
     </div>,
     document.body,

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { BILLING_TABS, SectionTabs } from "@/components/layout/section-tabs";
 import { showToast } from "@/components/ui/toaster";
 import {
   useClients,
@@ -44,6 +45,8 @@ export default function ClientsPage() {
 
   return (
     <div className="px-4 sm:px-7 pt-5 sm:pt-7 pb-[60px] max-w-[900px] mx-auto space-y-5">
+      {/* space-y-5 already spaces the strip from the header. */}
+      <SectionTabs tabs={BILLING_TABS} className="mb-0" />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-page-title text-gray-900 mb-1.5">Clients</h1>

@@ -75,19 +75,26 @@ describe("describeOrderSync", () => {
   });
 
   it("queued and running show a busy line", () => {
-    expect(describeOrderSync(sync({ state: "queued" }), true)).toMatchObject({ busy: true, tone: "muted" });
-    expect(describeOrderSync(sync({ state: "running" }), true)?.text).toMatch(/Checking the court portal/);
+    expect(describeOrderSync(sync({ state: "queued" }), true)).toMatchObject({
+      text: "Checking eCourts for orders…",
+      busy: true,
+      tone: "muted",
+    });
+    expect(describeOrderSync(sync({ state: "running" }), true)?.text).toBe("Checking eCourts for orders…");
   });
 
   it("ok with nothing found says so plainly instead of a bare zero", () => {
     const line = describeOrderSync(sync({ state: "ok", found: 0 }), true);
-    expect(line?.text).toMatch(/^No orders found on the court portal · checked (about )?3 hours ago/);
+    expect(line?.text).toBe("Checked eCourts about 3 hours ago. No orders published for this case yet.");
     expect(line?.tone).toBe("muted");
   });
 
   it("ok with orders reports when it was checked and how many", () => {
     const line = describeOrderSync(sync({ state: "ok", found: 3, downloaded: 3 }), true);
-    expect(line?.text).toBe("Orders last checked about 3 hours ago · 3 orders found");
+    expect(line?.text).toBe("Checked about 3 hours ago. 3 orders.");
+    expect(describeOrderSync(sync({ state: "ok", found: 1, downloaded: 1 }), true)?.text).toBe(
+      "Checked about 3 hours ago. 1 order.",
+    );
   });
 
   it("partial is amber and says what was saved", () => {
@@ -96,19 +103,27 @@ describe("describeOrderSync", () => {
     expect(line?.text).toMatch(/^3 orders found, 1 downloaded/);
   });
 
-  it("failed is amber, names the mapped reason, and promises a retry", () => {
+  it("failed is amber, names the mapped reason, says when it retries, and offers Retry", () => {
     const line = describeOrderSync(
       sync({ state: "failed", reason: "CAPTCHA not read", last_success_at: HOURS_AGO(48) }),
       true,
     );
-    expect(line?.tone).toBe("warning");
-    expect(line?.text).toContain("Last order check failed (CAPTCHA not read), retries on next refresh");
-    expect(line?.text).toContain("last successful check");
+    expect(line).toEqual({
+      text: "Last check failed (CAPTCHA not read). Will retry.",
+      tone: "warning",
+      canRetry: true,
+    });
   });
 
-  it("failed with no earlier success omits the last-success clause; 'other' reads as unexpected", () => {
+  it("'other' reads as an unexpected error", () => {
     const line = describeOrderSync(sync({ state: "failed", reason: "other", last_success_at: null }), true);
-    expect(line?.text).toBe("Last order check failed (unexpected error), retries on next refresh");
+    expect(line?.text).toBe("Last check failed (unexpected error). Will retry.");
+  });
+
+  it("only a failed check offers Retry", () => {
+    for (const state of ["never", "queued", "running", "ok", "partial"] as const) {
+      expect(describeOrderSync(sync({ state, found: 2, downloaded: 1 }), true)?.canRetry).toBeFalsy();
+    }
   });
 });
 
@@ -147,11 +162,11 @@ describe("rendering", () => {
 
   it.each([
     ["never", "Orders not checked yet"],
-    ["queued", "Order check queued…"],
-    ["running", "Checking the court portal for orders…"],
-    ["ok", "No orders found on the court portal"],
+    ["queued", "Checking eCourts for orders…"],
+    ["running", "Checking eCourts for orders…"],
+    ["ok", "No orders published for this case yet."],
     ["partial", "orders found, 1 downloaded"],
-    ["failed", "Last order check failed (court portal didn't answer), retries on next refresh"],
+    ["failed", "Last check failed (court portal didn't answer). Will retry."],
   ] as const)("the case page line for state %s", (state, text) => {
     render(
       <OrderSyncStatusLine
@@ -163,6 +178,23 @@ describe("rendering", () => {
     const line = screen.getByTestId("order-sync-status");
     expect(line).toHaveAttribute("data-state", state);
     expect(line).toHaveTextContent(text);
+  });
+
+  it("shows a Retry button only when one is wired up, and only for a failed check", async () => {
+    const onRetry = vi.fn();
+    const failed = makeCase({ order_sync: sync({ state: "failed", reason: "CAPTCHA not read" }) });
+    const { rerender } = render(<OrderSyncStatusLine caseItem={failed} />);
+    expect(screen.queryByRole("button", { name: "Retry order check" })).toBeNull();
+
+    rerender(<OrderSyncStatusLine caseItem={failed} onRetry={onRetry} />);
+    screen.getByRole("button", { name: "Retry order check" }).click();
+    expect(onRetry).toHaveBeenCalledTimes(1);
+
+    rerender(<OrderSyncStatusLine caseItem={failed} onRetry={onRetry} retrying />);
+    expect(screen.getByRole("button", { name: "Retry order check" })).toBeDisabled();
+
+    rerender(<OrderSyncStatusLine caseItem={makeCase()} onRetry={onRetry} />);
+    expect(screen.queryByRole("button", { name: "Retry order check" })).toBeNull();
   });
 
   it("renders nothing for an untracked case that was never checked", () => {

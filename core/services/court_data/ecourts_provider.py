@@ -130,6 +130,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import time
 
 import httpx
 from django.conf import settings
@@ -335,6 +336,67 @@ def _run_bounded(coro, *, label: str):
         ) from exc
 
 
+def _new_search_timing() -> dict:
+    """Seconds spent per step of ONE court complex's advocate search, summed
+    over its attempts, plus how many attempts it took. Numbers only: nothing
+    here can carry a name or a CAPTCHA reading. The caller reads it off
+    `provider.last_search_timing` after the call (success or failure)."""
+    return {"init_s": 0.0, "setup_s": 0.0, "captcha_s": 0.0, "submit_s": 0.0, "attempts": 0}
+
+
+class _AdvocateSearchSession:
+    """One District Courts client kept open across the court complexes of a
+    single district (ADVOCATE_SEARCH_REUSE_SESSION). It owns a private event
+    loop because an httpx client is bound to the loop it first ran on, and
+    the sync provider API otherwise opens and closes one per call.
+
+    `_init_session()` (three portal requests) then runs once, on the first
+    complex, and again only after something failed; `_setup_court()` still
+    runs for every complex. Use as a context manager, one session per
+    district, one complex at a time -- never shared between threads."""
+
+    def __init__(self, provider: "EcourtsProvider") -> None:
+        self._provider = provider
+        self._loop = asyncio.new_event_loop()
+        self._client = _TokenSeedingDistrictClient()
+        self.needs_init = True
+        self.last_search_timing: dict | None = None
+
+    def __enter__(self) -> "_AdvocateSearchSession":
+        try:
+            self._loop.run_until_complete(self._client.__aenter__())
+        except BaseException:
+            self._loop.close()
+            raise
+        return self
+
+    def __exit__(self, *exc_info) -> None:
+        try:
+            self._loop.run_until_complete(self._client.__aexit__(*exc_info))
+        finally:
+            self._loop.close()
+
+    def search_by_advocate(
+        self, hierarchy: dict, *, advocate_name: str = "", bar_code: str = "", status_filter: str = "Both"
+    ):
+        bar_state, bar_code, bar_year = EcourtsProvider._advocate_search_args(advocate_name, bar_code)
+        timing = _new_search_timing()
+        self.last_search_timing = timing
+        return self._loop.run_until_complete(
+            self._provider._district_search_by_advocate(
+                hierarchy,
+                advocate_name=advocate_name,
+                bar_state=bar_state,
+                bar_code=bar_code,
+                bar_year=bar_year,
+                status_filter=status_filter,
+                timing=timing,
+                client=self._client,
+                session=self,
+            )
+        )
+
+
 class EcourtsProvider(CourtDataProvider):
     """CourtDataProvider backed by bharat-courts against the live eCourts
     portals. Public methods are synchronous; asyncio.run() bridges into
@@ -398,11 +460,9 @@ class EcourtsProvider(CourtDataProvider):
         given, or bar_code doesn't match the expected format. Raises
         CaseNotFoundError/CourtPortalError/CaptchaSolveError as usual.
         """
-        if bool(advocate_name) == bool(bar_code):
-            raise ValueError("Exactly one of advocate_name or bar_code must be given.")
-        bar_state = bar_year = ""
-        if bar_code:
-            bar_state, bar_code, bar_year = split_bar_code(bar_code)
+        bar_state, bar_code, bar_year = self._advocate_search_args(advocate_name, bar_code)
+        timing = _new_search_timing()
+        self.last_search_timing = timing
         return asyncio.run(
             self._district_search_by_advocate(
                 hierarchy,
@@ -411,8 +471,25 @@ class EcourtsProvider(CourtDataProvider):
                 bar_code=bar_code,
                 bar_year=bar_year,
                 status_filter=status_filter,
+                timing=timing,
             )
         )
+
+    @staticmethod
+    def _advocate_search_args(advocate_name: str, bar_code: str) -> tuple[str, str, str]:
+        """Validate the name-or-bar-code pair; returns (bar_state, bar_code,
+        bar_year), the last three empty for a name search."""
+        if bool(advocate_name) == bool(bar_code):
+            raise ValueError("Exactly one of advocate_name or bar_code must be given.")
+        if bar_code:
+            return split_bar_code(bar_code)
+        return "", "", ""
+
+    def advocate_search_session(self) -> _AdvocateSearchSession:
+        """A context manager keeping one portal session open across the
+        complexes of a district -- see _AdvocateSearchSession. Only used when
+        ADVOCATE_SEARCH_REUSE_SESSION is on."""
+        return _AdvocateSearchSession(self)
 
     # ------------------------------------------------------------------
     # Public: orders (Phase B)
@@ -429,6 +506,24 @@ class EcourtsProvider(CourtDataProvider):
         if court_type == "district":
             return asyncio.run(self._download_district_order(cnr, order))
         return asyncio.run(self._download_hc_order(cnr, order))
+
+    def fetch_order_page_html(self, tracking_config: dict) -> str:
+        """The raw CNR-search page the order listing is read from, unparsed.
+
+        Exactly the portal call list_orders() makes (the same CAPTCHA-gated
+        CNR search, through the same internal function), without turning the
+        page into records. Read-only; used by `manage.py diagnose_orders` to
+        tell "the portal lists no orders" from "the parser misses them".
+        """
+        cnr, court_type = self._order_identity(tracking_config)
+        return asyncio.run(self._order_page_html(cnr, court_type))
+
+    async def _order_page_html(self, cnr: str, court_type: str) -> str:
+        if court_type == "district":
+            async with _TokenSeedingDistrictClient() as client:
+                return await self._district_cnr_search(client, cnr)
+        async with HCServicesClient() as client:
+            return await self._hc_cnr_search(client, cnr)
 
     @staticmethod
     def _order_identity(tracking_config: dict) -> tuple[str, str]:
@@ -593,6 +688,9 @@ class EcourtsProvider(CourtDataProvider):
         bar_code: str,
         bar_year: str,
         status_filter: str,
+        timing: dict | None = None,
+        client: DistrictCourtClient | None = None,
+        session: _AdvocateSearchSession | None = None,
     ) -> list[AdvocateSearchHit]:
         """Hand-rolled retry loop (matches _district_cnr_search's existing
         pattern in this file) instead of bharat-courts' own
@@ -634,17 +732,74 @@ class EcourtsProvider(CourtDataProvider):
         court_complex_code returns HTTP 200 with a genuinely blank body,
         indistinguishable from "no matching cases" unless checked for.
         """
-        async with _TokenSeedingDistrictClient() as client:
-            last_exc: Exception | None = None
+        timing = timing if timing is not None else _new_search_timing()
+        args = {
+            "advocate_name": advocate_name,
+            "bar_state": bar_state,
+            "bar_code": bar_code,
+            "bar_year": bar_year,
+            "status_filter": status_filter,
+            "timing": timing,
+        }
+        if client is not None:
+            # A kept-open session (see _AdvocateSearchSession).
+            return await self._advocate_search_attempts(client, session, hierarchy, **args)
+        async with _TokenSeedingDistrictClient() as own_client:
+            return await self._advocate_search_attempts(own_client, None, hierarchy, **args)
+
+    async def _advocate_search_attempts(
+        self,
+        client: DistrictCourtClient,
+        session: _AdvocateSearchSession | None,
+        hierarchy: dict,
+        *,
+        advocate_name: str,
+        bar_state: str,
+        bar_code: str,
+        bar_year: str,
+        status_filter: str,
+        timing: dict,
+    ) -> list[AdvocateSearchHit]:
+        """The attempt loop for one court complex. By default every attempt
+        starts the portal session over (_init_session, then _setup_court) --
+        exactly as before. A kept-open `session` skips _init_session until
+        something has failed. `timing` gets the seconds each step took.
+
+        Every failure starts the session over, including a wrong CAPTCHA
+        reading. Tried and rejected, live on the portal (6 Nov 2026): after a
+        wrong CAPTCHA the portal drops the session, so refetching the image and
+        resubmitting without a new _init_session got "Invalid Request" every
+        time and needed the full restart anyway -- three attempts instead of
+        two per complex, 28.6 s against 16.2 s on the same district."""
+        needs_init = True if session is None else session.needs_init
+        needs_setup = True
+        last_exc: Exception | None = None
+        completed = False
+        try:
             for attempt in range(1, ADVOCATE_SEARCH_MAX_ATTEMPTS + 1):
-                await client._init_session()
-                await client._setup_court(
-                    state_code=hierarchy["state_code"],
-                    dist_code=hierarchy["dist_code"],
-                    court_complex_code=hierarchy["court_complex_code"],
-                    est_code=hierarchy.get("est_code", ""),
-                )
+                timing["attempts"] = attempt
+                if needs_init:
+                    started = time.perf_counter()
+                    await client._init_session()
+                    timing["init_s"] += time.perf_counter() - started
+                    needs_init = False
+                    needs_setup = True
+                    if session is not None:
+                        session.needs_init = False
+                if needs_setup:
+                    started = time.perf_counter()
+                    await client._setup_court(
+                        state_code=hierarchy["state_code"],
+                        dist_code=hierarchy["dist_code"],
+                        court_complex_code=hierarchy["court_complex_code"],
+                        est_code=hierarchy.get("est_code", ""),
+                    )
+                    timing["setup_s"] += time.perf_counter() - started
+                    needs_setup = False
+
+                started = time.perf_counter()
                 captcha = await client._solve_captcha()
+                timing["captcha_s"] += time.perf_counter() - started
                 if not captcha:
                     last_exc = CaptchaSolveError("OCR failed to read the CAPTCHA image.")
                     logger.warning(
@@ -652,6 +807,7 @@ class EcourtsProvider(CourtDataProvider):
                         "read a valid CAPTCHA, refetching without submitting.",
                         attempt, ADVOCATE_SEARCH_MAX_ATTEMPTS,
                     )
+                    needs_init = needs_setup = True
                     if attempt < ADVOCATE_SEARCH_MAX_ATTEMPTS:
                         await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
                     continue
@@ -668,6 +824,7 @@ class EcourtsProvider(CourtDataProvider):
                     status_filter=status_filter,
                     captcha=captcha,
                 )
+                started = time.perf_counter()
                 try:
                     result = await client._post_ajax("casestatus/submitAdvName", form)
                 except (DistrictServerError, DistrictCaptchaError) as exc:
@@ -676,6 +833,7 @@ class EcourtsProvider(CourtDataProvider):
                         "District Courts advocate search attempt %d/%d failed: %s",
                         attempt, ADVOCATE_SEARCH_MAX_ATTEMPTS, exc,
                     )
+                    needs_init = needs_setup = True
                     if attempt < ADVOCATE_SEARCH_MAX_ATTEMPTS:
                         await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
                     continue
@@ -699,9 +857,12 @@ class EcourtsProvider(CourtDataProvider):
                         "error (%s: %s).",
                         attempt, ADVOCATE_SEARCH_MAX_ATTEMPTS, type(exc).__name__, exc,
                     )
+                    needs_init = needs_setup = True
                     if attempt < ADVOCATE_SEARCH_MAX_ATTEMPTS:
                         await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
                     continue
+                finally:
+                    timing["submit_s"] += time.perf_counter() - started
 
                 html = result.get("adv_data", "")
                 if not html:
@@ -716,11 +877,14 @@ class EcourtsProvider(CourtDataProvider):
                         "(missing/invalid dist_code or court_complex_code).",
                         attempt, ADVOCATE_SEARCH_MAX_ATTEMPTS,
                     )
+                    needs_init = needs_setup = True
                     if attempt < ADVOCATE_SEARCH_MAX_ATTEMPTS:
                         await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
                     continue
 
-                return parse_advocate_search_html(html, advocate_name=advocate_name)
+                hits = parse_advocate_search_html(html, advocate_name=advocate_name)
+                completed = True
+                return hits
 
             if isinstance(last_exc, (DistrictCaptchaError, CaptchaSolveError)):
                 raise CaptchaSolveError(
@@ -730,6 +894,11 @@ class EcourtsProvider(CourtDataProvider):
                 f"District Courts advocate search failed after {ADVOCATE_SEARCH_MAX_ATTEMPTS} "
                 f"attempts: {last_exc}"
             ) from last_exc
+        finally:
+            # A kept-open session that saw anything but a clean success is
+            # not trusted for the next complex: it starts over there.
+            if session is not None and not completed:
+                session.needs_init = True
 
     async def _district_history_with_retry(self, client: DistrictCourtClient, view_args: dict):
         form = {

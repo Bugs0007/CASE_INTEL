@@ -488,6 +488,17 @@ GOOGLE_OAUTH_CLIENT_ID = config("GOOGLE_OAUTH_CLIENT_ID", default="")
 SIGNUP_MODE = config("SIGNUP_MODE", default="open")
 WORKER_MAX_RSS_MB = config("WORKER_MAX_RSS_MB", default=300, cast=int)
 
+# Advocate search speed-up (core/services/court_data/ecourts_provider.py).
+# DEFAULTS TO OFF: turn it on only after comparing seconds per court complex
+# and the failure rate against the old path on the real portal.
+#   REUSE_SESSION  within one district, start the portal session once
+#                  (_init_session) and only select the court per complex;
+#                  start over after any failure, including "Invalid Request".
+# (A second flag, resubmitting after a wrong CAPTCHA without restarting the
+# session, was tried and removed: the portal rejects it -- see
+# _advocate_search_attempts.)
+ADVOCATE_SEARCH_REUSE_SESSION = config("ADVOCATE_SEARCH_REUSE_SESSION", default=False, cast=bool)
+
 # ============================================================================
 # Outbound email (invoice delivery to a case's billing contact)
 # ============================================================================

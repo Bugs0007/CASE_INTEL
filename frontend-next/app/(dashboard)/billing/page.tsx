@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { FileDown, Loader2, Users } from "lucide-react";
+import { FileDown, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { showToast } from "@/components/ui/toaster";
 import { AgingBuckets } from "@/components/billing/aging-buckets";
+import { BILLING_TABS, SectionTabs } from "@/components/layout/section-tabs";
 import {
   billingPortfolioKeys,
   useBillingPortfolio,
@@ -47,20 +48,13 @@ export default function BillingPage() {
 
   return (
     <div className="px-4 sm:px-7 pt-5 sm:pt-7 pb-[60px] max-w-[1100px] mx-auto space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-page-title text-gray-900 mb-1.5">Billing</h1>
-          <p className="text-sm text-gray-600">
-            Unpaid invoices by age, outstanding per client, and hearings not yet billed.
-          </p>
-        </div>
-        <Link
-          href="/clients"
-          className="inline-flex h-11 md:h-8 items-center gap-2 rounded-lg border border-gray-200 bg-surface px-3 text-sm font-semibold text-gray-800 hover:bg-gray-50"
-        >
-          <Users className="h-4 w-4" />
-          Manage clients
-        </Link>
+      {/* space-y-5 already spaces the strip from the header. */}
+      <SectionTabs tabs={BILLING_TABS} className="mb-0" />
+      <div>
+        <h1 className="text-page-title text-gray-900 mb-1.5">Billing</h1>
+        <p className="text-sm text-gray-600">
+          Unpaid invoices by age, outstanding per client, and hearings not yet billed.
+        </p>
       </div>
 
       {isLoading ? (

@@ -16,10 +16,11 @@ export function useDashboard() {
   });
 }
 
-export function useUpcomingHearings(since?: string) {
+export function useUpcomingHearings(since?: string, enabled = true) {
   return useQuery({
     queryKey: dashboardKeys.upcomingHearings(since),
     queryFn: () => dashboardApi.upcomingHearings(since),
     staleTime: 5 * 60 * 1000, // 5 minutes
+    enabled,
   });
 }
