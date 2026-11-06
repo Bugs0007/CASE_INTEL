@@ -9,18 +9,20 @@ indistinguishable from one that doesn't exist.
 """
 
 import logging
-from datetime import date
+from datetime import date, timedelta
 
 from django.core.files.storage import default_storage
 from django.http import FileResponse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.models import Case, CourtOrder
+from core.models import Case, CourtOrder, ProcessingJob
 from core.serializers import CourtOrderSerializer
 from core.services.court_order_sync import order_sequence_sort_key
+from core.services.order_sync_status import order_sync_summary
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +81,57 @@ class CaseOrdersView(APIView):
             ),
         )
         return Response(CourtOrderSerializer(ordered, many=True).data)
+
+
+ORDER_CHECK_COOLDOWN = timedelta(minutes=5)
+
+
+class CaseOrderCheckView(APIView):
+    """Queue another order check for one tracked case.
+
+    POST /api/cases/<id>/orders/check/
+
+    The "Retry" button on a failed order check. It does exactly what the
+    refresh does after a hearing sync -- enqueue one `order_sync` job for the
+    case -- so the worker runs it with the same pacing, retry and download
+    limits as any other. Nothing here talks to the portal.
+
+    Bounded three ways: only the caller's own tracked case; a check already
+    queued or running is returned as it is (never a second); and a new one is
+    refused for ORDER_CHECK_COOLDOWN after the previous one was queued or
+    finished, whichever is later, so the button cannot be used to hammer the
+    portal.
+    """
+
+    def post(self, request: Request, pk: int) -> Response:
+        case = Case.objects.filter(id=pk, owner=request.user).first()
+        if case is None:
+            return Response({"detail": "Case not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not case.tracking_enabled:
+            return Response(
+                {"detail": "Court tracking is not set up for this case."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        jobs = ProcessingJob.objects.filter(case=case, job_type="order_sync").exclude(status="cancelled")
+        if jobs.filter(status__in=["queued", "running"]).exists():
+            return Response({"order_sync": order_sync_summary(case)}, status=status.HTTP_200_OK)
+
+        last = jobs.order_by("-created_at", "-id").first()
+        if last is not None:
+            since = max(t for t in (last.created_at, last.finished_at) if t is not None)
+            wait = ORDER_CHECK_COOLDOWN - (timezone.now() - since)
+            if wait > timedelta(0):
+                seconds = int(wait.total_seconds()) + 1
+                response = Response(
+                    {"detail": "An order check just ran. Try again in a few minutes.", "retry_after": seconds},
+                    status=status.HTTP_429_TOO_MANY_REQUESTS,
+                )
+                response["Retry-After"] = str(seconds)
+                return response
+
+        ProcessingJob.enqueue_order_sync(case)
+        return Response({"order_sync": order_sync_summary(case)}, status=status.HTTP_202_ACCEPTED)
 
 
 class CourtOrderFileView(APIView):

@@ -430,6 +430,24 @@ class EcourtsProvider(CourtDataProvider):
             return asyncio.run(self._download_district_order(cnr, order))
         return asyncio.run(self._download_hc_order(cnr, order))
 
+    def fetch_order_page_html(self, tracking_config: dict) -> str:
+        """The raw CNR-search page the order listing is read from, unparsed.
+
+        Exactly the portal call list_orders() makes (the same CAPTCHA-gated
+        CNR search, through the same internal function), without turning the
+        page into records. Read-only; used by `manage.py diagnose_orders` to
+        tell "the portal lists no orders" from "the parser misses them".
+        """
+        cnr, court_type = self._order_identity(tracking_config)
+        return asyncio.run(self._order_page_html(cnr, court_type))
+
+    async def _order_page_html(self, cnr: str, court_type: str) -> str:
+        if court_type == "district":
+            async with _TokenSeedingDistrictClient() as client:
+                return await self._district_cnr_search(client, cnr)
+        async with HCServicesClient() as client:
+            return await self._hc_cnr_search(client, cnr)
+
     @staticmethod
     def _order_identity(tracking_config: dict) -> tuple[str, str]:
         court_type = tracking_config.get("court_type")

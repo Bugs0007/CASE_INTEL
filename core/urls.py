@@ -41,6 +41,7 @@ from core.views import (
     CaseEventDetailView,
     CaseEventListCreateView,
     CaseListView,
+    CaseOrderCheckView,
     CaseOrdersView,
     CaseTrackingConfirmView,
     CaseTrackingPreviewView,
@@ -172,6 +173,11 @@ urlpatterns = [
         "cases/<int:pk>/orders/",
         CaseOrdersView.as_view(),
         name="case-orders",
+    ),
+    path(
+        "cases/<int:pk>/orders/check/",
+        CaseOrderCheckView.as_view(),
+        name="case-order-check",
     ),
     path(
         "cases/<int:pk>/tracking/",

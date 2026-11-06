@@ -74,7 +74,7 @@ from .conversation import (
     ConversationListView,
     ConversationMessagesView,
 )
-from .court_order import CaseOrdersView, CourtOrderFileView
+from .court_order import CaseOrderCheckView, CaseOrdersView, CourtOrderFileView
 from .dashboard import DashboardView, UpcomingHearingsView
 from .document import (
     DocumentDetailView,
@@ -150,6 +150,7 @@ __all__ = [
     "CaseEventDetailView",
     "CaseEventListCreateView",
     "CaseListView",
+    "CaseOrderCheckView",
     "CaseOrdersView",
     "CaseTrackingConfirmView",
     "CaseTrackingPreviewView",
