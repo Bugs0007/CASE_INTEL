@@ -23,6 +23,7 @@ import {
 import { useCourtStructure } from "@/hooks/use-case-tracking";
 import { caseKeys, useCases } from "@/hooks/use-cases";
 import { useNow } from "@/hooks/use-now";
+import { coverageOf } from "@/lib/hc-jurisdiction";
 import { applyFilters, filtersFromParams, filtersToParams, formatClock, type ResultFilters } from "@/lib/advocate-search-results";
 import { cn, pluralize } from "@/lib/utils";
 import type { AdvocateFeatures, AdvocateResultRow, AdvocateSearchProfile } from "@/types";
@@ -377,6 +378,7 @@ export function AdvocateSearchV2({ features }: { features: AdvocateFeatures }) {
                 secondsPerCall={features.seconds_per_call}
                 isSearching={start.isPending}
                 error={formError}
+                coverage={court ? coverageOf(court.code) : ""}
                 onSearch={() =>
                   court &&
                   begin(

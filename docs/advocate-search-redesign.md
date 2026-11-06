@@ -11,8 +11,8 @@ old page behave exactly as before.
 | 1. Advocate profile and matching (backend) | built, tested |
 | 2. Per-court-complex status and retry | built, tested; "Solve here" **not built** (below) |
 | 3. High Court search | report below, then built (backend): our own `showRecords` form, bench runs, endpoints. Tested with the portal faked; **not confirmed against a live search** |
-| 4. Frontend | not started |
-| 5. India map picker | not started |
+| 4. Frontend | built: two tabs, profile card, per-court status, results, import; 20 browser specs pass |
+| 5. India map picker | built and tested, **switched off** (`NEXT_PUBLIC_HC_MAP`) until the outline is checked; the list and tile grid are what ships |
 
 ## Decisions and deviations
 
@@ -142,3 +142,62 @@ search (the portal has it, the library does not; same live check first, and only
 2. Bombay: all seven portal benches are offered, four ticked (Appellate Side, Aurangabad, Nagpur,
    Goa). Say if the others should go.
 3. Filing-number search: only if wanted.
+
+## Phase 4: the page
+
+`/cases/search` asks `GET /api/advocate-search/features/`. With the flag off (or the answer
+missing) the page that was there before loads unchanged (`legacy-search.tsx`). With it on, the
+redesigned page loads: `?tab=district|hc`, `?job=<id>` (a running or finished search, so a refresh
+or a return reopens it; a search left running is picked up on arrival), the result filters, and the
+chosen High Court all live in the URL.
+
+- District courts: `AdvocateProfileCard` (bar number, `NameFormChips`, Not me, what goes to
+  eCourts and the label preview, all from the server's profile) and `DistrictPicker`. If the
+  states or districts do not load, a visible error panel with Retry replaces the list.
+- High Courts: `HighCourtPicker` (a keyboard combobox and a tile grid; an unsupported court is
+  greyed with the reason) and the form: the portal's benches ticked as above, status, bar number
+  or names, a year range that only filters the result.
+- Running: `SearchProgress`, `CourtComplexStatus` (failed courts pinned with their reason, Retry,
+  "Search only these N again", a link to the court's site) and `LiveMatches`.
+- Finished: summary, `ResultFiltersBar` (search, status, court, year, match chips, Show hidden
+  with Not me list and Other names, both off), `ResultsTable` (Not me / That's me update at once and
+  nothing is searched again) and `ImportBar` (the existing import; courts already in Cases skipped).
+
+Differences from the mock-ups, on purpose or from what the backend can say:
+
+- **No Pause button.** The backend can stop a search, not pause it.
+- **No "Solve here"** (see above).
+- **District complex counts** show only for ticked districts (each is a portal lookup).
+- **Pending / Disposed chips** appear only when rows carry a status. A District Courts grid has
+  no status column, so they show for a search asked as Pending or Disposed, not for Both.
+- **Filing year** starts at "Any year" so nothing is hidden unasked.
+
+## Phase 5: the India map and the border check
+
+`@svg-maps/india` 2.0.0 (CC BY 4.0, credited under the map and in `NOTICE`), paths untouched.
+The jurisdiction table is one file, `frontend-next/lib/hc-jurisdiction.ts`, one line per court.
+Tests: every registry High Court is in it (`core/tests/test_hc_jurisdiction.py`, which reads the
+file), every one of the map's 36 locations belongs to exactly one court, and the names match
+(`__tests__/hc-jurisdiction.test.tsx`, which also drives the map: hover group, click, keyboard,
+greyed unsupported court, the small-states column). It differs from the registry in two places:
+Ladakh is not drawn separately (one Jammu and Kashmir shape; one court serves both), and the
+registry still calls that court "Jammu & Kashmir High Court".
+
+**The map is OFF** (`NEXT_PUBLIC_HC_MAP` unset) until the outline is checked.
+
+What the border check found, and did not:
+
+- The package's own metadata and geometry were read. Calibrated on places no one disputes
+  (Kanyakumari, Indira Point, Guhar Moti, Kibithu, Delhi), the drawing is a Mercator projection.
+  In that projection the Jammu and Kashmir shape reaches **37.10 N**, and runs from **72.60 E to 80.23 E**.
+  India's official depiction (all of the former state, Gilgit-Baltistan and Aksai Chin included) reaches
+  about 37.1 N and 72.5 E to 80.3 E; the territory India administers reaches about 35.5 N and 73.3 E to
+  79.5 E. So the outline follows the **official** extent, not the administered one.
+- That is a comparison of extents against published figures, **not** an overlay on the Survey of
+  India's own file. Its site offers the political and outline maps and the boundary data only as
+  PDF and vector downloads; none was downloaded.
+- Not checked at all: every other boundary (Arunachal Pradesh, Uttarakhand's east, the Sir Creek
+  edge of Gujarat, the sea limits, the islands).
+- Indian law requires published maps to follow the official depiction. **Someone qualified should
+  check the outline before `NEXT_PUBLIC_HC_MAP` is turned on.** Until then: the combobox and the tile
+  grid.

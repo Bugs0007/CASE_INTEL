@@ -2,8 +2,10 @@
 
 import { useId, useMemo, useState } from "react";
 import { AlertTriangle, Landmark, MapPin, Search } from "lucide-react";
+import { HC_MAP_ENABLED } from "@/lib/hc-jurisdiction";
 import { cn } from "@/lib/utils";
 import type { HighCourtInfo } from "@/types";
+import { IndiaMap } from "./india-map";
 import { Panel } from "./ui";
 
 /** The way to choose a High Court without the map: a search box that is a proper
@@ -50,7 +52,7 @@ export function HighCourtPicker({
       sub="Pick a court"
       label="Choose a High Court"
       className="h-full"
-      bodyClassName="gap-3 overflow-hidden"
+      bodyClassName={cn("overflow-hidden", HC_MAP_ENABLED ? "gap-0 p-0" : "gap-3")}
       action={
         <div className="relative w-[230px]">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-500" />
@@ -134,6 +136,8 @@ export function HighCourtPicker({
             )}
           </span>
         </div>
+      ) : HC_MAP_ENABLED ? (
+        <IndiaMap courts={courts} selected={selected} onSelect={onSelect} />
       ) : (
         <ul aria-label="High Courts" className="grid min-h-0 flex-1 grid-cols-2 content-start gap-2 overflow-y-auto pr-1 xl:grid-cols-3">
           {courts.map((c) => (

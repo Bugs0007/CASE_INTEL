@@ -1,0 +1,11 @@
+Third-party material that needs an acknowledgement
+
+@svg-maps/india
+  The outlines of the states and union territories used by the High Courts tab of
+  "Find cases by advocate" (frontend-next/components/advocate-search/india-map.tsx).
+  Author: Victor Cazanave. Licence: Creative Commons Attribution 4.0 International
+  (CC BY 4.0), https://creativecommons.org/licenses/by/4.0/
+  Source: https://github.com/VictorCazanave/svg-maps/tree/master/packages/india
+  The paths are used as published, unedited. The map is for choosing a court only
+  and is not to scale; it is switched off (NEXT_PUBLIC_HC_MAP) until its outline has
+  been checked. See docs/advocate-search-redesign.md.

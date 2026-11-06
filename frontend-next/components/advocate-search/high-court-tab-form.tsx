@@ -3,6 +3,7 @@
 import { AlertTriangle, Gavel, Loader2, RotateCcw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { describeEstimate, estimateSeconds } from "@/lib/advocate-search-results";
+import { HC_MAP_ENABLED } from "@/lib/hc-jurisdiction";
 import { cn } from "@/lib/utils";
 import type { AdvocateSearchProfile, HighCourtBench, HighCourtInfo } from "@/types";
 import { Eyebrow, Notice, Panel, Seg } from "./ui";
@@ -85,7 +86,7 @@ export function HighCourtForm({
       {coverage && (
         <Notice>
           <span>
-            This High Court covers <b className="font-semibold">{coverage}</b>.
+            This High Court covers <b className="font-semibold">{coverage}</b>.{HC_MAP_ENABLED ? " They light up together on the map." : ""}
           </span>
         </Notice>
       )}
