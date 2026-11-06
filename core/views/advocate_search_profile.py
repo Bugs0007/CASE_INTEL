@@ -3,8 +3,8 @@
 CRUD under /api/advocate-profiles/ (separate from /api/advocate-profile/, the
 billing letterhead), plus two one-click actions used from a result row:
 
-    POST /api/advocate-profiles/<id>/exclude/        {"name": "T Rambabu"}   ("Not me")
-    POST /api/advocate-profiles/<id>/add-name-form/  {"name": "Rambabu S"}   ("That's me")
+    POST /api/advocate-profiles/<id>/exclude/        {"name": "T Kiranmai"}   ("Not me")
+    POST /api/advocate-profiles/<id>/add-name-form/  {"name": "Kiranmai S"}   ("That's me")
 
 Each MOVES the name: marking a name "Not me" takes it off the name forms, and
 "That's me" takes it off the Not me list, because a name is never in both.

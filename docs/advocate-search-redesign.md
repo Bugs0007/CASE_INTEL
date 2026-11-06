@@ -19,12 +19,12 @@ old page behave exactly as before.
 - **The model is `AdvocateSearchProfile`, not `AdvocateProfile`.** `AdvocateProfile` already
   exists (billing letterhead, one row per user, `/api/advocate-profile/`). The search profile
   is a list, at the plural `/api/advocate-profiles/`.
-- **Matching is spaces- and (up to three words) order-insensitive.** "S Rambabu" and
-  "Rambabu S" are one name, so "Not me" on one removes the other from the name forms, and the
-  two lists can never hold either. "Rambabu" and "Ram babu" stay two entries because the portal
+- **Matching is spaces- and (up to three words) order-insensitive.** "S Kiranmai" and
+  "Kiranmai S" are one name, so "Not me" on one removes the other from the name forms, and the
+  two lists can never hold either. "Kiranmai" and "Kiran mai" stay two entries because the portal
   searches them differently.
 - **A match through a single word is `check`, never `matched`.** That includes a plain listed
-  "Rambabu" and a listed "Ram babu" against the single-word form "Rambabu".
+  "Kiranmai" and a listed "Kiran mai" against the single-word form "Kiranmai".
 - **A grid with no Advocate column is `check`** (nothing to verify against), as before.
 - **Rows are classified when read** (`core/services/advocate_results.py`), best match first,
   with counts over all rows. The status endpoint takes the job's profile, or `?profile_id=`.

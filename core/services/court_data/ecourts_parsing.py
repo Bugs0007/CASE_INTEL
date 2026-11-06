@@ -30,7 +30,14 @@ from bharat_courts.districtcourts.parser import parse_complex_value
 # drifting from behavior already verified live.
 from bharat_courts.districtcourts.parser import _extract_cnr, _extract_parties
 
-from core.services.court_data.models import AdvocateSearchHit, CourtCaseData, CourtOrderRecord, HearingRecord
+from core.services.court_data.models import (
+    AdvocateSearchHit,
+    BusinessLink,
+    BusinessRecord,
+    CourtCaseData,
+    CourtOrderRecord,
+    HearingRecord,
+)
 from core.services.name_matching import advocate_tokens, name_similarity
 
 logger = logging.getLogger(__name__)
@@ -781,6 +788,159 @@ def _parse_district_orders(html: str, cnr: str) -> list[tuple[CourtOrderRecord, 
         else:
             logger.info("District order listing for %s: orders section is empty (%s).", cnr, counts)
     return results
+
+
+# ---------------------------------------------------------------------------
+# Daily Status ("Business on Date") -- District Courts
+#
+# Every row of the district case-history table links its Business-on-Date
+# cell to viewBusiness(court_code, dist_code, n_dt, case_number, state_code,
+# businessStatus, todays_date1, court_no, national_court_code,
+# caseStatusSearchType, srno). The portal's own components.js (read live
+# 6 Nov 2026) turns that into a POST to home/viewBusiness with the fields
+# built in parse_business_links() below and renders the JSON's data_list.
+# The link arguments are verified on the captured page in
+# core/tests/fixtures/causelists/district_ecourts/cnr_case_page/; the
+# data_list markup itself has NOT been captured live yet, so
+# parse_business_html() reads it by label text ("Business", "Next Purpose",
+# "Next Hearing Date", ...) and works on table rows and on bold-label
+# paragraphs alike, rather than on any fixed layout.
+# ---------------------------------------------------------------------------
+
+def _js_call_args(func_name: str, target: str) -> list[str] | None:
+    """The arguments of the first `func_name(...)` call in `target`,
+    however they are quoted ('a', "a" or bare a)."""
+    match = re.search(rf"{func_name}\(\s*(.*?)\s*\)", target or "", re.S)
+    if not match:
+        return None
+    inner = match.group(1)
+    args: list[str] = []
+    pos = 0
+    while pos <= len(inner) and inner[pos:].strip() != "":
+        arg = _DC_ARG_RE.match(inner, pos)
+        if arg is None:
+            break
+        args.append(next((g for g in arg.groups() if g is not None), ""))
+        pos = arg.end()
+    return args
+
+
+def parse_business_links(html: str) -> list[BusinessLink]:
+    """Every viewBusiness(...) link on a district case-history page, newest
+    business date first, one per date (the last row for a date wins: the
+    table runs oldest to newest)."""
+    soup = BeautifulSoup(html or "", "lxml")
+    by_date: dict[date | None, BusinessLink] = {}
+    for tag in soup.find_all(attrs={"onclick": re.compile(r"viewBusiness")}):
+        args = _js_call_args("viewBusiness", tag.get("onclick", ""))
+        if not args or len(args) < 10:
+            continue
+        args = (args + [""] * 11)[:11]
+        court_code, dist_code, n_dt, case_number, state_code, status, bdate, court_no, ncc, search_by, srno = args
+        business_date = _parse_date(bdate)
+        if business_date is None:
+            continue
+        by_date[business_date] = BusinessLink(
+            business_date=business_date,
+            form={
+                "court_code": court_code,
+                "state_code": state_code,
+                "dist_code": dist_code,
+                "nextdate1": n_dt,
+                "case_number1": case_number,
+                "disposal_flag": status,
+                "businessDate": bdate,
+                "national_court_code": ncc,
+                "court_no": court_no,
+                "search_by": search_by,
+                "srno": srno,
+            },
+        )
+    return sorted(by_date.values(), key=lambda link: link.business_date, reverse=True)
+
+
+# Longest labels first, so "next hearing date" is never read as "date".
+_BUSINESS_LABELS = (
+    ("next hearing date", "next_hearing_date"),
+    ("next date", "next_hearing_date"),
+    ("next purpose", "next_purpose"),
+    ("in the court of", "court_name"),
+    ("business date", "business_date"),
+    ("cnr number", "_ignored"),
+    ("case number", "_ignored"),
+    ("business", "business_text"),
+    ("purpose", "next_purpose"),
+    ("date", "business_date"),
+)
+_BUSINESS_LABEL_RE = re.compile(
+    r"^(" + "|".join(re.escape(label) for label, _ in _BUSINESS_LABELS) + r")(?=\s*(?::|-|$))\s*[:\-]*\s*(.*)$",
+    re.I,
+)
+_BUSINESS_FIELDS = dict(_BUSINESS_LABELS)
+_BUSINESS_ERROR_MARKERS = ("invalid request", "there is an error", "not uploaded", "record not found", "no record")
+
+
+def parse_business_html(html: str, business_date: date | None = None) -> BusinessRecord | None:
+    """Parse a home/viewBusiness data_list into a BusinessRecord.
+
+    Walks the page's text line by line: a line starting with a known label
+    ("Business :", "Next Purpose", "Next Hearing Date", "In the court of",
+    "Date") opens that field, and the text after the label (or on the
+    following lines, for a label in its own cell) fills it. Business text
+    runs until the next label; every other field takes one line. Lines
+    that belong to no label (the "X versus Y" party line) are dropped, so
+    party names are never stored.
+
+    Returns None for an empty, error or unrecognised page ("Invalid
+    Request", "not uploaded", no Business/Date label at all). A recognised
+    page whose Business is blank still returns a record: the court simply
+    recorded nothing that day. `business_date` (from the link) is used when
+    the page shows no date of its own.
+    """
+    text_html = html or ""
+    if len(text_html.strip()) < 10:
+        return None
+    soup = BeautifulSoup(text_html, "lxml")
+    lines = [_clean(line) for line in soup.get_text("\n").split("\n")]
+    lines = [line for line in lines if line and line not in (":", "-", ":-")]
+
+    values: dict[str, list[str]] = {}
+    current: str | None = None
+    for line in lines:
+        match = _BUSINESS_LABEL_RE.match(line)
+        if match:
+            current = _BUSINESS_FIELDS[match.group(1).lower()]
+            values.setdefault(current, [])
+            rest = match.group(2).strip()
+            if rest:
+                values[current].append(rest)
+                if current != "business_text":
+                    current = None
+            continue
+        if current is None:
+            continue
+        values[current].append(line)
+        if current != "business_text":
+            current = None
+
+    if "business_text" not in values and "business_date" not in values:
+        lowered = text_html.lower()
+        known = next((m for m in _BUSINESS_ERROR_MARKERS if m in lowered), "")
+        # Only the matched marker is logged, never the page text (it can
+        # carry party names).
+        logger.info("Daily status page carried no business (%s).", known or "unrecognised layout")
+        return None
+
+    def _first(key: str) -> str:
+        return values.get(key, [""])[0] if values.get(key) else ""
+
+    return BusinessRecord(
+        business_date=_parse_date(_first("business_date")) or business_date,
+        court_name=_first("court_name"),
+        business_text=" ".join(values.get("business_text", [])).strip(),
+        next_purpose=_first("next_purpose"),
+        next_hearing_date=_parse_date(_normalize_ordinal_date(_first("next_hearing_date"))),
+    )
 
 
 _VIEWHISTORY_RE = re.compile(

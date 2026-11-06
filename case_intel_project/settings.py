@@ -302,6 +302,15 @@ OLLAMA_REQUEST_TIMEOUT_SECONDS = config("OLLAMA_REQUEST_TIMEOUT_SECONDS", defaul
 # a request thread can be held for minutes. Keep it under gunicorn's --timeout.
 COURT_PORTAL_CALL_TIMEOUT_SECONDS = config("COURT_PORTAL_CALL_TIMEOUT_SECONDS", default=90, cast=float)
 
+# District "Daily Status" (Business on Date) fetch, run by the order_sync worker
+# job (core/services/daily_status.py). Per sync at most this many missing dates
+# are fetched, newest first, this many seconds apart; and only the case's
+# latest COURT_BUSINESS_HISTORY_WINDOW business dates are ever fetched at all
+# (the hard per-case cap -- older history is never backfilled).
+COURT_BUSINESS_FETCHES_PER_SYNC = config("COURT_BUSINESS_FETCHES_PER_SYNC", default=3, cast=int)
+COURT_BUSINESS_HISTORY_WINDOW = config("COURT_BUSINESS_HISTORY_WINDOW", default=10, cast=int)
+COURT_BUSINESS_DELAY_SECONDS = config("COURT_BUSINESS_DELAY_SECONDS", default=3, cast=float)
+
 # Case Bot cross-encoder reranker (core/services/reranker.py).
 #   onnx  (default) onnxruntime, no torch in the web process
 #   torch the original sentence-transformers CrossEncoder (~+430 MB per worker)

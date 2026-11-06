@@ -28,7 +28,7 @@ class Migration(migrations.Migration):
                 (
                     "display_name",
                     models.CharField(
-                        help_text="The advocate's full name, e.g. 'Rambabu Samalla'.",
+                        help_text="The advocate's full name as on the Bar roll.",
                         max_length=120,
                     ),
                 ),

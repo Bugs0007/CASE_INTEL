@@ -20,6 +20,7 @@ from core.models import (
     Case,
     CaseBriefing,
     CaseEvent,
+    CaseBusinessEntry,
     CaseTag,
     CaseTagMap,
     Citation,
@@ -287,6 +288,14 @@ class CaseEventAdmin(admin.ModelAdmin):
     search_fields = ("title", "location", "notes")
     readonly_fields = ("created_at", "updated_at")
     date_hierarchy = "date"
+
+
+@admin.register(CaseBusinessEntry)
+class CaseBusinessEntryAdmin(admin.ModelAdmin):
+    list_display = ("case", "business_date", "next_purpose", "next_hearing_date", "fetched_at")
+    search_fields = ("business_text", "next_purpose")
+    readonly_fields = ("fetched_at",)
+    date_hierarchy = "business_date"
 
 
 @admin.register(Hearing)

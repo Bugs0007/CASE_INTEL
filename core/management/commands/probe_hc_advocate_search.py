@@ -1,7 +1,7 @@
 """One real High Court advocate search, to read what the portal actually returns.
 
     python manage.py probe_hc_advocate_search --court telangana --bar-code TS/1234/2009
-    python manage.py probe_hc_advocate_search --court bombay --bench 4 --name "Rambabu" --status Pending
+    python manage.py probe_hc_advocate_search --court bombay --bench 4 --name "<advocate name>" --status Pending
 
 The redesigned High Courts tab posts a form that bharat-courts has no builder for
 (core/services/court_data/ecourts_parsing.py: hc_advocate_search_form). Its field

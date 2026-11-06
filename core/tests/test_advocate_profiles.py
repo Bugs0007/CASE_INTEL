@@ -16,8 +16,8 @@ from core.services.court_data.ecourts_parsing import parse_advocate_search_html
 from core.services.court_data.ecourts_provider import EcourtsProvider
 from core.tests.auth_helpers import token_for
 
-FORMS = ["Rambabu", "Ram babu", "S Rambabu", "S Ram babu", "Rambabu S"]
-NOT_ME = ["T Rambabu", "K Rambabu", "Rambabu Reddy"]
+FORMS = ["Kiranmai", "Kiran mai", "S Kiranmai", "S Kiran mai", "Kiranmai S"]
+NOT_ME = ["T Kiranmai", "P Kiranmai", "Kiranmai Reddy"]
 
 
 @pytest.fixture
@@ -50,7 +50,7 @@ def client_b(user_b):
 def profile_a(user_a):
     return AdvocateSearchProfile.objects.create(
         owner=user_a,
-        display_name="Rambabu Samalla",
+        display_name="Kiranmai Sample",
         bar_codes=["TS/1234/2009"],
         name_forms=list(FORMS),
         excluded_names=list(NOT_ME),
@@ -77,16 +77,16 @@ class TestProfileCrud:
     def test_create_stamps_the_owner_and_computes_queries_and_suggestions(self, client_a, user_a):
         resp = client_a.post(
             "/api/advocate-profiles/",
-            {"display_name": "Rambabu Samalla", "bar_codes": ["ts/1234/2009"], "name_forms": FORMS},
+            {"display_name": "Kiranmai Sample", "bar_codes": ["ts/1234/2009"], "name_forms": FORMS},
             format="json",
         )
         assert resp.status_code == 201, resp.data
         assert AdvocateSearchProfile.objects.get(id=resp.data["id"]).owner == user_a
         assert resp.data["bar_codes"] == ["TS/1234/2009"]  # normalised
-        assert resp.data["queries"] == ["Rambabu", "Ram babu"]
+        assert resp.data["queries"] == ["Kiranmai", "Kiran mai"]
         assert resp.data["query_count"] == 2
         assert resp.data["query_warning"] == ""
-        assert resp.data["suggestions"] == ["Samalla Rambabu"]
+        assert resp.data["suggestions"] == ["Sample Kiranmai"]
 
     def test_more_than_three_queries_carries_a_warning(self, client_a):
         resp = client_a.post(
@@ -108,7 +108,7 @@ class TestProfileCrud:
     def test_a_name_cannot_be_in_both_lists(self, client_a):
         resp = client_a.post(
             "/api/advocate-profiles/",
-            {"display_name": "X Y", "name_forms": ["S Rambabu"], "excluded_names": ["s. rambabu"]},
+            {"display_name": "X Y", "name_forms": ["S Kiranmai"], "excluded_names": ["s. kiranmai"]},
             format="json",
         )
         assert resp.status_code == 400
@@ -116,21 +116,21 @@ class TestProfileCrud:
 
     def test_patch_cannot_create_the_overlap_either(self, client_a, profile_a):
         resp = client_a.patch(
-            f"/api/advocate-profiles/{profile_a.id}/", {"excluded_names": [*NOT_ME, "S Rambabu"]}, format="json"
+            f"/api/advocate-profiles/{profile_a.id}/", {"excluded_names": [*NOT_ME, "S Kiranmai"]}, format="json"
         )
         assert resp.status_code == 400
         profile_a.refresh_from_db()
-        assert "S Rambabu" not in profile_a.excluded_names
+        assert "S Kiranmai" not in profile_a.excluded_names
 
     def test_patch_updates_and_dedupes(self, client_a, profile_a):
         resp = client_a.patch(
             f"/api/advocate-profiles/{profile_a.id}/",
-            {"name_forms": ["Rambabu", "rambabu", "Ram  babu"]},
+            {"name_forms": ["Kiranmai", "kiranmai", "Kiran  mai"]},
             format="json",
         )
         assert resp.status_code == 200
-        # Exact repeats collapse; "Ram babu" stays: the portal searches it differently from "Rambabu".
-        assert resp.data["name_forms"] == ["Rambabu", "Ram babu"]
+        # Exact repeats collapse; "Kiran mai" stays: the portal searches it differently from "Kiranmai".
+        assert resp.data["name_forms"] == ["Kiranmai", "Kiran mai"]
 
     def test_empty_display_name_rejected(self, client_a):
         assert client_a.post("/api/advocate-profiles/", {"display_name": "  "}, format="json").status_code == 400
@@ -147,7 +147,7 @@ class TestProfileCrud:
 class TestProfileTenancy:
     def test_list_shows_only_my_profiles(self, client_a, client_b, profile_a, user_b):
         AdvocateSearchProfile.objects.create(owner=user_b, display_name="Bob")
-        assert [p["display_name"] for p in client_a.get("/api/advocate-profiles/").data] == ["Rambabu Samalla"]
+        assert [p["display_name"] for p in client_a.get("/api/advocate-profiles/").data] == ["Kiranmai Sample"]
         assert [p["display_name"] for p in client_b.get("/api/advocate-profiles/").data] == ["Bob"]
 
     def test_other_advocates_profile_is_a_404_on_every_verb_and_action(self, client_b, profile_a):
@@ -155,11 +155,11 @@ class TestProfileTenancy:
         assert client_b.get(base).status_code == 404
         assert client_b.patch(base, {"display_name": "hijacked"}, format="json").status_code == 404
         assert client_b.delete(base).status_code == 404
-        assert client_b.post(base + "exclude/", {"name": "S Rambabu"}, format="json").status_code == 404
+        assert client_b.post(base + "exclude/", {"name": "S Kiranmai"}, format="json").status_code == 404
         assert client_b.post(base + "add-name-form/", {"name": "X Y"}, format="json").status_code == 404
         profile_a.refresh_from_db()
-        assert profile_a.display_name == "Rambabu Samalla"
-        assert "S Rambabu" in profile_a.name_forms
+        assert profile_a.display_name == "Kiranmai Sample"
+        assert "S Kiranmai" in profile_a.name_forms
 
     def test_create_ignores_a_client_supplied_owner(self, client_a, user_a, user_b):
         resp = client_a.post(
@@ -177,26 +177,26 @@ class TestProfileTenancy:
 @pytest.mark.django_db
 class TestQuickActions:
     def test_not_me_moves_the_name_off_the_forms(self, client_a, profile_a):
-        resp = client_a.post(f"/api/advocate-profiles/{profile_a.id}/exclude/", {"name": "s rambabu"}, format="json")
+        resp = client_a.post(f"/api/advocate-profiles/{profile_a.id}/exclude/", {"name": "s kiranmai"}, format="json")
         assert resp.status_code == 200
         # every spelling that is the same name leaves the forms, not just the typed one
-        assert not {"S Rambabu", "Rambabu S", "S Ram babu"} & set(resp.data["name_forms"])
-        assert {"Rambabu", "Ram babu"} <= set(resp.data["name_forms"])
-        assert "s rambabu" in resp.data["excluded_names"]
+        assert not {"S Kiranmai", "Kiranmai S", "S Kiran mai"} & set(resp.data["name_forms"])
+        assert {"Kiranmai", "Kiran mai"} <= set(resp.data["name_forms"])
+        assert "s kiranmai" in resp.data["excluded_names"]
 
     def test_thats_me_moves_the_name_off_the_not_me_list(self, client_a, profile_a):
         resp = client_a.post(
-            f"/api/advocate-profiles/{profile_a.id}/add-name-form/", {"name": "T Rambabu"}, format="json"
+            f"/api/advocate-profiles/{profile_a.id}/add-name-form/", {"name": "T Kiranmai"}, format="json"
         )
         assert resp.status_code == 200
-        assert "T Rambabu" in resp.data["name_forms"]
-        assert "T Rambabu" not in resp.data["excluded_names"]
+        assert "T Kiranmai" in resp.data["name_forms"]
+        assert "T Kiranmai" not in resp.data["excluded_names"]
 
     def test_repeating_an_action_does_not_duplicate(self, client_a, profile_a):
         url = f"/api/advocate-profiles/{profile_a.id}/exclude/"
-        client_a.post(url, {"name": "G Rambabu"}, format="json")
-        resp = client_a.post(url, {"name": "G. Rambabu"}, format="json")
-        assert resp.data["excluded_names"].count("G Rambabu") == 1
+        client_a.post(url, {"name": "G Kiranmai"}, format="json")
+        resp = client_a.post(url, {"name": "G. Kiranmai"}, format="json")
+        assert resp.data["excluded_names"].count("G Kiranmai") == 1
         assert len(resp.data["excluded_names"]) == len(NOT_ME) + 1
 
     def test_name_is_required(self, client_a, profile_a):
@@ -211,14 +211,14 @@ class TestQuickActions:
 @pytest.mark.django_db
 class TestRowsAreLabelledWhenRead:
     ROWS = [
-        _row("C001", "S Rambabu"),
-        _row("C002", "Rambabu S"),
-        _row("C003", "Rambabu"),
-        _row("C004", "T Rambabu"),
-        _row("C005", "Rambabu Reddy"),
-        _row("C006", "G Rambabu"),
+        _row("C001", "S Kiranmai"),
+        _row("C002", "Kiranmai S"),
+        _row("C003", "Kiranmai"),
+        _row("C004", "T Kiranmai"),
+        _row("C005", "Kiranmai Reddy"),
+        _row("C006", "G Kiranmai"),
         _row("C007", "", listed_advocates=[]),
-        _row("C008", "unused", listed_advocates=["APP", "S Ram babu"]),
+        _row("C008", "unused", listed_advocates=["APP", "S Kiran mai"]),
         _row("C009", "Bar", match_source="bar_code", listed_advocates=["Someone Else"]),
     ]
 
@@ -228,7 +228,7 @@ class TestRowsAreLabelledWhenRead:
         assert status["C001"] == ("matched", "Your name")
         assert status["C002"] == ("matched", "Your name")
         assert status["C003"] == ("check", "Check name")
-        assert status["C004"][0] == "excluded"  # T Rambabu is hidden
+        assert status["C004"][0] == "excluded"  # T Kiranmai is hidden
         assert status["C005"][0] == "excluded"
         assert status["C006"][0] == "other"
         assert status["C007"][0] == "check"  # no advocate listed at all: cannot be verified
@@ -248,7 +248,7 @@ class TestRowsAreLabelledWhenRead:
         assert out is rows and counts == {}
 
     def test_an_old_row_with_only_matched_advocate_text_is_still_classified(self, profile_a):
-        rows, _ = annotate_rows([{"cnr_number": "C1", "matched_advocate_text": "S Rambabu"}], profile_a)
+        rows, _ = annotate_rows([{"cnr_number": "C1", "matched_advocate_text": "S Kiranmai"}], profile_a)
         assert rows[0]["match_status"] == "matched"
 
     def _job(self, user, profile):
@@ -273,26 +273,26 @@ class TestRowsAreLabelledWhenRead:
         before = {r["cnr_number"]: r["match_status"] for r in client_a.get(url).data["results"]}
         assert before["C001"] == "matched"
 
-        client_a.post(f"/api/advocate-profiles/{profile_a.id}/exclude/", {"name": "S Rambabu"}, format="json")
+        client_a.post(f"/api/advocate-profiles/{profile_a.id}/exclude/", {"name": "S Kiranmai"}, format="json")
         after = {r["cnr_number"]: r["match_status"] for r in client_a.get(url).data["results"]}
 
         assert after["C001"] == "excluded"  # the row is hidden...
-        # ...and so are the rows that list the same name another way: "Rambabu S"
-        # and "S Ram babu" are "S Rambabu" once spaces and word order are ignored.
+        # ...and so are the rows that list the same name another way: "Kiranmai S"
+        # and "S Kiran mai" are "S Kiranmai" once spaces and word order are ignored.
         assert after["C002"] == "excluded"
         assert after["C008"] == "excluded"
-        assert after["C003"] == "check"  # a plain "Rambabu" is a different question
+        assert after["C003"] == "check"  # a plain "Kiranmai" is a different question
         assert len(after) == len(before)  # ...and nothing was deleted
         assert ProcessingJob.objects.filter(job_type="advocate_search").count() == 1  # no new search
 
-        client_a.post(f"/api/advocate-profiles/{profile_a.id}/add-name-form/", {"name": "S Rambabu"}, format="json")
+        client_a.post(f"/api/advocate-profiles/{profile_a.id}/add-name-form/", {"name": "S Kiranmai"}, format="json")
         restored = {r["cnr_number"]: r["match_status"] for r in client_a.get(url).data["results"]}
         assert restored["C001"] == "matched"
 
     def test_a_row_flips_from_other_to_matched_after_thats_me(self, client_a, user_a, profile_a):
         job = self._job(user_a, profile_a)
         url = f"/api/cases/search-advocate/{job.id}/"
-        client_a.post(f"/api/advocate-profiles/{profile_a.id}/add-name-form/", {"name": "G Rambabu"}, format="json")
+        client_a.post(f"/api/advocate-profiles/{profile_a.id}/add-name-form/", {"name": "G Kiranmai"}, format="json")
         after = {r["cnr_number"]: r["match_status"] for r in client_a.get(url).data["results"]}
         assert after["C006"] == "matched"
 
@@ -334,24 +334,24 @@ def _html(*rows):
 
 class TestParserKeepAll:
     HTML = _html(
-        ("TSRA110027752023", "S Rambabu"),
+        ("TSRA110027752023", "S Kiranmai"),
         ("TSRA110027752024", "Totally Unrelated Person"),
         ("TSRA110027752025", "APP<br>G.Ramesh kumar"),
     )
 
     def test_default_still_drops_rows_the_advocate_column_does_not_back_up(self):
-        hits = parse_advocate_search_html(self.HTML, advocate_name="Rambabu")
+        hits = parse_advocate_search_html(self.HTML, advocate_name="Kiranmai")
         assert [h.cnr_number for h in hits] == ["TSRA110027752023"]
 
     def test_keep_all_keeps_every_row_with_the_cell_as_listed(self):
-        hits = parse_advocate_search_html(self.HTML, advocate_name="Rambabu", keep_all=True)
-        assert [h.listed_advocate_name for h in hits] == ["S Rambabu", "Totally Unrelated Person", "APP G.Ramesh kumar"]
+        hits = parse_advocate_search_html(self.HTML, advocate_name="Kiranmai", keep_all=True)
+        assert [h.listed_advocate_name for h in hits] == ["S Kiranmai", "Totally Unrelated Person", "APP G.Ramesh kumar"]
         assert [h.advocate_match_verified for h in hits] == [True, False, False]
 
     def test_a_br_splits_a_designation_from_the_name(self):
-        hits = parse_advocate_search_html(self.HTML, advocate_name="Rambabu", keep_all=True)
+        hits = parse_advocate_search_html(self.HTML, advocate_name="Kiranmai", keep_all=True)
         assert hits[2].listed_advocates == ["APP", "G.Ramesh kumar"]
-        assert hits[0].to_dict()["listed_advocates"] == ["S Rambabu"]
+        assert hits[0].to_dict()["listed_advocates"] == ["S Kiranmai"]
 
     def test_a_grid_with_no_advocate_column_keeps_rows_with_no_listed_name(self):
         html = (
@@ -359,7 +359,7 @@ class TestParserKeepAll:
             "<tr><td>1</td><td>OS/1/2020</td><td>A<br>Vs</br>B</td>"
             "<td><a onClick=\"viewHistory(1,'TSRA110027752023',1)\">View</a></td></tr></tbody></table>"
         )
-        hits = parse_advocate_search_html(html, advocate_name="Rambabu", keep_all=True)
+        hits = parse_advocate_search_html(html, advocate_name="Kiranmai", keep_all=True)
         assert len(hits) == 1
         assert hits[0].listed_advocate_name == "" and hits[0].listed_advocates == []
 

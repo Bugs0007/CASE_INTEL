@@ -1,4 +1,6 @@
 import { CaseCard } from "./case-card";
+import { MobileCaseCard } from "./mobile/mobile-case-card";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 import type { UrgencyReason } from "@/lib/case-urgency";
 import type { Case } from "@/types";
 
@@ -12,11 +14,22 @@ interface CaseGridProps {
 }
 
 export function CaseGrid({ cases, isLoading, onDelete, deletingId, urgencyReasons }: CaseGridProps) {
+  const isMobile = useIsMobile();
+
   if (isLoading) {
+    if (isMobile) {
+      return (
+        <div className="flex flex-col gap-2.5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="ci-skeleton h-[136px] rounded-[3px] bg-gray-200/60" />
+          ))}
+        </div>
+      );
+    }
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="h-80 bg-gray-200 rounded-xl animate-pulse" />
+          <div key={i} className="ci-skeleton h-80 bg-gray-200 rounded-xl animate-pulse" />
         ))}
       </div>
     );
@@ -33,6 +46,24 @@ export function CaseGrid({ cases, isLoading, onDelete, deletingId, urgencyReason
           Try adjusting your filters or create a new case.
         </p>
       </div>
+    );
+  }
+
+  // A phone gets compact cards: the next hearing first, one case per ~130px.
+  if (isMobile) {
+    return (
+      <ul className="flex flex-col gap-2.5">
+        {cases.map((caseItem, i) => (
+          <MobileCaseCard
+            key={caseItem.id}
+            case={caseItem}
+            index={i}
+            onDelete={onDelete}
+            isDeleting={deletingId === caseItem.id}
+            urgencyReason={urgencyReasons?.get(caseItem.id)}
+          />
+        ))}
+      </ul>
     );
   }
 

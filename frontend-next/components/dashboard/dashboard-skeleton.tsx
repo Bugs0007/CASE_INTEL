@@ -5,7 +5,40 @@ import { Skeleton } from "@/components/ui/skeleton";
  * beside its Glance column, so nothing jumps when the data arrives. */
 export function DashboardSkeleton() {
   return (
-    <div data-testid="dashboard-skeleton" className="@container mx-auto max-w-[1680px] px-4 pb-[60px] pt-5 sm:px-7 sm:pt-7">
+    <>
+      <MobileDashboardSkeleton />
+      <DesktopDashboardSkeleton />
+    </>
+  );
+}
+
+/** A phone's shape: greeting, the number chips, the view switch and a few
+ * hearing cards. Hidden from md up, where the desktop skeleton shows. */
+function MobileDashboardSkeleton() {
+  return (
+    <div aria-hidden="true" className="px-4 pb-6 pt-4 md:hidden">
+      <Skeleton className="h-7 w-56" />
+      <Skeleton className="mt-2 h-4 w-40" />
+      <Skeleton className="mt-2 h-3 w-60" />
+      <div className="mt-4 flex gap-2 overflow-hidden">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-[52px] w-[104px] flex-none rounded-[3px]" />
+        ))}
+      </div>
+      <Skeleton className="mt-4 h-[46px] w-full rounded-[7px]" />
+      <Skeleton className="mt-5 h-5 w-36" />
+      {Array.from({ length: 2 }).map((_, i) => (
+        <Skeleton key={i} className="mt-3 h-[118px] w-full rounded-[3px]" />
+      ))}
+      <Skeleton className="mt-5 h-5 w-28" />
+      <Skeleton className="mt-3 h-[150px] w-full rounded-[3px]" />
+    </div>
+  );
+}
+
+function DesktopDashboardSkeleton() {
+  return (
+    <div data-testid="dashboard-skeleton" className="@container mx-auto hidden max-w-[1680px] px-4 pb-[60px] pt-5 sm:px-7 sm:pt-7 md:block">
       <div className="mb-5 flex flex-wrap items-center gap-4">
         <div>
           <Skeleton className="mb-1.5 h-8 w-40" />

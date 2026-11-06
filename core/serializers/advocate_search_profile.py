@@ -24,7 +24,7 @@ MAX_NAME_LENGTH = 100
 
 def same_name(a: str, b: str) -> bool:
     """The matching rule itself: equal ignoring spaces and, up to three words,
-    word order. "S Rambabu" and "Rambabu S" are one name, so the two lists never
+    word order. "S Kiranmai" and "Kiranmai S" are one name, so the two lists never
     hold either of them at once -- exactly what classification would do."""
     return advocate_names_equal(advocate_name_tokens(a), advocate_name_tokens(b))
 
@@ -42,7 +42,7 @@ def clean_name_list(value, *, label: str, limit: int) -> list[str]:
             continue
         if len(name) > MAX_NAME_LENGTH:
             raise serializers.ValidationError(f"A name in {label} is longer than {MAX_NAME_LENGTH} characters.")
-        # Spaces are KEPT in the duplicate check: "Rambabu" and "Ram babu" are two
+        # Spaces are KEPT in the duplicate check: "Kiranmai" and "Kiran mai" are two
         # spellings the portal searches differently, so both stay. Only case,
         # honorifics, dots and repeated spaces make two entries the same.
         key = normalize_advocate_name(name)

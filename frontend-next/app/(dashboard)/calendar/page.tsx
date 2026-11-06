@@ -9,12 +9,15 @@ import { ALL_KINDS, type CalendarKind } from "@/lib/calendar";
 import { CalendarMonth } from "@/components/calendar/calendar-month";
 import { CalendarByCourt } from "@/components/calendar/calendar-by-court";
 import { CalendarSkeleton } from "@/components/calendar/calendar-skeleton";
+import { MobileCalendar } from "@/components/calendar/mobile-calendar";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 import { cn } from "@/lib/utils";
 
 type View = "calendar" | "court";
 
 export default function CalendarPage() {
   const [view, setView] = useState<View>("calendar");
+  const isMobile = useIsMobile();
   // The 7-day-wide month grid is the hardest element to squeeze into a phone
   // screen, so mobile defaults to the already-mobile-friendly By Court list
   // instead. Done post-mount (not in the initial state) to avoid an SSR/
@@ -72,6 +75,22 @@ export default function CalendarPage() {
           </div>
         </div>
       </div>
+    );
+  }
+
+  // A phone gets an agenda (week strip + the day's cards); month and by-court
+  // are tabs inside it.
+  if (isMobile) {
+    return (
+      <MobileCalendar
+        hearings={hearings}
+        upcomingHearings={upcomingHearings}
+        caseMeta={caseMeta}
+        tasks={tasks}
+        events={events}
+        kinds={kinds}
+        onToggleKind={toggleKind}
+      />
     );
   }
 
