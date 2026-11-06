@@ -385,6 +385,12 @@ def run_advocate_search(job: ProcessingJob, progress_callback=None) -> None:
     own error handling and fails the job.
     """
     params = job.payload or {}
+    if params.get("v2"):
+        # The redesigned search (profiles, per-court status, retry): its own
+        # runner, so everything below stays exactly as the old requests ran it.
+        from core.services.advocate_search_v2 import run_advocate_search_v2
+
+        return run_advocate_search_v2(job, progress_callback)
     state_code = params.get("state_code")
     advocate_name = params.get("advocate_name", "") or ""
     bar_code = params.get("bar_code", "") or ""

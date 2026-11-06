@@ -29,6 +29,15 @@ from core.views import (
     AdvocateSearchRetryFailedView,
     AdvocateSearchStatusView,
     AdvocateSearchView,
+    AdvocateSearchCourtsView,
+    AdvocateSearchRetryView,
+    HighCourtBenchesView,
+    HighCourtListView,
+    AdvocateSearchFeaturesView,
+    AdvocateSearchProfileAddNameFormView,
+    AdvocateSearchProfileDetailView,
+    AdvocateSearchProfileExcludeView,
+    AdvocateSearchProfileListCreateView,
     AppearanceFeeDetailView,
     AppearanceFeeInvoiceFileView,
     AppearanceFeeInvoiceView,
@@ -273,6 +282,27 @@ urlpatterns = [
         AdvocateSearchStatusView.as_view(),
         name="advocate-search-status",
     ),
+    # High Courts for the advocate search's High Courts tab: the registry, and a
+    # court's benches as the portal lists them. Literal paths, placed before the
+    # <int:job_id> routes only for readability.
+    path("cases/high-courts/", HighCourtListView.as_view(), name="high-court-list"),
+    path(
+        "cases/high-courts/<str:code>/benches/",
+        HighCourtBenchesView.as_view(),
+        name="high-court-benches",
+    ),
+    # Court-by-court status and a retry of chosen courts (the redesigned
+    # search, ADVOCATE_SEARCH_V2). retry-failed below is the old district-level one.
+    path(
+        "cases/search-advocate/<int:job_id>/courts/",
+        AdvocateSearchCourtsView.as_view(),
+        name="advocate-search-courts",
+    ),
+    path(
+        "cases/search-advocate/<int:job_id>/retry/",
+        AdvocateSearchRetryView.as_view(),
+        name="advocate-search-retry",
+    ),
     path(
         "cases/search-advocate/<int:job_id>/retry-failed/",
         AdvocateSearchRetryFailedView.as_view(),
@@ -299,6 +329,35 @@ urlpatterns = [
     # Advocate billing profile (invoice letterhead + default fee). A
     # singleton per user -- no id in the path, see AdvocateProfileView.
     path("advocate-profile/", AdvocateProfileView.as_view(), name="advocate-profile"),
+
+    # Advocate SEARCH profiles (name forms, Not me list, bar codes) -- plural
+    # and with ids, unlike the billing profile above. See
+    # views/advocate_search_profile.py.
+    path(
+        "advocate-profiles/",
+        AdvocateSearchProfileListCreateView.as_view(),
+        name="advocate-search-profile-list",
+    ),
+    path(
+        "advocate-profiles/<int:pk>/",
+        AdvocateSearchProfileDetailView.as_view(),
+        name="advocate-search-profile-detail",
+    ),
+    path(
+        "advocate-profiles/<int:pk>/exclude/",
+        AdvocateSearchProfileExcludeView.as_view(),
+        name="advocate-search-profile-exclude",
+    ),
+    path(
+        "advocate-profiles/<int:pk>/add-name-form/",
+        AdvocateSearchProfileAddNameFormView.as_view(),
+        name="advocate-search-profile-add-name-form",
+    ),
+    path(
+        "advocate-search/features/",
+        AdvocateSearchFeaturesView.as_view(),
+        name="advocate-search-features",
+    ),
 
     # Appearance fees + invoicing. The literal "invoice/file/" route is
     # listed before "invoice/" only for readability; they can't shadow

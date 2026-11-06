@@ -1,13 +1,22 @@
 import { apiClient } from "./client";
 import type {
+  AdvocateFeatures,
   AdvocateImportJobResult,
   AdvocateImportSelection,
   AdvocateImportStartResponse,
+  AdvocateProfileInput,
   AdvocateSearchJobResult,
   AdvocateSearchPreference,
+  AdvocateSearchProfile,
   AdvocateSearchRequest,
   AdvocateSearchStartResponse,
+  CourtsStatus,
   CourtType,
+  HighCourtBench,
+  HighCourtInfo,
+  RetryCourtsResponse,
+  StartSearchV2Request,
+  StartSearchV2Response,
 } from "@/types";
 
 export const advocateSearchApi = {
@@ -54,4 +63,49 @@ export const advocateSearchApi = {
         ? { name_or_bar_code: query.nameOrBarCode, state_code: query.stateCode }
         : undefined,
     }),
+
+  // -- The redesigned search (ADVOCATE_SEARCH_V2) ---------------------------
+
+  /** Whether the redesigned search is switched on, and the per-request time estimate. */
+  features: () => apiClient<AdvocateFeatures>("/advocate-search/features/"),
+
+  listProfiles: () => apiClient<AdvocateSearchProfile[]>("/advocate-profiles/"),
+  createProfile: (body: AdvocateProfileInput) =>
+    apiClient<AdvocateSearchProfile>("/advocate-profiles/", { method: "POST", body: JSON.stringify(body) }),
+  updateProfile: (id: number, body: Partial<AdvocateProfileInput>) =>
+    apiClient<AdvocateSearchProfile>(`/advocate-profiles/${id}/`, { method: "PATCH", body: JSON.stringify(body) }),
+  /** "Not me": rejects the name from every search. Moves it off the name forms. */
+  excludeName: (id: number, name: string) =>
+    apiClient<AdvocateSearchProfile>(`/advocate-profiles/${id}/exclude/`, {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }),
+  /** "That's me": the spelling is the advocate's own. Moves it off the Not me list. */
+  addNameForm: (id: number, name: string) =>
+    apiClient<AdvocateSearchProfile>(`/advocate-profiles/${id}/add-name-form/`, {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }),
+
+  searchV2: (body: StartSearchV2Request) =>
+    apiClient<StartSearchV2Response>("/cases/search-advocate/", { method: "POST", body: JSON.stringify(body) }),
+  /** Court-by-court status of a redesigned search. */
+  getCourts: (jobId: number) => apiClient<CourtsStatus>(`/cases/search-advocate/${jobId}/courts/`),
+  /** Search only the failed courts (or chosen ones) again; merges into the same list. */
+  retryCourts: (jobId: number, body: { only_failed: true } | { complex_ids: number[] }) =>
+    apiClient<RetryCourtsResponse>(`/cases/search-advocate/${jobId}/retry/`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  cancelSearch: (jobId: number) =>
+    apiClient<{ status: string; cancel_requested: boolean }>(`/cases/search-advocate/${jobId}/cancel/`, {
+      method: "POST",
+    }),
+  /** The caller's own queued/running searches, so a refreshed page can pick one up again. */
+  listActive: () =>
+    apiClient<{ job_id: number; status: string; state_code: string }[]>("/cases/search-advocate/active/"),
+
+  listHighCourts: () => apiClient<{ courts: HighCourtInfo[] }>("/cases/high-courts/"),
+  highCourtBenches: (code: string) =>
+    apiClient<{ court: HighCourtInfo; benches: HighCourtBench[] }>(`/cases/high-courts/${code}/benches/`),
 };
