@@ -117,13 +117,23 @@ def _search_complex(searcher, hierarchy: dict, *, queries: list[str], bar_code: 
         if index:
             time.sleep(SEARCH_DELAY_SECONDS)
         try:
-            found = searcher.search_by_advocate(
-                hierarchy,
-                advocate_name=query or "",
-                bar_code="" if query else bar_code,
-                status_filter=status_filter,
-                keep_all=True,
-            )
+            if "hc_court_code" in hierarchy:  # a High Court bench, not a district court complex
+                found = searcher.search_hc_by_advocate(
+                    hierarchy["hc_court_code"],
+                    hierarchy["bench_code"],
+                    advocate_name=query or "",
+                    bar_code="" if query else bar_code,
+                    status_filter=status_filter,
+                    bench_name=hierarchy.get("bench_name", ""),
+                )
+            else:
+                found = searcher.search_by_advocate(
+                    hierarchy,
+                    advocate_name=query or "",
+                    bar_code="" if query else bar_code,
+                    status_filter=status_filter,
+                    keep_all=True,
+                )
         except Exception as exc:  # noqa: BLE001 -- one bad court must never end the run
             result.attempts += _attempts(searcher)
             result.error = exc
@@ -137,6 +147,19 @@ def _search_complex(searcher, hierarchy: dict, *, queries: list[str], bar_code: 
                 seen.add(key)
             result.hits.append(hit)
     return result
+
+
+def _hierarchy(run: AdvocateSearchComplexRun, ctx: dict) -> dict:
+    """What the provider needs to find this court: a district court complex, or a
+    High Court bench (its portal bench code is stored as the run's complex_code)."""
+    if ctx["court_type"] == "high_court":
+        return {"hc_court_code": ctx["hc_court_code"], "bench_code": run.complex_code, "bench_name": run.complex_name}
+    return {
+        "state_code": ctx["state_code"],
+        "dist_code": run.dist_code,
+        "court_complex_code": run.complex_code,
+        "est_code": run.est_code,
+    }
 
 
 def _row(hit, run: AdvocateSearchComplexRun, *, bar_mode: bool) -> dict:
@@ -227,12 +250,7 @@ def _run_court(searcher, run: AdvocateSearchComplexRun, ctx: dict, timings: _Tim
     started = time.perf_counter()
     result = _search_complex(
         searcher,
-        {
-            "state_code": ctx["state_code"],
-            "dist_code": run.dist_code,
-            "court_complex_code": run.complex_code,
-            "est_code": run.est_code,
-        },
+        _hierarchy(run, ctx),
         queries=ctx["queries"],
         bar_code=ctx["bar_code"],
         status_filter=ctx["status_filter"],
@@ -265,9 +283,15 @@ def _run_court(searcher, run: AdvocateSearchComplexRun, ctx: dict, timings: _Tim
 
 
 @contextlib.contextmanager
-def _searcher(provider):
-    """One portal session for a district's courts when session reuse is on."""
-    reuse = bool(getattr(settings, "ADVOCATE_SEARCH_REUSE_SESSION", False)) and hasattr(provider, "advocate_search_session")
+def _searcher(provider, court_type: str = "district"):
+    """One portal session for a district's courts when session reuse is on. A High
+    Court bench always has a session of its own (the reusable one is the District
+    Courts portal's)."""
+    reuse = (
+        court_type != "high_court"
+        and bool(getattr(settings, "ADVOCATE_SEARCH_REUSE_SESSION", False))
+        and hasattr(provider, "advocate_search_session")
+    )
     with (provider.advocate_search_session() if reuse else contextlib.nullcontext(provider)) as searcher:
         yield searcher
 
@@ -277,6 +301,11 @@ def _context(job: ProcessingJob, params: dict) -> dict:
     bar_code = params.get("bar_code", "") or ""
     return {
         "job_id": job.id,
+        "court_type": params.get("court_type") or "district",
+        "hc_court_code": params.get("hc_court_code") or "",
+        "hc_court_name": params.get("hc_court_name") or "",
+        # {portal bench code: bench name}, in the order chosen
+        "benches": dict(zip(params.get("bench_codes") or [], params.get("bench_names") or [])),
         "state_code": str(params.get("state_code")),
         "queries": queries,
         "bar_code": bar_code,
@@ -290,7 +319,10 @@ def _context(job: ProcessingJob, params: dict) -> dict:
 def _ensure_runs(job: ProcessingJob, dist_code: str, dist_name: str, complexes: dict, ctx: dict) -> list[AdvocateSearchComplexRun]:
     runs = []
     for complex_raw, complex_name in complexes.items():
-        complex_code, est_code = parse_complex_code(complex_raw)
+        if ctx["court_type"] == "high_court":
+            complex_code, est_code = str(complex_raw), ""
+        else:
+            complex_code, est_code = parse_complex_code(complex_raw)
         run, _ = Run.objects.get_or_create(
             job=job,
             owner=job.owner,
@@ -348,9 +380,13 @@ def run_advocate_search_v2(job: ProcessingJob, progress_callback=None) -> None:
 
     # Listing the state's districts is fatal when it fails (nothing to fan out
     # over); the provider already retried a dropped connection with backoff.
-    all_districts = provider.list_districts(ctx["state_code"])
-    wanted = set(districts_filter or ())
-    districts = {c: n for c, n in all_districts.items() if c in wanted} if wanted else all_districts
+    if ctx["court_type"] == "high_court":
+        # One "district": the High Court itself; its courts are the chosen benches.
+        districts = {ctx["hc_court_code"]: ctx["hc_court_name"]}
+    else:
+        all_districts = provider.list_districts(ctx["state_code"])
+        wanted = set(districts_filter or ())
+        districts = {c: n for c, n in all_districts.items() if c in wanted} if wanted else all_districts
 
     results_by_cnr: dict[str, dict] = {}
     live = {"district": ""}
@@ -380,7 +416,10 @@ def run_advocate_search_v2(job: ProcessingJob, progress_callback=None) -> None:
 
         for attempt in range(1, MAX_DISTRICT_ATTEMPTS + 1):
             try:
-                complexes = provider.list_complexes(ctx["state_code"], dist_code)
+                if ctx["court_type"] == "high_court":
+                    complexes = ctx["benches"]
+                else:
+                    complexes = provider.list_complexes(ctx["state_code"], dist_code)
             except Exception as exc:  # noqa: BLE001 -- one district must not end the run
                 logger.warning(
                     "Advocate search v2: courts of district %s could not be listed (attempt %d/%d).",
@@ -394,7 +433,7 @@ def run_advocate_search_v2(job: ProcessingJob, progress_callback=None) -> None:
 
             runs = _ensure_runs(job, dist_code, dist_name, complexes, ctx)
             persist()
-            with _searcher(provider) as searcher:
+            with _searcher(provider, ctx["court_type"]) as searcher:
                 for run in runs:
                     if run.status != Run.PENDING:
                         continue
@@ -484,7 +523,7 @@ def run_retry(job: ProcessingJob, progress_callback=None) -> None:
             courts = _expand_district(parent, run, provider, ctx)
         else:
             courts = [run]
-        with _searcher(provider) as searcher:
+        with _searcher(provider, ctx["court_type"]) as searcher:
             for court in courts:
                 if court.status != Run.PENDING:
                     continue

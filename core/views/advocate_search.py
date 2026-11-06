@@ -31,10 +31,14 @@ from core.models import (
 from core.services.advocate_quick_search import quick_search_summary, remembered_complexes
 from core.services.advocate_results import annotate_rows
 from core.services.advocate_search_v2 import COURT_SITE_URL
+from core.services.court_data import CourtDataError, get_provider
+from core.services.high_court_registry import get_high_court
 from core.services.name_matching import minimize_queries
 
 _BAR_CODE_RE = re.compile(r"^[A-Za-z]{2,3}/\d+/\d{4}$")
 MAX_IMPORT_BATCH = 100
+# Benches in one High Court search: every bench is a full CAPTCHA-gated request.
+MAX_HC_BENCHES = 8
 
 VALID_COURT_TYPES = ("district", "high_court")
 
@@ -243,16 +247,24 @@ class AdvocateSearchView(APIView):
             return Response({"detail": "Search profile not found."}, status=status.HTTP_400_BAD_REQUEST)
 
         court_type = request.data.get("court_type") or "district"
-        if court_type != "district":
+        if court_type not in ("district", "high_court"):
             return Response(
-                {"detail": "Only District Courts can be searched here."}, status=status.HTTP_400_BAD_REQUEST
+                {"detail": "court_type must be 'district' or 'high_court'."}, status=status.HTTP_400_BAD_REQUEST
             )
-        state_code = request.data.get("state_code")
-        if not state_code:
-            return Response({"detail": "state_code is required."}, status=status.HTTP_400_BAD_REQUEST)
-        districts, districts_error = _parse_districts(request.data.get("dist_code"), request.data.get("dist_codes"))
-        if districts_error:
-            return Response({"detail": districts_error}, status=status.HTTP_400_BAD_REQUEST)
+        high_court: dict | None = None
+        districts: list[str] = []
+        if court_type == "high_court":
+            high_court, error_response = self._high_court_params(request)
+            if error_response is not None:
+                return error_response
+            state_code = high_court["state_code"]
+        else:
+            state_code = request.data.get("state_code")
+            if not state_code:
+                return Response({"detail": "state_code is required."}, status=status.HTTP_400_BAD_REQUEST)
+            districts, districts_error = _parse_districts(request.data.get("dist_code"), request.data.get("dist_codes"))
+            if districts_error:
+                return Response({"detail": districts_error}, status=status.HTTP_400_BAD_REQUEST)
         status_filter = request.data.get("status_filter") or "Both"
         if status_filter not in ("Pending", "Disposed", "Both"):
             return Response(
@@ -292,10 +304,12 @@ class AdvocateSearchView(APIView):
             "advocate_name": queries[0] if queries else "",
             "bar_code": bar_code,
             "status_filter": status_filter,
-            "mode": "districts" if districts else "state",
+            "mode": "high_court" if high_court else ("districts" if districts else "state"),
         }
         if districts:
             job_params["districts_filter"] = districts
+        if high_court:
+            job_params.update(high_court)
         try:
             job = ProcessingJob.enqueue_advocate_search(request.user, job_params)
         except JobAlreadyRunningError as exc:
@@ -303,19 +317,75 @@ class AdvocateSearchView(APIView):
                 {"detail": str(exc), "code": "search_already_running"}, status=status.HTTP_409_CONFLICT
             )
 
-        existing = AdvocateSearchPreference.objects.filter(owner=request.user).first()
-        config = dict(existing.hierarchy_config or {}) if existing else {}
-        config["state_code"] = str(state_code)
-        if districts:
-            config["dist_codes"] = districts
-        else:
-            config.pop("dist_codes", None)
-        AdvocateSearchPreference.objects.update_or_create(
-            owner=request.user, defaults={"court_type": court_type, "hierarchy_config": config}
-        )
-        return Response(
-            {"job_id": job.id, "queries": queries, "portal_calls_per_court": max(1, len(queries))},
-            status=status.HTTP_202_ACCEPTED,
+        if high_court is None:  # the remembered state and districts are the District Courts tab's
+            existing = AdvocateSearchPreference.objects.filter(owner=request.user).first()
+            config = dict(existing.hierarchy_config or {}) if existing else {}
+            config["state_code"] = str(state_code)
+            if districts:
+                config["dist_codes"] = districts
+            else:
+                config.pop("dist_codes", None)
+            AdvocateSearchPreference.objects.update_or_create(
+                owner=request.user, defaults={"court_type": court_type, "hierarchy_config": config}
+            )
+        body = {"job_id": job.id, "queries": queries, "portal_calls_per_court": max(1, len(queries))}
+        if high_court and search_by == "names":
+            body["warning"] = (
+                "A High Court result row does not list the advocate, so rows from a name search cannot be "
+                "told apart by name: every one needs checking. A bar number search is exact."
+            )
+        return Response(body, status=status.HTTP_202_ACCEPTED)
+
+    @staticmethod
+    def _high_court_params(request):
+        """Validate the High Court part of a v2 start: the court, and benches that
+        the portal itself lists for it. Returns (params, None) or (None, error
+        response). The portal call (the bench list) is CAPTCHA-free and cached."""
+        court = get_high_court(str(request.data.get("hc_court_code") or ""))
+        if court is None:
+            return None, Response(
+                {"detail": "hc_court_code must be one of the courts at /api/cases/high-courts/."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not court["supported"]:
+            return None, Response(
+                {"detail": court["support_note"], "code": "high_court_unsupported"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        raw = request.data.get("bench_codes")
+        if (
+            not isinstance(raw, list)
+            or not raw
+            or any(not isinstance(c, (str, int)) or isinstance(c, bool) for c in raw)
+        ):
+            return None, Response({"detail": "Pick at least one bench."}, status=status.HTTP_400_BAD_REQUEST)
+        codes = list(dict.fromkeys(str(c) for c in raw))
+        if len(codes) > MAX_HC_BENCHES:
+            return None, Response(
+                {"detail": f"Pick at most {MAX_HC_BENCHES} benches: each one is a separate search."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            portal = get_provider().list_benches(court["code"])
+        except CourtDataError as exc:
+            return None, Response(
+                {"detail": f"The court portal could not list this court's benches: {exc}", "code": "portal_error"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        unknown = [c for c in codes if c not in portal]
+        if unknown:
+            return None, Response(
+                {"detail": f"Not a bench of this court: {', '.join(unknown)}."}, status=status.HTTP_400_BAD_REQUEST
+            )
+        return (
+            {
+                "hc_court_code": court["code"],
+                "hc_court_name": court["name"],
+                "state_code": court["state_code"],
+                "bench_codes": codes,
+                "bench_names": [portal[c] for c in codes],
+            },
+            None,
         )
 
 
@@ -369,6 +439,14 @@ class AdvocateSearchStatusView(APIView):
                 "error": job.error,
                 "profile_id": profile.id if profile else None,
                 "match_counts": match_counts,
+                # What kind of search this was, so the page can reopen it on the
+                # right tab after a refresh (the old searches simply read "district").
+                "v2": bool(payload.get("v2")),
+                "court_type": payload.get("court_type", "district"),
+                "search_by": payload.get("search_by", ""),
+                "queries": payload.get("queries", []),
+                "state_code": payload.get("state_code", ""),
+                "hc_court_name": payload.get("hc_court_name", ""),
                 "results": results,
                 # results_total is the real match count; results may be a
                 # truncated prefix of it. See MAX_RESULTS_IN_RESPONSE for why

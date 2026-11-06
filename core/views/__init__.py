@@ -26,6 +26,7 @@ from .advocate_search_profile import (
     AdvocateSearchProfileExcludeView,
     AdvocateSearchProfileListCreateView,
 )
+from .high_court_search import HighCourtBenchesView, HighCourtListView
 from .appearance_fee import (
     AppearanceFeeDetailView,
     AppearanceFeeInvoiceFileView,
@@ -155,6 +156,8 @@ __all__ = [
     "AdvocateSearchView",
     "AdvocateSearchCourtsView",
     "AdvocateSearchRetryView",
+    "HighCourtBenchesView",
+    "HighCourtListView",
     "AdvocateSearchFeaturesView",
     "AdvocateSearchProfileAddNameFormView",
     "AdvocateSearchProfileDetailView",

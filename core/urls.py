@@ -31,6 +31,8 @@ from core.views import (
     AdvocateSearchView,
     AdvocateSearchCourtsView,
     AdvocateSearchRetryView,
+    HighCourtBenchesView,
+    HighCourtListView,
     AdvocateSearchFeaturesView,
     AdvocateSearchProfileAddNameFormView,
     AdvocateSearchProfileDetailView,
@@ -279,6 +281,15 @@ urlpatterns = [
         "cases/search-advocate/<int:job_id>/",
         AdvocateSearchStatusView.as_view(),
         name="advocate-search-status",
+    ),
+    # High Courts for the advocate search's High Courts tab: the registry, and a
+    # court's benches as the portal lists them. Literal paths, placed before the
+    # <int:job_id> routes only for readability.
+    path("cases/high-courts/", HighCourtListView.as_view(), name="high-court-list"),
+    path(
+        "cases/high-courts/<str:code>/benches/",
+        HighCourtBenchesView.as_view(),
+        name="high-court-benches",
     ),
     # Court-by-court status and a retry of chosen courts (the redesigned
     # search, ADVOCATE_SEARCH_V2). retry-failed below is the old district-level one.

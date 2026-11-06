@@ -144,6 +144,7 @@ from bharat_courts.districtcourts.parser import parse_case_status_html
 from bharat_courts.hcservices import endpoints as hc_endpoints
 from bharat_courts.hcservices.parser import CaptchaError as HCCaptchaError
 from bharat_courts.hcservices.parser import ServerError as HCServerError
+from bharat_courts.hcservices.parser import _parse_json_envelope as hc_parse_json_envelope
 
 from core.services.court_data.base import CourtDataProvider
 from core.services.court_data.ecourts_parsing import (
@@ -151,11 +152,13 @@ from core.services.court_data.ecourts_parsing import (
     _HC_ORDERS_BASE,
     _district_advocate_search_form,
     _extract_view_history_args,
+    hc_advocate_search_form,
     _parse_district_orders,
     _parse_hc_orders,
     _strip_pdf_prefix,
     parse_advocate_search_html,
     parse_case_history_html,
+    parse_hc_advocate_search,
     split_bar_code,
 )
 from core.services.court_data.exceptions import (
@@ -489,6 +492,71 @@ class EcourtsProvider(CourtDataProvider):
                 timing=timing,
                 keep_all=keep_all,
             )
+        )
+
+    def search_hc_by_advocate(
+        self,
+        hc_court_code: str,
+        bench_code: str,
+        *,
+        advocate_name: str = "",
+        bar_code: str = "",
+        status_filter: str = "Both",
+        bench_name: str = "",
+    ) -> list[AdvocateSearchHit]:
+        """Search one High Court bench by advocate name or bar code.
+
+        One CAPTCHA-gated request per bench (the portal answers with the whole
+        book, no year filter). Worker-only, like the District search: bounded by
+        ADVOCATE_SEARCH_MAX_ATTEMPTS submissions, each on a fresh session.
+        `last_search_timing["attempts"]` is the number of times the form was
+        submitted. Raises CaptchaSolveError / CourtPortalError like the District
+        search, ValueError for a bad court or for both/neither of name and bar code.
+        """
+        if bool(advocate_name) == bool(bar_code):
+            raise ValueError("Exactly one of advocate_name or bar_code must be given.")
+        if bar_code:
+            split_bar_code(bar_code)  # raises ValueError for a malformed one
+        court = get_court(hc_court_code)
+        if court is None:
+            raise ValueError(f"Unknown hc_court_code: {hc_court_code!r}")
+        timing = _new_search_timing()
+        self.last_search_timing = timing
+        return asyncio.run(
+            self._hc_search_by_advocate(
+                court, str(bench_code), advocate_name=advocate_name, bar_code=bar_code,
+                status_filter=status_filter, bench_name=bench_name, timing=timing,
+            )
+        )
+
+    async def _hc_search_by_advocate(
+        self, court, bench_code: str, *, advocate_name: str, bar_code: str, status_filter: str,
+        bench_name: str, timing: dict,
+    ) -> list[AdvocateSearchHit]:
+        def build_form(captcha: str) -> dict[str, str]:
+            timing["attempts"] += 1  # one per submission: the library re-fetches a CAPTCHA each time
+            return hc_advocate_search_form(
+                state_code=court.state_code, bench_code=bench_code, advocate_name=advocate_name,
+                bar_code=bar_code, status_filter=status_filter, captcha=captcha,
+            )
+
+        started = time.perf_counter()
+        try:
+            async with HCServicesClient() as client:
+                response = await client._post_with_captcha_retry(
+                    hc_endpoints.SHOW_RECORDS_URL, build_form, max_retries=ADVOCATE_SEARCH_MAX_ATTEMPTS
+                )
+                records, _total = hc_parse_json_envelope(response.text)
+        except HCCaptchaError as exc:
+            raise CaptchaSolveError(
+                f"CAPTCHA solving failed after {ADVOCATE_SEARCH_MAX_ATTEMPTS} attempts."
+            ) from exc
+        except (HCServerError, httpx.HTTPError) as exc:
+            raise CourtPortalError(f"High Court portal error: {exc}") from exc
+        finally:
+            timing["submit_s"] += time.perf_counter() - started
+        return parse_hc_advocate_search(
+            records, bench_name=bench_name, status="" if status_filter == "Both" else status_filter
         )
 
     @staticmethod

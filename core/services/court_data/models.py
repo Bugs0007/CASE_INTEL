@@ -98,6 +98,9 @@ class AdvocateSearchHit:
     # Advocate column.
     listed_advocate_name: str = ""
     listed_advocates: list[str] = field(default_factory=list)
+    # The year in the case number. High Court rows have it as a field of their
+    # own; None for a District Courts row (the year is inside the case number).
+    case_year: int | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -117,6 +120,7 @@ class AdvocateSearchHit:
             "matched_advocate_text": self.matched_advocate_text,
             "listed_advocate_name": self.listed_advocate_name,
             "listed_advocates": self.listed_advocates,
+            "case_year": self.case_year,
         }
 
 

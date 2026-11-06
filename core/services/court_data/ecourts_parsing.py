@@ -138,6 +138,78 @@ def _district_advocate_search_form(
     }
 
 
+def hc_advocate_search_form(
+    *,
+    state_code: str,
+    bench_code: str,
+    advocate_name: str = "",
+    bar_code: str = "",
+    status_filter: str = "Both",
+    captcha: str,
+) -> dict[str, str]:
+    """Form data for the High Court Services "Advocate" case-status search
+    (cases_qry/index_qry.php?action_code=showRecords).
+
+    bharat-courts has no builder for it. The field names are the ones the
+    portal's own page posts (read from its landing page, 6 Nov 2026):
+    caseStatusSearchType "CSAdvName", `search_type` 1 = advocate name and
+    2 = bar code, the name in `advocate_name` or the whole bar code in the single
+    field `adv_bar_state`, and `f` = Pending / Disposed / Both. There is no year
+    field: the portal answers with the advocate's whole book. The base fields
+    (court_code = bench, state_code, court_complex_code, captcha) are the ones the
+    library's own party search builds. NOT yet confirmed by a live search, which
+    is what `manage.py probe_hc_advocate_search` is for.
+    """
+    is_bar_code = bool(bar_code)
+    form = {
+        "court_code": str(bench_code),
+        "state_code": str(state_code),
+        "court_complex_code": "1",
+        "caseStatusSearchType": "CSAdvName",
+        "captcha": captcha,
+        "f": status_filter,
+        "search_type": "2" if is_bar_code else "1",
+    }
+    if is_bar_code:
+        form["adv_bar_state"] = bar_code
+    else:
+        form["advocate_name"] = advocate_name
+    return form
+
+
+def parse_hc_advocate_search(records: list[dict], *, bench_name: str = "", status: str = "") -> list[AdvocateSearchHit]:
+    """The records of a High Court showRecords answer -> one hit per case.
+
+    `records` is the already-unwrapped list (see the provider). Fields used are
+    the ones bharat-courts documents as verified live for this endpoint:
+    type_name, case_no, case_year, pet_name, res_name, cino. The case number is
+    written the usual way, TYPE/NUMBER/YEAR. A High Court row names no advocate
+    (none is documented), so listed_advocate_name stays empty: a name search
+    cannot be told apart by it. `status` is what was ASKED (the portal returns
+    none per row); empty when the search was for both.
+    """
+    hits: list[AdvocateSearchHit] = []
+    for record in records:
+        case_type = _clean(str(record.get("type_name") or ""))
+        number = _clean(str(record.get("case_no") or ""))
+        year_text = _clean(str(record.get("case_year") or ""))
+        year = int(year_text) if year_text.isdigit() and len(year_text) == 4 else None
+        case_number = "/".join(part for part in (case_type, number, year_text) if part)
+        hits.append(
+            AdvocateSearchHit(
+                case_number=case_number,
+                case_type=case_type,
+                cnr_number=_clean(str(record.get("cino") or "")),
+                petitioner=_clean(str(record.get("pet_name") or "")),
+                respondent=_clean(str(record.get("res_name") or "")),
+                status=status,
+                court_name=bench_name,
+                case_year=year,
+            )
+        )
+    return hits
+
+
 _ADVOCATE_HEADER_RE = re.compile(r"\badvocate\b", re.I)
 
 

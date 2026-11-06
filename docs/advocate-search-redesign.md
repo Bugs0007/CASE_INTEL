@@ -10,7 +10,7 @@ old page behave exactly as before.
 | --- | --- |
 | 1. Advocate profile and matching (backend) | built, tested |
 | 2. Per-court-complex status and retry | built, tested; "Solve here" **not built** (below) |
-| 3. High Court search | verification report written (below); **nothing built, waiting for a decision** |
+| 3. High Court search | report below, then built (backend): our own `showRecords` form, bench runs, endpoints. Tested with the portal faked; **not confirmed against a live search** |
 | 4. Frontend | not started |
 | 5. India map picker | not started |
 
@@ -109,11 +109,36 @@ The library registry has 29 entries for 25 High Courts, but it carries bench *na
 **Calcutta** is a separate client with order search only: no advocate search through this
 library. Whether `hcservices` serves Calcutta at all was not probed. Mark it unsupported.
 
-### Decisions needed
+### What was built after the report
 
-1. Build the High Court advocate search with our own `showRecords` form (bar code first)?
-   It needs one live CAPTCHA-gated bar-code search, with a real bar number, to read the real
-   row shape and the exact bar-code format before anything ships.
-2. Which Bombay benches to offer (4 as designed, or all 7)?
-3. Filing-number search: the portal has it, the library does not. Build only after the same
-   live check, and only if you want it.
+Decision taken: build the High Court advocate search with our own form. Not built: filing-number
+search (the portal has it, the library does not; same live check first, and only if wanted).
+
+- `ecourts_parsing.hc_advocate_search_form` and `EcourtsProvider.search_hc_by_advocate`: one
+  CAPTCHA-gated request per bench through the library's own CAPTCHA helper, bounded by
+  `ADVOCATE_SEARCH_MAX_ATTEMPTS`. `attempts` is the number of form submissions, counted for real.
+- `advocate_search_v2`: a High Court search is the same job and the same court rows. The High
+  Court is the "district", each chosen bench a row (`complex_code` = the portal's bench code), one
+  request per bench (per query for a name search), no session reuse, failures isolated per bench,
+  retry of a failed bench by the same endpoint.
+- `POST /api/cases/search-advocate/` with `court_type: "high_court"`, `hc_court_code`,
+  `bench_codes` (checked against the benches the portal lists, at most 8). Bar number or names.
+  A name search answers with a warning: no advocate is named on a High Court row, so every row is
+  `check`.
+- `GET /api/cases/high-courts/` (the registry, 25 courts, `supported` and why not) and
+  `GET /api/cases/high-courts/<code>/benches/` (the portal's benches; the principal seat and the
+  registry-named benches start ticked, the rest offered). Calcutta is the one unsupported court.
+- A row carries `case_year`; the year range is applied by the page after the fetch, never a new search.
+  Pending / Disposed per row is only what was asked: the portal sends no status.
+- `manage.py probe_hc_advocate_search --court telangana --bar-code <yours>`: ONE real search with
+  a hard cap on HTTP requests; prints the field names of a row, whether any looks like an advocate,
+  the case years and the first rows. Writes nothing. **Run this once with a real bar number before
+  turning the flag on**: the form's field names come from the portal's own page, but the answer has
+  never been read, and the bar-code format (`TS/1234/2009`) is an assumption.
+
+### Open items
+
+1. Run the probe above and share the field names (not the case details).
+2. Bombay: all seven portal benches are offered, four ticked (Appellate Side, Aurangabad, Nagpur,
+   Goa). Say if the others should go.
+3. Filing-number search: only if wanted.

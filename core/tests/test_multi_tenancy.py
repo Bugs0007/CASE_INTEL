@@ -718,6 +718,8 @@ _NO_TENANT_ROWS_VIEWS = {
     "limitation.LimitationRulesView",  # statutory reference data
     "limitation.LimitationComputeView",  # pure computation
     "advocate_search_profile.AdvocateSearchFeaturesView",  # two settings flags, no rows
+    "high_court_search.HighCourtListView",  # the court library's registry
+    "high_court_search.HighCourtBenchesView",  # public court structure, cached like court-structure/
 }
 
 # Plain APIViews that scope every query to request.user by hand. Reviewed
