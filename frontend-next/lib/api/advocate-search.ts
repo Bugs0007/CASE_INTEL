@@ -46,6 +46,12 @@ export const advocateSearchApi = {
   getImportStatus: (jobId: number) =>
     apiClient<AdvocateImportJobResult>(`/cases/search-advocate/import/${jobId}/`),
 
-  getPreference: () =>
-    apiClient<AdvocateSearchPreference | null>("/cases/search-advocate/preference/"),
+  /** The last-used state and districts. With a name and state, also says
+   * whether a Quick search is available for them (quick_search). */
+  getPreference: (query?: { nameOrBarCode: string; stateCode: string }) =>
+    apiClient<AdvocateSearchPreference | null>("/cases/search-advocate/preference/", {
+      params: query
+        ? { name_or_bar_code: query.nameOrBarCode, state_code: query.stateCode }
+        : undefined,
+    }),
 };

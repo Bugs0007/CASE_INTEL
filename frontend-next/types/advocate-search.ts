@@ -33,13 +33,21 @@ export interface AdvocateSearchRequest {
   name_or_bar_code: string;
   court_type: CourtType;
   /** The user always picks a STATE; the backend fans out across every
-   * district and court complex in it -- unless dist_code narrows it to
-   * just one district (fast path for an advocate who mainly practices
-   * in one place). */
+   * district and court complex in it -- unless dist_codes narrows it to
+   * the districts where the advocate practices (fast path). Omit or send
+   * [] for the whole state. */
   state_code: string;
-  dist_code?: string;
+  dist_codes?: string[];
+  /** "quick" searches only the court complexes remembered from earlier
+   * searches for this advocate (the server answers 400 code
+   * "no_quick_history" when there are none). Default "full". */
+  mode?: "full" | "quick";
   status_filter?: "Pending" | "Disposed" | "Both";
 }
+
+/** How a search was scoped: the whole state, chosen districts, or only the
+ * remembered court complexes. */
+export type AdvocateSearchMode = "state" | "districts" | "quick";
 
 export type AdvocateSearchJobStatus = "queued" | "running" | "succeeded" | "failed";
 
@@ -91,13 +99,35 @@ export interface AdvocateSearchJobResult {
   failures: AdvocateSearchFailure[];
   districts_total: number | null;
   districts_status: Record<string, AdvocateSearchDistrictStatus>;
+  /** Court complexes read successfully so far. */
   complexes_searched: number | null;
+  /** Court complexes attempted so far, read or not. */
+  complexes_done: number | null;
+  /** Complexes in the districts listed so far -- a district's count is
+   * known once it is listed, so this grows as the run goes. */
+  complexes_total_known: number | null;
+  current_district: string;
+  mode: AdvocateSearchMode;
+  created_at: string;
+  /** Null while the job is still waiting for the worker. */
+  started_at: string | null;
+}
+
+/** Courts remembered for an advocate from earlier searches (Quick search). */
+export interface QuickSearchSummary {
+  complexes: number;
+  districts: number;
+  updated_at: string | null;
 }
 
 export interface AdvocateSearchPreference {
   court_type: CourtType;
-  /** { state_code } only -- district/complex are discovered server-side. */
-  hierarchy_config: Record<string, string>;
+  /** The last state searched, and the districts picked for it (none =
+   * all districts). Court complexes are discovered server-side. */
+  hierarchy_config: { state_code?: string; dist_codes?: string[] };
+  /** Present when asked about a name + state: null if nothing is
+   * remembered for them yet. */
+  quick_search: QuickSearchSummary | null;
 }
 
 export interface AdvocateImportSelection {

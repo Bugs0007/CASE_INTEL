@@ -10,6 +10,11 @@
 # (select_for_update skip_locked -- no Redis/Celery, deliberately) and runs
 # extract -> OCR-if-scanned -> chunk -> embed. Exactly ONE instance should
 # run: the queue is safe for multiple workers, but the 1GB t3.micro is not.
+#
+# If advocate search is moved to its own worker (case-intel-search-worker.service,
+# only after measuring memory: deploy/systemd/README.md), this unit's ExecStart
+# gains `--lane portal` so it no longer claims searches. Until then it serves
+# every job type (--lane all, the default) and there is no second worker.
 
 [Unit]
 Description=Case Intel document-processing worker

@@ -5,6 +5,7 @@ import type {
   CnrLookupPreview,
   CourtStructureResponse,
   CourtType,
+  OrderSyncStatus,
   TrackingConfig,
   TrackingPreview,
   TrackingResponse,
@@ -44,6 +45,14 @@ export const caseTrackingApi = {
     apiClient<TrackingResponse>(`/cases/${caseId}/tracking/refresh/`, {
       method: "POST",
       body: JSON.stringify({ force }),
+    }),
+
+  /** Queues another order check for a tracked case (the Retry button). The
+   * worker runs it like any other: the server refuses a second while one is
+   * queued or running, and for a few minutes after the last one. */
+  retryOrderCheck: (caseId: number) =>
+    apiClient<{ order_sync: OrderSyncStatus }>(`/cases/${caseId}/orders/check/`, {
+      method: "POST",
     }),
 
   /** Clears all tracking state for a case (CNR, config, hearings sourced

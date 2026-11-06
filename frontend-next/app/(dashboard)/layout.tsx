@@ -23,7 +23,7 @@ export default function DashboardLayout({
               un-shrunk content width upward through this flex-column chain,
               stretching the whole app shell wider than the viewport instead
               of staying contained to its own overflow-x-auto scrollbar. */}
-          <div className="flex-1 flex flex-col lg:ml-60 min-w-0">
+          <div className="flex-1 flex flex-col lg:ml-52 min-w-0">
             <Header />
             {/* <main> itself no longer scrolls -- it's just a flex host so
                 that template.tsx's wrapper div (flex-1 min-h-0) gets a

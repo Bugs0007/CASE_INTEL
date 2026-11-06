@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useRef, useState, type ReactNode } from "react";
 import { Maximize2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ExpandDialog } from "@/components/ui/expand-dialog";
@@ -14,6 +14,12 @@ export interface ExpandedContext {
   /** The dialog's search text; always "" on the card. */
   query: string;
 }
+
+/** True inside a dialog that hosts a whole card as its content (the case
+ * page's compact cards open the full card this way). The card then drops its
+ * own chrome and expand button and shows its expanded body directly, so the
+ * dialog is the only frame. */
+export const EmbeddedCardContext = createContext(false);
 
 interface ExpandableCardProps {
   id?: string;
@@ -62,6 +68,7 @@ export function ExpandableCard({
   bodyClassName,
   children,
 }: ExpandableCardProps) {
+  const embedded = useContext(EmbeddedCardContext);
   const cardRef = useRef<HTMLDivElement>(null);
   const expandRef = useRef<HTMLButtonElement>(null);
   // Whatever opened the dialog gets focus back: normally the expand button,
@@ -79,6 +86,15 @@ export function ExpandableCard({
   };
 
   const hasMore = !!viewAll && viewAll.total > viewAll.shown;
+
+  if (embedded) {
+    return (
+      <div id={id} className={className}>
+        {actions && <div className="mb-3 flex flex-wrap items-center justify-end gap-2">{actions}</div>}
+        <div className={bodyClassName}>{children({ expanded: true, isOpen: true, query: "" })}</div>
+      </div>
+    );
+  }
 
   return (
     <div id={id} ref={cardRef} className={cn("scroll-mt-4", className)}>
