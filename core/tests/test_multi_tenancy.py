@@ -717,6 +717,9 @@ _NO_TENANT_ROWS_VIEWS = {
     "case_tracking.CourtStructureView",
     "limitation.LimitationRulesView",  # statutory reference data
     "limitation.LimitationComputeView",  # pure computation
+    "advocate_search_profile.AdvocateSearchFeaturesView",  # two settings flags, no rows
+    "high_court_search.HighCourtListView",  # the court library's registry
+    "high_court_search.HighCourtBenchesView",  # public court structure, cached like court-structure/
 }
 
 # Plain APIViews that scope every query to request.user by hand. Reviewed
@@ -746,6 +749,8 @@ _MANUALLY_SCOPED_VIEWS = {
     "advocate_search.AdvocateSearchActiveListView",
     "advocate_search.AdvocateSearchStatusView",
     "advocate_search.AdvocateSearchRetryFailedView",
+    "advocate_search.AdvocateSearchCourtsView",  # job + runs looked up by owner=request.user
+    "advocate_search.AdvocateSearchRetryView",  # job + runs looked up by owner=request.user
     "advocate_search.AdvocateSearchCancelView",
     "advocate_profile.AdvocateProfileView",
     "appearance_fee.AppearanceFeeInvoiceView",

@@ -91,6 +91,16 @@ class AdvocateSearchHit:
     next_hearing_date: date | None = None
     advocate_match_verified: bool = False
     matched_advocate_text: str | None = None
+    # The Advocate cell exactly as the court lists it, and its parts when it
+    # names several advocates or a designation ("APP") on separate lines. Kept
+    # on every row so a result can be re-classified against the advocate's
+    # profile later with no new portal search. Empty for a grid with no
+    # Advocate column.
+    listed_advocate_name: str = ""
+    listed_advocates: list[str] = field(default_factory=list)
+    # The year in the case number. High Court rows have it as a field of their
+    # own; None for a District Courts row (the year is inside the case number).
+    case_year: int | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -108,6 +118,9 @@ class AdvocateSearchHit:
             "next_hearing_date": self.next_hearing_date.isoformat() if self.next_hearing_date else None,
             "advocate_match_verified": self.advocate_match_verified,
             "matched_advocate_text": self.matched_advocate_text,
+            "listed_advocate_name": self.listed_advocate_name,
+            "listed_advocates": self.listed_advocates,
+            "case_year": self.case_year,
         }
 
 

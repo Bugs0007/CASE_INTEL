@@ -499,6 +499,23 @@ WORKER_MAX_RSS_MB = config("WORKER_MAX_RSS_MB", default=300, cast=int)
 # _advocate_search_attempts.)
 ADVOCATE_SEARCH_REUSE_SESSION = config("ADVOCATE_SEARCH_REUSE_SESSION", default=False, cast=bool)
 
+# Advocate search redesign (profiles, per-court-complex status, High Court tab).
+# DEFAULTS TO OFF in every environment: the old request shape and page keep
+# working untouched until this is turned on.
+#   ADVOCATE_SEARCH_V2   the new search request ({profile_id, ...}), the
+#                        per-court-complex status and retry endpoints and the
+#                        High Court search.
+# There is deliberately no "solve the CAPTCHA in the app" flag: it was assessed
+# and not built (see docs/advocate-search-redesign.md). A failed court complex
+# links to the court's own site instead.
+ADVOCATE_SEARCH_V2 = config("ADVOCATE_SEARCH_V2", default=False, cast=bool)
+# What the search page tells the advocate to expect, per portal request (one
+# query on one court complex). Display only; measure it from the timing line in
+# the worker log before trusting it.
+ADVOCATE_SEARCH_ESTIMATE_SECONDS_PER_CALL = config(
+    "ADVOCATE_SEARCH_ESTIMATE_SECONDS_PER_CALL", default=20, cast=int
+)
+
 # ============================================================================
 # Outbound email (invoice delivery to a case's billing contact)
 # ============================================================================

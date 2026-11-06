@@ -10,13 +10,23 @@ from .advocate_profile import AdvocateProfileView
 from .advocate_search import (
     AdvocateSearchActiveListView,
     AdvocateSearchCancelView,
+    AdvocateSearchCourtsView,
     AdvocateSearchImportStatusView,
     AdvocateSearchImportView,
     AdvocateSearchPreferenceView,
     AdvocateSearchRetryFailedView,
+    AdvocateSearchRetryView,
     AdvocateSearchStatusView,
     AdvocateSearchView,
 )
+from .advocate_search_profile import (
+    AdvocateSearchFeaturesView,
+    AdvocateSearchProfileAddNameFormView,
+    AdvocateSearchProfileDetailView,
+    AdvocateSearchProfileExcludeView,
+    AdvocateSearchProfileListCreateView,
+)
+from .high_court_search import HighCourtBenchesView, HighCourtListView
 from .appearance_fee import (
     AppearanceFeeDetailView,
     AppearanceFeeInvoiceFileView,
@@ -144,6 +154,15 @@ __all__ = [
     "AdvocateSearchRetryFailedView",
     "AdvocateSearchStatusView",
     "AdvocateSearchView",
+    "AdvocateSearchCourtsView",
+    "AdvocateSearchRetryView",
+    "HighCourtBenchesView",
+    "HighCourtListView",
+    "AdvocateSearchFeaturesView",
+    "AdvocateSearchProfileAddNameFormView",
+    "AdvocateSearchProfileDetailView",
+    "AdvocateSearchProfileExcludeView",
+    "AdvocateSearchProfileListCreateView",
     "CaseCnrCreateView",
     "CaseCnrLookupView",
     "CaseDetailView",

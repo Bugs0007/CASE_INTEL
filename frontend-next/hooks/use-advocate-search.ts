@@ -75,12 +75,15 @@ export function useAdvocateSearch() {
 
 /** Polls a state-wide search job until it reaches a terminal state. While
  * running, progress_current/progress_total are districts_done/total. */
-export function useAdvocateSearchJob(jobId: number | null) {
+export function useAdvocateSearchJob(jobId: number | null, keepPolling = false) {
   return useQuery({
     queryKey: advocateSearchKeys.searchJob(jobId ?? -1),
     queryFn: () => advocateSearchApi.getSearchStatus(jobId!),
     enabled: jobId !== null,
-    refetchInterval: (query) => jobPollInterval(query.state.data, SEARCH_POLL_MS),
+    // keepPolling: a retry of some courts is running and will add rows to a
+    // search whose own job has already finished.
+    refetchInterval: (query) =>
+      keepPolling && query.state.data ? SEARCH_POLL_MS : jobPollInterval(query.state.data, SEARCH_POLL_MS),
     // Deliberately NOT polling in a hidden tab (refetchIntervalInBackground
     // is left at its default, false): every poll costs the server the whole
     // result payload, and a search runs for tens of minutes, so a forgotten

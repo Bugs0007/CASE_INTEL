@@ -11,7 +11,9 @@ from core.models import (
     AccountLock,
     ActivityLog,
     AdvocateProfile,
+    AdvocateSearchComplexRun,
     AdvocateSearchPreference,
+    AdvocateSearchProfile,
     AppearanceFee,
     AuthSession,
     SocialIdentity,
@@ -341,6 +343,20 @@ class AdvocateSearchPreferenceAdmin(admin.ModelAdmin):
     list_display = ("owner", "court_type", "updated_at")
     list_filter = ("court_type",)
     readonly_fields = ("updated_at",)
+
+
+@admin.register(AdvocateSearchComplexRun)
+class AdvocateSearchComplexRunAdmin(admin.ModelAdmin):
+    list_display = ("job", "dist_name", "complex_name", "status", "attempts", "last_error_code", "raw_count")
+    list_filter = ("status", "last_error_code")
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(AdvocateSearchProfile)
+class AdvocateSearchProfileAdmin(admin.ModelAdmin):
+    list_display = ("owner", "display_name", "updated_at")
+    search_fields = ("display_name",)
+    readonly_fields = ("created_at", "updated_at")
 
 
 @admin.register(ActivityLog)

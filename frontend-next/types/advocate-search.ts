@@ -49,7 +49,7 @@ export interface AdvocateSearchRequest {
  * remembered court complexes. */
 export type AdvocateSearchMode = "state" | "districts" | "quick";
 
-export type AdvocateSearchJobStatus = "queued" | "running" | "succeeded" | "failed";
+export type AdvocateSearchJobStatus = "queued" | "running" | "succeeded" | "partial" | "failed" | "cancelled";
 
 /** One court complex that was skipped during the fan-out (CAPTCHA/portal
  * error). court_complex is null when the district's complex-list call
@@ -92,7 +92,7 @@ export interface AdvocateSearchJobResult {
   /** Capped at MAX_RESULTS_IN_RESPONSE server-side -- may be a prefix of
    * results_total. A state-wide search on a common name matches tens of
    * thousands of cases, and returning them all took the API down. */
-  results: AdvocateSearchResult[];
+  results: AdvocateResultRow[];
   /** The real match count, which may exceed results.length. */
   results_total: number;
   results_truncated: boolean;
@@ -111,6 +111,17 @@ export interface AdvocateSearchJobResult {
   created_at: string;
   /** Null while the job is still waiting for the worker. */
   started_at: string | null;
+  /** Redesigned search only (absent on an old job): the profile the rows are
+   * labelled against, the count of each label over ALL rows, and what kind of
+   * search it was. */
+  profile_id?: number | null;
+  match_counts?: Partial<Record<MatchStatus, number>>;
+  v2?: boolean;
+  court_type?: CourtType;
+  search_by?: "names" | "bar_code" | "";
+  queries?: string[];
+  state_code?: string;
+  hc_court_name?: string;
 }
 
 /** Courts remembered for an advocate from earlier searches (Quick search). */
@@ -155,4 +166,143 @@ export interface AdvocateImportJobResult {
   failed: { cnr: string; error: string }[];
   /** CNR -> possible conflicts of interest found for that imported case. */
   conflicts: Record<string, ConflictHit[]>;
+}
+
+// ---------------------------------------------------------------------------
+// The redesigned search (ADVOCATE_SEARCH_V2): profiles, per-court status, High Courts
+// ---------------------------------------------------------------------------
+
+/** How a stored row relates to the advocate's profile, decided when read. */
+export type MatchStatus = "matched" | "check" | "excluded" | "other";
+
+/** A result row as the redesigned search stores it: the old fields plus the
+ * advocate cell as the court listed it, the court it came from, a case year
+ * (High Courts) and the label computed against the profile. */
+export interface AdvocateResultRow extends AdvocateSearchResult {
+  match_status?: MatchStatus;
+  match_label?: string;
+  listed_advocate_name?: string;
+  listed_advocates?: string[];
+  dist_code?: string;
+  dist_name?: string;
+  complex_code?: string;
+  complex_name?: string;
+  case_year?: number | null;
+  /** "bar_code": the portal matched the bar number itself. */
+  match_source?: "bar_code";
+}
+
+export interface AdvocateSearchProfile {
+  id: number;
+  display_name: string;
+  bar_codes: string[];
+  name_forms: string[];
+  excluded_names: string[];
+  /** What goes to eCourts, from the same function the search uses. */
+  queries: string[];
+  query_count: number;
+  query_warning: string;
+  /** Spellings worth offering as dashed chips; never added on their own. */
+  suggestions: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdvocateProfileInput {
+  display_name: string;
+  bar_codes?: string[];
+  name_forms?: string[];
+  excluded_names?: string[];
+}
+
+export interface AdvocateFeatures {
+  v2: boolean;
+  seconds_per_call: number;
+}
+
+export type CourtRunStatus = "pending" | "running" | "done" | "failed";
+
+export interface CourtRun {
+  id: number;
+  dist_code: string;
+  dist_name: string;
+  complex_name: string;
+  status: CourtRunStatus;
+  attempts: number;
+  error_code: string;
+  /** Plain language: "Portal disconnected. 3 attempts." */
+  reason: string;
+  raw_count: number;
+  matched_count: number;
+  seconds: number | null;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+export interface CourtGroup {
+  dist_code: string;
+  name: string;
+  total: number;
+  done: number;
+  failed: number;
+  running: number;
+  runs: CourtRun[];
+}
+
+export interface CourtsStatus {
+  job: {
+    id: number;
+    status: string;
+    cancel_requested: boolean;
+    created_at: string;
+    started_at: string | null;
+    is_retrying: boolean;
+    retry_job_id: number | null;
+    can_retry: boolean;
+  };
+  counts: { total: number; done: number; failed: number; running: number; pending: number; raw: number; matched: number };
+  seconds_left: number | null;
+  needs_attention: CourtRun[];
+  groups: CourtGroup[];
+  court_site_url: string;
+}
+
+export interface HighCourtInfo {
+  code: string;
+  name: string;
+  state_code: string;
+  registry_benches: { code: string; name: string }[];
+  supported: boolean;
+  support_note: string;
+}
+
+export interface HighCourtBench {
+  code: string;
+  name: string;
+  default: boolean;
+}
+
+export interface StartSearchV2Request {
+  profile_id: number;
+  court_type: "district" | "high_court";
+  state_code?: string;
+  dist_codes?: string[];
+  hc_court_code?: string;
+  bench_codes?: string[];
+  status_filter: "Pending" | "Disposed" | "Both";
+  search_by: "names" | "bar_code";
+  bar_code?: string;
+}
+
+export interface StartSearchV2Response {
+  job_id: number;
+  queries: string[];
+  portal_calls_per_court: number;
+  warning?: string;
+}
+
+export interface RetryCourtsResponse {
+  job_id: number;
+  parent_job_id: number;
+  courts: number;
 }

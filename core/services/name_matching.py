@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import re
 from difflib import SequenceMatcher
+from itertools import permutations
 
 # ---------------------------------------------------------------------------
 # Basic name normalisation (shared with party_role.py)
@@ -219,3 +220,159 @@ def could_match(a: tuple[str, ...], b: tuple[str, ...]) -> bool:
         return {t[:2] for t in tokens if len(t) >= 4 and t not in COMMON_TOKENS}
 
     return bool(prefixes(a) & prefixes(b))
+
+
+# ---------------------------------------------------------------------------
+# Advocate search: telling the advocate's own name forms from other people
+# ---------------------------------------------------------------------------
+#
+# The eCourts "Search by Advocate" box does loose, space-sensitive substring
+# matching ("Rambabu" and "Ram babu" are different searches, and a search for
+# "Rambabu" also returns "T Rambabu", "Rambabu Reddy" and a prosecutor named
+# "APP G.Rambabu"). So the portal result is only a candidate list; these
+# functions decide, against the advocate's own profile, which rows are theirs.
+# Everything here is pure (no database): the profile is anything with
+# `name_forms` and `excluded_names` lists, so rows can be re-classified at
+# read time the moment the advocate marks a name "Not me" or "That's me".
+
+# Honorifics and titles that are not part of an advocate's name. "sri" is here
+# on purpose (normalize_name, shared with party_role.py, leaves it alone).
+_ADVOCATE_HONORIFIC_RE = re.compile(r"\b(?:adv|advocate|sri|shri|smt|mr|mrs|ms|dr|sr|jr)\b", re.I)
+_ADVOCATE_PUNCT_RE = re.compile(r"[.,;:/\\()\-_]+")
+
+MATCHED = "matched"
+CHECK = "check"
+EXCLUDED = "excluded"
+OTHER = "other"
+
+# A name typed as one word ("Rambabu") can be anybody with that name: a row that
+# matches only through it is never auto-verified.
+MAX_ORDER_FREE_TOKENS = 3
+MIN_QUERY_LENGTH = 3  # the portal's own minimum
+MAX_RECOMMENDED_QUERIES = 3  # every query is a full scan of every court complex
+
+_RANK = {MATCHED: 3, CHECK: 2, EXCLUDED: 1, OTHER: 0}
+
+
+def _clean_advocate_name(name: str, *, lower: bool) -> list[str]:
+    text = name or ""
+    if lower:
+        text = text.lower()
+    text = _ADVOCATE_HONORIFIC_RE.sub(" ", text)
+    text = _ADVOCATE_PUNCT_RE.sub(" ", text)
+    return _WS_RE.sub(" ", text).strip().split()
+
+
+def normalize_advocate_name(name: str) -> str:
+    """Lowercase; honorifics (Adv, Advocate, Sri, Smt, Shri, ...), dots, commas
+    and other punctuation dropped; spaces collapsed."""
+    return " ".join(_clean_advocate_name(name, lower=True))
+
+
+def advocate_name_tokens(name: str) -> tuple[str, ...]:
+    return tuple(_clean_advocate_name(name, lower=True))
+
+
+def _joined_orderings(tokens: tuple[str, ...]) -> set[str]:
+    """The name with its spaces removed, in every word order when it has at
+    most three words, else in the order written."""
+    if len(tokens) <= MAX_ORDER_FREE_TOKENS:
+        return {"".join(order) for order in permutations(tokens)}
+    return {"".join(tokens)}
+
+
+def advocate_names_equal(a: tuple[str, ...], b: tuple[str, ...]) -> bool:
+    """Same name ignoring spaces ("Ram babu" = "Rambabu") and, up to three
+    words, word order ("S Rambabu" = "Rambabu S")."""
+    if not a or not b:
+        return False
+    return bool(_joined_orderings(a) & _joined_orderings(b))
+
+
+def classify_advocate_name(listed_name: str, profile) -> str:
+    """One advocate name as the court lists it -> `matched`, `check`,
+    `excluded` or `other`.
+
+    excluded -- equals a name on the Not me list (checked first: the advocate
+        rejected it explicitly).
+    matched  -- equals one of the advocate's name forms and both are at least
+        two words, so an initial or a second name backs it up.
+    check    -- equals a name form only through a single word (a plain
+        "Rambabu"): could be them, could be anyone; never auto-verified.
+    other    -- anything else the portal returned for the query.
+    """
+    listed = advocate_name_tokens(listed_name)
+    if not listed:
+        return OTHER
+    for excluded in getattr(profile, "excluded_names", None) or []:
+        if advocate_names_equal(listed, advocate_name_tokens(excluded)):
+            return EXCLUDED
+    result = OTHER
+    for form in getattr(profile, "name_forms", None) or []:
+        tokens = advocate_name_tokens(form)
+        if advocate_names_equal(listed, tokens):
+            if len(listed) >= 2 and len(tokens) >= 2:
+                return MATCHED
+            result = CHECK
+    return result
+
+
+def classify_listed_advocates(segments: list[str] | str, profile) -> str:
+    """A court row can list several advocates (one per line) or a designation
+    such as "APP" beside a name. The row takes its best result: another
+    advocate's name beside the advocate's own never hides the case."""
+    if isinstance(segments, str):
+        segments = [segments]
+    best = OTHER
+    for segment in segments:
+        result = classify_advocate_name(segment, profile)
+        if _RANK[result] > _RANK[best]:
+            best = result
+    return best
+
+
+def minimize_queries(name_forms: list[str]) -> list[str]:
+    """The fewest portal searches that still catch every name form.
+
+    The portal does substring matching and is space-sensitive, so a short query
+    catches every longer form that contains it and the rest is filtered here.
+    Per form: honorifics and initial-only words go ("S Ram babu" -> "Ram
+    babu"); a spelling shorter than three letters cannot be searched; a query
+    containing another query is dropped ("Rambabu Samalla" rides on "Rambabu").
+    Distinct spaced spellings stay distinct ("Rambabu" and "Ram babu" are two
+    searches). Case of the first spelling is kept for display.
+    """
+    seen: dict[str, str] = {}
+    for form in name_forms or []:
+        tokens = [t for t in _clean_advocate_name(form, lower=False) if len(t) > 1]
+        query = " ".join(tokens)
+        if len(query) >= MIN_QUERY_LENGTH:
+            seen.setdefault(query.lower(), query)
+    keys = list(seen)
+    return [
+        seen[key]
+        for key in keys
+        if not any(other != key and other in key for other in keys)
+    ]
+
+
+def suggest_name_forms(display_name: str, name_forms: list[str], excluded_names: list[str]) -> list[str]:
+    """Spellings the court might use for `display_name`, offered but never added
+    on their own: "Rambabu Samalla" -> "S Rambabu", "Rambabu S", "Samalla Rambabu".
+    Anything already a name form or on the Not me list is left out."""
+    parts = _clean_advocate_name(display_name, lower=False)
+    if len(parts) < 2:
+        return []
+    first, last = parts[0], parts[-1]
+    candidates = [f"{last[0].upper()} {first}", f"{first} {last[0].upper()}", f"{last} {first}"]
+    # Exact spellings only: "Rambabu S" is worth offering even when "S Rambabu"
+    # is already a form, because they are two chips the advocate may want.
+    known = {normalize_advocate_name(name) for name in [*(name_forms or []), *(excluded_names or [])]}
+    out: list[str] = []
+    for candidate in candidates:
+        key = normalize_advocate_name(candidate)
+        if key in known:
+            continue
+        known.add(key)
+        out.append(candidate)
+    return out

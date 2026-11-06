@@ -138,11 +138,83 @@ def _district_advocate_search_form(
     }
 
 
+def hc_advocate_search_form(
+    *,
+    state_code: str,
+    bench_code: str,
+    advocate_name: str = "",
+    bar_code: str = "",
+    status_filter: str = "Both",
+    captcha: str,
+) -> dict[str, str]:
+    """Form data for the High Court Services "Advocate" case-status search
+    (cases_qry/index_qry.php?action_code=showRecords).
+
+    bharat-courts has no builder for it. The field names are the ones the
+    portal's own page posts (read from its landing page, 6 Nov 2026):
+    caseStatusSearchType "CSAdvName", `search_type` 1 = advocate name and
+    2 = bar code, the name in `advocate_name` or the whole bar code in the single
+    field `adv_bar_state`, and `f` = Pending / Disposed / Both. There is no year
+    field: the portal answers with the advocate's whole book. The base fields
+    (court_code = bench, state_code, court_complex_code, captcha) are the ones the
+    library's own party search builds. NOT yet confirmed by a live search, which
+    is what `manage.py probe_hc_advocate_search` is for.
+    """
+    is_bar_code = bool(bar_code)
+    form = {
+        "court_code": str(bench_code),
+        "state_code": str(state_code),
+        "court_complex_code": "1",
+        "caseStatusSearchType": "CSAdvName",
+        "captcha": captcha,
+        "f": status_filter,
+        "search_type": "2" if is_bar_code else "1",
+    }
+    if is_bar_code:
+        form["adv_bar_state"] = bar_code
+    else:
+        form["advocate_name"] = advocate_name
+    return form
+
+
+def parse_hc_advocate_search(records: list[dict], *, bench_name: str = "", status: str = "") -> list[AdvocateSearchHit]:
+    """The records of a High Court showRecords answer -> one hit per case.
+
+    `records` is the already-unwrapped list (see the provider). Fields used are
+    the ones bharat-courts documents as verified live for this endpoint:
+    type_name, case_no, case_year, pet_name, res_name, cino. The case number is
+    written the usual way, TYPE/NUMBER/YEAR. A High Court row names no advocate
+    (none is documented), so listed_advocate_name stays empty: a name search
+    cannot be told apart by it. `status` is what was ASKED (the portal returns
+    none per row); empty when the search was for both.
+    """
+    hits: list[AdvocateSearchHit] = []
+    for record in records:
+        case_type = _clean(str(record.get("type_name") or ""))
+        number = _clean(str(record.get("case_no") or ""))
+        year_text = _clean(str(record.get("case_year") or ""))
+        year = int(year_text) if year_text.isdigit() and len(year_text) == 4 else None
+        case_number = "/".join(part for part in (case_type, number, year_text) if part)
+        hits.append(
+            AdvocateSearchHit(
+                case_number=case_number,
+                case_type=case_type,
+                cnr_number=_clean(str(record.get("cino") or "")),
+                petitioner=_clean(str(record.get("pet_name") or "")),
+                respondent=_clean(str(record.get("res_name") or "")),
+                status=status,
+                court_name=bench_name,
+                case_year=year,
+            )
+        )
+    return hits
+
+
 _ADVOCATE_HEADER_RE = re.compile(r"\badvocate\b", re.I)
 
 
 def parse_advocate_search_html(
-    html: str, *, advocate_name: str = "",
+    html: str, *, advocate_name: str = "", keep_all: bool = False,
 ) -> list[AdvocateSearchHit]:
     """Parse casestatus/submitAdvName's "adv_data" HTML, dropping rows
     that don't actually match the search and flagging the rest as
@@ -193,6 +265,12 @@ def parse_advocate_search_html(
     search (eCourts never exposes bar codes in this grid -- see
     party_role.py's docstring for the same gap). Pretending those are
     verified would be worse than admitting they aren't.
+
+    keep_all=True (the redesigned search) never drops a row: every row the
+    portal returned is kept with the Advocate cell as listed, and which rows
+    are the advocate's own is decided later, against their profile, by
+    core/services/advocate_results.py. `advocate_match_verified` is still
+    computed, but only as information.
     """
     soup = BeautifulSoup(html, "lxml")
     table = soup.find("table")
@@ -231,12 +309,19 @@ def parse_advocate_search_html(
         cnr = _extract_cnr(row)
 
         advocate_text = None
+        advocate_segments: list[str] = []
         if advocate_col_index is not None and advocate_col_index < len(cols):
             # Space-joined: the live markup is "APP<br>G.Ramesh kumar", and a
             # bare get_text() fuses that to "APPG.Ramesh kumar" -- worse, a
             # cell listing two advocates on separate lines would fuse their
-            # tokens together and defeat the name match.
-            advocate_text = _clean(cols[advocate_col_index].get_text(" ")) or None
+            # tokens together and defeat the name match. A <br> also ends one
+            # advocate (or a designation) and starts the next, so the parts
+            # are kept apart for classification.
+            cell = cols[advocate_col_index]
+            for br in cell.find_all("br"):
+                br.replace_with("\n")
+            advocate_segments = [s for s in (_clean(p) for p in cell.get_text(" ").split("\n")) if s]
+            advocate_text = _clean(" ".join(advocate_segments)) or None
 
         verified = False
         if can_check_name and advocate_text:
@@ -244,9 +329,10 @@ def parse_advocate_search_html(
                 matches_by_text[advocate_text] = (
                     name_similarity(query_tokens, advocate_tokens(advocate_text)) > 0
                 )
-            if not matches_by_text[advocate_text]:
+            if matches_by_text[advocate_text]:
+                verified = True
+            elif not keep_all:
                 continue  # portal matched something the Advocate field doesn't back up
-            verified = True
 
         hits.append(
             AdvocateSearchHit(
@@ -257,6 +343,8 @@ def parse_advocate_search_html(
                 respondent=respondent,
                 advocate_match_verified=verified,
                 matched_advocate_text=advocate_text,
+                listed_advocate_name=advocate_text or "",
+                listed_advocates=advocate_segments,
             )
         )
     return hits

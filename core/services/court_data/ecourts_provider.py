@@ -144,6 +144,7 @@ from bharat_courts.districtcourts.parser import parse_case_status_html
 from bharat_courts.hcservices import endpoints as hc_endpoints
 from bharat_courts.hcservices.parser import CaptchaError as HCCaptchaError
 from bharat_courts.hcservices.parser import ServerError as HCServerError
+from bharat_courts.hcservices.parser import _parse_json_envelope as hc_parse_json_envelope
 
 from core.services.court_data.base import CourtDataProvider
 from core.services.court_data.ecourts_parsing import (
@@ -151,11 +152,13 @@ from core.services.court_data.ecourts_parsing import (
     _HC_ORDERS_BASE,
     _district_advocate_search_form,
     _extract_view_history_args,
+    hc_advocate_search_form,
     _parse_district_orders,
     _parse_hc_orders,
     _strip_pdf_prefix,
     parse_advocate_search_html,
     parse_case_history_html,
+    parse_hc_advocate_search,
     split_bar_code,
 )
 from core.services.court_data.exceptions import (
@@ -170,6 +173,12 @@ logger = logging.getLogger(__name__)
 
 MAX_RETRIES = 3
 RETRY_BACKOFF_SECONDS = 1.5
+# Court-structure calls (states, districts, complexes, benches, case types) go
+# through one fresh portal session each, and the very first one of a visit
+# sometimes lands on a connection the portal then drops. Only a CONNECTION
+# failure is retried, after these waits (so up to four attempts); a portal
+# that answers with an error is not retried here.
+HIERARCHY_CONNECTION_BACKOFF_SECONDS = (0.5, 1.5, 3.0)
 
 # Advocate search gets more attempts than MAX_RETRIES (used by CNR/case-
 # number/party search): root-caused 25 Jul 2026 that bharat-courts'
@@ -377,7 +386,8 @@ class _AdvocateSearchSession:
             self._loop.close()
 
     def search_by_advocate(
-        self, hierarchy: dict, *, advocate_name: str = "", bar_code: str = "", status_filter: str = "Both"
+        self, hierarchy: dict, *, advocate_name: str = "", bar_code: str = "", status_filter: str = "Both",
+        keep_all: bool = False,
     ):
         bar_state, bar_code, bar_year = EcourtsProvider._advocate_search_args(advocate_name, bar_code)
         timing = _new_search_timing()
@@ -393,6 +403,7 @@ class _AdvocateSearchSession:
                 timing=timing,
                 client=self._client,
                 session=self,
+                keep_all=keep_all,
             )
         )
 
@@ -444,8 +455,15 @@ class EcourtsProvider(CourtDataProvider):
         advocate_name: str = "",
         bar_code: str = "",
         status_filter: str = "Both",
+        keep_all: bool = False,
     ) -> list[AdvocateSearchHit]:
         """Search District Courts cases by advocate name or bar code.
+
+        keep_all: keep every row the portal returned instead of dropping the ones
+        whose Advocate column shares no name token with the query. The redesigned
+        search stores every raw row and decides at read time which are the
+        advocate's own (see core/services/advocate_results.py); the old flow
+        leaves it False and behaves exactly as before.
 
         Exactly one of advocate_name (min 3 chars, partial match per the
         portal's own help text) or bar_code ("STATE/NUMBER/YEAR", e.g.
@@ -472,7 +490,73 @@ class EcourtsProvider(CourtDataProvider):
                 bar_year=bar_year,
                 status_filter=status_filter,
                 timing=timing,
+                keep_all=keep_all,
             )
+        )
+
+    def search_hc_by_advocate(
+        self,
+        hc_court_code: str,
+        bench_code: str,
+        *,
+        advocate_name: str = "",
+        bar_code: str = "",
+        status_filter: str = "Both",
+        bench_name: str = "",
+    ) -> list[AdvocateSearchHit]:
+        """Search one High Court bench by advocate name or bar code.
+
+        One CAPTCHA-gated request per bench (the portal answers with the whole
+        book, no year filter). Worker-only, like the District search: bounded by
+        ADVOCATE_SEARCH_MAX_ATTEMPTS submissions, each on a fresh session.
+        `last_search_timing["attempts"]` is the number of times the form was
+        submitted. Raises CaptchaSolveError / CourtPortalError like the District
+        search, ValueError for a bad court or for both/neither of name and bar code.
+        """
+        if bool(advocate_name) == bool(bar_code):
+            raise ValueError("Exactly one of advocate_name or bar_code must be given.")
+        if bar_code:
+            split_bar_code(bar_code)  # raises ValueError for a malformed one
+        court = get_court(hc_court_code)
+        if court is None:
+            raise ValueError(f"Unknown hc_court_code: {hc_court_code!r}")
+        timing = _new_search_timing()
+        self.last_search_timing = timing
+        return asyncio.run(
+            self._hc_search_by_advocate(
+                court, str(bench_code), advocate_name=advocate_name, bar_code=bar_code,
+                status_filter=status_filter, bench_name=bench_name, timing=timing,
+            )
+        )
+
+    async def _hc_search_by_advocate(
+        self, court, bench_code: str, *, advocate_name: str, bar_code: str, status_filter: str,
+        bench_name: str, timing: dict,
+    ) -> list[AdvocateSearchHit]:
+        def build_form(captcha: str) -> dict[str, str]:
+            timing["attempts"] += 1  # one per submission: the library re-fetches a CAPTCHA each time
+            return hc_advocate_search_form(
+                state_code=court.state_code, bench_code=bench_code, advocate_name=advocate_name,
+                bar_code=bar_code, status_filter=status_filter, captcha=captcha,
+            )
+
+        started = time.perf_counter()
+        try:
+            async with HCServicesClient() as client:
+                response = await client._post_with_captcha_retry(
+                    hc_endpoints.SHOW_RECORDS_URL, build_form, max_retries=ADVOCATE_SEARCH_MAX_ATTEMPTS
+                )
+                records, _total = hc_parse_json_envelope(response.text)
+        except HCCaptchaError as exc:
+            raise CaptchaSolveError(
+                f"CAPTCHA solving failed after {ADVOCATE_SEARCH_MAX_ATTEMPTS} attempts."
+            ) from exc
+        except (HCServerError, httpx.HTTPError) as exc:
+            raise CourtPortalError(f"High Court portal error: {exc}") from exc
+        finally:
+            timing["submit_s"] += time.perf_counter() - started
+        return parse_hc_advocate_search(
+            records, bench_name=bench_name, status="" if status_filter == "Both" else status_filter
         )
 
     @staticmethod
@@ -691,6 +775,7 @@ class EcourtsProvider(CourtDataProvider):
         timing: dict | None = None,
         client: DistrictCourtClient | None = None,
         session: _AdvocateSearchSession | None = None,
+        keep_all: bool = False,
     ) -> list[AdvocateSearchHit]:
         """Hand-rolled retry loop (matches _district_cnr_search's existing
         pattern in this file) instead of bharat-courts' own
@@ -740,6 +825,7 @@ class EcourtsProvider(CourtDataProvider):
             "bar_year": bar_year,
             "status_filter": status_filter,
             "timing": timing,
+            "keep_all": keep_all,
         }
         if client is not None:
             # A kept-open session (see _AdvocateSearchSession).
@@ -759,6 +845,7 @@ class EcourtsProvider(CourtDataProvider):
         bar_year: str,
         status_filter: str,
         timing: dict,
+        keep_all: bool = False,
     ) -> list[AdvocateSearchHit]:
         """The attempt loop for one court complex. By default every attempt
         starts the portal session over (_init_session, then _setup_court) --
@@ -882,7 +969,7 @@ class EcourtsProvider(CourtDataProvider):
                         await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
                     continue
 
-                hits = parse_advocate_search_html(html, advocate_name=advocate_name)
+                hits = parse_advocate_search_html(html, advocate_name=advocate_name, keep_all=keep_all)
                 completed = True
                 return hits
 
@@ -1200,7 +1287,7 @@ class EcourtsProvider(CourtDataProvider):
         cache.set(key, value, HIERARCHY_CACHE_TTL)
         return value
 
-    def _run_hierarchy_call(self, coro):
+    def _run_hierarchy_call(self, make_coro):
         """Run a captcha-free hierarchy-discovery coroutine (list_states/
         list_districts/list_complexes/list_benches/list_case_types),
         converting any bharat_courts/transport exception into the
@@ -1242,8 +1329,22 @@ class EcourtsProvider(CourtDataProvider):
         inside these coroutines today, but a future addition shouldn't be
         silently re-wrapped) pass through unchanged.
         """
+        # `make_coro` builds the coroutine, so a connection failure can be tried
+        # again on a fresh one (a coroutine cannot be awaited twice).
+        waits = list(HIERARCHY_CONNECTION_BACKOFF_SECONDS)
         try:
-            return _run_bounded(coro, label="court structure")
+            while True:
+                try:
+                    return _run_bounded(make_coro(), label="court structure")
+                except httpx.TransportError as exc:
+                    if not waits:
+                        raise
+                    wait = waits.pop(0)
+                    logger.warning(
+                        "Court structure call: connection error (%s); retrying in %.1fs (%d left).",
+                        type(exc).__name__, wait, len(waits),
+                    )
+                    time.sleep(wait)
         except ValueError:
             raise
         except CourtDataError:
@@ -1259,7 +1360,7 @@ class EcourtsProvider(CourtDataProvider):
         if court_type == "district":
             return self._cached(
                 ("district_states",),
-                lambda: self._run_hierarchy_call(self._list_district_states()),
+                lambda: self._run_hierarchy_call(lambda: self._list_district_states()),
             )
         if court_type == "high_court":
             return self._cached(
@@ -1275,7 +1376,7 @@ class EcourtsProvider(CourtDataProvider):
     def list_districts(self, state_code: str) -> dict[str, str]:
         return self._cached(
             ("districts", state_code),
-            lambda: self._run_hierarchy_call(self._list_districts(state_code)),
+            lambda: self._run_hierarchy_call(lambda: self._list_districts(state_code)),
         )
 
     async def _list_districts(self, state_code: str) -> dict[str, str]:
@@ -1285,7 +1386,7 @@ class EcourtsProvider(CourtDataProvider):
     def list_complexes(self, state_code: str, dist_code: str) -> dict[str, str]:
         return self._cached(
             ("complexes", state_code, dist_code),
-            lambda: self._run_hierarchy_call(self._list_complexes(state_code, dist_code)),
+            lambda: self._run_hierarchy_call(lambda: self._list_complexes(state_code, dist_code)),
         )
 
     async def _list_complexes(self, state_code: str, dist_code: str) -> dict[str, str]:
@@ -1295,7 +1396,7 @@ class EcourtsProvider(CourtDataProvider):
     def list_benches(self, hc_court_code: str) -> dict[str, str]:
         return self._cached(
             ("benches", hc_court_code),
-            lambda: self._run_hierarchy_call(self._list_benches(hc_court_code)),
+            lambda: self._run_hierarchy_call(lambda: self._list_benches(hc_court_code)),
         )
 
     async def _list_benches(self, hc_court_code: str) -> dict[str, str]:
@@ -1310,12 +1411,12 @@ class EcourtsProvider(CourtDataProvider):
             key = ("district_case_types", hierarchy["state_code"], hierarchy["dist_code"],
                    hierarchy["court_complex_code"], hierarchy.get("est_code", ""))
             return self._cached(
-                key, lambda: self._run_hierarchy_call(self._list_district_case_types(hierarchy))
+                key, lambda: self._run_hierarchy_call(lambda: self._list_district_case_types(hierarchy))
             )
         if court_type == "high_court":
             key = ("hc_case_types", hierarchy["hc_court_code"], hierarchy.get("bench_code", "1"))
             return self._cached(
-                key, lambda: self._run_hierarchy_call(self._list_hc_case_types(hierarchy))
+                key, lambda: self._run_hierarchy_call(lambda: self._list_hc_case_types(hierarchy))
             )
         raise ValueError(f"Unknown court_type: {court_type!r}")
 
