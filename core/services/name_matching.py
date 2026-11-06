@@ -227,9 +227,9 @@ def could_match(a: tuple[str, ...], b: tuple[str, ...]) -> bool:
 # ---------------------------------------------------------------------------
 #
 # The eCourts "Search by Advocate" box does loose, space-sensitive substring
-# matching ("Rambabu" and "Ram babu" are different searches, and a search for
-# "Rambabu" also returns "T Rambabu", "Rambabu Reddy" and a prosecutor named
-# "APP G.Rambabu"). So the portal result is only a candidate list; these
+# matching ("Kiranmai" and "Kiran mai" are different searches, and a search for
+# "Kiranmai" also returns "T Kiranmai", "Kiranmai Reddy" and a prosecutor named
+# "APP G.Kiranmai"). So the portal result is only a candidate list; these
 # functions decide, against the advocate's own profile, which rows are theirs.
 # Everything here is pure (no database): the profile is anything with
 # `name_forms` and `excluded_names` lists, so rows can be re-classified at
@@ -245,7 +245,7 @@ CHECK = "check"
 EXCLUDED = "excluded"
 OTHER = "other"
 
-# A name typed as one word ("Rambabu") can be anybody with that name: a row that
+# A name typed as one word ("Kiranmai") can be anybody with that name: a row that
 # matches only through it is never auto-verified.
 MAX_ORDER_FREE_TOKENS = 3
 MIN_QUERY_LENGTH = 3  # the portal's own minimum
@@ -282,8 +282,8 @@ def _joined_orderings(tokens: tuple[str, ...]) -> set[str]:
 
 
 def advocate_names_equal(a: tuple[str, ...], b: tuple[str, ...]) -> bool:
-    """Same name ignoring spaces ("Ram babu" = "Rambabu") and, up to three
-    words, word order ("S Rambabu" = "Rambabu S")."""
+    """Same name ignoring spaces ("Kiran mai" = "Kiranmai") and, up to three
+    words, word order ("S Kiranmai" = "Kiranmai S")."""
     if not a or not b:
         return False
     return bool(_joined_orderings(a) & _joined_orderings(b))
@@ -298,7 +298,7 @@ def classify_advocate_name(listed_name: str, profile) -> str:
     matched  -- equals one of the advocate's name forms and both are at least
         two words, so an initial or a second name backs it up.
     check    -- equals a name form only through a single word (a plain
-        "Rambabu"): could be them, could be anyone; never auto-verified.
+        "Kiranmai"): could be them, could be anyone; never auto-verified.
     other    -- anything else the portal returned for the query.
     """
     listed = advocate_name_tokens(listed_name)
@@ -336,10 +336,10 @@ def minimize_queries(name_forms: list[str]) -> list[str]:
 
     The portal does substring matching and is space-sensitive, so a short query
     catches every longer form that contains it and the rest is filtered here.
-    Per form: honorifics and initial-only words go ("S Ram babu" -> "Ram
-    babu"); a spelling shorter than three letters cannot be searched; a query
-    containing another query is dropped ("Rambabu Samalla" rides on "Rambabu").
-    Distinct spaced spellings stay distinct ("Rambabu" and "Ram babu" are two
+    Per form: honorifics and initial-only words go ("S Kiran mai" -> "Kiran
+    mai"); a spelling shorter than three letters cannot be searched; a query
+    containing another query is dropped ("Kiranmai Sample" rides on "Kiranmai").
+    Distinct spaced spellings stay distinct ("Kiranmai" and "Kiran mai" are two
     searches). Case of the first spelling is kept for display.
     """
     seen: dict[str, str] = {}
@@ -358,14 +358,14 @@ def minimize_queries(name_forms: list[str]) -> list[str]:
 
 def suggest_name_forms(display_name: str, name_forms: list[str], excluded_names: list[str]) -> list[str]:
     """Spellings the court might use for `display_name`, offered but never added
-    on their own: "Rambabu Samalla" -> "S Rambabu", "Rambabu S", "Samalla Rambabu".
+    on their own: "Kiranmai Sample" -> "S Kiranmai", "Kiranmai S", "Sample Kiranmai".
     Anything already a name form or on the Not me list is left out."""
     parts = _clean_advocate_name(display_name, lower=False)
     if len(parts) < 2:
         return []
     first, last = parts[0], parts[-1]
     candidates = [f"{last[0].upper()} {first}", f"{first} {last[0].upper()}", f"{last} {first}"]
-    # Exact spellings only: "Rambabu S" is worth offering even when "S Rambabu"
+    # Exact spellings only: "Kiranmai S" is worth offering even when "S Kiranmai"
     # is already a form, because they are two chips the advocate may want.
     known = {normalize_advocate_name(name) for name in [*(name_forms or []), *(excluded_names or [])]}
     out: list[str] = []

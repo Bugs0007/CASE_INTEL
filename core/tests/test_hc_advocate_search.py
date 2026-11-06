@@ -54,8 +54,8 @@ def client_a(user_a):
 @pytest.fixture
 def profile_a(user_a):
     return AdvocateSearchProfile.objects.create(
-        owner=user_a, display_name="Rambabu Samalla", bar_codes=["TS/1234/2009"],
-        name_forms=["Rambabu", "S Rambabu"], excluded_names=["T Rambabu"],
+        owner=user_a, display_name="Kiranmai Sample", bar_codes=["TS/1234/2009"],
+        name_forms=["Kiranmai", "S Kiranmai"], excluded_names=["T Kiranmai"],
     )
 
 
@@ -93,8 +93,8 @@ class TestForm:
         }
 
     def test_name_search(self):
-        form = hc_advocate_search_form(state_code="1", bench_code="4", advocate_name="Rambabu", captcha="x")
-        assert form["search_type"] == "1" and form["advocate_name"] == "Rambabu" and form["court_code"] == "4"
+        form = hc_advocate_search_form(state_code="1", bench_code="4", advocate_name="Kiranmai", captcha="x")
+        assert form["search_type"] == "1" and form["advocate_name"] == "Kiranmai" and form["court_code"] == "4"
         assert "adv_bar_state" not in form and form["f"] == "Both"
 
     def test_there_is_no_year_field_the_portal_returns_the_whole_book(self):
@@ -169,8 +169,8 @@ class TestProvider:
 
     def test_a_name_search(self):
         client = _hc_client(envelope(record()))
-        self._search(client, advocate_name="Rambabu", bar_code="")
-        assert client.last_form["search_type"] == "1" and client.last_form["advocate_name"] == "Rambabu"
+        self._search(client, advocate_name="Kiranmai", bar_code="")
+        assert client.last_form["search_type"] == "1" and client.last_form["advocate_name"] == "Kiranmai"
 
     def test_a_wrong_captcha_to_the_end_is_a_captcha_failure(self):
         with pytest.raises(CaptchaSolveError):
@@ -295,7 +295,7 @@ class TestStart:
         resp = self._start(client_a, profile_a, search_by="names")
         assert resp.status_code == 202
         assert "cannot be told apart" in resp.data["warning"]
-        assert ProcessingJob.objects.get(id=resp.data["job_id"]).payload["queries"] == ["Rambabu"]
+        assert ProcessingJob.objects.get(id=resp.data["job_id"]).payload["queries"] == ["Kiranmai"]
 
     def test_it_leaves_the_district_tabs_remembered_state_alone(self, v2_on, client_a, user_a, profile_a):
         AdvocateSearchPreference.objects.create(owner=user_a, court_type="district", hierarchy_config={"state_code": "29"})
@@ -440,12 +440,12 @@ class TestWorker:
     def test_a_name_search_runs_each_query_on_each_bench_and_labels_every_row_check(self, user_a, profile_a):
         from core.services.advocate_results import annotate_rows
 
-        job = hc_job(user_a, profile_a, search_by="names", queries=["Rambabu"], bar_code="", bench_codes=["1"],
+        job = hc_job(user_a, profile_a, search_by="names", queries=["Kiranmai"], bar_code="", bench_codes=["1"],
                      bench_names=["Appellate Side,Bombay"])
         provider = FakeHCProvider([([hc_hit("CNR01")], 1)])
         run_hc(job, provider)
         assert provider.calls == [
-            {"court": "bombay", "bench": "1", "name": "Rambabu", "bar": "", "status": "Both", "bench_name": "Appellate Side,Bombay"}
+            {"court": "bombay", "bench": "1", "name": "Kiranmai", "bar": "", "status": "Both", "bench_name": "Appellate Side,Bombay"}
         ]
         labelled, counts = annotate_rows(job.payload["results"], profile_a)
         assert counts["check"] == 1 and labelled[0]["match_status"] == "check"  # no advocate on the row to judge by
@@ -474,7 +474,7 @@ class TestWorker:
         never calls the High Court one."""
         job = ProcessingJob.enqueue_advocate_search(
             user_a,
-            {"v2": True, "state_code": "29", "court_type": "district", "queries": ["Rambabu"], "bar_code": "",
+            {"v2": True, "state_code": "29", "court_type": "district", "queries": ["Kiranmai"], "bar_code": "",
              "status_filter": "Both", "profile_id": profile_a.id},
         )
         provider = MagicMock()

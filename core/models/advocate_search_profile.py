@@ -15,8 +15,8 @@ class AdvocateSearchProfile(OwnedModel):
 
     The lists are JSON arrays of strings, edited whole by the API:
       bar_codes       -- "STATE/NUMBER/YEAR", e.g. "TS/1234/2009"
-      name_forms      -- spellings that ARE this advocate ("S Rambabu")
-      excluded_names  -- spellings that are NOT ("T Rambabu"), hidden from
+      name_forms      -- spellings that ARE this advocate ("S Kiranmai")
+      excluded_names  -- spellings that are NOT ("T Kiranmai"), hidden from
                          every search. A name is never in both lists.
 
     Search results store the advocate name exactly as the court listed it; which
@@ -25,7 +25,7 @@ class AdvocateSearchProfile(OwnedModel):
     search without a new portal call.
     """
 
-    display_name = models.CharField(max_length=120, help_text="The advocate's full name, e.g. 'Rambabu Samalla'.")
+    display_name = models.CharField(max_length=120, help_text="The advocate's full name as on the Bar roll.")
     bar_codes = models.JSONField(default=list, blank=True)
     name_forms = models.JSONField(default=list, blank=True)
     excluded_names = models.JSONField(default=list, blank=True)

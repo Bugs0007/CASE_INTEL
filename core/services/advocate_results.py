@@ -6,7 +6,7 @@ dropped and no verdict is stored. The verdict -- `match_status` -- is computed
 here, from the CURRENT search profile, every time results are read:
 
     matched   -- a spelling the advocate listed as theirs ("Your name")
-    check     -- could be them (a plain "Rambabu", or no advocate listed at all)
+    check     -- could be them (a plain "Kiranmai", or no advocate listed at all)
     excluded  -- a spelling on the Not me list (hidden by default)
     other     -- the portal's loose matching returned someone else (hidden)
 

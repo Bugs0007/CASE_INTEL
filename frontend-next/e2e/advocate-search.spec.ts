@@ -18,14 +18,14 @@ const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOSt
 
 const profile = {
   id: 1,
-  display_name: "Rambabu Samalla",
+  display_name: "Kiranmai Sample",
   bar_codes: ["TS/1234/2009"],
-  name_forms: ["Rambabu", "Ram babu", "S Rambabu", "S Ram babu", "Rambabu S"],
-  excluded_names: ["T Rambabu", "K Rambabu", "Rambabu Reddy"],
-  queries: ["Rambabu", "Ram babu"],
+  name_forms: ["Kiranmai", "Kiran mai", "S Kiranmai", "S Kiran mai", "Kiranmai S"],
+  excluded_names: ["T Kiranmai", "P Kiranmai", "Kiranmai Reddy"],
+  queries: ["Kiranmai", "Kiran mai"],
   query_count: 2,
   query_warning: "",
-  suggestions: ["Ram babu S", "Samalla Rambabu"],
+  suggestions: ["Kiran mai S", "Sample Kiranmai"],
   created_at: ago(5000),
   updated_at: ago(5),
 };
@@ -93,23 +93,23 @@ const row = (cnr: string, no: string, parties: [string, string], advocate: strin
 });
 
 const RESULT_ROWS = [
-  row("TSAD01", "OS/740/2015", ["Venkat Rao", "State Bank of India"], "S Rambabu", "Adilabad Court Complex", "Pending", "matched"),
-  row("TSAD02", "CC/312/2019", ["State of Telangana", "M. Anil"], "Rambabu S", "Adilabad Court Complex", "Disposed", "matched"),
-  row("TSAD03", "AS/55/2021", ["K. Lakshmi", "P. Reddy"], "S Ram babu", "Nirmal Court Complex", "Pending", "matched"),
-  row("TSAD04", "WP/1709/2026", ["Butham Srinivas", "Respondent"], "Rambabu S", "Adilabad Court Complex", "Pending", "matched"),
-  row("TSAD05", "CC/88/2020", ["State of Telangana", "D. Ramesh"], "S Rambabu", "Nirmal Court Complex", "Pending", "matched"),
-  row("TSAD06", "OS/118/2018", ["G. Narsaiah", "Mandal Revenue Officer"], "Rambabu", "Mancherial Court Complex", "Pending", "check"),
-  row("TSAD07", "MC/12/2022", ["A. Kumar", "Ravi Teja"], "Rambabu", "Khanapur Court Complex", "Disposed", "check"),
-  row("TSAD08", "EP/9/2017", ["Rao Finance", "Y. Satish"], "S Ram babu", "Nirmal Court Complex", "Disposed", "matched"),
-  row("TSAD09", "OS/301/2016", ["M. Prasad", "Gram Panchayat"], "S Rambabu", "Adilabad Court Complex", "Pending", "matched"),
-  row("TSAD10", "CC/44/2023", ["State of Telangana", "R. Naik"], "Rambabu S", "Mancherial Court Complex", "Pending", "matched"),
-  row("TSAD11", "AS/12/2019", ["T. Devi", "K. Mohan"], "S Ram babu", "Nirmal Court Complex", "Disposed", "matched"),
-  row("TSAD12", "OS/87/2022", ["Sri Ram Finance", "B. Yadav"], "Rambabu", "Khanapur Court Complex", "Pending", "check"),
-  row("TSAD13", "CC/230/2018", ["State of Telangana", "V. Goud"], "Rambabu S", "Adilabad Court Complex", "Disposed", "matched"),
-  row("TSAD14", "EP/21/2020", ["P. Kumari", "A. Rao"], "S Rambabu", "Mancherial Court Complex", "Pending", "matched"),
-  row("TSAD15", "OS/5/2014", ["X", "Y"], "T Rambabu", "Adilabad Court Complex", "Pending", "excluded"),
-  row("TSAD16", "OS/6/2014", ["X", "Z"], "Rambabu Reddy", "Nirmal Court Complex", "Pending", "excluded"),
-  row("TSAD17", "OS/7/2013", ["Q", "R"], "G Rambabu", "Nirmal Court Complex", "Pending", "other"),
+  row("TSAD01", "OS/740/2015", ["Venkat Rao", "State Bank of India"], "S Kiranmai", "Adilabad Court Complex", "Pending", "matched"),
+  row("TSAD02", "CC/312/2019", ["State of Telangana", "M. Anil"], "Kiranmai S", "Adilabad Court Complex", "Disposed", "matched"),
+  row("TSAD03", "AS/55/2021", ["K. Lakshmi", "P. Reddy"], "S Kiran mai", "Nirmal Court Complex", "Pending", "matched"),
+  row("TSAD04", "WP/1709/2026", ["Butham Srinivas", "Respondent"], "Kiranmai S", "Adilabad Court Complex", "Pending", "matched"),
+  row("TSAD05", "CC/88/2020", ["State of Telangana", "D. Ramesh"], "S Kiranmai", "Nirmal Court Complex", "Pending", "matched"),
+  row("TSAD06", "OS/118/2018", ["G. Narsaiah", "Mandal Revenue Officer"], "Kiranmai", "Mancherial Court Complex", "Pending", "check"),
+  row("TSAD07", "MC/12/2022", ["A. Kumar", "Ravi Teja"], "Kiranmai", "Khanapur Court Complex", "Disposed", "check"),
+  row("TSAD08", "EP/9/2017", ["Rao Finance", "Y. Satish"], "S Kiran mai", "Nirmal Court Complex", "Disposed", "matched"),
+  row("TSAD09", "OS/301/2016", ["M. Prasad", "Gram Panchayat"], "S Kiranmai", "Adilabad Court Complex", "Pending", "matched"),
+  row("TSAD10", "CC/44/2023", ["State of Telangana", "R. Naik"], "Kiranmai S", "Mancherial Court Complex", "Pending", "matched"),
+  row("TSAD11", "AS/12/2019", ["T. Devi", "K. Mohan"], "S Kiran mai", "Nirmal Court Complex", "Disposed", "matched"),
+  row("TSAD12", "OS/87/2022", ["Sri Ram Finance", "B. Yadav"], "Kiranmai", "Khanapur Court Complex", "Pending", "check"),
+  row("TSAD13", "CC/230/2018", ["State of Telangana", "V. Goud"], "Kiranmai S", "Adilabad Court Complex", "Disposed", "matched"),
+  row("TSAD14", "EP/21/2020", ["P. Kumari", "A. Rao"], "S Kiranmai", "Mancherial Court Complex", "Pending", "matched"),
+  row("TSAD15", "OS/5/2014", ["X", "Y"], "T Kiranmai", "Adilabad Court Complex", "Pending", "excluded"),
+  row("TSAD16", "OS/6/2014", ["X", "Z"], "Kiranmai Reddy", "Nirmal Court Complex", "Pending", "excluded"),
+  row("TSAD17", "OS/7/2013", ["Q", "R"], "G Kiranmai", "Nirmal Court Complex", "Pending", "other"),
 ];
 
 const run = (id: number, dist: string, name: string, status: string, extra = {}) => ({
@@ -159,7 +159,7 @@ const jobResult = (status: string, rows: typeof RESULT_ROWS, extra = {}) => ({
   status, progress_current: 3, progress_total: 3, error: "", results: rows, results_total: rows.length, results_truncated: false, failures: [],
   districts_total: 3, districts_status: {}, complexes_searched: 8, complexes_done: 10, complexes_total_known: 10, current_district: "",
   mode: "districts", created_at: ago(8), started_at: ago(8), profile_id: 1, v2: true, court_type: "district", search_by: "names",
-  queries: ["Rambabu", "Ram babu"], state_code: "29", hc_court_name: "",
+  queries: ["Kiranmai", "Kiran mai"], state_code: "29", hc_court_name: "",
   match_counts: {
     matched: rows.filter((r) => r.match_status === "matched").length,
     check: rows.filter((r) => r.match_status === "check").length,
@@ -244,23 +244,23 @@ test("Not me hides the row and its siblings at once, with no new search", async 
   let posted = 0;
   // After the Not me is saved the server answers the same search with those rows relabelled.
   await page.route("http://localhost:8000/api/cases/search-advocate/8/", async (route) => {
-    const rows = RESULT_ROWS.map((r) => (posted > 0 && r.listed_advocate_name === "Rambabu" ? { ...r, match_status: "excluded", match_label: "Hidden (Not me)" } : r));
+    const rows = RESULT_ROWS.map((r) => (posted > 0 && r.listed_advocate_name === "Kiranmai" ? { ...r, match_status: "excluded", match_label: "Hidden (Not me)" } : r));
     await route.fulfill({ status: 200, contentType: "application/json", headers: CORS, body: JSON.stringify(jobResult("succeeded", rows as typeof RESULT_ROWS)) });
   });
   await page.route("http://localhost:8000/api/advocate-profiles/1/exclude/", async (route) => {
     posted += 1;
     await route.fulfill({
       status: 200, contentType: "application/json", headers: CORS,
-      body: JSON.stringify({ ...profile, name_forms: ["Ram babu"], excluded_names: [...profile.excluded_names, "Rambabu"] }),
+      body: JSON.stringify({ ...profile, name_forms: ["Kiran mai"], excluded_names: [...profile.excluded_names, "Kiranmai"] }),
     });
   });
   await page.goto("/cases/search?tab=district&job=8");
   await expect(page.getByText("Advocate as listed")).toBeVisible({ timeout: 20_000 });
   const before = await page.getByRole("row").filter({ hasText: "OS/118/2018" }).count();
   expect(before).toBe(1);
-  await page.getByRole("button", { name: "Not me: Rambabu" }).first().click();
+  await page.getByRole("button", { name: "Not me: Kiranmai" }).first().click();
   await expect(page.getByRole("row").filter({ hasText: "OS/118/2018" })).toHaveCount(0); // moved at once
-  await expect(page.getByRole("row").filter({ hasText: "MC/12/2022" })).toHaveCount(0); // so did the other row listing "Rambabu"
+  await expect(page.getByRole("row").filter({ hasText: "MC/12/2022" })).toHaveCount(0); // so did the other row listing "Kiranmai"
   await expect.poll(() => posted).toBe(1);
   // and it stays that way once the server's answer replaces the guess
   await page.waitForTimeout(500);
