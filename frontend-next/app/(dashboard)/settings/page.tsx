@@ -132,7 +132,7 @@ export default function SettingsPage() {
   return (
     <div className="px-4 sm:px-7 pt-5 sm:pt-7 pb-[60px] max-w-[700px] mx-auto">
       <div className="mb-5">
-        <h1 className="text-page-title text-gray-900 mb-1.5">Settings</h1>
+        <h1 className="text-page-title max-md:!text-[26px] max-md:!leading-[1.1] text-gray-900 mb-1.5">Settings</h1>
         <p className="text-sm text-gray-600">
           Your billing identity — this is what appears on generated invoices.
         </p>

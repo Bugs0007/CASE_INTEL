@@ -79,17 +79,20 @@ export function CompactCard({
       aria-label={title}
       className={cn("ci-card flex min-h-0 min-w-0 flex-col overflow-hidden", className)}
     >
-      <header className="flex h-11 flex-shrink-0 items-center gap-2 border-b border-gray-100 px-4">
+      {/* On a phone the header may take two lines: the title row, then the
+          buttons wrap beneath (right-aligned) instead of squeezing the title
+          down to "Ord...". From md up it is the single 44px row it was. */}
+      <header className="flex h-11 flex-shrink-0 items-center gap-2 border-b border-gray-100 px-4 max-md:h-auto max-md:min-h-[48px] max-md:flex-wrap max-md:gap-y-1.5 max-md:py-1.5">
         {icon && <span className="flex-shrink-0 text-gray-600">{icon}</span>}
-        <h2 className="min-w-0 truncate font-serif text-[15px] font-bold text-gray-900">{title}</h2>
+        <h2 className="min-w-0 truncate font-serif text-[15px] font-bold text-gray-900 max-md:flex-shrink-0 max-md:text-[16px]">{title}</h2>
         {count !== undefined && <span className="ci-chip ci-chip--none flex-shrink-0">{count}</span>}
         {titleExtra && <span className="flex-shrink-0 font-serif text-xs text-gray-500">{titleExtra}</span>}
-        <div className="ml-auto flex flex-shrink-0 items-center gap-1.5">
+        <div className="ml-auto flex flex-shrink-0 items-center gap-1.5 max-md:flex-wrap max-md:justify-end">
           {viewAll !== undefined && dialog && (
             <button
               type="button"
               onClick={(event) => setOpen(true, event.currentTarget)}
-              className="inline-flex h-7 items-center rounded border border-[var(--ci-ink-14)] bg-surface px-2.5 text-xs font-semibold text-gray-900 hover:border-[var(--ci-ink)]"
+              className="inline-flex h-7 items-center rounded border border-[var(--ci-ink-14)] bg-surface px-2.5 text-xs font-semibold text-gray-900 hover:border-[var(--ci-ink)] max-md:h-10 max-md:px-3.5"
             >
               View all {viewAll}
             </button>
@@ -102,7 +105,7 @@ export function CompactCard({
               onClick={() => setOpen(true)}
               aria-label={`Expand ${title}`}
               title={`Expand ${title}`}
-              className="flex h-7 w-7 items-center justify-center rounded border border-[var(--ci-ink-14)] text-gray-600 hover:border-[var(--ci-ink)] hover:text-gray-900"
+              className="flex h-7 w-7 items-center justify-center rounded border border-[var(--ci-ink-14)] text-gray-600 hover:border-[var(--ci-ink)] hover:text-gray-900 max-md:h-10 max-md:w-10"
             >
               <Maximize2 className="h-3.5 w-3.5" />
             </button>

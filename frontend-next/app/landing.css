@@ -37,7 +37,6 @@ html.lenis, html.lenis body { height: auto; }
 .nb ::selection { background: var(--nb-glow); color: var(--nb-surface); }
 .nb-wrap { max-width: var(--ci-maxw); margin: 0 auto; padding-inline: var(--nb-gut); }
 .nb-mono { font-family: var(--ci-mono); font-variant-numeric: tabular-nums; letter-spacing: 0.01em; }
-.nb em { font-style: italic; color: var(--nb-glow); }
 .nb-main { position: relative; z-index: 2; }
 .nb :focus-visible { outline: 2px solid var(--nb-glow); outline-offset: 3px; }
 
@@ -80,12 +79,14 @@ html.lenis, html.lenis body { height: auto; }
 .nb-gl { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 1; pointer-events: none; opacity: 0; }
 
 /* ------------------------------------------------------------ type */
+.nb :is(h1, h2, .nb-flight-line) { font-family: var(--ci-sans); font-weight: 600; }
+.nb :is(h1, h2, .nb-flight-line) em { font-style: inherit; }
 .nb-eyebrow {
   font-family: var(--ci-mono); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
   color: var(--nb-glow); display: flex; align-items: center; gap: 12px; margin: 0;
 }
 .nb-eyebrow::before { content: ""; width: 26px; height: 1px; background: currentColor; opacity: 0.7; }
-.nb h2 { font-size: clamp(32px, 4.4vw, 62px); line-height: 1.02; letter-spacing: -0.022em; margin-top: 18px; }
+.nb h2 { font-size: clamp(30px, 3.8vw, 52px); line-height: 1.12; letter-spacing: -0.025em; margin-top: 18px; }
 .nb-body { margin-top: 18px; color: var(--nb-dim); font-size: clamp(15.5px, 1.25vw, 17px); line-height: 1.62; max-width: 46ch; }
 .nb-points { list-style: none; margin: 22px 0 0; padding: 0; display: grid; gap: 10px; max-width: 46ch; }
 .nb-points li { position: relative; padding-left: 22px; font-size: 14.5px; color: var(--nb-dim); line-height: 1.5; }
@@ -165,7 +166,7 @@ html.lenis, html.lenis body { height: auto; }
 /* ------------------------------------------------------------ hero */
 .nb-hero { position: relative; min-height: 100svh; display: flex; align-items: center; padding: 104px 0 72px; }
 .nb-hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.02fr); gap: clamp(28px, 5vw, 80px); align-items: center; width: 100%; }
-.nb-h1 { font-size: clamp(46px, 7.6vw, 118px); line-height: 0.94; letter-spacing: -0.03em; margin-top: 22px; }
+.nb-h1 { font-size: clamp(32px, 4.3vw, 56px); line-height: 1.08; letter-spacing: -0.035em; margin-top: 22px; }
 .nb-lede { margin-top: 26px; color: var(--nb-dim); font-size: clamp(16px, 1.35vw, 18.5px); line-height: 1.6; max-width: 46ch; }
 .nb-cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
 .nb-note { margin-top: 16px; font-size: 13px; color: var(--nb-faint); }
@@ -228,7 +229,7 @@ html.lenis, html.lenis body { height: auto; }
 /* ------------------------------------------------------------ flight */
 .nb-flight { position: relative; height: 210vh; }
 .nb-flight-stick { position: sticky; top: 0; height: 100svh; display: grid; place-items: center; overflow: hidden; }
-.nb-flight-line { position: relative; z-index: 2; display: grid; justify-items: center; text-align: center; font-family: var(--ci-serif); font-size: clamp(40px, 7.5vw, 112px); line-height: 1; letter-spacing: -0.025em; padding-inline: var(--nb-gut); }
+.nb-flight-line { position: relative; z-index: 2; display: grid; justify-items: center; text-align: center; font-size: clamp(34px, 5.4vw, 76px); line-height: 1.08; letter-spacing: -0.03em; padding-inline: var(--nb-gut); }
 .nb-flight-line span { display: block; }
 .nb-flight-line::before { content: ""; position: absolute; inset: -30% -12%; z-index: -1; background: radial-gradient(closest-side, rgba(248, 246, 240, 0.94), transparent); }
 .nb-flight-static { position: absolute; inset: 0; perspective: 900px; }
@@ -602,7 +603,7 @@ html.lenis, html.lenis body { height: auto; }
 /* ------------------------------------------------------------ trust */
 .nb-trust { position: relative; padding: clamp(110px, 14vw, 180px) 0 clamp(90px, 10vw, 140px); }
 .tr-head { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); gap: clamp(28px, 5vw, 80px); align-items: end; }
-.nb-trust h2 { font-size: clamp(34px, 5vw, 72px); }
+.nb-trust h2 { font-size: clamp(32px, 4.4vw, 60px); }
 .tr-field { position: relative; }
 .tr-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 5px; }
 .tr-cell { aspect-ratio: 1; border-radius: 1px; background: rgba(20, 32, 44, 0.08); }
@@ -634,8 +635,7 @@ html.lenis, html.lenis body { height: auto; }
   position: absolute; right: var(--nb-gut); bottom: 6%; font-size: clamp(84px, 17vw, 250px); font-weight: 500; letter-spacing: -0.04em; line-height: 1;
   color: transparent; -webkit-text-stroke: 1.2px rgba(20, 32, 44, 0.2);
 }
-.fin-h { font-size: clamp(50px, 9.6vw, 152px) !important; line-height: 0.92 !important; letter-spacing: -0.035em !important; margin: 0 !important; max-width: 12ch; color: var(--ci-ink); }
-.nb-finale .fin-h em { color: var(--nb-glow); }
+.nb-finale .fin-h { font-size: clamp(38px, 6.4vw, 88px); line-height: 1.08; letter-spacing: -0.035em; margin: 0; max-width: 16ch; color: var(--ci-ink); }
 .fin-sub { margin-top: 28px; max-width: 44ch; font-size: clamp(16px, 1.4vw, 19px); color: var(--nb-dim); line-height: 1.6; }
 .fin-cta { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 34px; }
 .nb-finale .nb-btn--solid { background: var(--ci-ink); color: var(--ci-paper); }

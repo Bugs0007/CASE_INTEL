@@ -112,12 +112,13 @@ export default function DocumentsPage() {
   }
 
   return (
-    <div className="px-4 sm:px-7 pt-5 sm:pt-7 pb-[60px] max-w-[1240px] mx-auto">
-      <SectionTabs tabs={CASES_TABS} />
+    <div className="px-4 sm:px-7 pt-4 sm:pt-7 pb-[60px] max-w-[1240px] mx-auto">
+      {/* Cases | Documents are both in the bottom bar on a phone. */}
+      <SectionTabs tabs={CASES_TABS} className="max-md:hidden" />
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-[22px] gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-[22px] max-md:mb-3.5 gap-3">
         <div className="min-w-0">
-          <h1 className="text-page-title text-gray-900 mb-1.5">Documents</h1>
+          <h1 className="text-page-title max-md:!text-[26px] max-md:!leading-[1.1] text-gray-900 mb-1.5 max-md:mb-0.5">Documents</h1>
           <p className="text-sm text-gray-600">
             {pluralize(filteredDocuments.length, "document")} across all cases
           </p>
@@ -132,7 +133,7 @@ export default function DocumentsPage() {
       </div>
 
       {/* Filters */}
-      <div className="mb-5">
+      <div className="mb-5 max-md:mb-3">
         <DocumentFilters
           onSearchChange={setSearchQuery}
           onCaseChange={setSelectedCase}

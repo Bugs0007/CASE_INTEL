@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { BriefingView } from "@/components/dashboard/briefing-view";
+import { MobileDashboard } from "@/components/dashboard/mobile-dashboard";
 import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
 import { PracticeMap } from "@/components/dashboard/practice-map";
 import { RefreshAllButton } from "@/components/dashboard/refresh-all-button";
@@ -12,6 +13,7 @@ import { useCases } from "@/hooks/use-cases";
 import { useBillingPortfolio, useClientMessages } from "@/hooks/use-clients";
 import { useUpcomingHearings } from "@/hooks/use-dashboard";
 import { useDashboardView } from "@/hooks/use-dashboard-view";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 import { useDocuments } from "@/hooks/use-documents";
 import { useHearings } from "@/hooks/use-hearings";
 import { useTasks, useUpdateTask } from "@/hooks/use-tasks";
@@ -43,6 +45,7 @@ export default function DashboardPage() {
 
 function Dashboard() {
   const { view, setView } = useDashboardView();
+  const isMobile = useIsMobile();
   const [today] = useState(() => istDayKey());
   const [hour] = useState(() => new Date().getHours());
 
@@ -119,6 +122,25 @@ function Dashboard() {
     updateTask.mutate(
       { id, data: { status: "completed" } },
       { onError: () => showToast.error("Could not update task", "Try again in a moment.") },
+    );
+  }
+
+  // A phone gets its own layout (cards to glance at and tap), built from
+  // the same model; the Practice map view is the same component.
+  if (isMobile) {
+    return (
+      <div role="tabpanel" id={panelId(view)} aria-labelledby={tabId(view)}>
+        <MobileDashboard
+          model={model}
+          greeting={greeting}
+          billing={{ data: billing.data, isLoading: false, error: billing.error }}
+          view={view}
+          onViewChange={setView}
+          completingTaskId={completingTaskId}
+          onCompleteTask={completeTask}
+          map={<PracticeMap model={model} />}
+        />
+      </div>
     );
   }
 

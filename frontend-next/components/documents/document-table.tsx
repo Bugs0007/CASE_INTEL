@@ -52,9 +52,10 @@ export function DocumentTable({
 
   return (
     <div className="flex flex-col gap-2.5">
-      {documents.map((doc) => (
+      {documents.map((doc, i) => (
         <DocumentRow
           key={doc.id}
+          index={i}
           document={doc}
           onProcess={onProcess}
           onDelete={onDelete}

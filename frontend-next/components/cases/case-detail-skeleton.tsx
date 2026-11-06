@@ -3,7 +3,45 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export function CaseDetailSkeleton() {
   return (
-    <div className="h-full overflow-hidden flex flex-col">
+    <>
+      <MobileCaseSkeleton />
+      <DesktopCaseSkeleton />
+    </>
+  );
+}
+
+/** A phone's shape: tabs, title block, the next-hearing card, quick actions. */
+function MobileCaseSkeleton() {
+  return (
+    <div aria-hidden="true" className="px-4 pb-6 md:hidden">
+      <div className="-mx-4 mb-3 flex h-[44px] items-center gap-6 border-b border-gray-200 bg-surface px-5">
+        {[0, 1, 2, 3].map((i) => (
+          <Skeleton key={i} className={`h-3 ${["w-14","w-12","w-[72px]","w-16"][i]}`} />
+        ))}
+      </div>
+      <div className="flex gap-1.5">
+        <Skeleton className="h-5 w-14 rounded-full" />
+        <Skeleton className="h-5 w-16 rounded-full" />
+        <Skeleton className="h-5 w-24" />
+      </div>
+      <Skeleton className="mt-3 h-7 w-4/5" />
+      <Skeleton className="mt-2 h-7 w-3/5" />
+      <Skeleton className="mt-4 h-[132px] w-full rounded-[3px]" />
+      <div className="mt-3 flex gap-2 overflow-hidden">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-11 w-28 flex-none rounded-lg" />
+        ))}
+      </div>
+      <Skeleton className="mt-4 h-5 w-32" />
+      <Skeleton className="mt-3 h-[120px] w-full rounded-[3px]" />
+      <Skeleton className="mt-3 h-[90px] w-full rounded-[3px]" />
+    </div>
+  );
+}
+
+function DesktopCaseSkeleton() {
+  return (
+    <div className="h-full overflow-hidden flex flex-col max-md:hidden">
       {/* Header */}
       <div className="bg-white border-b border-gray-100 px-7 py-5 flex-shrink-0">
         <Skeleton className="h-4 w-28 mb-3.5" />

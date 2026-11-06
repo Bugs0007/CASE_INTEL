@@ -35,7 +35,7 @@ import type { Case, CourtOrder, Hearing, OrderSummary } from "@/types";
 
 /** The text for the direction box: your side's when the side is known, else
  * both sides as the order states them. */
-function directionsOf(summary: OrderSummary): { label: string; text: string } | null {
+export function directionsOf(summary: OrderSummary): { label: string; text: string } | null {
   if (summary.status !== "summarized") return null;
   if (summary.your_side_directions !== null) {
     const text = summary.your_side_directions.join(" ");

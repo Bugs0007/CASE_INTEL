@@ -9,6 +9,9 @@ import { useDeleteHearing, useHearings } from "@/hooks/use-hearings";
 import { useCaseOrders, useViewOrder } from "@/hooks/use-court-orders";
 import { useClientMessages } from "@/hooks/use-clients";
 import { useViewportBudget } from "@/hooks/use-viewport-budget";
+import { useIsMobile } from "@/hooks/use-is-mobile";
+import { MobileCaseView } from "@/components/cases/mobile/mobile-case-view";
+import { DailyStatusCard } from "@/components/cases/daily-status-card";
 import { CaseOverview } from "@/components/cases/case-overview";
 import { CaseDetailsDialog } from "@/components/cases/case-details-dialog";
 import { DisposalBanner, UpdateRecipientsNote } from "@/components/cases/case-banners";
@@ -52,7 +55,10 @@ export default function CaseDetailPage() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const budget = useViewportBudget();
+  const isMobile = useIsMobile();
   const [showChat, setShowChat] = useState(false);
+  // On a phone the Case Bot slides away before it unmounts.
+  const [chatClosing, setChatClosing] = useState(false);
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [isGenerateDialogOpen, setIsGenerateDialogOpen] = useState(false);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
@@ -250,6 +256,159 @@ export default function CaseDetailPage() {
 
   const viewingOrderId = viewOrder.isPending ? viewOrder.variables : undefined;
 
+  const closeChat = () => {
+    if (!isMobile) {
+      setShowChat(false);
+      return;
+    }
+    setChatClosing(true);
+    window.setTimeout(() => {
+      setShowChat(false);
+      setChatClosing(false);
+    }, 260);
+  };
+
+  // Everything that opens over the page: the same on desktop and phone (on a
+  // phone the dialogs show as bottom sheets).
+  const overlays = (
+    <>
+      <PageDialog
+        isOpen={trackingOpen}
+        onClose={() => setTrackingOpen(false)}
+        title="Court tracking"
+        returnFocusRef={dialogOpenerRef}
+      >
+        <CourtTrackingCard caseItem={caseItem} hearings={hearings} />
+      </PageDialog>
+
+      <PageDialog
+        isOpen={detailsViewOpen}
+        onClose={() => setDetailsViewOpen(false)}
+        title="Case details"
+        icon={<Users className="h-4 w-4" />}
+        returnFocusRef={dialogOpenerRef}
+      >
+        <div className="space-y-4">
+          <DisposalBanner caseItem={caseItem} />
+          <UpdateRecipientsNote caseItem={caseItem} onEditDetails={openEditDetails} />
+          <CaseOverview case={caseItem} onEditDetails={openEditDetails} />
+          <OrderSyncStatusLine caseItem={caseItem} />
+          <ClientContactsCard contacts={caseItem.client_contacts} onEditDetails={openEditDetails} />
+        </div>
+      </PageDialog>
+
+      {/* Case Bot -- a slide-over from the right at every width. Portaled to
+          document.body: (dashboard)/template.tsx's page-transition wrapper
+          uses `transform`, which per spec makes it the containing block for
+          fixed descendants and would shrink "fixed inset-y-0" to that
+          wrapper's box (leaving the Header and bottom MobileNav poking out
+          around it). */}
+      {showChat &&
+        typeof document !== "undefined" &&
+        createPortal(
+          // A slide-over from the right on desktop; on a phone a sheet that
+          // rises from the bottom edge (and slides back down before it
+          // unmounts), leaving a strip of the page showing above it.
+          <div
+            className={cn(
+              "fixed z-40 bg-white shadow-2xl motion-reduce:animate-none motion-reduce:transition-none",
+              "inset-y-0 right-0 w-full sm:w-[min(680px,100vw)] animate-slide-in-right",
+              "max-md:inset-x-0 max-md:bottom-0 max-md:top-3 max-md:w-auto max-md:rounded-t-[14px] max-md:animate-sheet-up max-md:transition-transform max-md:duration-[260ms] max-md:ease-in",
+              chatClosing && "max-md:translate-y-full",
+            )}
+          >
+            <div aria-hidden="true" className="absolute left-1/2 top-1.5 z-10 h-1 w-10 -translate-x-1/2 rounded-full bg-[var(--ci-ink-14)] md:hidden" />
+            <ChatPanel
+              caseId={caseId}
+              onClose={closeChat}
+              onOpenCitation={handleOpenCitation}
+              className="h-full max-md:rounded-t-[14px]"
+            />
+          </div>,
+          document.body,
+        )}
+
+      {viewerDocId !== null && !docsLoading && (
+        <DocumentViewer
+          caseId={caseId}
+          documentId={viewerDocId}
+          documents={documents}
+          orders={courtOrders}
+          onSelectDocument={switchDocument}
+          onClose={closeViewer}
+          chatInitiallyOpen={botDocked}
+        />
+      )}
+
+      {/* Upload Document Dialog */}
+      <UploadDocumentDialog
+        isOpen={isUploadDialogOpen}
+        onClose={() => setIsUploadDialogOpen(false)}
+        defaultCaseId={caseId}
+      />
+
+      <CaseDetailsDialog
+        isOpen={isDetailsDialogOpen}
+        onClose={() => setIsDetailsDialogOpen(false)}
+        case={caseItem}
+      />
+
+      {/* Template-merge documents (vakalatnama, memo of appearance, ...) */}
+      <GenerateDocumentDialog
+        isOpen={isGenerateDialogOpen}
+        onClose={() => setIsGenerateDialogOpen(false)}
+        caseItem={caseItem}
+      />
+
+      {/* Add/Edit Hearing Dialog */}
+      <HearingDialog
+        isOpen={isHearingDialogOpen}
+        onClose={() => setIsHearingDialogOpen(false)}
+        caseId={caseId}
+        hearing={editingHearing}
+      />
+    </>
+  );
+
+  // A phone gets its own one-column layout (components/cases/mobile).
+  if (isMobile) {
+    return (
+      <>
+        <MobileCaseView
+          caseItem={caseItem}
+          caseId={caseId}
+          hearings={hearings}
+          hearingsLoading={hearingsLoading}
+          orders={courtOrders}
+          documents={documents}
+          docsLoading={docsLoading}
+          latestDatedOrder={latestDatedOrder}
+          viewingOrderId={viewingOrderId}
+          onViewOrder={handleViewOrder}
+          onAddHearing={handleAddHearing}
+          onEditHearing={handleEditHearing}
+          onDeleteHearing={handleDeleteHearing}
+          deletingHearingId={deleteHearing.variables}
+          onUpload={() => setIsUploadDialogOpen(true)}
+          onGenerate={() => setIsGenerateDialogOpen(true)}
+          onViewDocument={(id) => openDocument(id)}
+          onProcessDocument={handleProcessDocument}
+          onDeleteDocument={handleDeleteDocument}
+          processPending={processDocument.isPending}
+          processingDocId={processDocument.variables}
+          onEditDetails={openEditDetails}
+          onOpenTracking={openTracking}
+          onOpenDetails={openDetailsView}
+          onOpenBot={() => setShowChat(true)}
+          statusLine={<CaseOrderCheckLine caseItem={caseItem} />}
+          // District courts only: they publish the day's business, not order documents.
+          dailyStatusSlot={caseItem.court_type === "district" ? <DailyStatusCard caseId={caseId} /> : undefined}
+        />
+        {overlays}
+      </>
+    );
+  }
+
   return (
     <div className={cn("flex h-full flex-col", budget.fit ? "overflow-hidden" : "overflow-y-auto")}>
       <CaseHeaderRow
@@ -331,90 +490,7 @@ export default function CaseDetailPage() {
         </aside>
       </div>
 
-      <PageDialog
-        isOpen={trackingOpen}
-        onClose={() => setTrackingOpen(false)}
-        title="Court tracking"
-        returnFocusRef={dialogOpenerRef}
-      >
-        <CourtTrackingCard caseItem={caseItem} hearings={hearings} />
-      </PageDialog>
-
-      <PageDialog
-        isOpen={detailsViewOpen}
-        onClose={() => setDetailsViewOpen(false)}
-        title="Case details"
-        icon={<Users className="h-4 w-4" />}
-        returnFocusRef={dialogOpenerRef}
-      >
-        <div className="space-y-4">
-          <DisposalBanner caseItem={caseItem} />
-          <UpdateRecipientsNote caseItem={caseItem} onEditDetails={openEditDetails} />
-          <CaseOverview case={caseItem} onEditDetails={openEditDetails} />
-          <OrderSyncStatusLine caseItem={caseItem} />
-          <ClientContactsCard contacts={caseItem.client_contacts} onEditDetails={openEditDetails} />
-        </div>
-      </PageDialog>
-
-      {/* Case Bot -- a slide-over from the right at every width. Portaled to
-          document.body: (dashboard)/template.tsx's page-transition wrapper
-          uses `transform`, which per spec makes it the containing block for
-          fixed descendants and would shrink "fixed inset-y-0" to that
-          wrapper's box (leaving the Header and bottom MobileNav poking out
-          around it). */}
-      {showChat &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div className="fixed inset-y-0 right-0 z-40 w-full sm:w-[min(680px,100vw)] bg-white shadow-2xl animate-slide-in-right motion-reduce:animate-none">
-            <ChatPanel
-              caseId={caseId}
-              onClose={() => setShowChat(false)}
-              onOpenCitation={handleOpenCitation}
-              className="h-full"
-            />
-          </div>,
-          document.body,
-        )}
-
-      {viewerDocId !== null && !docsLoading && (
-        <DocumentViewer
-          caseId={caseId}
-          documentId={viewerDocId}
-          documents={documents}
-          orders={courtOrders}
-          onSelectDocument={switchDocument}
-          onClose={closeViewer}
-          chatInitiallyOpen={botDocked}
-        />
-      )}
-
-      {/* Upload Document Dialog */}
-      <UploadDocumentDialog
-        isOpen={isUploadDialogOpen}
-        onClose={() => setIsUploadDialogOpen(false)}
-        defaultCaseId={caseId}
-      />
-
-      <CaseDetailsDialog
-        isOpen={isDetailsDialogOpen}
-        onClose={() => setIsDetailsDialogOpen(false)}
-        case={caseItem}
-      />
-
-      {/* Template-merge documents (vakalatnama, memo of appearance, ...) */}
-      <GenerateDocumentDialog
-        isOpen={isGenerateDialogOpen}
-        onClose={() => setIsGenerateDialogOpen(false)}
-        caseItem={caseItem}
-      />
-
-      {/* Add/Edit Hearing Dialog */}
-      <HearingDialog
-        isOpen={isHearingDialogOpen}
-        onClose={() => setIsHearingDialogOpen(false)}
-        caseId={caseId}
-        hearing={editingHearing}
-      />
+      {overlays}
     </div>
   );
 }

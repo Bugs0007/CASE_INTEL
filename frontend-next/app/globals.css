@@ -10,6 +10,10 @@
        that sits above it (bottom clearance) so the two can never drift out
        of sync -- env() falls back to 0px on devices/browsers without it. */
     --mobile-nav-height: calc(4rem + env(safe-area-inset-bottom, 0px));
+    /* The phone's compact top bar (MobileChrome hides it while scrolling
+       down and brings it back on the way up). Header + the scroll area's
+       top padding both read this, so they cannot drift apart. */
+    --mobile-header-h: calc(52px + env(safe-area-inset-top, 0px));
   }
 
   /* Tailwind's preflight resets border-color to `currentColor`; case-intel-
@@ -40,3 +44,126 @@
 ::-webkit-scrollbar-thumb:hover {
   background: var(--ci-ink-45);
 }
+
+/* ==========================================================================
+   Phone experience (< 768px)
+   Everything below only applies under `md`; the desktop look is untouched.
+   Motion is transform + opacity only, and the global reduced-motion rule in
+   case-intel-theme.css (animation/transition: none) switches all of it off.
+   ========================================================================== */
+
+@keyframes ci-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes ci-sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes ci-shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+@media (max-width: 767px) {
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Taps answer at once (no 300ms double-tap wait) and press down a little. */
+  a, button, summary, [role="button"], [role="tab"], [role="menuitem"] {
+    touch-action: manipulation;
+  }
+  :where(button, a[href], summary, [role="button"], [role="tab"], [role="menuitem"]) {
+    transition-property: transform, background-color, border-color, color, opacity, box-shadow;
+    transition-duration: 140ms;
+    transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  :where(button, a[href], summary, [role="button"], [role="tab"], [role="menuitem"]):not(:disabled):active {
+    transform: scale(var(--press-scale, 0.97));
+  }
+
+  /* iOS zooms the page when a focused field's text is under 16px. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  /* Skeletons shimmer instead of pulsing. */
+  .ci-skeleton {
+    animation: none !important;
+    position: relative;
+    overflow: hidden;
+  }
+  .ci-skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent);
+    animation: ci-shimmer 1.5s ease-in-out infinite;
+  }
+
+  /* Toasts sit above the bottom bar, not under it. */
+  [data-sonner-toaster][data-y-position="bottom"] {
+    bottom: calc(var(--mobile-nav-height) + 12px) !important;
+  }
+
+  /* The top bar hides while reading down the page. */
+  .ci-mobile-header {
+    transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  html[data-chrome="hidden"] .ci-mobile-header {
+    transform: translateY(calc(-1 * var(--mobile-header-h)));
+  }
+
+  /* The app's own dialogs (edit, upload, hearing...) are sheets on a phone:
+     they sit on the bottom edge, rise into place and show a grabber. The
+     search dialog stays a top-anchored panel. The expand dialog sets its
+     own look in code (it has a data-layer). */
+  div.fixed.inset-0.z-50.flex:has(> [role="dialog"][aria-modal="true"]:not([aria-label="Search"])) {
+    align-items: flex-end;
+    padding: 0;
+  }
+  div.fixed.inset-0.z-50.flex > [role="dialog"][aria-modal="true"]:not([aria-label="Search"]) {
+    margin: 0;
+    width: 100%;
+    max-width: none;
+    max-height: calc(100dvh - 24px - env(safe-area-inset-top, 0px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-radius: 14px 14px 0 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    animation: ci-sheet-up 0.36s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  }
+  div.fixed.inset-0.z-50.flex > [role="dialog"][aria-modal="true"]:not([aria-label="Search"])::before {
+    content: "";
+    display: block;
+    width: 38px;
+    height: 4px;
+    margin: 8px auto 0;
+    border-radius: 2px;
+    background: var(--ci-ink-14);
+  }
+  div.fixed.inset-0.z-50.flex > [aria-hidden="true"].absolute.inset-0 {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    animation: ci-fade-in 0.26s ease-out backwards;
+  }
+}
+
+/* Chip / badge row that scrolls sideways inside its own box, scrollbar hidden. */
+.ci-hscroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: 16px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.ci-hscroll::-webkit-scrollbar { display: none; }
+.ci-hscroll > * { flex: none; scroll-snap-align: start; }

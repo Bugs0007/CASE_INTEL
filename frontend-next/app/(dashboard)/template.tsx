@@ -22,7 +22,14 @@ export default function DashboardTemplate({ children }: { children: ReactNode })
   // day-detail list) still get a real scrollbar and correct bottom-nav
   // clearance -- just from this element instead of from <main>.
   return (
-    <div className="flex-1 min-h-0 min-w-0 overflow-y-auto pb-[var(--mobile-nav-height)] lg:pb-0 animate-fade-up motion-reduce:animate-none">
+    // data-page-scroll: MobileChrome reads this scroller to hide the phone's
+    // top bar while reading down. Below md the bar is fixed over the page, so
+    // the scroller starts under it (padding-top) and the page slides in from
+    // the right on every navigation; md and up keep the plain fade-up.
+    <div
+      data-page-scroll
+      className="flex-1 min-h-0 min-w-0 overflow-y-auto overscroll-y-contain pb-[var(--mobile-nav-height)] max-md:pt-[var(--mobile-header-h)] lg:pb-0 animate-fade-up max-md:animate-page-in motion-reduce:animate-none"
+    >
       {children}
     </div>
   );

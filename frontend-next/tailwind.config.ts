@@ -119,6 +119,49 @@ const config: Config = {
           "0%": { transform: "translateX(100%)", opacity: "0" },
           "100%": { transform: "translateX(0)", opacity: "1" },
         },
+        // --- Mobile motion (transform + opacity only) --------------------
+        // A bottom sheet rising from the screen edge.
+        "sheet-up": {
+          "0%": { transform: "translateY(100%)" },
+          "100%": { transform: "translateY(0)" },
+        },
+        "backdrop-in": {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
+        // A card or row entering a list: lift from 14px below.
+        "rise-in": {
+          "0%": { opacity: "0", transform: "translateY(14px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        // A chip, number or check settling into place with a small overshoot.
+        "pop-in": {
+          "0%": { opacity: "0", transform: "scale(0.6)" },
+          "60%": { opacity: "1", transform: "scale(1.08)" },
+          "100%": { opacity: "1", transform: "scale(1)" },
+        },
+        "settle": {
+          "0%": { opacity: "0", transform: "translateY(8px) scale(0.92)" },
+          "100%": { opacity: "1", transform: "translateY(0) scale(1)" },
+        },
+        // Page-to-page: the new screen slides in from the right.
+        "page-in": {
+          "0%": { opacity: "0", transform: "translateX(16px)" },
+          "100%": { opacity: "1", transform: "translateX(0)" },
+        },
+        "page-in-reverse": {
+          "0%": { opacity: "0", transform: "translateX(-16px)" },
+          "100%": { opacity: "1", transform: "translateX(0)" },
+        },
+        "shimmer": {
+          "0%": { transform: "translateX(-100%)" },
+          "100%": { transform: "translateX(100%)" },
+        },
+        // A soft ring expanding off a success check or a live dot.
+        "ring-out": {
+          "0%": { opacity: "0.45", transform: "scale(0.6)" },
+          "100%": { opacity: "0", transform: "scale(1.9)" },
+        },
       },
       animation: {
         "chat-indeterminate": "chat-indeterminate 1.2s ease-in-out infinite",
@@ -131,6 +174,16 @@ const config: Config = {
         "fade-up": "fade-up 0.25s ease-out backwards",
         "fade-in": "fade-in 0.2s ease-out both",
         "slide-in-right": "slide-in-right 0.3s ease-out both",
+        // "backwards" throughout (see fade-up): no lingering transform.
+        "sheet-up": "sheet-up 0.36s cubic-bezier(0.2, 0.8, 0.2, 1) backwards",
+        "backdrop-in": "backdrop-in 0.26s ease-out backwards",
+        "rise-in": "rise-in 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) backwards",
+        "pop-in": "pop-in 0.46s cubic-bezier(0.34, 1.56, 0.64, 1) backwards",
+        "settle": "settle 0.46s cubic-bezier(0.2, 0.8, 0.2, 1) backwards",
+        "page-in": "page-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) backwards",
+        "page-in-reverse": "page-in-reverse 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) backwards",
+        "shimmer": "shimmer 1.5s ease-in-out infinite",
+        "ring-out": "ring-out 0.7s ease-out backwards",
       },
     },
   },
