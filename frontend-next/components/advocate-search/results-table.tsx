@@ -24,6 +24,9 @@ export function ResultsTable({
   onToggleAll,
   onNameAction,
   showStatus,
+  activeFilters = [],
+  hiddenByFilters = 0,
+  onClearFilters,
 }: {
   rows: AdvocateResultRow[];
   selected: Set<string>;
@@ -32,6 +35,10 @@ export function ResultsTable({
   onToggleAll: () => void;
   onNameAction: (row: AdvocateResultRow, action: "exclude" | "add") => void;
   showStatus: boolean;
+  /** The filters narrowing the list (in words), how many rows they hide, and a way to drop them. */
+  activeFilters?: string[];
+  hiddenByFilters?: number;
+  onClearFilters?: () => void;
 }) {
   const selectable = rows.filter((r) => !inCases.has(r.cnr_number));
   const allOn = selectable.length > 0 && selectable.every((r) => selected.has(r.cnr_number));
@@ -132,7 +139,23 @@ export function ResultsTable({
           })}
         </tbody>
       </table>
-      {rows.length === 0 && <p className="px-4 py-6 text-center text-sm text-gray-500">No rows match these filters.</p>}
+      {rows.length === 0 && (
+        <div className="px-4 py-6 text-center text-sm text-gray-500" data-testid="no-rows">
+          <p>
+            No rows match{activeFilters.length > 0 ? ` ${activeFilters.join(" + ")}` : " these filters"}.
+            {hiddenByFilters > 0 && ` The filters are hiding ${hiddenByFilters.toLocaleString()} ${hiddenByFilters === 1 ? "row" : "rows"}.`}
+          </p>
+          {activeFilters.length > 0 && onClearFilters && (
+            <button
+              type="button"
+              onClick={onClearFilters}
+              className="mt-2 rounded-md border border-gray-300 bg-surface px-3 py-1 text-[13px] font-semibold text-gray-900 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -172,6 +172,21 @@ export function applyFilters(rows: AdvocateResultRow[], f: ResultFilters): Advoc
   });
 }
 
+/** The filters that are narrowing the list, in words, for the empty state and the
+ * "showing N of M" line. The Show hidden switches are not listed: they widen it. */
+export function activeFilterLabels(f: ResultFilters): string[] {
+  const out: string[] = [];
+  if (f.q.trim()) out.push(`search "${f.q.trim()}"`);
+  if (f.status !== "all") out.push(f.status === "pending" ? "Pending only" : "Disposed only");
+  if (f.court) out.push(`court ${f.court}`);
+  if (f.yearFrom || f.yearTo) {
+    out.push(f.yearFrom && f.yearTo ? (f.yearFrom === f.yearTo ? `year ${f.yearFrom}` : `years ${f.yearFrom} to ${f.yearTo}`) : f.yearFrom ? `year ${f.yearFrom} or later` : `year ${f.yearTo} or earlier`);
+  }
+  if (f.match === "verified") out.push("verified matches only");
+  if (f.match === "check") out.push("needs a check only");
+  return out;
+}
+
 /** Counts for the Pending / Disposed chips, over rows that pass every OTHER filter. */
 export function statusCounts(rows: AdvocateResultRow[], f: ResultFilters): { pending: number; disposed: number; known: boolean } {
   const base = applyFilters(rows, { ...f, status: "all" });

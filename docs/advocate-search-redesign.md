@@ -12,7 +12,7 @@ old page behave exactly as before.
 | 2. Per-court-complex status and retry | built, tested; "Solve here" **not built** (below) |
 | 3. High Court search | report below, then built (backend): our own `showRecords` form, bench runs, endpoints. Tested with the portal faked; **not confirmed against a live search** |
 | 4. Frontend | built: two tabs, profile card, per-court status, results, import; 20 browser specs pass |
-| 5. India map picker | built and tested, **switched off** (`NEXT_PUBLIC_HC_MAP`) until the outline is checked; the list and tile grid are what ships |
+| 5. India map picker | built and tested, **on by default** (`NEXT_PUBLIC_HC_MAP=false` turns it off); the outline has only had an extent check |
 
 ## Decisions and deviations
 
@@ -183,7 +183,9 @@ greyed unsupported court, the small-states column). It differs from the registry
 Ladakh is not drawn separately (one Jammu and Kashmir shape; one court serves both), and the
 registry still calls that court "Jammu & Kashmir High Court".
 
-**The map is OFF** (`NEXT_PUBLIC_HC_MAP` unset) until the outline is checked.
+**The map is ON by default** (set `NEXT_PUBLIC_HC_MAP=false` and redeploy to switch it off; the
+variable is read at build time). It was switched on on the owner's instruction, with the outline still
+only extent-checked, as below.
 
 What the border check found, and did not:
 
@@ -199,5 +201,5 @@ What the border check found, and did not:
 - Not checked at all: every other boundary (Arunachal Pradesh, Uttarakhand's east, the Sir Creek
   edge of Gujarat, the sea limits, the islands).
 - Indian law requires published maps to follow the official depiction. **Someone qualified should
-  check the outline before `NEXT_PUBLIC_HC_MAP` is turned on.** Until then: the combobox and the tile
-  grid.
+  check the outline.** It is on without that check; `NEXT_PUBLIC_HC_MAP=false` brings back the
+  combobox and the tile grid.

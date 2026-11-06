@@ -60,13 +60,14 @@ export const SMALL_LOCATIONS: { ids: string[]; label: string }[] = [
 ];
 
 /**
- * The map is OFF until the outline has been checked by someone qualified (Indian
- * law requires map outlines to follow the Survey of India's official depiction;
- * see docs/advocate-search-redesign.md). Turn it on with
- * NEXT_PUBLIC_HC_MAP=true. Until then the High Courts tab uses the searchable
- * list and a plain tile grid, which do the same job.
+ * The map is ON by default. Its outline has only had an extent check, not a
+ * review by someone qualified (Indian law requires map outlines to follow the
+ * Survey of India's official depiction; see docs/advocate-search-redesign.md).
+ * Switch it off with NEXT_PUBLIC_HC_MAP=false (read at build time, so redeploy);
+ * the High Courts tab then uses the searchable list and a plain tile grid, which
+ * do the same job.
  */
-export const HC_MAP_ENABLED = process.env.NEXT_PUBLIC_HC_MAP === "true";
+export const HC_MAP_ENABLED = process.env.NEXT_PUBLIC_HC_MAP !== "false";
 
 export const MAP_CREDIT = "Map: @svg-maps/india, CC BY 4.0. Not to scale; for choosing a court only.";
 

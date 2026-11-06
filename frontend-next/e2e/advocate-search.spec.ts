@@ -283,6 +283,27 @@ test("Show hidden reveals the Not me rows, and the filters live in the URL", asy
   await expect(page.getByRole("row").filter({ hasText: "OS/740/2015" })).toHaveCount(0);
 });
 
+test("a year filter that hides every row says so and clears with one click", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockSearchApi(page);
+  // Only OS/301/2016, EP/9/2017... exist for 2014-2023 here; 2025 has none.
+  await page.goto("/cases/search?tab=district&job=8&yf=2025&yt=2025");
+  await expect(page.getByText("Advocate as listed")).toBeVisible({ timeout: 20_000 });
+  const empty = page.getByTestId("no-rows");
+  await expect(empty).toContainText("No rows match year 2025");
+  await expect(empty).toContainText("The filters are hiding");
+  await expect(page.getByTestId("filtered-count")).toContainText("Showing 0 of");
+  // a set filter is marked; an unset one reads Earliest / Latest, never a year
+  await expect(page.getByLabel("Year from")).toHaveClass(/border-primary/);
+  await empty.getByRole("button", { name: "Clear filters" }).click();
+  await expect(page).not.toHaveURL(/yf=|yt=/);
+  await expect(page.getByTestId("no-rows")).toHaveCount(0);
+  await expect(page.getByRole("row").filter({ hasText: "OS/740/2015" })).toHaveCount(1);
+  await expect(page.getByLabel("Year from").locator("option:checked")).toHaveText("Earliest");
+  await expect(page.getByLabel("Year to").locator("option:checked")).toHaveText("Latest");
+  await expect(page.getByTestId("filtered-count")).toHaveCount(0);
+});
+
 test("a district list that fails to load shows an error with Retry, not an empty list", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await mockSearchApi(page);
@@ -302,9 +323,16 @@ test("an unsupported High Court is greyed and cannot be chosen", async ({ page }
   await page.setViewportSize({ width: 1440, height: 900 });
   await mockSearchApi(page);
   await page.goto("/cases/search?tab=hc");
-  const calcutta = page.getByRole("button", { name: /Calcutta/ });
-  await expect(calcutta).toBeDisabled();
-  await expect(calcutta).toHaveAttribute("title", /orders by case number/);
+  if (process.env.NEXT_PUBLIC_HC_MAP === "false") {
+    const calcutta = page.getByRole("button", { name: /Calcutta/ });
+    await expect(calcutta).toBeDisabled();
+    await expect(calcutta).toHaveAttribute("title", /orders by case number/);
+  } else {
+    // On the map, Calcutta's two places (West Bengal, Andaman and Nicobar) are both greyed and say why.
+    const places = page.getByRole("button", { name: /Calcutta High Court \(not available\)/ });
+    await expect(places).toHaveCount(2);
+    for (const place of await places.all()) await expect(place).toHaveAttribute("aria-disabled", "true");
+  }
 });
 
 test("the High Court search box is a keyboard combobox", async ({ page }) => {
@@ -319,13 +347,12 @@ test("the High Court search box is a keyboard combobox", async ({ page }) => {
   await expect(page.getByText(/Search Bombay High Court/).first()).toBeVisible();
 });
 
-// The India map is off until its outline has been checked (NEXT_PUBLIC_HC_MAP).
-// With it on, these show it and keep it to one screen. Run with
-// NEXT_PUBLIC_HC_MAP=true; skipped otherwise.
+// The India map is on by default (NEXT_PUBLIC_HC_MAP=false turns it off). These
+// show it and keep it to one screen; skipped when it is turned off.
 for (const [court, name] of [["telangana", "02_high_court_map_telangana"], ["bombay", "03_high_court_map_bombay_group"]] as const) {
   for (const { width, height } of SIZES) {
     test(`with the map on, ${name} is one screen at ${width}x${height}`, async ({ page }) => {
-      test.skip(process.env.NEXT_PUBLIC_HC_MAP !== "true", "the map is off by default");
+      test.skip(process.env.NEXT_PUBLIC_HC_MAP === "false", "the map is turned off");
       await page.setViewportSize({ width, height });
       await mockSearchApi(page);
       await page.goto(`/cases/search?tab=hc&court=${court}`);

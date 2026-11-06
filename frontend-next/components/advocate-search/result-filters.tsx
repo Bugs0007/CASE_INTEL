@@ -90,8 +90,13 @@ export function ResultFiltersBar({
       {bounds && (
         <span className="flex items-center gap-1.5 text-[13px] text-gray-600">
           Year
-          <select aria-label="Year from" value={filters.yearFrom ?? ""} onChange={(e) => set({ yearFrom: e.target.value ? Number(e.target.value) : null })} className={field}>
-            <option value="">{bounds[0]}</option>
+          <select
+            aria-label="Year from"
+            value={filters.yearFrom ?? ""}
+            onChange={(e) => set({ yearFrom: e.target.value ? Number(e.target.value) : null })}
+            className={cn(field, filters.yearFrom && "border-primary font-semibold")}
+          >
+            <option value="">Earliest</option>
             {[...years].reverse().map((y) => (
               <option key={y} value={y}>
                 {y}
@@ -99,8 +104,13 @@ export function ResultFiltersBar({
             ))}
           </select>
           to
-          <select aria-label="Year to" value={filters.yearTo ?? ""} onChange={(e) => set({ yearTo: e.target.value ? Number(e.target.value) : null })} className={field}>
-            <option value="">{bounds[1]}</option>
+          <select
+            aria-label="Year to"
+            value={filters.yearTo ?? ""}
+            onChange={(e) => set({ yearTo: e.target.value ? Number(e.target.value) : null })}
+            className={cn(field, filters.yearTo && "border-primary font-semibold")}
+          >
+            <option value="">Latest</option>
             {years.map((y) => (
               <option key={y} value={y}>
                 {y}
