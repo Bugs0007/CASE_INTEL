@@ -29,6 +29,8 @@ from core.views import (
     AdvocateSearchRetryFailedView,
     AdvocateSearchStatusView,
     AdvocateSearchView,
+    AdvocateSearchCourtsView,
+    AdvocateSearchRetryView,
     AdvocateSearchFeaturesView,
     AdvocateSearchProfileAddNameFormView,
     AdvocateSearchProfileDetailView,
@@ -277,6 +279,18 @@ urlpatterns = [
         "cases/search-advocate/<int:job_id>/",
         AdvocateSearchStatusView.as_view(),
         name="advocate-search-status",
+    ),
+    # Court-by-court status and a retry of chosen courts (the redesigned
+    # search, ADVOCATE_SEARCH_V2). retry-failed below is the old district-level one.
+    path(
+        "cases/search-advocate/<int:job_id>/courts/",
+        AdvocateSearchCourtsView.as_view(),
+        name="advocate-search-courts",
+    ),
+    path(
+        "cases/search-advocate/<int:job_id>/retry/",
+        AdvocateSearchRetryView.as_view(),
+        name="advocate-search-retry",
     ),
     path(
         "cases/search-advocate/<int:job_id>/retry-failed/",

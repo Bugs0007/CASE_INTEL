@@ -10,10 +10,12 @@ from .advocate_profile import AdvocateProfileView
 from .advocate_search import (
     AdvocateSearchActiveListView,
     AdvocateSearchCancelView,
+    AdvocateSearchCourtsView,
     AdvocateSearchImportStatusView,
     AdvocateSearchImportView,
     AdvocateSearchPreferenceView,
     AdvocateSearchRetryFailedView,
+    AdvocateSearchRetryView,
     AdvocateSearchStatusView,
     AdvocateSearchView,
 )
@@ -151,6 +153,8 @@ __all__ = [
     "AdvocateSearchRetryFailedView",
     "AdvocateSearchStatusView",
     "AdvocateSearchView",
+    "AdvocateSearchCourtsView",
+    "AdvocateSearchRetryView",
     "AdvocateSearchFeaturesView",
     "AdvocateSearchProfileAddNameFormView",
     "AdvocateSearchProfileDetailView",

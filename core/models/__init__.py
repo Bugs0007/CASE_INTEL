@@ -31,6 +31,7 @@ from .court_tracking_preview import CourtTrackingPreview
 from .processing_job import JobAlreadyRunningError, ProcessingJob
 from .advocate_search_preference import AdvocateSearchPreference
 from .advocate_search_profile import AdvocateSearchProfile
+from .advocate_search_complex_run import AdvocateSearchComplexRun, InvalidComplexRunTransition
 from .invite_token import InviteToken
 from .auth_session import AuthSession
 from .social_identity import SocialIdentity
@@ -76,5 +77,7 @@ __all__ = [
     "JobAlreadyRunningError",
     "AdvocateSearchPreference",
     "AdvocateSearchProfile",
+    "AdvocateSearchComplexRun",
+    "InvalidComplexRunTransition",
     "InviteToken",
 ]
