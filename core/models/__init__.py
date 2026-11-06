@@ -3,6 +3,7 @@ from .advocate_profile import AdvocateProfile
 from .appearance_fee import AppearanceFee
 from .case import Case
 from .case_briefing import CaseBriefing
+from .case_business_entry import CaseBusinessEntry
 from .case_event import CaseEvent
 from .case_tag import CaseTag, CaseTagMap
 from .client import Client
@@ -44,6 +45,7 @@ __all__ = [
     "AppearanceFee",
     "Case",
     "CaseBriefing",
+    "CaseBusinessEntry",
     "CaseEvent",
     "CaseTag",
     "CaseTagMap",

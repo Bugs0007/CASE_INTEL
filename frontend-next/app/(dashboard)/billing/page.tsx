@@ -16,8 +16,9 @@ import {
   useViewClientStatement,
 } from "@/hooks/use-clients";
 import { useUpdateCase } from "@/hooks/use-cases";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 import { apiErrorDetail } from "@/lib/api/client";
-import { formatINR } from "@/lib/utils";
+import { cn, formatINR, staggerDelay } from "@/lib/utils";
 import { UnbilledHearings } from "@/components/billing/unbilled-hearings";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -29,6 +30,7 @@ export default function BillingPage() {
   const viewStatement = useViewClientStatement();
   const updateCase = useUpdateCase();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
 
   function openStatement(clientId: number) {
     viewStatement.mutate(clientId, {
@@ -47,11 +49,11 @@ export default function BillingPage() {
   }
 
   return (
-    <div className="px-4 sm:px-7 pt-5 sm:pt-7 pb-[60px] max-w-[1100px] mx-auto space-y-5">
+    <div className="px-4 sm:px-7 pt-4 sm:pt-7 pb-[60px] max-w-[1100px] mx-auto space-y-5 max-md:space-y-3.5">
       {/* space-y-5 already spaces the strip from the header. */}
       <SectionTabs tabs={BILLING_TABS} className="mb-0" />
-      <div>
-        <h1 className="text-page-title text-gray-900 mb-1.5">Billing</h1>
+      <div className="max-md:animate-rise-in motion-reduce:animate-none">
+        <h1 className="text-page-title max-md:!text-[26px] max-md:!leading-[1.1] text-gray-900 mb-1.5 max-md:mb-1">Billing</h1>
         <p className="text-sm text-gray-600">
           Unpaid invoices by age, outstanding per client, and hearings not yet billed.
         </p>
@@ -67,7 +69,7 @@ export default function BillingPage() {
         </Card>
       ) : (
         <>
-          <Card>
+          <Card className="max-md:animate-rise-in motion-reduce:animate-none" style={staggerDelay(1)}>
             <CardHeader className="flex flex-row flex-wrap items-baseline justify-between gap-2">
               <CardTitle>Awaiting payment</CardTitle>
               <span className="text-sm text-gray-600">
@@ -82,12 +84,62 @@ export default function BillingPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="max-md:animate-rise-in motion-reduce:animate-none" style={staggerDelay(2)}>
             <CardHeader>
               <CardTitle>Outstanding by client</CardTitle>
             </CardHeader>
             <CardContent className="p-0 overflow-x-auto">
-              {data.clients.length === 0 ? (
+              {data.clients.length > 0 && isMobile ? (
+                // A phone has no room for a five-column table: one card per client.
+                <ul>
+                  {data.clients.map((row, i) => {
+                    const busy = viewStatement.isPending && viewStatement.variables === row.client_id;
+                    const old = row.oldest_invoice_days !== null && row.oldest_invoice_days > 30;
+                    return (
+                      <li
+                        key={row.client_id}
+                        style={staggerDelay(i, 50)}
+                        className="animate-rise-in border-b border-gray-100 px-4 py-3 last:border-0 motion-reduce:animate-none"
+                      >
+                        <div className="flex items-start gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-[15px] font-semibold text-gray-900">{row.client_name}</div>
+                            <div className="text-xs text-gray-500">
+                              {row.case_count} case{row.case_count === 1 ? "" : "s"}
+                              {row.client_type === "business" ? " · business" : ""}
+                            </div>
+                          </div>
+                          {row.oldest_invoice_days !== null && (
+                            <span className={cn("ci-chip flex-shrink-0", old ? "ci-chip--pending" : "ci-chip--none")}>
+                              oldest {row.oldest_invoice_days} d
+                            </span>
+                          )}
+                        </div>
+                        <dl className="mt-2 grid grid-cols-2 gap-3">
+                          <div>
+                            <dt className="text-[11px] text-gray-500">Invoiced, unpaid</dt>
+                            <dd className="font-mono text-[15px] font-semibold text-gray-900">{formatINR(row.invoiced_amount)}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-[11px] text-gray-500">Not yet invoiced</dt>
+                            <dd className="font-mono text-[15px] text-gray-600">{formatINR(row.pending_amount)}</dd>
+                          </div>
+                        </dl>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="mt-2.5 w-full"
+                          onClick={() => openStatement(row.client_id)}
+                          disabled={busy}
+                        >
+                          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+                          Statement
+                        </Button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : data.clients.length === 0 ? (
                 <p className="px-5 py-6 text-sm text-gray-500">
                   No client has anything outstanding.{" "}
                   {clients.length === 0 && (

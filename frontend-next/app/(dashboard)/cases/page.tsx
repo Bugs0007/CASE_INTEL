@@ -6,10 +6,13 @@ import Link from "next/link";
 import { Search } from "lucide-react";
 import { CaseFilters } from "@/components/cases/case-filters";
 import { CaseGrid } from "@/components/cases/case-grid";
+import { MobileCaseSearch, MobileStatusTabs } from "@/components/cases/mobile/mobile-case-filters";
 import { CasesSkeleton } from "@/components/cases/cases-skeleton";
+import { MobileSubbar } from "@/components/layout/mobile-chrome";
 import { CASES_TABS, SectionTabs } from "@/components/layout/section-tabs";
 import { showToast } from "@/components/ui/toaster";
 import { useCases, useDeleteCase } from "@/hooks/use-cases";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 import { useUpcomingHearings } from "@/hooks/use-dashboard";
 import { useDocuments } from "@/hooks/use-documents";
 import { getLastDashboardVisit } from "@/lib/last-visit";
@@ -20,6 +23,7 @@ export default function CasesPage() {
   const [activeStatus, setActiveStatus] = useState<CaseStatus | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [othersExpanded, setOthersExpanded] = useState(false);
+  const isMobile = useIsMobile();
 
   // Read (never write) the same "since last visit" marker the Dashboard
   // sets, so a case's urgency status agrees between the two screens.
@@ -130,17 +134,25 @@ export default function CasesPage() {
   const othersToShow = hasUrgentGroup ? otherCases : filteredCases;
 
   return (
-    <div className="px-4 sm:px-7 pt-5 sm:pt-7 pb-[60px] max-w-[1240px] mx-auto">
-      <SectionTabs tabs={CASES_TABS} />
+    <div className="px-4 sm:px-7 pt-4 sm:pt-7 pb-[60px] max-w-[1240px] mx-auto">
+      {/* The status tabs live in the phone's top bar, first thing on the page
+          (the bar is fixed to the top of the screen). */}
+      {isMobile && (
+        <MobileSubbar height={44}>
+          <MobileStatusTabs active={activeStatus} onChange={setActiveStatus} />
+        </MobileSubbar>
+      )}
+      {/* Cases | Documents are both in the bottom bar on a phone. */}
+      <SectionTabs tabs={CASES_TABS} className="max-md:hidden" />
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-[22px] gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-[22px] max-md:mb-3.5 gap-3">
         <div className="min-w-0">
-          <h1 className="text-page-title text-gray-900 mb-1.5">Cases</h1>
+          <h1 className="text-page-title max-md:!text-[26px] max-md:!leading-[1.1] text-gray-900 mb-1.5 max-md:mb-0.5">Cases</h1>
           <p className="text-sm text-gray-600">
             {pluralize(filteredCases.length, "case")} across your workspace
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="grid grid-cols-2 sm:flex items-center gap-2">
           <Link
             href="/cases/new"
             className="inline-flex items-center justify-center gap-2 h-11 sm:h-10 px-4 rounded-lg border border-gray-200 bg-surface text-gray-800 text-sm font-semibold hover:bg-gray-50 transition-colors"
@@ -157,19 +169,26 @@ export default function CasesPage() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="mb-6">
-        <CaseFilters
-          activeStatus={activeStatus}
-          onStatusChange={setActiveStatus}
-          onSearchChange={setSearchQuery}
-        />
-      </div>
+      {/* Filters -- a phone gets a big search field here and the status tabs
+          pinned under the top bar, so both stay in reach while scrolling. */}
+      {isMobile ? (
+        <div className="mb-3">
+          <MobileCaseSearch value={searchQuery} onChange={setSearchQuery} />
+        </div>
+      ) : (
+        <div className="mb-6">
+          <CaseFilters
+            activeStatus={activeStatus}
+            onStatusChange={setActiveStatus}
+            onSearchChange={setSearchQuery}
+          />
+        </div>
+      )}
 
       {/* Needs Attention This Week */}
       {!isLoading && hasUrgentGroup && (
-        <div className="mb-8">
-          <div className="flex items-center gap-2.5 mb-3.5">
+        <div className="mb-8 max-md:mt-3 max-md:mb-6">
+          <div className="flex items-center gap-2.5 mb-3.5 max-md:mb-2.5">
             <h2 className="text-card-title text-gray-900">Needs Attention This Week</h2>
             <span className="ci-chip ci-chip--pending">
               {needsAttentionCases.length}

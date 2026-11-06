@@ -251,7 +251,7 @@ export default function NewCasePage() {
           <ArrowLeft className="h-4 w-4" />
           Back to Cases
         </Link>
-        <h1 className="text-page-title text-gray-900 mt-2 mb-1.5">Add a Case Manually</h1>
+        <h1 className="text-page-title max-md:!text-[26px] max-md:!leading-[1.1] text-gray-900 mt-2 mb-1.5">Add a Case Manually</h1>
         <p className="text-sm text-gray-600">
           Type in the case details yourself instead of searching eCourts — useful for a case
           that hasn&apos;t shown up in a search yet, or one you&apos;d just rather enter by hand.

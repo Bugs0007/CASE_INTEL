@@ -1,6 +1,7 @@
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
+import { MobileChromeController } from "@/components/layout/mobile-chrome";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { AuthGuard } from "@/components/auth-guard";
 import { DialogProvider } from "@/providers/dialog-provider";
@@ -13,7 +14,10 @@ export default function DashboardLayout({
   return (
     <AuthGuard>
       <DialogProvider>
-        <div className="flex h-screen bg-page">
+        {/* dvh, not vh: on a phone 100vh is taller than what is visible
+            while the browser's own address bar is showing. Same value on a
+            desktop. */}
+        <div className="flex h-screen supports-[height:100dvh]:h-dvh bg-page">
           {/* Sidebar -- desktop only; MobileNav below replaces it on phones/tablets */}
           <Sidebar />
 
@@ -36,6 +40,7 @@ export default function DashboardLayout({
           </div>
 
           <MobileNav />
+          <MobileChromeController />
         </div>
       </DialogProvider>
     </AuthGuard>

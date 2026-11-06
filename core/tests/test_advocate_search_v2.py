@@ -27,8 +27,8 @@ from core.tests.auth_helpers import token_for
 
 Run = AdvocateSearchComplexRun
 
-FORMS = ["Rambabu", "Ram babu", "S Rambabu", "S Ram babu", "Rambabu S"]
-NOT_ME = ["T Rambabu", "K Rambabu", "Rambabu Reddy"]
+FORMS = ["Kiranmai", "Kiran mai", "S Kiranmai", "S Kiran mai", "Kiranmai S"]
+NOT_ME = ["T Kiranmai", "P Kiranmai", "Kiranmai Reddy"]
 TWO_COURTS = {"c1@e1@N": "Adilabad Court Complex", "c2@e1@N": "Khanapur Court Complex"}
 
 
@@ -61,7 +61,7 @@ def client_b(user_b):
 @pytest.fixture
 def profile_a(user_a):
     return AdvocateSearchProfile.objects.create(
-        owner=user_a, display_name="Rambabu Samalla", bar_codes=["TS/1234/2009"],
+        owner=user_a, display_name="Kiranmai Sample", bar_codes=["TS/1234/2009"],
         name_forms=list(FORMS), excluded_names=list(NOT_ME),
     )
 
@@ -71,7 +71,7 @@ def v2_on(settings):
     settings.ADVOCATE_SEARCH_V2 = True
 
 
-def hit(cnr, advocate="S Rambabu", segments=None):
+def hit(cnr, advocate="S Kiranmai", segments=None):
     return AdvocateSearchHit(
         case_number=f"OS/{cnr[-1]}/2020",
         cnr_number=cnr,
@@ -116,7 +116,7 @@ class FakeProvider:
 def _job(user, profile=None, **overrides):
     params = {
         "v2": True, "state_code": "29", "court_type": "district", "search_by": "names",
-        "queries": ["Rambabu"], "advocate_name": "Rambabu", "bar_code": "", "status_filter": "Both",
+        "queries": ["Kiranmai"], "advocate_name": "Kiranmai", "bar_code": "", "status_filter": "Both",
         "profile_id": profile.id if profile else None, "mode": "state",
     }
     params.update(overrides)
@@ -255,7 +255,7 @@ class TestWorkerV2:
         job = _job(user_a, profile_a)
         provider = FakeProvider(
             [
-                ([hit("CNR1"), hit("CNR2", "T Rambabu"), hit("CNR3", "G Rambabu")], 1),
+                ([hit("CNR1"), hit("CNR2", "T Kiranmai"), hit("CNR3", "G Kiranmai")], 1),
                 (_disconnect(), 6),
             ]
         )
@@ -263,11 +263,11 @@ class TestWorkerV2:
 
         a, b = Run.objects.filter(job=job).order_by("id")
         assert (a.complex_name, a.status, a.attempts, a.raw_count) == ("Adilabad Court Complex", Run.DONE, 1, 3)
-        # Of the three rows only the advocate's own counts: T Rambabu is Not me, G Rambabu is someone else.
+        # Of the three rows only the advocate's own counts: T Kiranmai is Not me, G Kiranmai is someone else.
         assert a.matched_count == 1
         assert (b.complex_name, b.status, b.attempts) == ("Khanapur Court Complex", Run.FAILED, 6)
         assert (b.last_error_code, b.last_error_message) == ("portal_disconnect", "Portal disconnected.")
-        assert a.query == "Rambabu" and b.finished_at is not None
+        assert a.query == "Kiranmai" and b.finished_at is not None
 
         payload = job.payload
         assert sorted(r["cnr_number"] for r in payload["results"]) == ["CNR1", "CNR2", "CNR3"]  # nothing dropped
@@ -277,9 +277,9 @@ class TestWorkerV2:
 
     def test_stored_rows_carry_the_cell_as_listed_and_where_it_came_from(self, user_a, profile_a):
         job = _job(user_a, profile_a)
-        _run_worker(job, FakeProvider([([hit("CNR1", segments=["APP", "S Rambabu"])], 1), ([], 1)]))
+        _run_worker(job, FakeProvider([([hit("CNR1", segments=["APP", "S Kiranmai"])], 1), ([], 1)]))
         row = job.payload["results"][0]
-        assert row["listed_advocates"] == ["APP", "S Rambabu"]
+        assert row["listed_advocates"] == ["APP", "S Kiranmai"]
         assert (row["dist_name"], row["complex_name"], row["complex_code"]) == ("Adilabad", "Adilabad Court Complex", "c1")
 
     def test_a_row_is_pending_or_disposed_only_when_the_search_asked_for_it(self, user_a, profile_a):
@@ -306,26 +306,26 @@ class TestWorkerV2:
         assert seen[0] == [("Adilabad Court Complex", "running"), ("Khanapur Court Complex", "pending")]
 
     def test_two_queries_cost_two_requests_per_court_merged_by_cnr(self, user_a, profile_a):
-        job = _job(user_a, profile_a, queries=["Rambabu", "Ram babu"])
+        job = _job(user_a, profile_a, queries=["Kiranmai", "Kiran mai"])
         provider = FakeProvider(
             [
-                ([hit("CNR1"), hit("CNR2")], 1),  # court 1, "Rambabu"
-                ([hit("CNR2"), hit("CNR3")], 2),  # court 1, "Ram babu"
-                ([], 1),  # court 2, "Rambabu"
-                ([], 1),  # court 2, "Ram babu"
+                ([hit("CNR1"), hit("CNR2")], 1),  # court 1, "Kiranmai"
+                ([hit("CNR2"), hit("CNR3")], 2),  # court 1, "Kiran mai"
+                ([], 1),  # court 2, "Kiranmai"
+                ([], 1),  # court 2, "Kiran mai"
             ]
         )
         _run_worker(job, provider)
         assert [(c["complex"], c["advocate_name"]) for c in provider.calls] == [
-            ("c1", "Rambabu"), ("c1", "Ram babu"), ("c2", "Rambabu"), ("c2", "Ram babu"),
+            ("c1", "Kiranmai"), ("c1", "Kiran mai"), ("c2", "Kiranmai"), ("c2", "Kiran mai"),
         ]
         assert all(c["keep_all"] and c["bar_code"] == "" for c in provider.calls)
         first = Run.objects.filter(job=job).order_by("id").first()
-        assert (first.raw_count, first.attempts, first.query) == (3, 3, "Rambabu | Ram babu")
+        assert (first.raw_count, first.attempts, first.query) == (3, 3, "Kiranmai | Kiran mai")
         assert sorted(r["cnr_number"] for r in job.payload["results"]) == ["CNR1", "CNR2", "CNR3"]
 
     def test_a_court_whose_first_query_fails_is_not_tried_with_the_second(self, user_a, profile_a):
-        job = _job(user_a, profile_a, queries=["Rambabu", "Ram babu"], districts_filter=["1"])
+        job = _job(user_a, profile_a, queries=["Kiranmai", "Kiran mai"], districts_filter=["1"])
         provider = FakeProvider([(_disconnect(), 6), ([], 1), ([], 1)], complexes={"c1@e1@N": "Only Court"})
         _run_worker(job, provider)
         assert len(provider.calls) == 1  # the portal that just dropped us is not hammered
@@ -333,7 +333,7 @@ class TestWorkerV2:
         assert run.status == Run.FAILED and run.attempts == 6
 
     def test_rows_read_before_a_failure_are_kept(self, user_a, profile_a):
-        job = _job(user_a, profile_a, queries=["Rambabu", "Ram babu"])
+        job = _job(user_a, profile_a, queries=["Kiranmai", "Kiran mai"])
         provider = FakeProvider([([hit("CNR1")], 1), (_disconnect(), 6), ([], 1), ([], 1)])
         _run_worker(job, provider)
         first = Run.objects.filter(job=job).order_by("id").first()
@@ -436,12 +436,12 @@ class TestStartV2:
         # The profile has a bar code, so ask for names explicitly.
         resp = self._start(client_a, profile_a, search_by="names", dist_codes=["1", "3"], status_filter="Pending")
         assert resp.status_code == 202, resp.data
-        assert resp.data["queries"] == ["Rambabu", "Ram babu"] and resp.data["portal_calls_per_court"] == 2
+        assert resp.data["queries"] == ["Kiranmai", "Kiran mai"] and resp.data["portal_calls_per_court"] == 2
         params = ProcessingJob.objects.get(id=resp.data["job_id"]).payload
         assert params["v2"] is True and params["profile_id"] == profile_a.id
-        assert params["queries"] == ["Rambabu", "Ram babu"] and params["bar_code"] == ""
+        assert params["queries"] == ["Kiranmai", "Kiran mai"] and params["bar_code"] == ""
         assert params["districts_filter"] == ["1", "3"] and params["status_filter"] == "Pending"
-        assert params["advocate_name"] == "Rambabu"
+        assert params["advocate_name"] == "Kiranmai"
 
     def test_defaults_to_the_bar_code_when_the_profile_has_one(self, v2_on, client_a, profile_a):
         resp = self._start(client_a, profile_a)
@@ -492,7 +492,7 @@ class TestStartV2:
 
 def _finished_search(user, profile):
     job = _job(user, profile)
-    provider = FakeProvider([([hit("CNR1"), hit("CNR2", "T Rambabu")], 1), (_disconnect(), 3)])
+    provider = FakeProvider([([hit("CNR1"), hit("CNR2", "T Kiranmai")], 1), (_disconnect(), 3)])
     _run_worker(job, provider)
     ProcessingJob.objects.filter(pk=job.pk).update(status="succeeded")
     job.refresh_from_db()
@@ -559,7 +559,7 @@ class TestRetry:
         assert resp.data["courts"] == 1 and resp.data["parent_job_id"] == job.id
         child = ProcessingJob.objects.get(id=resp.data["job_id"])
         assert child.payload["parent_job_id"] == job.id and child.payload["run_ids"] == [failed.id]
-        assert child.payload["queries"] == ["Rambabu"] and child.payload["profile_id"] == profile_a.id
+        assert child.payload["queries"] == ["Kiranmai"] and child.payload["profile_id"] == profile_a.id
         failed.refresh_from_db(), done.refresh_from_db()
         assert failed.status == Run.PENDING and failed.last_error_code == "" and failed.attempts == 0
         assert done.status == Run.DONE  # the courts that worked are left alone
@@ -569,7 +569,7 @@ class TestRetry:
         before = sorted(r["cnr_number"] for r in job.payload["results"])
         child = ProcessingJob.objects.get(id=self._retry(client_a, job, only_failed=True).data["job_id"])
 
-        provider = FakeProvider([([hit("CNR9"), hit("CNR1", "Rambabu S")], 2)])
+        provider = FakeProvider([([hit("CNR9"), hit("CNR1", "Kiranmai S")], 2)])
         with patch("core.services.advocate_search_v2.get_provider", return_value=provider), \
                 patch("core.services.advocate_search_v2.time.sleep"):
             run_advocate_search(child)
@@ -578,7 +578,7 @@ class TestRetry:
         job.refresh_from_db()
         after = sorted(r["cnr_number"] for r in job.payload["results"])
         assert after == sorted(set(before) | {"CNR9"})  # merged, no duplicates
-        assert {r["cnr_number"]: r["listed_advocate_name"] for r in job.payload["results"]}["CNR1"] == "Rambabu S"
+        assert {r["cnr_number"]: r["listed_advocate_name"] for r in job.payload["results"]}["CNR1"] == "Kiranmai S"
         assert {r.status for r in Run.objects.filter(job=job)} == {Run.DONE}
         assert job.payload["districts_status"]["1"]["status"] == "success"
         assert job.payload["failures"] == [] and job.payload["complexes_searched"] == 2

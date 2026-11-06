@@ -12,6 +12,7 @@ import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { isTopModal, useModalLayer } from "@/hooks/use-modal-layer";
+import { useSheetDrag } from "@/hooks/use-sheet-drag";
 import { showSearch } from "@/lib/case-previews";
 
 const DURATION_MS = 280;
@@ -30,6 +31,17 @@ function prefersReducedMotion(): boolean {
     window.matchMedia("(prefers-reduced-motion: reduce)").matches
   );
 }
+
+/** A phone: the dialog is a bottom sheet that rises from the screen edge. */
+function isPhone(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(max-width: 767px)").matches
+  );
+}
+const SHEET_MS = 340;
+const SHEET_FROM = "translateY(100%)";
 
 /** The transform that makes the (final-size, centred) panel look like it is
  * still the card it grew from: same centre, same size. FLIP -- the panel is
@@ -115,9 +127,10 @@ export function ExpandDialog({
       if (!panel || !backdrop) return;
 
       const reduced = prefersReducedMotion();
-      const duration = reduced ? REDUCED_DURATION_MS : rise ? RISE_MS : DURATION_MS;
-      const ease = rise ? RISE_EASE : EASE_OUT;
-      const backdropMs = reduced ? REDUCED_DURATION_MS : rise ? RISE_BACKDROP_MS : duration;
+      const phone = isPhone();
+      const duration = reduced ? REDUCED_DURATION_MS : phone ? SHEET_MS : rise ? RISE_MS : DURATION_MS;
+      const ease = phone || rise ? RISE_EASE : EASE_OUT;
+      const backdropMs = reduced ? REDUCED_DURATION_MS : phone ? 260 : rise ? RISE_BACKDROP_MS : duration;
 
       // Measure the panel at its real size and position first.
       panel.style.transition = "none";
@@ -128,12 +141,15 @@ export function ExpandDialog({
 
       panel.style.transform = reduced
         ? "none"
-        : rise
-          ? RISE_FROM
-          : origin
-            ? originTransform(origin, finalRect)
-            : "none";
-      panel.style.opacity = "0";
+        : phone
+          ? SHEET_FROM
+          : rise
+            ? RISE_FROM
+            : origin
+              ? originTransform(origin, finalRect)
+              : "none";
+      // A sheet slides in at full opacity; the others fade as they move.
+      panel.style.opacity = phone && !reduced ? "1" : "0";
       backdrop.style.transition = "none";
       backdrop.style.opacity = "0";
       void panel.offsetWidth; // commit the starting state before animating
@@ -157,18 +173,21 @@ export function ExpandDialog({
       return;
     }
     const reduced = prefersReducedMotion();
-    const duration = reduced ? REDUCED_DURATION_MS : rise ? RISE_MS : DURATION_MS;
+    const phone = isPhone();
+    const duration = reduced ? REDUCED_DURATION_MS : phone ? SHEET_MS - 60 : rise ? RISE_MS : DURATION_MS;
     const origin = originRef?.current?.getBoundingClientRect();
-    panel.style.transition = `transform ${duration}ms ${rise ? RISE_EASE : EASE_OUT}, opacity ${duration}ms ease-out`;
-    backdrop.style.transition = `opacity ${reduced ? REDUCED_DURATION_MS : rise ? RISE_BACKDROP_MS : duration}ms ease-out`;
+    panel.style.transition = `transform ${duration}ms ${phone || rise ? RISE_EASE : EASE_OUT}, opacity ${duration}ms ease-out`;
+    backdrop.style.transition = `opacity ${reduced ? REDUCED_DURATION_MS : phone ? 240 : rise ? RISE_BACKDROP_MS : duration}ms ease-out`;
     panel.style.transform = reduced
       ? "none"
-      : rise
-        ? RISE_FROM
-        : origin
-          ? originTransform(origin, panel.getBoundingClientRect())
-          : "none";
-    panel.style.opacity = "0";
+      : phone
+        ? SHEET_FROM
+        : rise
+          ? RISE_FROM
+          : origin
+            ? originTransform(origin, panel.getBoundingClientRect())
+            : "none";
+    panel.style.opacity = phone && !reduced ? "1" : "0";
     backdrop.style.opacity = "0";
 
     const timer = window.setTimeout(() => setMounted(false), duration + 30);
@@ -179,6 +198,8 @@ export function ExpandDialog({
 
   // Page scroll locked and Tab kept inside while open.
   useModalLayer(panelRef, isOpen);
+  // On a phone the header is a grabber: drag it down to dismiss.
+  const dragHandlers = useSheetDrag(panelRef, backdropRef, onClose);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -198,7 +219,7 @@ export function ExpandDialog({
   if ((!isOpen && !mounted) || typeof document === "undefined") return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[45] flex items-center justify-center">
+    <div className="fixed inset-0 z-[45] flex items-center justify-center max-md:items-end">
       <div
         ref={backdropRef}
         data-testid="expand-dialog-backdrop"
@@ -223,11 +244,15 @@ export function ExpandDialog({
         tabIndex={-1}
         className={
           rise
-            ? "relative flex flex-col overflow-hidden bg-surface outline-none will-change-transform max-sm:h-[100dvh] max-sm:w-full sm:w-[min(960px,calc(100%-80px))] sm:max-h-[calc(100%-72px)] sm:rounded-[10px] sm:shadow-[0_30px_80px_rgba(8,16,32,0.38)]"
-            : "relative flex flex-col overflow-hidden bg-surface outline-none will-change-transform max-sm:h-[100dvh] max-sm:w-full sm:w-[min(960px,90vw)] sm:max-h-[85vh] sm:rounded-lg sm:border sm:border-gray-200 sm:shadow-card"
+            ? "relative flex flex-col overflow-hidden bg-surface outline-none will-change-transform max-md:h-[calc(100dvh-20px)] max-md:w-full max-md:rounded-t-[14px] max-md:shadow-[0_-18px_50px_rgba(8,16,32,0.35)] md:w-[min(960px,calc(100%-80px))] md:max-h-[calc(100%-72px)] md:rounded-[10px] md:shadow-[0_30px_80px_rgba(8,16,32,0.38)]"
+            : "relative flex flex-col overflow-hidden bg-surface outline-none will-change-transform max-md:h-[calc(100dvh-20px)] max-md:w-full max-md:rounded-t-[14px] max-md:shadow-[0_-18px_50px_rgba(8,16,32,0.35)] md:w-[min(960px,90vw)] md:max-h-[85vh] md:rounded-lg md:border md:border-gray-200 md:shadow-card"
         }
       >
-        <div className="flex flex-shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-gray-100 px-4 py-3 sm:px-5 sm:py-3.5">
+        <div
+          {...dragHandlers}
+          className="flex flex-shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-gray-100 px-4 py-3 max-md:touch-none sm:px-5 sm:py-3.5"
+        >
+          <div className="mx-auto -mb-1 h-1 w-10 basis-full rounded-full bg-[var(--ci-ink-14)] md:hidden" aria-hidden="true" />
           <h2
             className={
               rise
@@ -248,7 +273,7 @@ export function ExpandDialog({
               className="h-9 w-full sm:ml-2 sm:w-56"
             />
           )}
-          <div className="ml-auto flex flex-wrap items-center gap-2">
+          <div className="ml-auto flex flex-wrap items-center gap-2" onPointerDown={(event) => event.stopPropagation()}>
             {actions}
             <button
               type="button"

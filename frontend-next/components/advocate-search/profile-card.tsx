@@ -218,7 +218,7 @@ export function CreateProfileCard() {
         </p>
         <label className="text-xs text-gray-600">
           Your full name
-          <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Rambabu Samalla" className="mt-1" />
+          <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Your name as on the Bar roll" className="mt-1" />
         </label>
         <label className="text-xs text-gray-600">
           Bar enrolment number <span className="text-gray-400">(optional, exact and fastest)</span>

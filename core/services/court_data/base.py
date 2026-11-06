@@ -100,6 +100,22 @@ class CourtDataProvider(ABC):
         the same portal exceptions as fetch_case.
         """
 
+    def business_session(self, tracking_config: dict):
+        """District Courts only: a context manager for reading a case's
+        "Daily Status" (Business on Date) pages.
+
+        Entering it runs ONE CNR search (CAPTCHA-gated, retried like every
+        other lookup) and exposes `.links` -- the case-history table's
+        BusinessLink list, newest date first. `.fetch(link)` then POSTs one
+        home/viewBusiness in the same portal session and returns a
+        BusinessRecord, or None for an empty/unrecognised page. Every portal
+        call is bounded by COURT_PORTAL_CALL_TIMEOUT_SECONDS. Callers go
+        sequentially, a few dates at a time, from the worker only.
+
+        Not abstract: a provider without this capability simply raises.
+        """
+        raise NotImplementedError("This court data provider cannot read daily status.")
+
     @abstractmethod
     def list_court_options(self, court_type: str) -> dict[str, str]:
         """Top-level choice for the tracking setup form.

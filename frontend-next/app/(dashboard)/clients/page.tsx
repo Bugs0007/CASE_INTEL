@@ -49,7 +49,7 @@ export default function ClientsPage() {
       <SectionTabs tabs={BILLING_TABS} className="mb-0" />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-page-title text-gray-900 mb-1.5">Clients</h1>
+          <h1 className="text-page-title max-md:!text-[26px] max-md:!leading-[1.1] text-gray-900 mb-1.5">Clients</h1>
           <p className="text-sm text-gray-600">Who you bill. Link cases to a client from the case&apos;s Edit Details.</p>
         </div>
         <Button size="sm" onClick={() => setEditing("new")}>

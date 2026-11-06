@@ -56,6 +56,30 @@ class CourtOrderRecord:
 
 
 @dataclass
+class BusinessLink:
+    """One "Business on Date" link of a District Courts case-history table:
+    the arguments of its viewBusiness(...) onclick, already shaped as the
+    home/viewBusiness POST form the portal's own components.js builds.
+    Session-independent values only (codes, CNR, dates) -- no party data."""
+
+    business_date: date | None
+    form: dict = field(default_factory=dict)
+
+
+@dataclass
+class BusinessRecord:
+    """The "Daily Status" (business) of one hearing date on the District
+    Courts portal: what the court recorded that day and what is next.
+    Party names are deliberately not carried."""
+
+    business_date: date | None
+    court_name: str = ""
+    business_text: str = ""
+    next_purpose: str = ""
+    next_hearing_date: date | None = None
+
+
+@dataclass
 class AdvocateSearchHit:
     """One row of a District Courts "Search by Advocate" result grid --
     see ecourts_parsing.parse_advocate_search_html for how this differs

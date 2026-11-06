@@ -1,6 +1,11 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
-import { Eye, Trash2, Play, Loader2, Pencil } from "lucide-react";
-import { formatDate, getFileIcon } from "@/lib/utils";
+import { Eye, Trash2, Play, Loader2, Pencil, MoreVertical } from "lucide-react";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
+import { useIsMobile } from "@/hooks/use-is-mobile";
+import { cn, formatDate, getFileIcon, staggerDelay } from "@/lib/utils";
 import {
   DocumentStatusBadge,
   isDocumentActive,
@@ -9,6 +14,8 @@ import type { Document } from "@/types";
 
 interface DocumentRowProps {
   document: Document;
+  /** Position in the list, for the phone's stagger-in. */
+  index?: number;
   onProcess: (id: number) => void;
   onDelete: (id: number) => void;
   onEdit: (document: Document) => void;
@@ -21,7 +28,134 @@ interface DocumentRowProps {
 const ACTION_BTN =
   "inline-flex items-center gap-1.5 h-11 md:h-8 px-3 rounded-md border border-gray-200 bg-white text-gray-700 text-xs font-semibold hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors";
 
-export function DocumentRow({
+export function DocumentRow(props: DocumentRowProps) {
+  const isMobile = useIsMobile();
+  return isMobile ? <MobileDocumentRow {...props} /> : <DesktopDocumentRow {...props} />;
+}
+
+/** A phone: a card that opens the document when tapped; every other action
+ * (process, edit, delete) is in the sheet behind the three dots. */
+function MobileDocumentRow({
+  document,
+  index = 0,
+  onProcess,
+  onDelete,
+  onEdit,
+  onView,
+  isProcessing,
+  isDeleting,
+  isViewing,
+}: DocumentRowProps) {
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const canProcess =
+    !isDocumentActive(document) &&
+    (document.processing_status === "pending" || document.processing_status === "failed");
+  const name = document.display_name || document.filename;
+  const row = "flex h-14 w-full items-center gap-3 px-4 text-[15px] font-semibold text-gray-900 disabled:opacity-50";
+
+  return (
+    <div
+      style={staggerDelay(index, 45, 10)}
+      className="relative animate-rise-in rounded-[3px] border border-gray-100 bg-white motion-reduce:animate-none"
+    >
+      <button
+        type="button"
+        onClick={() => onView(document.id)}
+        disabled={isViewing}
+        aria-label={`Open ${name}`}
+        className="flex w-full items-start gap-3 p-3 pr-14 text-left [--press-scale:0.985]"
+      >
+        <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gray-100 text-lg" aria-hidden="true">
+          {isViewing ? <Loader2 className="h-4 w-4 animate-spin" /> : getFileIcon(document.file_type)}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="line-clamp-2 text-[14.5px] font-semibold leading-snug text-gray-900">{name}</span>
+          <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 font-mono text-[11.5px] text-gray-500">
+            <span>{document.case ? document.case.case_number : "No case"}</span>
+            <span>·</span>
+            <span>{formatDate(document.document_date || document.created_at, "MMM d, yyyy")}</span>
+          </span>
+          {document.case && <span className="mt-0.5 block truncate text-[12px] text-gray-500">{document.case.title}</span>}
+          <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <DocumentStatusBadge document={document} />
+            {document.document_type === "court_order" && <span className="ci-chip ci-chip--none">From eCourts</span>}
+          </span>
+          {document.ai_summary && (
+            <span className="mt-1.5 line-clamp-2 block text-[12.5px] leading-snug text-gray-600">{document.ai_summary}</span>
+          )}
+        </span>
+      </button>
+      <button
+        type="button"
+        aria-label="Document actions"
+        aria-haspopup="dialog"
+        onClick={() => setSheetOpen(true)}
+        className="absolute right-1 top-1 flex h-11 w-11 items-center justify-center rounded-full text-gray-500"
+      >
+        <MoreVertical className="h-4 w-4" />
+      </button>
+      <BottomSheet open={sheetOpen} onClose={() => setSheetOpen(false)} label="Document actions" title={name}>
+        <ul className="py-1">
+          <li>
+            <button
+              type="button"
+              className={row}
+              onClick={() => {
+                setSheetOpen(false);
+                onView(document.id);
+              }}
+            >
+              <Eye className="h-5 w-5 text-gray-500" aria-hidden="true" /> View
+            </button>
+          </li>
+          {canProcess && (
+            <li>
+              <button
+                type="button"
+                className={row}
+                disabled={isProcessing}
+                onClick={() => {
+                  setSheetOpen(false);
+                  onProcess(document.id);
+                }}
+              >
+                <Play className="h-5 w-5 text-gray-500" aria-hidden="true" />
+                {document.processing_status === "failed" ? "Retry processing" : "Process"}
+              </button>
+            </li>
+          )}
+          <li>
+            <button
+              type="button"
+              className={row}
+              onClick={() => {
+                setSheetOpen(false);
+                onEdit(document);
+              }}
+            >
+              <Pencil className="h-5 w-5 text-gray-500" aria-hidden="true" /> Edit details
+            </button>
+          </li>
+          <li>
+            <button
+              type="button"
+              className={cn(row, "!text-destructive")}
+              disabled={isDeleting}
+              onClick={() => {
+                setSheetOpen(false);
+                onDelete(document.id);
+              }}
+            >
+              <Trash2 className="h-5 w-5" aria-hidden="true" /> Delete
+            </button>
+          </li>
+        </ul>
+      </BottomSheet>
+    </div>
+  );
+}
+
+function DesktopDocumentRow({
   document,
   onProcess,
   onDelete,

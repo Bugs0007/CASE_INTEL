@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Newsreader, Public_Sans, IBM_Plex_Mono } from "next/font/google";
 // Design tokens first, ahead of everything else -- Tailwind's own
 // base/components/utilities (pulled in by globals.css) and every component
@@ -45,6 +45,15 @@ export const metadata: Metadata = {
     ],
     apple: "/apple-touch-icon-180x180.png",
   },
+};
+
+// viewport-fit=cover lets the app draw under a phone's notch and home bar; the
+// shell pads itself with env(safe-area-inset-*) so nothing sits beneath them.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#14202C",
 };
 
 export default function RootLayout({
