@@ -12,27 +12,41 @@ import { showToast } from "@/components/ui/toaster";
 import { APIError } from "@/lib/api/client";
 import { useCourtStructure } from "@/hooks/use-case-tracking";
 import {
+  advocateSearchKeys,
   useAdvocateImportJob,
   useAdvocateSearch,
   useAdvocateSearchJob,
   useAdvocateSearchPreference,
   useImportAdvocateCases,
+  useQuickSearchAvailability,
   useRetryFailedDistricts,
 } from "@/hooks/use-advocate-search";
+import { useNow } from "@/hooks/use-now";
 import { useQueryClient } from "@tanstack/react-query";
 import { caseKeys } from "@/hooks/use-cases";
+import { describeSearchProgress } from "@/lib/advocate-search-progress";
+import { formatRelativeTime, pluralize } from "@/lib/utils";
 import type { AdvocateSearchResult } from "@/types";
 
 const BAR_CODE_RE = /^[A-Za-z]{2,3}\/\d+\/\d{4}$/;
 const IMPORT_CAP = 100;
-const ALL_DISTRICTS = "";
+
+type SearchMode = "full" | "quick";
+
+function optionLabel(value: unknown): string {
+  return typeof value === "string" ? value : (value as { label: string }).label;
+}
 
 export default function AdvocateSearchPage() {
   const queryClient = useQueryClient();
   const { data: preference } = useAdvocateSearchPreference();
 
   const [stateCode, setStateCode] = useState("");
-  const [distCode, setDistCode] = useState(ALL_DISTRICTS);
+  // The districts to search; none picked means every district in the state.
+  const [distCodes, setDistCodes] = useState<string[]>([]);
+  const [searchMode, setSearchMode] = useState<SearchMode>("full");
+  // Once the advocate picks a mode themselves, stop choosing it for them.
+  const [modeTouched, setModeTouched] = useState(false);
   const [nameOrBarCode, setNameOrBarCode] = useState("");
   const [statusFilter, setStatusFilter] = useState<"Pending" | "Disposed" | "Both">("Both");
   const [formError, setFormError] = useState<string | null>(null);
@@ -42,10 +56,11 @@ export default function AdvocateSearchPage() {
   const [importJobId, setImportJobId] = useState<number | null>(null);
   const [districtsExpanded, setDistrictsExpanded] = useState(false);
 
-  // Pre-fill the state from the caller's last search, once.
+  // Pre-fill the state and districts from the caller's last search, once.
   useEffect(() => {
     if (!preference || stateCode) return;
     setStateCode(preference.hierarchy_config.state_code ?? "");
+    setDistCodes(preference.hierarchy_config.dist_codes ?? []);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preference]);
 
@@ -56,11 +71,26 @@ export default function AdvocateSearchPage() {
   const nameValid = nameLooksLikeBarCode || nameOrBarCode.trim().length >= 3;
   const canSearch = !!stateCode && nameValid && nameOrBarCode.trim().length > 0;
 
+  // Courts remembered from earlier searches for this name in this state.
+  const { data: quick = null } = useQuickSearchAvailability(nameOrBarCode, stateCode);
+  useEffect(() => {
+    if (quick && !modeTouched) setSearchMode("quick");
+    else if (!quick && searchMode === "quick") setSearchMode("full");
+  }, [quick, modeTouched, searchMode]);
+
   const search = useAdvocateSearch();
   const searchJob = useAdvocateSearchJob(searchJobId);
   const retryFailed = useRetryFailedDistricts();
   const startImport = useImportAdvocateCases();
   const importJob = useAdvocateImportJob(importJobId);
+
+  // A finished search updates the courts remembered for Quick search.
+  const searchStatus = searchJob.data?.status;
+  useEffect(() => {
+    if (searchStatus === "succeeded") {
+      queryClient.invalidateQueries({ queryKey: advocateSearchKeys.preference });
+    }
+  }, [searchStatus, queryClient]);
 
   useEffect(() => {
     if (importJob.data?.status === "succeeded" && importJob.data.created.length > 0) {
@@ -82,7 +112,9 @@ export default function AdvocateSearchPage() {
         name_or_bar_code: nameOrBarCode.trim(),
         court_type: "district",
         state_code: stateCode,
-        dist_code: distCode || undefined,
+        // A Quick search goes to the remembered courts, not to districts.
+        dist_codes: searchMode === "quick" || distCodes.length === 0 ? undefined : distCodes,
+        mode: searchMode,
         status_filter: statusFilter,
       });
       setSearchJobId(job_id);
@@ -155,13 +187,19 @@ export default function AdvocateSearchPage() {
   const renderOptions = (options: Record<string, unknown> | undefined) =>
     Object.entries(options || {}).map(([code, value]) => (
       <option key={code} value={code}>
-        {typeof value === "string" ? value : (value as { label: string }).label}
+        {optionLabel(value)}
       </option>
     ));
+
+  function toggleDistrict(code: string) {
+    setDistCodes((prev) => (prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]));
+  }
 
   const sj = searchJob.data;
   const searchRunning =
     searchJobId !== null && (!sj || sj.status === "queued" || sj.status === "running");
+  const now = useNow(searchRunning);
+  const progress = sj && searchRunning ? describeSearchProgress(sj, now) : null;
   const results: AdvocateSearchResult[] = sj?.results ?? [];
   // results is capped server-side; results_total is the real match count.
   // Fall back to results.length so an older backend still reads correctly.
@@ -212,7 +250,8 @@ export default function AdvocateSearchPage() {
                 value={stateCode}
                 onChange={(e) => {
                   setStateCode(e.target.value);
-                  setDistCode(ALL_DISTRICTS);
+                  setDistCodes([]);
+                  setModeTouched(false);
                 }}
                 disabled={states.isLoading}
               >
@@ -221,26 +260,40 @@ export default function AdvocateSearchPage() {
               </Select>
             </div>
 
-            {stateCode && (
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  District <span className="font-normal text-gray-400">(optional)</span>
-                </label>
-                <Select
-                  value={distCode}
-                  onChange={(e) => setDistCode(e.target.value)}
-                  disabled={districts.isLoading}
+            {stateCode && searchMode !== "quick" && (
+              <fieldset>
+                <legend className="mb-1 block text-sm font-medium text-gray-700">
+                  Districts <span className="font-normal text-gray-400">(optional)</span>
+                </legend>
+                <div
+                  role="group"
+                  aria-label="Districts to search"
+                  className="max-h-[220px] overflow-auto rounded-lg border border-gray-200 divide-y divide-gray-100"
                 >
-                  <option value={ALL_DISTRICTS}>
+                  <label className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800">
+                    <input
+                      type="checkbox"
+                      checked={distCodes.length === 0}
+                      onChange={() => setDistCodes([])}
+                    />
                     {districts.isLoading ? "Loading..." : "All districts (thorough, several minutes)"}
-                  </option>
-                  {renderOptions(districts.data?.options)}
-                </Select>
+                  </label>
+                  {Object.entries(districts.data?.options ?? {}).map(([code, value]) => (
+                    <label key={code} className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={distCodes.includes(code)}
+                        onChange={() => toggleDistrict(code)}
+                      />
+                      {optionLabel(value)}
+                    </label>
+                  ))}
+                </div>
                 <p className="mt-1 text-xs text-gray-500">
-                  If you mainly practice in one district, pick it here for a much faster search.
-                  Otherwise leave it on &quot;All districts&quot; to search the whole state.
+                  If you practice in a few districts, tick them for a much faster search. Leave it on
+                  &quot;All districts&quot; to search the whole state.
                 </p>
-              </div>
+              </fieldset>
             )}
 
             <div>
@@ -249,7 +302,10 @@ export default function AdvocateSearchPage() {
               </label>
               <Input
                 value={nameOrBarCode}
-                onChange={(e) => setNameOrBarCode(e.target.value)}
+                onChange={(e) => {
+                  setNameOrBarCode(e.target.value);
+                  setModeTouched(false);
+                }}
                 placeholder="e.g. Suresh Kumar, or MAH/1234/2015"
               />
               {nameOrBarCode && !nameValid && (
@@ -258,6 +314,50 @@ export default function AdvocateSearchPage() {
                 </p>
               )}
             </div>
+
+            {quick && (
+              <fieldset>
+                <legend className="mb-1 block text-sm font-medium text-gray-700">How much to search</legend>
+                <div className="space-y-1.5 text-sm">
+                  <label className="flex items-start gap-2">
+                    <input
+                      type="radio"
+                      name="search_mode"
+                      className="mt-1"
+                      checked={searchMode === "quick"}
+                      onChange={() => {
+                        setSearchMode("quick");
+                        setModeTouched(true);
+                      }}
+                    />
+                    <span>
+                      <span className="font-medium text-gray-900">Quick search</span> &mdash;{" "}
+                      {pluralize(quick.complexes, "court complex", "court complexes")} in{" "}
+                      {pluralize(quick.districts, "district")} that returned cases for this advocate
+                      {quick.updated_at ? ` (as of ${formatRelativeTime(quick.updated_at)})` : ""}
+                    </span>
+                  </label>
+                  <label className="flex items-start gap-2">
+                    <input
+                      type="radio"
+                      name="search_mode"
+                      className="mt-1"
+                      checked={searchMode === "full"}
+                      onChange={() => {
+                        setSearchMode("full");
+                        setModeTouched(true);
+                      }}
+                    />
+                    <span>
+                      <span className="font-medium text-gray-900">Full scan</span> &mdash;{" "}
+                      {distCodes.length > 0
+                        ? `every court complex in the ${pluralize(distCodes.length, "district")} ticked`
+                        : "every court complex in the state"}
+                    </span>
+                  </label>
+                </div>
+              </fieldset>
+            )}
 
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Case Status</label>
@@ -279,9 +379,11 @@ export default function AdvocateSearchPage() {
             <div className="flex items-start gap-2 rounded-lg bg-gray-100 border border-gray-200 p-3 text-xs text-gray-600">
               <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
               <span>
-                {distCode
-                  ? "A single-district search usually takes under a minute."
-                  : "A state-wide search checks every district and court complex, one at a time, and can take several minutes (longer for large states)."}{" "}
+                {searchMode === "quick"
+                  ? "A Quick search visits only the courts remembered from earlier searches, so it usually takes a minute or two. A case in any other court is only found by a full scan."
+                  : distCodes.length > 0
+                    ? `A search of ${pluralize(distCodes.length, "district")} usually takes a few minutes or less.`
+                    : "A state-wide search checks every district and court complex, one at a time, and can take several minutes (longer for large states)."}{" "}
                 You can leave this page open — cases already found appear below as they come in.
               </span>
             </div>
@@ -306,7 +408,13 @@ export default function AdvocateSearchPage() {
               ) : (
                 <>
                   <Search className="h-4 w-4" />
-                  {distCode ? "Search This District" : "Search State-wide"}
+                  {searchMode === "quick"
+                    ? "Quick Search"
+                    : distCodes.length === 1
+                      ? "Search This District"
+                      : distCodes.length > 1
+                        ? `Search ${distCodes.length} Districts`
+                        : "Search State-wide"}
                 </>
               )}
             </Button>
@@ -338,11 +446,26 @@ export default function AdvocateSearchPage() {
                     }}
                   />
                 </div>
-                <p className="flex items-center gap-2 text-sm text-gray-600 mb-3">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Checking each district — results appear below as they&apos;re found. You can leave
-                  and come back; nothing is lost.
-                </p>
+                <div className="mb-3 space-y-1 text-sm text-gray-600" data-testid="search-progress">
+                  {progress?.waiting ? (
+                    <p className="flex items-start gap-2">
+                      <Loader2 className="mt-0.5 h-4 w-4 flex-shrink-0 animate-spin" />
+                      <span>{progress.waiting}</span>
+                    </p>
+                  ) : (
+                    <>
+                      <p className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span className="font-medium text-gray-900">{progress?.counts}</span>
+                        {progress?.elapsed && <span className="text-gray-500">&middot; {progress.elapsed}</span>}
+                      </p>
+                      {progress?.district && <p className="pl-6 text-xs text-gray-500">{progress.district}</p>}
+                    </>
+                  )}
+                  <p className="pl-6 text-xs text-gray-500">
+                    Results appear below as they&apos;re found. You can leave and come back; nothing is lost.
+                  </p>
+                </div>
               </>
             )}
 
@@ -414,7 +537,12 @@ export default function AdvocateSearchPage() {
 
             {sj.status === "succeeded" && results.length === 0 && (
               <p className="text-sm text-gray-500">
-                No cases found for this advocate/bar code {distCode ? "in this district" : "anywhere in the selected state"}.
+                No cases found for this advocate/bar code{" "}
+                {sj.mode === "quick"
+                  ? "in the remembered courts. Run a full scan to check the rest of the state."
+                  : sj.mode === "districts"
+                    ? "in the selected districts."
+                    : "anywhere in the selected state."}
               </p>
             )}
 

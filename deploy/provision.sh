@@ -45,6 +45,10 @@ GUNICORN_TIMEOUT="${GUNICORN_TIMEOUT:-120}"
 OLLAMA_EMBEDDING_MODEL="${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}"
 SWAP_FILE="${SWAP_FILE:-/swapfile}"
 SWAP_SIZE_MB="${SWAP_SIZE_MB:-1024}"
+# Optional second worker for advocate search (deploy/systemd/README.md, "Search
+# worker"). OFF by default: each worker holds its own CAPTCHA OCR model, and
+# the box has to be measured before it is switched on.
+ENABLE_SEARCH_WORKER="${ENABLE_SEARCH_WORKER:-false}"
 
 if [ "$(id -u)" -ne 0 ]; then
     echo "This script needs root (it installs packages, writes systemd units," >&2
@@ -200,7 +204,14 @@ echo "Unit written and enabled. Not starting it yet -- it needs $PROJECT_DIR/.en
 # Runs `manage.py process_jobs` -- the DB-backed background worker that
 # document uploads enqueue into (chunking, OCR of scanned PDFs, embedding).
 # Same values as deploy/case-intel-worker.service (the checked-in reference
-# copy), templated here like the gunicorn unit above. Exactly one instance.
+# copy), templated here like the gunicorn unit above. One instance, serving
+# every job type -- unless ENABLE_SEARCH_WORKER=true, in which case this one
+# serves everything but advocate search/import (--lane portal) and the unit
+# below serves those.
+MAIN_WORKER_LANE=""
+if [ "$ENABLE_SEARCH_WORKER" = "true" ]; then
+    MAIN_WORKER_LANE=" --lane portal"
+fi
 log "Writing worker systemd unit (${SERVICE_NAME}-worker)"
 cat > "/etc/systemd/system/${SERVICE_NAME}-worker.service" <<EOF
 [Unit]
@@ -211,7 +222,7 @@ After=network.target
 User=$DEPLOY_USER
 Group=$DEPLOY_USER
 WorkingDirectory=$PROJECT_DIR
-ExecStart=$PROJECT_DIR/.venv/bin/python manage.py process_jobs
+ExecStart=$PROJECT_DIR/.venv/bin/python manage.py process_jobs${MAIN_WORKER_LANE}
 Restart=on-failure
 RestartSec=5
 
@@ -219,9 +230,36 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
+if [ "$ENABLE_SEARCH_WORKER" = "true" ]; then
+    # Same as deploy/case-intel-search-worker.service (the reference copy).
+    log "Writing search worker systemd unit (${SERVICE_NAME}-search-worker)"
+    cat > "/etc/systemd/system/${SERVICE_NAME}-search-worker.service" <<EOF
+[Unit]
+Description=Case Intel advocate-search worker
+After=network.target
+
+[Service]
+User=$DEPLOY_USER
+Group=$DEPLOY_USER
+WorkingDirectory=$PROJECT_DIR
+ExecStart=$PROJECT_DIR/.venv/bin/python manage.py process_jobs --lane search
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+fi
+
 systemctl daemon-reload
 systemctl enable "${SERVICE_NAME}-worker"
 echo "Worker unit written and enabled. Start it together with $SERVICE_NAME once .env exists."
+if [ "$ENABLE_SEARCH_WORKER" = "true" ]; then
+    systemctl enable "${SERVICE_NAME}-search-worker"
+    echo "Search worker unit written and enabled (the main worker now runs --lane portal)."
+else
+    echo "Single worker (--lane all). To split advocate search onto its own worker, measure the box first: deploy/systemd/README.md."
+fi
 
 # ============================================================================
 # 8. Nginx site config
@@ -268,6 +306,9 @@ log "Configuring narrow sudoers rule for $DEPLOY_USER"
 SYSTEMCTL_PATH="$(command -v systemctl)"
 SUDOERS_FILE="/etc/sudoers.d/${SERVICE_NAME}-restart"
 SUDOERS_LINE="$DEPLOY_USER ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH restart $SERVICE_NAME, $SYSTEMCTL_PATH restart ${SERVICE_NAME}-worker"
+if [ "$ENABLE_SEARCH_WORKER" = "true" ]; then
+    SUDOERS_LINE="$SUDOERS_LINE, $SYSTEMCTL_PATH restart ${SERVICE_NAME}-search-worker"
+fi
 TMP_SUDOERS="$(mktemp)"
 echo "$SUDOERS_LINE" > "$TMP_SUDOERS"
 if visudo -c -f "$TMP_SUDOERS" >/dev/null 2>&1; then
@@ -303,5 +344,7 @@ Next steps (see PROVISIONING.md for the full checklist):
   4. python manage.py collectstatic --noinput
   5. sudo systemctl start ${SERVICE_NAME}
   6. sudo systemctl start ${SERVICE_NAME}-worker   # background document processing
+$(if [ "$ENABLE_SEARCH_WORKER" = "true" ]; then echo "     sudo systemctl start ${SERVICE_NAME}-search-worker   # advocate search/import (start BOTH, or searches never run)
+     NOTE: .github/workflows/deploy.yml restarts only ${SERVICE_NAME} and ${SERVICE_NAME}-worker -- add ${SERVICE_NAME}-search-worker to it."; fi)
   7. Once DNS for $DOMAIN resolves to this box: sudo certbot --nginx -d $DOMAIN
 EOF

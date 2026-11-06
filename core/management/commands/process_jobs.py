@@ -40,10 +40,22 @@ worker running alongside an interactive one is fine -- the queue is safe for
 any number of workers (skip_locked); the limit is the box's memory, not
 correctness.
 
+Two more lanes split the long portal work from everything else, for a box
+with room for a second worker (each one loads the CAPTCHA OCR model):
+`--lane search` claims only advocate_search and advocate_import (10-45 minute
+fan-outs), `--lane portal` claims everything else (documents, briefings,
+order sync, refresh-all). Run one of each and an advocate search no longer
+blocks order sync or an upload, nor a refresh-all the search. Every job type
+belongs to exactly one of the two (a test pins it), so neither lane leaves a
+job nobody serves; running only ONE of them would leave the other's jobs
+queued forever -- start both, or stay on `--lane all`.
+
 Usage:
     python manage.py process_jobs                 # long-lived loop
     python manage.py process_jobs --once          # drain queue, then exit
     python manage.py process_jobs --lane interactive   # uploads/briefings only
+    python manage.py process_jobs --lane search        # advocate search + import only
+    python manage.py process_jobs --lane portal        # everything but those
     python manage.py process_jobs --max-jobs 0 --max-rss-mb 0   # never recycle
 """
 
@@ -79,7 +91,14 @@ RECYCLE_EXIT_CODE = 75
 
 # Job types a worker running each lane may claim. "all" is every type.
 INTERACTIVE_JOB_TYPES = ("document", "case_briefing")
-LANES = ("all", "interactive")
+SEARCH_JOB_TYPES = ("advocate_search", "advocate_import")
+PORTAL_JOB_TYPES = ("document", "case_briefing", "order_sync", "tracking_refresh")
+LANE_JOB_TYPES = {
+    "interactive": INTERACTIVE_JOB_TYPES,
+    "search": SEARCH_JOB_TYPES,
+    "portal": PORTAL_JOB_TYPES,
+}
+LANES = ("all", *LANE_JOB_TYPES)
 
 # Lower claims first. A document job is the interactive tier UNLESS its
 # document is a court order the portal sync fetched in the background (a
@@ -133,9 +152,12 @@ class Command(BaseCommand):
             "--lane",
             choices=LANES,
             default="all",
-            help="Which jobs this worker may claim: 'all' (default) or "
+            help="Which jobs this worker may claim: 'all' (default); "
                  "'interactive' (document + briefing jobs only, so uploads are "
-                 "never stuck behind a long advocate search on another worker).",
+                 "never stuck behind a long advocate search on another worker); "
+                 "'search' (advocate search + import only); or 'portal' "
+                 "(every job type except those two). Run 'search' and 'portal' "
+                 "together, or neither.",
         )
         parser.add_argument(
             "--stale-seconds",
@@ -211,8 +233,8 @@ class Command(BaseCommand):
         """
         with transaction.atomic():
             queued = ProcessingJob.objects.filter(status="queued")
-            if lane == "interactive":
-                queued = queued.filter(job_type__in=INTERACTIVE_JOB_TYPES)
+            if lane != "all":
+                queued = queued.filter(job_type__in=LANE_JOB_TYPES[lane])
             job = (
                 queued
                 .annotate(priority=_job_priority())
