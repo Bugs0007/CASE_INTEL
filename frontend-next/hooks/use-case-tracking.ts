@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { caseTrackingApi } from "@/lib/api/case-tracking";
 import { caseKeys } from "@/hooks/use-cases";
 import { hearingKeys } from "@/hooks/use-hearings";
+import { invalidateOrderData } from "@/hooks/use-order-sync";
 import type { CaseCreateFromCnrInput, CourtType, TrackingConfig } from "@/types";
 
 export const courtStructureKeys = {
@@ -97,7 +98,9 @@ export function useRefreshTracking(caseId: number) {
     mutationFn: (force: boolean) => caseTrackingApi.refresh(caseId, force),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: caseKeys.detail(caseId) });
-      queryClient.invalidateQueries({ queryKey: hearingKeys.lists() });
+      // A refresh queues an order check: re-read the documents and orders
+      // now, and again when that check finishes (useRefreshWhenOrdersArrive).
+      invalidateOrderData(queryClient);
     },
   });
 }

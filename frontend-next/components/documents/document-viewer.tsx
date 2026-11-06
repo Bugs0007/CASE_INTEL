@@ -47,6 +47,8 @@ interface DocumentViewerProps {
    * closes the viewer in one step). */
   onSelectDocument: (documentId: number) => void;
   onClose: () => void;
+  /** Opened from the Case Bot button: the bot is docked even on a narrow window. */
+  chatInitiallyOpen?: boolean;
 }
 
 /** A document, full screen: the case's documents on the left, the file in
@@ -64,6 +66,7 @@ export function DocumentViewer({
   orders,
   onSelectDocument,
   onClose,
+  chatInitiallyOpen = false,
 }: DocumentViewerProps) {
   const doc = documents.find((d) => d.id === documentId);
   const file = useDocumentFile(doc, orders);
@@ -74,12 +77,13 @@ export function DocumentViewer({
 
   useModalLayer(panelRef, true);
 
-  // Both side panels start open where there is room for three columns.
+  // Both side panels start open where there is room for three columns (the
+  // bot also when the Case Bot button opened the viewer).
   useEffect(() => {
     const roomy = window.matchMedia?.("(min-width: 1024px)").matches ?? false;
     setListOpen(roomy);
-    setChatOpen(roomy);
-  }, []);
+    setChatOpen(roomy || chatInitiallyOpen);
+  }, [chatInitiallyOpen]);
 
   // Focus in on open, and back to whatever had it on close.
   useEffect(() => {
@@ -131,7 +135,7 @@ export function DocumentViewer({
       aria-label={`Document viewer: ${name}`}
       data-layer="48"
       tabIndex={-1}
-      className="fixed inset-0 z-[48] flex flex-col bg-surface outline-none animate-fade-in motion-reduce:animate-none"
+      className="fixed bottom-0 left-0 right-0 top-[67px] z-[48] flex flex-col bg-surface outline-none animate-fade-in motion-reduce:animate-none lg:left-52"
     >
       <header className="flex flex-shrink-0 items-center gap-2 border-b border-gray-200 bg-surface px-2 py-2 sm:px-3">
         <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close viewer">
@@ -186,7 +190,7 @@ export function DocumentViewer({
         {listOpen && (
           <aside
             aria-label="Case documents"
-            className="z-10 flex w-64 flex-shrink-0 flex-col border-r border-gray-200 bg-surface max-lg:absolute max-lg:inset-y-0 max-lg:left-0 max-lg:w-72 max-lg:shadow-card"
+            className="z-10 flex w-[230px] flex-shrink-0 flex-col border-r border-gray-200 bg-surface max-lg:absolute max-lg:inset-y-0 max-lg:left-0 max-lg:w-72 max-lg:shadow-card"
           >
             <div className="flex-shrink-0 border-b border-gray-100 p-2">
               <Input
@@ -283,7 +287,7 @@ export function DocumentViewer({
         {chatOpen && (
           <aside
             aria-label="Case Bot"
-            className="z-10 flex min-h-0 w-[420px] flex-shrink-0 flex-col max-lg:absolute max-lg:inset-0 max-lg:w-full"
+            className="z-10 flex min-h-0 w-[380px] flex-shrink-0 flex-col max-lg:absolute max-lg:inset-0 max-lg:w-full"
           >
             <ChatPanel
               caseId={caseId}
