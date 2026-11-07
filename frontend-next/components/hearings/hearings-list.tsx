@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge, StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -253,6 +253,9 @@ interface HearingItemProps {
   orders?: CourtOrder[];
   onViewOrder?: (orderId: number) => void;
   viewingOrderId?: number;
+  /** What the court recorded at this hearing (a district case's "What
+      happened" section), drawn under the outcome and notes. */
+  whatHappened?: ReactNode;
 }
 
 export function HearingItem({
@@ -267,6 +270,7 @@ export function HearingItem({
   orders,
   onViewOrder,
   viewingOrderId,
+  whatHappened,
 }: HearingItemProps) {
   return (
     <div
@@ -344,6 +348,8 @@ export function HearingItem({
           {hearing.notes && (
             <div className="mt-2 text-sm text-gray-600">📝 {hearing.notes}</div>
           )}
+
+          {whatHappened}
 
           {/* Order PDFs filed on this date. A date routinely carries more
               than one, so a single order gets one button and several get a

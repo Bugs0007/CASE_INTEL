@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { mobileCases, mockMobileApi } from "./mobile-fixtures";
+import { mobileCases, mobileHearings, mockMobileApi } from "./mobile-fixtures";
 
 // The phone layouts (< 768px wide): nothing scrolls sideways, the key content
 // of each screen shows, the bottom bar works, and the sheets behave. The API
@@ -232,6 +232,134 @@ test("a district case shows what the court recorded at the last hearing, under t
   expect(o.scrollerOverflow).toBeLessThanOrEqual(0);
   expect(o.offenders).toEqual([]);
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/spec-case-daily-status-390.png` });
+});
+
+// What the court recorded at each hearing of a district case. Dates hang off
+// the India day (like the app), never the UTC date.
+const indiaDay = (offset: number) => new Date(Date.now() + 330 * 60_000 + offset * 86_400_000).toISOString().slice(0, 10);
+
+function districtHearingMocks() {
+  const mine = mobileCases[0];
+  const passed = mobileHearings.find((h) => h.id === 107)!;
+  return {
+    "/cases/1/": { ...mine, court_type: "district", cnr_number: "TSHS020000882016" },
+    "/hearings/": [
+      ...mobileHearings.filter((h) => h.case === mine.id).map((h) => (h.id === 107 ? { ...h, business_date: indiaDay(-6) } : h)),
+      // The court lists business for this one, but it is not saved yet.
+      { ...passed, id: 108, hearing_date: `${indiaDay(-20)}T04:30:00Z`, business_date: indiaDay(-20), outcome: null, purpose: "Evidence" },
+    ],
+    "/cases/1/daily-status/": [
+      {
+        business_date: indiaDay(-6),
+        court_name: "IV Addl. Rent Controller-cum-XVI Junior Civil Judge",
+        business_text:
+          "Petitioner counsel present. Respondent counsel absent.\nMemo filed by the petitioner counsel stay is granted. Hence call on 19.11.2026.",
+        next_purpose: "STAY",
+        next_hearing_date: indiaDay(12),
+        fetched_at: new Date().toISOString(),
+      },
+    ],
+    "/cases/1/orders/check/": {
+      order_sync: { state: "queued", last_checked_at: null, last_success_at: null, found: 0, downloaded: 0, reason: null },
+    },
+  };
+}
+
+test("a district case's Hearings tab: a preview in the row, what happened in the sheet", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: HEIGHT });
+  await mockMobileApi(page, districtHearingMocks());
+  await page.goto("/cases/1");
+  await page.getByRole("tab", { name: "Hearings" }).click();
+
+  // The passed hearing with a record shows one preview line; the others none.
+  const preview = page.getByTestId("hearing-business-preview");
+  await expect(preview).toHaveCount(1, { timeout: 20_000 });
+  await expect(preview).toContainText("Petitioner counsel present.");
+  const previewBox = (await preview.boundingBox())!;
+  expect(previewBox.height).toBeLessThan(20); // one line
+  await page.waitForTimeout(700);
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/spec-hearings-preview-390.png` });
+
+  // Tap it: the full text, the next purpose and the next hearing.
+  await page.getByRole("button", { name: /What happened is saved/ }).click();
+  const sheet = page.getByRole("dialog", { name: "Hearing details" });
+  await expect(sheet).toBeVisible();
+  const section = sheet.getByRole("region", { name: "What happened" });
+  await expect(section).toContainText("Petitioner counsel present. Respondent counsel absent.");
+  await expect(section).toContainText("Memo filed by the petitioner counsel stay is granted. Hence call on 19.11.2026.");
+  await expect(section).toContainText("Next purpose");
+  await expect(section).toContainText("STAY");
+  await expect(section).toContainText("Next hearing");
+  await expect(section).toContainText("In 12 days");
+  await page.waitForTimeout(900); // the sheet and the section have settled
+  const [sheetBox, sectionBox] = await Promise.all([sheet.boundingBox(), section.boundingBox()]);
+  expect(sheetBox!.width).toBeLessThanOrEqual(390);
+  expect(sectionBox!.x + sectionBox!.width).toBeLessThanOrEqual(390);
+  const o = await horizontalOverflow(page);
+  expect(o.docOverflow).toBeLessThanOrEqual(0);
+  expect(o.scrollerOverflow).toBeLessThanOrEqual(0);
+  expect(o.offenders).toEqual([]);
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/spec-hearings-sheet-390.png` });
+  await page.keyboard.press("Escape");
+  await expect(sheet).toBeHidden();
+});
+
+test("a district hearing with no saved record offers Check now, which queues the order check", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: HEIGHT });
+  await mockMobileApi(page, districtHearingMocks());
+  await page.goto("/cases/1");
+  await page.getByRole("tab", { name: "Hearings" }).click();
+  // The 20-days-ago hearing: listed by the court, not saved.
+  await page.getByRole("button", { name: /Open details/ }).nth(2).click();
+  const section = page.getByRole("dialog", { name: "Hearing details" }).getByRole("region", { name: "What happened" });
+  await expect(section).toContainText("What happened is not saved yet.");
+  await page.waitForTimeout(900); // the sheet and the section have settled
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/spec-hearings-sheet-not-saved-390.png` });
+  const queued = page.waitForRequest((r) => r.method() === "POST" && r.url().endsWith("/cases/1/orders/check/"));
+  await section.getByRole("button", { name: "Check now" }).click();
+  await queued;
+});
+
+test("desktop: a district hearing row opens what happened under itself, and the layout holds", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockMobileApi(page, districtHearingMocks());
+  await page.goto("/cases/1");
+  const card = page.getByRole("region", { name: "Hearings & orders" });
+  await expect(card).toBeVisible({ timeout: 20_000 });
+  await page.waitForTimeout(700);
+
+  const toggle = card.getByRole("button", { name: /^What happened on / }).first();
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  // The collapsed row is the same 40px row.
+  const rowBox = (await toggle.locator("xpath=..").boundingBox())!;
+  expect(Math.round(rowBox.height)).toBe(40);
+  const before = (await card.boundingBox())!;
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/spec-hearings-desktop-collapsed-1440.png` });
+
+  await toggle.focus();
+  await page.keyboard.press("Enter");
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  const section = card.getByRole("region", { name: "What happened" });
+  await expect(section).toContainText("Petitioner counsel present. Respondent counsel absent.");
+  await expect(section).toContainText("Next purpose");
+  await expect(section).toContainText("STAY");
+  await expect(section).toContainText("In 12 days");
+  await page.waitForTimeout(700);
+
+  // The card keeps its size and the page still does not scroll.
+  const after = (await card.boundingBox())!;
+  expect(Math.round(after.height)).toBe(Math.round(before.height));
+  expect(Math.round(after.width)).toBe(Math.round(before.width));
+  const doc = await page.evaluate(() => ({
+    scroll: (document.scrollingElement as HTMLElement).scrollHeight,
+    inner: window.innerHeight,
+  }));
+  expect(doc.scroll).toBeLessThanOrEqual(doc.inner);
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/spec-hearings-desktop-expanded-1440.png` });
+
+  await page.keyboard.press("Enter");
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(section).toBeHidden();
 });
 
 test("the calendar is an agenda: pick a day from the week strip", async ({ page }) => {

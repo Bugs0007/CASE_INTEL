@@ -452,6 +452,7 @@ export default function CaseDetailPage() {
             onViewOrder={handleViewOrder}
             viewingOrderId={viewingOrderId}
             statusLine={<CaseOrderCheckLine caseItem={caseItem} />}
+            caseItem={caseItem}
           />
           <CompactCalendar
             caseId={caseId}
