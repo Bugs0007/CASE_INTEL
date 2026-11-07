@@ -10,12 +10,13 @@ export const dailyStatusKeys = {
  *
  * Entries only arrive with a court-tracking refresh (rate-limited to about
  * hourly) and never change once stored, so there is no need to re-fetch
- * eagerly. */
-export function useDailyStatus(caseId: number) {
+ * eagerly. `enabled` is false for cases that are not district cases, which
+ * have no daily status to ask for. */
+export function useDailyStatus(caseId: number, enabled: boolean = true) {
   return useQuery({
     queryKey: dailyStatusKeys.list(caseId),
     queryFn: () => dailyStatusApi.listForCase(caseId),
-    enabled: !!caseId,
+    enabled: !!caseId && enabled,
     staleTime: 5 * 60 * 1000,
   });
 }

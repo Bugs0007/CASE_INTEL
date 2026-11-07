@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { CalendarDays, FileText, Gavel, Loader2, Plus } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { CalendarDays, ChevronDown, FileText, Gavel, Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CompactCard } from "@/components/cases/compact/compact-card";
@@ -9,9 +9,11 @@ import { OrderOverviewCard } from "@/components/cases/order-overview";
 import { CaseCalendarCard } from "@/components/calendar/case-calendar-card";
 import { CaseEventDialog } from "@/components/calendar/case-event-dialog";
 import { HearingItem } from "@/components/hearings/hearings-list";
+import { HearingBusinessSection } from "@/components/cases/hearing-business";
 import { HearingDigestDialog } from "@/components/hearings/hearing-digest-dialog";
 import { groupOrdersByDate, hearingDateKey } from "@/hooks/use-court-orders";
 import { useCaseEvents } from "@/hooks/use-case-events";
+import { useHearingBusiness, type HearingBusinessData } from "@/hooks/use-hearing-business";
 import { useTasks } from "@/hooks/use-tasks";
 import { buildDayBuckets, dayMarkerCounts } from "@/lib/calendar";
 import { latestOrderForOverview, matchesQuery, ordersWithOverview } from "@/lib/case-previews";
@@ -161,28 +163,51 @@ const DOT: Record<HearingRow["tone"], string> = {
   other: "bg-gray-400",
 };
 
+/** What happened at a hearing, opened under its row (a district case). It is
+ * scrolled into view when it opens: the card's rows are fitted to the window,
+ * so the card scrolls inside itself while one is open. */
+function HearingBusinessPanel({ id, business, hearing }: { id: string; business: HearingBusinessData; hearing: Hearing }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    ref.current?.scrollIntoView?.({ block: "nearest" });
+  }, []);
+  return (
+    <div ref={ref} id={id} className="border-t border-gray-100 bg-page px-4 pb-3">
+      <HearingBusinessSection
+        info={business.infoFor(hearing)}
+        check={business.check}
+        onReload={business.reload}
+        variant="inline"
+        className="mt-2.5"
+      />
+    </div>
+  );
+}
+
 function HearingLine({
   row,
   onViewOrder,
   viewingOrderId,
   trailing,
   roomy,
+  business,
+  expanded,
+  onToggle,
 }: {
   row: HearingRow;
   onViewOrder: (orderId: number) => void;
   viewingOrderId?: number;
   trailing?: React.ReactNode;
   roomy?: boolean;
+  /** A district case's what-happened data: rows get an expander (the roomy
+   * rows of the dialog open the whole hearing with its Details button). */
+  business?: HearingBusinessData;
+  expanded?: boolean;
+  onToggle?: () => void;
 }) {
   const { order } = row;
-  return (
-    <li
-      className={cn(
-        "flex items-center gap-3 border-b border-gray-100 px-4 last:border-b-0",
-        roomy ? "min-h-[52px] py-2" : "h-10",
-        row.isNext && "bg-[color-mix(in_srgb,var(--ci-warn)_9%,white)]",
-      )}
-    >
+  const inner = (
+    <>
       <span className={cn("h-2.5 w-2.5 flex-shrink-0 rounded-full", DOT[row.tone])} aria-hidden="true" />
       <div className={cn("min-w-0 flex-1", roomy ? "" : "flex items-center gap-4")}>
         <div className="w-[104px] flex-shrink-0 text-[13.5px] font-bold text-gray-900">
@@ -205,6 +230,60 @@ function HearingLine({
         </Button>
       )}
       {trailing}
+    </>
+  );
+
+  if (!business?.enabled || roomy) {
+    return (
+      <li
+        className={cn(
+          "flex items-center gap-3 border-b border-gray-100 px-4 last:border-b-0",
+          roomy ? "min-h-[52px] py-2" : "h-10",
+          row.isNext && "bg-[color-mix(in_srgb,var(--ci-warn)_9%,white)]",
+        )}
+      >
+        {inner}
+      </li>
+    );
+  }
+
+  // A district case: the same 40px row, plus a column at its end for the
+  // expander (empty on a row with nothing to open, so the columns line up).
+  const info = business.infoFor(row.hearing);
+  const hasDetail = info.kind === "entry" || info.kind === "missing" || info.kind === "unlisted";
+  const panelId = `hearing-business-${row.hearing.id}`;
+  return (
+    <li
+      className={cn(
+        "border-b border-gray-100 last:border-b-0",
+        row.isNext && "bg-[color-mix(in_srgb,var(--ci-warn)_9%,white)]",
+      )}
+    >
+      <div className="flex h-10 items-center gap-3 px-4">
+        {inner}
+        {hasDetail ? (
+          <button
+            type="button"
+            aria-expanded={!!expanded}
+            aria-controls={panelId}
+            aria-label={`What happened on ${dayMonth(row.day)} ${row.day.slice(0, 4)}`}
+            title="What happened"
+            onClick={onToggle}
+            className={cn(
+              "flex h-7 w-7 flex-shrink-0 items-center justify-center rounded border border-transparent hover:border-[var(--ci-ink-14)] hover:text-gray-900",
+              info.kind === "entry" ? "text-gray-700" : "text-gray-400",
+            )}
+          >
+            <ChevronDown
+              aria-hidden="true"
+              className={cn("h-4 w-4 transition-transform motion-reduce:transition-none", expanded && "rotate-180")}
+            />
+          </button>
+        ) : (
+          <span aria-hidden="true" className="h-7 w-7 flex-shrink-0" />
+        )}
+      </div>
+      {expanded && hasDetail && <HearingBusinessPanel id={panelId} business={business} hearing={row.hearing} />}
     </li>
   );
 }
@@ -223,6 +302,8 @@ interface CompactHearingsProps {
   viewingOrderId?: number;
   /** One plain line under the rows about the order check (see order sync). */
   statusLine?: React.ReactNode;
+  /** The case, for what the court recorded at each hearing (district cases). */
+  caseItem?: Case;
 }
 
 export function CompactHearings({
@@ -238,6 +319,7 @@ export function CompactHearings({
   onViewOrder,
   viewingOrderId,
   statusLine,
+  caseItem,
 }: CompactHearingsProps) {
   const today = istDayKey();
   const { rows: shown, total } = useMemo(
@@ -252,6 +334,9 @@ export function CompactHearings({
   const [query, setQuery] = useState("");
   const [detailId, setDetailId] = useState<number | null>(null);
   const [prepId, setPrepId] = useState<number | null>(null);
+  // The row opened under itself in the card (what happened at that hearing).
+  const [rowOpenId, setRowOpenId] = useState<number | null>(null);
+  const business = useHearingBusiness(caseItem, hearings);
 
   const counts = {
     all: all.length,
@@ -275,6 +360,8 @@ export function CompactHearings({
       <CompactCard
         id="hearings"
         className="min-h-0 flex-1"
+        // The card is as tall as the window allows; an opened row scrolls inside it.
+        bodyClassName={rowOpenId !== null ? "overflow-y-auto" : undefined}
         title="Hearings & orders"
         icon={<Gavel className="h-4 w-4" />}
         count={total}
@@ -361,6 +448,13 @@ export function CompactHearings({
                         orders={byDate.get(hearingDateKey(row.hearing.hearing_date))}
                         onViewOrder={onViewOrder}
                         viewingOrderId={viewingOrderId}
+                        whatHappened={
+                          <HearingBusinessSection
+                            info={business.infoFor(row.hearing)}
+                            check={business.check}
+                            onReload={business.reload}
+                          />
+                        }
                       />
                     </div>
                   )}
@@ -385,7 +479,15 @@ export function CompactHearings({
         ) : (
           <ul>
             {shown.map((row) => (
-              <HearingLine key={row.hearing.id} row={row} onViewOrder={onViewOrder} viewingOrderId={viewingOrderId} />
+              <HearingLine
+                key={row.hearing.id}
+                row={row}
+                onViewOrder={onViewOrder}
+                viewingOrderId={viewingOrderId}
+                business={business}
+                expanded={rowOpenId === row.hearing.id}
+                onToggle={() => setRowOpenId((id) => (id === row.hearing.id ? null : row.hearing.id))}
+              />
             ))}
           </ul>
         )}
