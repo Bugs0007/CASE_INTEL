@@ -306,9 +306,11 @@ COURT_PORTAL_CALL_TIMEOUT_SECONDS = config("COURT_PORTAL_CALL_TIMEOUT_SECONDS", 
 # job (core/services/daily_status.py). Per sync at most this many missing dates
 # are fetched, newest first, this many seconds apart; and only the case's
 # latest COURT_BUSINESS_HISTORY_WINDOW business dates are ever fetched at all
-# (the hard per-case cap -- older history is never backfilled).
+# (the hard per-case cap -- older history is never backfilled). 40 covers a
+# long hearing history (~38 rows): it fills in over successive order checks,
+# FETCHES_PER_SYNC dates each, newest first, so the pace per check is unchanged.
 COURT_BUSINESS_FETCHES_PER_SYNC = config("COURT_BUSINESS_FETCHES_PER_SYNC", default=3, cast=int)
-COURT_BUSINESS_HISTORY_WINDOW = config("COURT_BUSINESS_HISTORY_WINDOW", default=10, cast=int)
+COURT_BUSINESS_HISTORY_WINDOW = config("COURT_BUSINESS_HISTORY_WINDOW", default=40, cast=int)
 COURT_BUSINESS_DELAY_SECONDS = config("COURT_BUSINESS_DELAY_SECONDS", default=3, cast=float)
 
 # Case Bot cross-encoder reranker (core/services/reranker.py).

@@ -75,7 +75,7 @@ function DateChip({ iso, size = "lg" }: { iso: string; size?: "lg" | "sm" }) {
   );
 }
 
-function PurposePill({ purpose }: { purpose: string }) {
+export function PurposePill({ purpose }: { purpose: string }) {
   if (!purpose) return null;
   return (
     <span

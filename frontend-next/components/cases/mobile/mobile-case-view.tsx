@@ -22,6 +22,7 @@ import { useMobileHeader, MobileSubbar } from "@/components/layout/mobile-chrome
 import { CauseListBadge } from "@/components/hearings/cause-list-badge";
 import { HearingItem } from "@/components/hearings/hearings-list";
 import { HearingDigestDialog } from "@/components/hearings/hearing-digest-dialog";
+import { HearingBusinessPreview, HearingBusinessSection } from "@/components/cases/hearing-business";
 import { CompactCalendar, directionsOf } from "@/components/cases/compact/compact-main";
 import {
   CompactClientUpdates,
@@ -31,6 +32,7 @@ import {
 } from "@/components/cases/compact/compact-rail";
 import { groupOrdersByDate, hearingDateKey } from "@/hooks/use-court-orders";
 import { useRefreshTracking } from "@/hooks/use-case-tracking";
+import { useHearingBusiness } from "@/hooks/use-hearing-business";
 import { hearingDayKey } from "@/lib/calendar";
 import { allHearingRows, caseFacts, filterHearingRows, syncState, type HearingFilter, type HearingRow, type SyncTone } from "@/lib/case-page-rows";
 import { latestOrderForOverview } from "@/lib/case-previews";
@@ -534,6 +536,9 @@ function HearingsTab(props: MobileCaseViewProps) {
 
   const all = useMemo(() => allHearingRows(props.hearings, props.orders, today), [props.hearings, props.orders, today]);
   const byDate = useMemo(() => groupOrdersByDate(props.orders), [props.orders]);
+  // What the court recorded at each hearing (district cases): a preview line
+  // in the row, the full text in the sheet.
+  const business = useHearingBusiness(props.caseItem, props.hearings);
   const rows = filterHearingRows(all, filter);
   const open = all.find((r) => r.hearing.id === openId) ?? null;
   const chips: [HearingFilter, string][] = [
@@ -578,6 +583,8 @@ function HearingsTab(props: MobileCaseViewProps) {
         <ul key={filter} className="overflow-hidden rounded-[3px] border border-[var(--ci-ink-14)] bg-surface shadow-card">
           {rows.map((row, i) => {
             const t = dateTile(row.day);
+            const info = business.infoFor(row.hearing);
+            const entry = info.kind === "entry" ? info.entry : null;
             return (
               <li key={row.hearing.id} style={riseIn(i).style} className={cn("border-b border-gray-100 last:border-0", riseIn(i).className)}>
                 <button
@@ -587,7 +594,7 @@ function HearingsTab(props: MobileCaseViewProps) {
                     "flex min-h-[64px] w-full items-center gap-3 px-3 py-2 text-left [--press-scale:0.99]",
                     row.isNext && "bg-[color-mix(in_srgb,var(--ci-warn)_9%,white)]",
                   )}
-                  aria-label={`${dayMonth(row.day)} ${row.day.slice(0, 4)}: ${row.status}. Open details`}
+                  aria-label={`${dayMonth(row.day)} ${row.day.slice(0, 4)}: ${row.status}. Open details${entry ? ". What happened is saved" : ""}`}
                 >
                   <span className={cn("h-2.5 w-2.5 flex-shrink-0 rounded-full", ROW_DOT[row.tone])} aria-hidden="true" />
                   <span className="w-[54px] flex-shrink-0">
@@ -598,6 +605,7 @@ function HearingsTab(props: MobileCaseViewProps) {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="line-clamp-2 text-[13px] leading-snug text-gray-700">{row.text || "—"}</span>
+                    {entry && <HearingBusinessPreview entry={entry} />}
                     <span className="mt-0.5 block font-mono text-[10.5px] tracking-[0.06em] text-gray-500">{row.status}</span>
                   </span>
                   {row.order?.has_file && <FileText className="h-4 w-4 flex-shrink-0 text-[color:var(--ci-listed)]" aria-label="Order available" />}
@@ -636,6 +644,9 @@ function HearingsTab(props: MobileCaseViewProps) {
             orders={byDate.get(hearingDateKey(open.hearing.hearing_date))}
             onViewOrder={props.onViewOrder}
             viewingOrderId={props.viewingOrderId}
+            whatHappened={
+              <HearingBusinessSection info={business.infoFor(open.hearing)} check={business.check} onReload={business.reload} />
+            }
           />
         )}
       </BottomSheet>
