@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Case Intel | Case Bot review console</title>
+<title>Case Intel | Product review console</title>
 <style>
 :root{color-scheme:light;--paper:#f7f6f2;--white:#fff;--ink:#14202c;--slate:#485662;--blue:#34566c;--tint:#ebf1f4;--rule:#d4dbdf;--gold:#785719;--gold-bg:#faf0d8;--green:#28604d;--green-bg:#e8f2eb;--red:#8b382b;--red-bg:#f9ede8}
 *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 system-ui,sans-serif}
@@ -38,18 +38,23 @@ textarea{resize:vertical;min-height:86px}.editor{min-height:250px}.steps{display
 .steps li{padding:5px 7px;border-radius:4px;background:var(--paper);color:var(--slate);font-size:.8rem}.steps [aria-current="step"]{background:var(--blue);color:var(--white)}
 .phase-grid{display:grid;grid-template-columns:minmax(175px,.38fr) minmax(0,1fr);gap:14px}.phase-nav{display:grid;gap:8px;align-content:start}
 .phase-nav button{width:100%}.phase-detail ul{padding-left:22px;margin-bottom:0}.phase-detail li+li{margin-top:7px}
+.firm-switch{margin-bottom:14px}.firm-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+#firm-permissions li,#firm-members li{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+#firm-library summary{margin-top:4px}#firm-posts li{overflow-wrap:anywhere}
 footer{margin:26px auto 0;padding:16px 0 28px;border-top:1px solid var(--rule)}
 @media(max-width:730px){.grid,.phase-grid{grid-template-columns:1fr}.phase-nav{display:flex;flex-wrap:wrap}.phase-nav button{width:auto}.hero{padding-top:25px}}
 @media(max-width:460px){.wrap{width:calc(100% - 24px)}.panel{padding:14px}.metrics{gap:5px}.metrics article{padding:9px 7px;font-size:.73rem}.metrics b{font-size:1.4rem}button{min-height:44px}.tag{font-size:.68rem}.section-title{flex-wrap:wrap}}
+@media(max-width:460px){.firm-fields{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <header><div class="wrap brand"><div class="wordmark">Case Intel</div><span class="tag">Design review · sample data</span></div></header>
 <main class="wrap">
-  <div class="hero"><p class="kicker">Product walkthrough</p><h1>Case Bot review console</h1><p class="quiet">Explore the dashboard assistant, its shared calendar, and the path from draft to approved output.</p></div>
+  <div class="hero"><p class="kicker">Product walkthrough</p><h1>Case Intel review console</h1><p class="quiet">Explore the dashboard assistant, case drafting, and how advocates collaborate in a firm workspace.</p></div>
   <nav aria-label="Review sections">
     <button type="button" data-view="dashboard" aria-controls="dashboard" aria-pressed="true">Dashboard</button>
     <button type="button" data-view="drafting" aria-controls="drafting" aria-pressed="false">Drafting studio</button>
+    <button type="button" data-view="firm" aria-controls="firm" aria-pressed="false">Firm collaboration</button>
     <button type="button" data-view="delivery" aria-controls="delivery" aria-pressed="false">Delivery plan</button>
   </nav>
   <section id="dashboard" aria-label="Dashboard walkthrough">
@@ -100,6 +105,64 @@ footer{margin:26px auto 0;padding:16px 0 28px;border-top:1px solid var(--rule)}
       </section>
     </div>
   </section>
+  <section id="firm" aria-label="Firm collaboration walkthrough" hidden>
+    <div class="panel stack firm-switch">
+      <div class="section-title"><div><p class="kicker">Firm collaboration</p><h2>One matter, shared work</h2><p class="small quiet">Switch accounts, open a case, and try a permission. The role simulator uses fictional members and data.</p></div><span class="tag" id="firm-scope-tag">Firm space</span></div>
+      <div class="firm-fields">
+        <label>Act as<select id="firm-actor"></select></label>
+        <label>Open a test route<select id="firm-case"><option value="standard">Ordinary matter</option><option value="restricted">Restricted route</option></select></label>
+      </div>
+      <div class="actions" aria-label="Workspace">
+        <button type="button" data-firm-space="firm" aria-pressed="true">Firm workspace</button>
+        <button type="button" data-firm-space="personal" aria-pressed="false">Personal workspace</button>
+      </div>
+      <p id="firm-feedback" class="notice small" role="status">Choose an actor to inspect their workspace.</p>
+    </div>
+    <div class="grid">
+      <section class="panel stack" aria-labelledby="firm-case-title">
+        <div><p class="kicker" id="firm-case-kicker">Case and assignment</p><h2 id="firm-case-title"></h2><p class="small quiet" id="firm-case-note"></p></div>
+        <div class="actions">
+          <button type="button" class="primary" id="firm-join">Work on this case</button>
+          <button type="button" id="firm-leave">Leave assignment</button>
+          <button type="button" id="firm-accept" hidden>Accept simulated invite</button>
+        </div>
+        <div id="firm-counts" class="chips" aria-label="Case record counts"></div>
+        <div id="firm-my-work"></div>
+        <div id="firm-roster"></div>
+        <div id="firm-roster-actions" class="stack" hidden>
+          <label>Assignment target<select id="firm-assignee"></select></label>
+          <button type="button" id="firm-assign">Assign to this case</button>
+        </div>
+      </section>
+      <section class="panel stack" aria-labelledby="firm-permissions-title">
+        <div><p class="kicker">Policy check</p><h2 id="firm-permissions-title">What this actor can do</h2></div>
+        <ul id="firm-permissions" class="item-list"></ul>
+      </section>
+      <section class="panel stack" id="firm-library" aria-labelledby="firm-library-title">
+        <div><p class="kicker">Case library</p><h2 id="firm-library-title">Shared documents</h2><p class="small quiet">Each item has one file history for all authorized advocates.</p></div>
+        <label>Show<select id="firm-document-filter"><option value="all">All documents</option><option value="Order">Orders</option><option value="Upload">Uploads</option><option value="Generated">Generated</option></select></label>
+        <ul class="item-list" id="firm-document-list" aria-live="polite"></ul>
+      </section>
+      <section class="panel stack" id="firm-discussion" aria-labelledby="firm-discussion-title">
+        <div><p class="kicker">Case discussion</p><h2 id="firm-discussion-title">Coordinate on the matter</h2><p class="small quiet">Posts are shared on this case. Assigned advocates can participate.</p></div>
+        <ul class="item-list" id="firm-posts" aria-live="polite"></ul>
+        <form id="firm-post-form" class="stack">
+          <label>Write a sample post<textarea id="firm-post" maxlength="300" placeholder="Example: I’ll prepare the exhibit index."></textarea></label>
+          <button type="submit" class="primary" id="firm-post-button">Add simulated post</button>
+        </form>
+        <p id="firm-post-access" class="small quiet"></p>
+      </section>
+      <section class="panel stack" id="firm-admin" aria-labelledby="firm-admin-title">
+        <div><p class="kicker">Group administration</p><h2 id="firm-admin-title">Firm membership</h2><p class="small quiet">Admin changes apply to the firm workspace and its grants.</p></div>
+        <ul id="firm-members" class="item-list"></ul>
+        <label>Simulated membership target<select id="firm-target"></select></label>
+        <div class="actions">
+          <button type="button" id="firm-invite">Simulate invitation</button>
+          <button type="button" id="firm-remove">Remove from firm</button>
+        </div>
+      </section>
+    </div>
+  </section>
   <section id="delivery" aria-label="Implementation review" hidden>
     <div class="phase-grid">
       <div class="panel phase-nav" id="phase-nav" aria-label="Implementation milestones">
@@ -107,6 +170,7 @@ footer{margin:26px auto 0;padding:16px 0 28px;border-top:1px solid var(--rule)}
         <button type="button" data-phase="dashboard" aria-pressed="false">2. Dashboard and calendar</button>
         <button type="button" data-phase="drafting" aria-pressed="false">3. Draft generation</button>
         <button type="button" data-phase="release" aria-pressed="false">4. Approval and release</button>
+        <button type="button" data-phase="firm" aria-pressed="false">5. Firm pilot</button>
       </div>
       <article class="panel phase-detail" id="phase-detail" aria-live="polite"></article>
     </div>
@@ -141,7 +205,7 @@ const el = (tag, text, className) => {
 const state = { day:"2026-11-10", query:"week", stage:"brief", revision:0, approved:null, previewKind:"document", draftCase:null, savedText:"" };
 const press = (selector, attribute, value) => document.querySelectorAll(selector).forEach(button => button.setAttribute("aria-pressed",String(button.dataset[attribute]===value)));
 function openView(view) {
-  ["dashboard","drafting","delivery"].forEach(name => { byId(name).hidden = name !== view; });
+  ["dashboard","drafting","firm","delivery"].forEach(name => { byId(name).hidden = name !== view; });
   press("[data-view]","view",view);
 }
 document.querySelectorAll("[data-view]").forEach(button => button.addEventListener("click", () => openView(button.dataset.view)));
@@ -305,7 +369,9 @@ const phases = {
   drafting:{name:"Case-scoped drafts and notes",goal:"Generate an editable revision using verified case facts and the advocate's brief.",
     work:["Reuse the case retrieval path and route drafting through bounded LangGraph nodes.","Validate structured output, evidence links, and missing facts.","Keep a revision history and expose retry or clarification states."],check:"A draft with an unresolved required fact cannot pass the approval gate."},
   release:{name:"Approval and output",goal:"Publish only the revision the advocate reviewed.",
-    work:["Approve a specific immutable revision under an authenticated Django transaction.","Render DOCX deterministically or save an approved personal note.","Make repeated approvals, exports, and worker retries safe."],check:"Editing an approved draft invalidates approval for the new revision."}
+    work:["Approve a specific immutable revision under an authenticated Django transaction.","Render DOCX deterministically or save an approved personal note.","Make repeated approvals, exports, and worker retries safe."],check:"Editing an approved draft invalidates approval for the new revision."},
+  firm:{name:"Firm membership and shared work",goal:"Add firms with one canonical case and explicit grants while preserving personal workflows.",
+    work:["F1 and F2: invite verified members, separate workspace scope, and implement ordinary and restricted assignment rules.","F3: add case discussion, private version access, and paginated case and document lists.","F4 and F5: enable scope-aware jobs and assistant retrieval after isolation tests, then pilot with a single firm."],check:"A removed member loses firm cases, file access, and drafts. Their personal workspace remains available."}
 };
 function renderPhase(key) {
   const phase=phases[key];
@@ -316,6 +382,228 @@ function renderPhase(key) {
 }
 document.querySelectorAll("[data-phase]").forEach(button=>button.addEventListener("click",()=>renderPhase(button.dataset.phase)));
 renderPhase("scope");
+
+const firmActors = [
+  {id:"ananya",name:"Ananya Rao",role:"admin",state:"active",epoch:1},
+  {id:"rohan",name:"Rohan Shah",role:"member",state:"active",epoch:1},
+  {id:"mira",name:"Mira Menon",role:"member",state:"active",epoch:1},
+  {id:"dev",name:"Dev Sen",role:"member",state:"active",epoch:1},
+  {id:"isha",name:"Isha Varma",role:"member",state:"outside",epoch:0}
+];
+const firmCases = {
+  standard:{id:"F-104",title:"Coastline Traders v. Pine Market",restricted:false,
+    roster:{rohan:{role:"advocate",epoch:1},mira:{role:"steward",epoch:1}},
+    docs:[{name:"Case management order",kind:"Order",versions:["Verified order PDF"]},{name:"Exhibit index",kind:"Upload",versions:["Updated exhibit index","Original index"]},{name:"Hearing preparation memo",kind:"Generated",versions:["Approved DOCX"]}],
+    posts:[{actor:"mira",text:"The verified order is in the case library."},{actor:"rohan",text:"I’ll update the exhibit index before the next listing."}]},
+  restricted:{id:"F-208",title:"Birch Engineering v. Arden Equipment",restricted:true,
+    roster:{mira:{role:"steward",epoch:1}},
+    docs:[{name:"Restricted case management order",kind:"Order",versions:["Verified order PDF"]}],
+    posts:[{actor:"mira",text:"I’ve added the verified order for the restricted case team."}]}
+};
+const firmState = {space:"firm",actor:"ananya",caseKey:"standard",target:"isha",assignee:"dev"};
+const firmActor = id => firmActors.find(person=>person.id===id);
+const currentFirmCase = () => firmCases[firmState.caseKey];
+function activeGrant(record, person) {
+  const grant=record.roster[person.id];
+  return person.state==="active" && grant && grant.epoch===person.epoch ? grant.role : null;
+}
+function firmPolicy() {
+  const actor=firmActor(firmState.actor);
+  const record=currentFirmCase();
+  const inFirm=firmState.space==="firm";
+  const member=inFirm && actor.state==="active";
+  const admin=member && actor.role==="admin";
+  const grant=member ? activeGrant(record,actor) : null;
+  const read=member && (!record.restricted || Boolean(grant));
+  const contribute=read && Boolean(grant);
+  const roster=read && (grant==="steward" || (admin && !record.restricted));
+  return {actor,record,inFirm,member,admin,grant,read,contribute,roster,join:read && !record.restricted && !grant,leave:contribute && grant!=="steward"};
+}
+const firmActorSelect=byId("firm-actor");
+const firmCaseSelect=byId("firm-case");
+const firmTarget=byId("firm-target");
+const firmAssignee=byId("firm-assignee");
+firmActors.forEach(person=>{
+  const option=el("option",person.name);
+  option.value=person.id;
+  firmActorSelect.append(option);
+  if(person.role!=="admin") firmTarget.append(option.cloneNode(true));
+  firmAssignee.append(option.cloneNode(true));
+});
+firmTarget.value=firmState.target;
+firmAssignee.value=firmState.assignee;
+const firmFeedback=byId("firm-feedback");
+function firmNotice(message,status) {
+  firmFeedback.textContent=message;
+  firmFeedback.className="notice small" + (status ? " " + status : "");
+}
+function firmRecordLabel(text,kind) { return el("span",text,"label" + (kind ? " " + kind : "")); }
+function renderFirmDocuments(policy) {
+  const list=byId("firm-document-list");
+  list.replaceChildren();
+  if(!policy.read) return;
+  const kind=byId("firm-document-filter").value;
+  const docs=policy.record.docs.filter(doc=>kind==="all" || doc.kind===kind);
+  if(!docs.length) list.append(el("li","No documents match this filter.","small quiet"));
+  docs.forEach(doc=>{
+    const row=el("li"), detail=el("details");
+    const n=doc.versions.length;
+    const summary=el("summary",doc.name);
+    summary.append(" · " + n + (n===1 ? " version" : " versions"));
+    detail.append(summary);
+    doc.versions.forEach((version,index)=>detail.append(el("p","Version " + (n-index) + " · " + version,"small quiet")));
+    row.append(firmRecordLabel(doc.kind),detail);
+    list.append(row);
+  });
+}
+function renderFirm() {
+  const policy=firmPolicy();
+  const {actor,record,member,admin,grant,read,contribute,inFirm,roster}=policy;
+  const target=firmActor(firmState.target);
+  const assignee=firmActor(firmState.assignee);
+  byId("firm-scope-tag").textContent=inFirm ? "Firm space" : "Personal space";
+  press("[data-firm-space]","firmSpace",firmState.space);
+  firmActors.forEach((person,index)=>{
+    firmActorSelect.options[index].textContent=person.name+" · "+(person.state==="active" ? (person.role==="admin" ? "Firm admin" : "Member") : person.state==="pending" ? "Invited" : person.state==="removed" ? "Removed" : "Outside firm");
+  });
+  firmCaseSelect.disabled=!inFirm;
+  byId("firm-case-kicker").textContent=inFirm ? "Case and assignment" : "Personal case";
+  byId("firm-case-title").textContent=!inFirm ? actor.name + "’s personal matter" : read ? record.title : "Case unavailable";
+  byId("firm-case-note").textContent=!inFirm ? "This sample personal case belongs to this advocate. Firm membership does not change their personal access."
+    : read ? record.id + " · " + (record.restricted ? "Restricted" : "Firm-visible") + " · " + (grant ? (grant==="steward" ? "Case steward" : "Assigned advocate") : "Read access")
+    : actor.state==="pending" ? "The invitation must be accepted before this member can open any firm case."
+    : "This account cannot open the selected firm route.";
+  byId("firm-join").hidden=!policy.join;
+  byId("firm-leave").hidden=!policy.leave;
+  byId("firm-accept").hidden=!(inFirm && actor.state==="pending");
+  const counts=byId("firm-counts");
+  counts.replaceChildren();
+  if(read) {
+    const active=firmActors.filter(person=>activeGrant(record,person));
+    const fileCount=record.docs.length;
+    counts.append(firmRecordLabel("1 canonical case row"),firmRecordLabel(active.length+" assignments"),firmRecordLabel(fileCount+" logical documents"));
+  }
+  const myWork=byId("firm-my-work");
+  myWork.replaceChildren();
+  if(member) {
+    const work=Object.values(firmCases).filter(item=>activeGrant(item,actor));
+    myWork.append(el("h3","My assigned cases"),el("p",work.length ? work.map(item=>item.id+" · "+item.title).join(" | ") : "No cases assigned.","small quiet"));
+  }
+  const rosterOut=byId("firm-roster");
+  rosterOut.replaceChildren();
+  byId("firm-roster-actions").hidden=!roster;
+  if(roster) {
+    const assignees=firmActors.filter(person=>activeGrant(record,person));
+    rosterOut.append(el("h3","Case roster"),el("p",assignees.map(person=>person.name+" ("+activeGrant(record,person)+")").join(", ") || "No assignments.","small quiet"));
+  }
+  const permissionRows=inFirm ? [
+    ["Read case and authorized document versions",read],
+    ["Edit case work, upload a version, post a message",contribute],
+    ["Manage assignments on this case",roster],
+    ["Invite or remove firm members",admin]
+  ] : [["Open and work on own personal case",true],["Read firm case content from Personal",false],["Manage a firm from Personal",false]];
+  const permissionList=byId("firm-permissions");
+  permissionList.replaceChildren();
+  permissionRows.forEach(([action,allowed])=>{
+    const row=el("li");
+    row.append(el("span",action),firmRecordLabel(allowed ? "Allowed" : "Denied",allowed ? "ok" : "error"));
+    permissionList.append(row);
+  });
+
+  byId("firm-library").hidden=!read;
+  byId("firm-discussion").hidden=!read;
+  renderFirmDocuments(policy);
+  const posts=byId("firm-posts");
+  posts.replaceChildren();
+  if(read) record.posts.forEach(post=>{
+    const row=el("li");
+    row.append(el("h3",firmActor(post.actor).name),el("p",post.text,"small quiet"));
+    posts.append(row);
+  });
+  byId("firm-post-form").hidden=!contribute;
+  byId("firm-post-access").textContent=read && !contribute ? "You can read. Take an assignment to post on an ordinary matter." : "";
+
+  byId("firm-admin").hidden=!admin;
+  const memberList=byId("firm-members");
+  memberList.replaceChildren();
+  if(admin) firmActors.filter(person=>person.state!=="outside").forEach(person=>{
+    const row=el("li");
+    row.append(el("span",person.name + (person.role==="admin" ? " · admin" : "")),firmRecordLabel(person.state));
+    memberList.append(row);
+  });
+  byId("firm-invite").disabled=!admin || !["outside","removed"].includes(target.state);
+  byId("firm-assign").disabled=!roster || assignee.state!=="active" || Boolean(activeGrant(record,assignee));
+  const soleSteward=Object.values(firmCases).some(item=>item.restricted && activeGrant(item,target)==="steward" && firmActors.filter(person=>activeGrant(item,person)==="steward").length===1);
+  byId("firm-remove").disabled=!admin || target.state!=="active" || soleSteward;
+}
+function changeFirmView() {
+  byId("firm-post").value="";
+  firmNotice("Viewing " + firmActor(firmState.actor).name + " in " + (firmState.space==="firm" ? "the firm workspace." : "Personal."));
+  renderFirm();
+}
+firmActorSelect.addEventListener("change",()=>{firmState.actor=firmActorSelect.value;changeFirmView();});
+firmCaseSelect.addEventListener("change",()=>{firmState.caseKey=firmCaseSelect.value;changeFirmView();});
+firmTarget.addEventListener("change",()=>{firmState.target=firmTarget.value;renderFirm();});
+firmAssignee.addEventListener("change",()=>{firmState.assignee=firmAssignee.value;renderFirm();});
+document.querySelectorAll("[data-firm-space]").forEach(button=>button.addEventListener("click",()=>{firmState.space=button.dataset.firmSpace;changeFirmView();}));
+byId("firm-document-filter").addEventListener("change",()=>renderFirmDocuments(firmPolicy()));
+byId("firm-join").addEventListener("click",()=>{
+  const {actor,record,join}=firmPolicy();
+  if(!join) return;
+  record.roster[actor.id]={role:"advocate",epoch:actor.epoch};
+  firmNotice("Assignment added to My assigned cases. The case and its files still have one shared record.","ok");
+  renderFirm();
+});
+byId("firm-leave").addEventListener("click",()=>{
+  const {actor,record,leave}=firmPolicy();
+  if(!leave) return;
+  delete record.roster[actor.id];
+  firmNotice("Assignment removed. Case access now follows the matter’s visibility policy.","ok");
+  renderFirm();
+});
+byId("firm-invite").addEventListener("click",()=>{
+  const target=firmActor(firmState.target);
+  if(!firmPolicy().admin || !["outside","removed"].includes(target.state)) return;
+  target.state="pending";
+  firmNotice("Invitation staged for " + target.name + ". Switch to that actor to accept it. Pending invites grant zero case access.","ok");
+  renderFirm();
+});
+byId("firm-accept").addEventListener("click",()=>{
+  const {actor,inFirm}=firmPolicy();
+  if(!inFirm || actor.state!=="pending") return;
+  actor.state="active";
+  actor.epoch+=1;
+  firmNotice("Membership activated in this simulation. Ordinary cases can be read. No assignments were restored.","ok");
+  renderFirm();
+});
+byId("firm-assign").addEventListener("click",()=>{
+  const {roster,record}=firmPolicy();
+  const target=firmActor(firmState.assignee);
+  if(!roster || target.state!=="active" || activeGrant(record,target)) return;
+  record.roster[target.id]={role:"advocate",epoch:target.epoch};
+  firmNotice("Assigned " + target.name + " to the shared case.","ok");
+  renderFirm();
+});
+byId("firm-remove").addEventListener("click",()=>{
+  const target=firmActor(firmState.target);
+  if(!firmPolicy().admin || byId("firm-remove").disabled) return;
+  target.state="removed";
+  target.epoch+=1;
+  firmNotice(target.name + " was removed from the firm. Their firm access and assignments are revoked. Their personal workspace is available.","ok");
+  renderFirm();
+});
+byId("firm-post-form").addEventListener("submit",event=>{
+  event.preventDefault();
+  const {actor,record,contribute}=firmPolicy();
+  const input=byId("firm-post");
+  const content=input.value.trim();
+  if(!contribute || !content) return;
+  record.posts.push({actor:actor.id,text:content});
+  input.value="";
+  firmNotice("Sample post added to this case’s shared discussion.","ok");
+  renderFirm();
+});
+renderFirm();
 </script>
 </body>
 </html>
