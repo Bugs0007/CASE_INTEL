@@ -51,6 +51,6 @@ export const DUE_DATE_BASIS_NOTE: Record<Task["due_date_basis"], string | null> 
   "": null,
   explicit_date: "date stated in the order",
   relative_to_order: "counted from the order date",
-  next_hearing_fallback: "no period stated — using the next hearing",
-  limitation_rule: "computed from a limitation rule — verify",
+  next_hearing_fallback: "uses the next hearing date because no period was stated",
+  limitation_rule: "calculated from a limitation rule. Verify the date.",
 };

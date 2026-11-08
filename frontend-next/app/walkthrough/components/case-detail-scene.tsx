@@ -98,7 +98,7 @@ function OrderOverview() {
         <div className="pt-3 border-t border-gray-100 text-sm">
           <span className="text-gray-500">Next date: </span>
           <span className="font-medium text-gray-900">{mockOrder.nextDate}</span>
-          <span className="text-gray-500"> — {mockOrder.nextDatePurpose}</span>
+          <span className="text-gray-500"> · {mockOrder.nextDatePurpose}</span>
         </div>
       </CardContent>
     </Card>
@@ -213,7 +213,7 @@ function FeeSection() {
       <Card>
         <CardHeader>
           <CardTitle className="text-sm">
-            Try it — {mockInvoice.amount} fee for the {mockInvoice.hearingDate} hearing
+            Try it with a {mockInvoice.amount} fee for the {mockInvoice.hearingDate} hearing
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -240,7 +240,7 @@ function FeeSection() {
           {feeState === "paid" && (
             <div className="flex items-center gap-2 text-sm text-status-ok">
               <CheckCircle2 className="h-4 w-4" />
-              Marked paid — invoice {mockInvoice.number} settled
+              Invoice {mockInvoice.number} marked as paid
             </div>
           )}
 
@@ -274,7 +274,7 @@ function FeeSection() {
             )}
           </div>
           <p className="text-xs text-gray-400">
-            This is a live demo of the three buttons — nothing here contacts a server, sends a
+            This demo runs locally. Nothing here contacts a server, sends a
             real email, or creates a real PDF.
           </p>
         </CardContent>
