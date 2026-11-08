@@ -251,11 +251,11 @@ export function caseFacts(c: Case): CaseFacts {
   const snap = c.tracking_snapshot;
   const contact = primaryClientContact(c.client_contacts ?? []);
   return {
-    court: snap?.court_name || snap?.court_and_judge || "—",
-    stage: snap?.case_stage || snap?.case_status || "—",
+    court: snap?.court_name || snap?.court_and_judge || "Unknown",
+    stage: snap?.case_stage || snap?.case_status || "Unknown",
     side: c.user_party_role === "petitioner" ? "Petitioner" : c.user_party_role === "respondent" ? "Respondent" : "",
-    client: c.client_detail?.name || contact?.name || c.client_name || "—",
+    client: c.client_detail?.name || contact?.name || c.client_name || "No client",
     filed: c.filing_date ? c.filing_date.slice(0, 10) : "",
-    cnr: c.cnr_number || "—",
+    cnr: c.cnr_number || "Unavailable",
   };
 }

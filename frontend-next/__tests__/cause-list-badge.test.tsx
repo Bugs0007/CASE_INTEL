@@ -163,7 +163,7 @@ describe("CauseListCoverageLine", () => {
         }}
       />,
     );
-    expect(screen.getByText(/Not covered — Kerala High Court/)).toBeTruthy();
+    expect(screen.getByText(/Not covered \(Kerala High Court/)).toBeTruthy();
     expect(screen.getByText("court's site").getAttribute("href")).toContain("hcservices");
   });
 

@@ -175,7 +175,7 @@ export default function BillingPage() {
                           {formatINR(row.pending_amount)}
                         </td>
                         <td className="px-3 py-2 text-right text-gray-600">
-                          {row.oldest_invoice_days !== null ? `${row.oldest_invoice_days} d` : "—"}
+                          {row.oldest_invoice_days !== null ? `${row.oldest_invoice_days} d` : "Unknown"}
                         </td>
                         <td className="px-5 py-2 text-right">
                           <Button

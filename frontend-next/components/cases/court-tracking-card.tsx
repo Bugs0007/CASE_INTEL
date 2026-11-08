@@ -470,19 +470,19 @@ function TrackingPreviewPanel({
 
         <div className="grid grid-cols-1 @sm:grid-cols-2 gap-4 mb-4">
           <Field label="Case Title">
-            <span className="text-sm font-medium text-gray-900">{preview.case_title || "—"}</span>
+            <span className="text-sm font-medium text-gray-900">{preview.case_title || "Untitled"}</span>
           </Field>
           <Field label="CNR">
-            <span className="font-mono text-sm">{preview.cnr || "—"}</span>
+            <span className="font-mono text-sm">{preview.cnr || "Unavailable"}</span>
           </Field>
           <Field label="Petitioner">
-            <span className="text-sm text-gray-900">{preview.petitioner || "—"}</span>
+            <span className="text-sm text-gray-900">{preview.petitioner || "Unknown"}</span>
           </Field>
           <Field label="Respondent">
-            <span className="text-sm text-gray-900">{preview.respondent || "—"}</span>
+            <span className="text-sm text-gray-900">{preview.respondent || "Unknown"}</span>
           </Field>
           <Field label="Court">
-            <span className="text-sm text-gray-900">{preview.court_name || "—"}</span>
+            <span className="text-sm text-gray-900">{preview.court_name || "Unknown"}</span>
           </Field>
           <Field label="Court Type">
             <span className="text-sm text-gray-900">
@@ -613,7 +613,7 @@ function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hea
   // Status: what eCourts itself said last time, not a guess from hearings.
   const statusText = disposal
     ? "Disposed"
-    : snapshot?.case_status || (nextHearing ? "Pending" : "—");
+    : snapshot?.case_status || (nextHearing ? "Pending" : "Unknown");
 
   let nextHearingCell: React.ReactNode;
   if (nextHearing) {
@@ -716,7 +716,7 @@ function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hea
 
         <div className="grid grid-cols-1 @md:grid-cols-2 @3xl:grid-cols-3 gap-4 mb-4">
           <Field label="CNR">
-            <span className="font-mono text-sm">{caseItem.cnr_number || "—"}</span>
+            <span className="font-mono text-sm">{caseItem.cnr_number || "Unavailable"}</span>
           </Field>
           <Field label="Status">
             {caseItem.fetch_status === "failed" ? (
@@ -729,10 +729,10 @@ function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hea
           </Field>
           <Field label="Next Hearing">{nextHearingCell}</Field>
           <Field label="Judge">
-            <span className="text-sm text-gray-900">{nextHearing?.judge || snapshot?.court_and_judge || "—"}</span>
+            <span className="text-sm text-gray-900">{nextHearing?.judge || snapshot?.court_and_judge || "Unknown"}</span>
           </Field>
           <Field label="Stage / Purpose">
-            <span className="text-sm text-gray-900">{nextHearing?.purpose || snapshot?.case_stage || "—"}</span>
+            <span className="text-sm text-gray-900">{nextHearing?.purpose || snapshot?.case_stage || "Unknown"}</span>
           </Field>
           <Field label="Last Refreshed">
             <span className={stale ? "text-sm text-status-pending" : "text-sm text-gray-500"}>
@@ -762,7 +762,7 @@ function TrackingDisplay({ caseItem, hearings }: { caseItem: Case; hearings: Hea
  * "not covered" gives the reason and a link to the court's own page. */
 export function CauseListCoverageLine({ coverage }: { coverage?: CauseListCoverage }) {
   if (!coverage || coverage.status === "unknown") {
-    return <span className="text-sm text-gray-500">—</span>;
+    return <span className="text-sm text-gray-500">Unknown</span>;
   }
   if (coverage.status === "supported") {
     return (
@@ -774,13 +774,13 @@ export function CauseListCoverageLine({ coverage }: { coverage?: CauseListCovera
   if (coverage.status === "pending") {
     return (
       <span className="text-sm text-gray-600" title={coverage.reason || undefined}>
-        Covered — starts after the next refresh
+        Coverage starts after the next refresh
       </span>
     );
   }
   return (
     <span className="text-sm text-gray-600">
-      Not covered{coverage.reason ? ` — ${coverage.reason}` : ""}
+      Not covered{coverage.reason ? ` (${coverage.reason})` : ""}
       {coverage.url && (
         <>
           {" "}

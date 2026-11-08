@@ -292,7 +292,7 @@ export function ClientMessageCard({ message, showCase = false, defaultOpen = fal
           ) : (
             <>
               <div className="text-xs text-gray-600">
-                To: {message.recipients.map((r) => `${r.name} <${r.email}>`).join(", ") || "—"}
+                To: {message.recipients.map((r) => `${r.name} <${r.email}>`).join(", ") || "No recipients"}
               </div>
               {message.discard_reason && (
                 <div className="text-xs text-gray-500">{message.discard_reason}</div>
