@@ -212,7 +212,7 @@ export function GenerateDocumentDialog({ isOpen, onClose, caseItem }: GenerateDo
                   {typedFields.length > 0 && (
                     <div className="space-y-3">
                       <span className="block text-sm font-medium text-gray-700">
-                        Not on record — fill in for this document
+                        Enter a value for this document
                       </span>
                       {typedFields.map((f) => (
                         <div key={f.name}>
@@ -280,7 +280,7 @@ export function GenerateDocumentDialog({ isOpen, onClose, caseItem }: GenerateDo
                     {serverMissing.map((m) => (
                       <li key={m.name}>
                         {m.label}
-                        {m.where && <span className="text-xs"> — add it in {m.where}, or fill it in above</span>}
+                        {m.where && <span className="text-xs">. Add it in {m.where} or fill it in above.</span>}
                       </li>
                     ))}
                   </ul>

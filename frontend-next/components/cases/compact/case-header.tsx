@@ -164,7 +164,7 @@ export function FactsStrip({
         )}
       </Cell>
       <Cell label="Client">{f.client}</Cell>
-      <Cell label="Filed">{f.filed ? `${dayMonth(f.filed)} ${f.filed.slice(0, 4)}` : "—"}</Cell>
+      <Cell label="Filed">{f.filed ? `${dayMonth(f.filed)} ${f.filed.slice(0, 4)}` : "Not recorded"}</Cell>
       <Cell label="CNR" last>
         <span className="font-mono">{f.cnr}</span>
       </Cell>

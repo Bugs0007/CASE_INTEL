@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Case Intel | Case Bot review console</title>
+<style>
+:root{color-scheme:light;--paper:#f7f6f2;--white:#fff;--ink:#14202c;--slate:#485662;--blue:#34566c;--tint:#ebf1f4;--rule:#d4dbdf;--gold:#785719;--gold-bg:#faf0d8;--green:#28604d;--green-bg:#e8f2eb;--red:#8b382b;--red-bg:#f9ede8}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 system-ui,sans-serif}
+button,select,input,textarea{font:inherit}button{cursor:pointer}button:disabled{cursor:default;opacity:.55}
+:focus-visible{outline:3px solid var(--blue);outline-offset:3px}[hidden]{display:none!important}
+.wrap{width:min(1192px,100% - 40px);margin-inline:auto}header{border-bottom:1px solid var(--rule);background:var(--white)}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:17px}
+.wordmark{font:24px Georgia,serif}.tag,.kicker{font-size:.77rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase}
+.tag{padding:4px 8px;background:var(--tint);color:var(--blue);border-radius:4px}.hero{padding:34px 0 22px}
+h1,h2,h3,p{margin:0}h1{font:clamp(2.1rem,4.7vw,3.75rem)/1.05 Georgia,serif;letter-spacing:-.04em;margin:7px 0 11px}
+h2{font:1.65rem/1.2 Georgia,serif;margin-bottom:8px}h3{font-size:1rem;line-height:1.35}.quiet{color:var(--slate)}.small{font-size:.86rem}.kicker{color:var(--blue)}
+nav,.actions,.chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center}nav{margin-bottom:22px;border-bottom:1px solid var(--rule);padding-bottom:10px}
+button{min-height:40px;background:var(--white);color:var(--ink);border:1px solid var(--rule);border-radius:5px;padding:7px 12px;text-align:left}
+button:hover:not(:disabled){border-color:var(--blue);background:var(--tint)}button[aria-pressed="true"],.primary{background:var(--blue);color:var(--white);border-color:var(--blue)}
+button[aria-pressed="true"]:hover,.primary:hover:not(:disabled){background:var(--ink);color:var(--white)}
+.panel,.metrics article{border:1px solid var(--rule);background:var(--white);border-radius:7px;padding:20px;min-width:0}
+.metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.metrics article{padding:13px 16px}.metrics b{font:1.8rem Georgia,serif;display:block}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}.stack{display:grid;gap:12px}
+.section-title{display:flex;justify-content:space-between;gap:12px;align-items:start;margin-bottom:11px}
+.calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin:14px 0}.calendar button{text-align:center;padding:5px 1px;min-width:0}
+.calendar span,.calendar b{display:block}.calendar span{font-size:.71rem}.calendar b{font-size:.94rem}
+.item-list{list-style:none;margin:0;padding:0}.item-list li{padding:10px 0;border-top:1px solid var(--rule);overflow-wrap:anywhere}.item-list li:first-child{border-top:0}
+.label{font-size:.72rem;font-weight:700;border-radius:4px;padding:2px 6px;background:var(--tint);color:var(--blue);white-space:nowrap}
+.label.task,.label.warn{background:var(--gold-bg);color:var(--gold)}.label.event,.label.ok{background:var(--green-bg);color:var(--green)}.label.error{background:var(--red-bg);color:var(--red)}
+.response,.notice{padding:12px 14px;background:var(--tint);border-left:3px solid var(--blue);border-radius:3px}
+.notice.error{border-color:var(--red);background:var(--red-bg);color:var(--red)}.notice.ok{border-color:var(--green);background:var(--green-bg);color:var(--green)}
+dl{margin:0}dt{font-weight:700}dd{margin:2px 0 11px;color:var(--slate)}
+fieldset{padding:0;border:0;margin:0;min-width:0}legend{font-weight:700;margin-bottom:7px}
+label{display:block;font-size:.9rem;font-weight:650}select,textarea{display:block;width:100%;border:1px solid var(--rule);border-radius:4px;color:var(--ink);background:var(--white);padding:8px;margin-top:4px}
+textarea{resize:vertical;min-height:86px}.editor{min-height:250px}.steps{display:flex;flex-wrap:wrap;gap:6px;list-style:none;padding:0;margin:0}
+.steps li{padding:5px 7px;border-radius:4px;background:var(--paper);color:var(--slate);font-size:.8rem}.steps [aria-current="step"]{background:var(--blue);color:var(--white)}
+.phase-grid{display:grid;grid-template-columns:minmax(175px,.38fr) minmax(0,1fr);gap:14px}.phase-nav{display:grid;gap:8px;align-content:start}
+.phase-nav button{width:100%}.phase-detail ul{padding-left:22px;margin-bottom:0}.phase-detail li+li{margin-top:7px}
+footer{margin:26px auto 0;padding:16px 0 28px;border-top:1px solid var(--rule)}
+@media(max-width:730px){.grid,.phase-grid{grid-template-columns:1fr}.phase-nav{display:flex;flex-wrap:wrap}.phase-nav button{width:auto}.hero{padding-top:25px}}
+@media(max-width:460px){.wrap{width:calc(100% - 24px)}.panel{padding:14px}.metrics{gap:5px}.metrics article{padding:9px 7px;font-size:.73rem}.metrics b{font-size:1.4rem}button{min-height:44px}.tag{font-size:.68rem}.section-title{flex-wrap:wrap}}
+</style>
+</head>
+<body>
+<header><div class="wrap brand"><div class="wordmark">Case Intel</div><span class="tag">Design review · sample data</span></div></header>
+<main class="wrap">
+  <div class="hero"><p class="kicker">Product walkthrough</p><h1>Case Bot review console</h1><p class="quiet">Explore the dashboard assistant, its shared calendar, and the path from draft to approved output.</p></div>
+  <nav aria-label="Review sections">
+    <button type="button" data-view="dashboard" aria-controls="dashboard" aria-pressed="true">Dashboard</button>
+    <button type="button" data-view="drafting" aria-controls="drafting" aria-pressed="false">Drafting studio</button>
+    <button type="button" data-view="delivery" aria-controls="delivery" aria-pressed="false">Delivery plan</button>
+  </nav>
+  <section id="dashboard" aria-label="Dashboard walkthrough">
+    <div class="metrics" id="metrics" aria-label="Portfolio summary"></div>
+    <div class="grid">
+      <div class="stack">
+        <section class="panel">
+          <div class="section-title"><div><p class="kicker">9 to 15 November 2026</p><h2>Calendar</h2><p class="small quiet">Hearings, appointments, and deadlines · IST</p></div></div>
+          <div id="week" class="calendar" aria-label="Select a day"></div>
+          <div id="agenda" aria-live="polite"></div>
+        </section>
+        <section class="panel" aria-labelledby="case-list-title">
+          <p class="kicker">All my cases</p><h2 id="case-list-title">Case overview</h2>
+          <ul id="case-list" class="item-list"></ul>
+        </section>
+      </div>
+      <section class="panel stack">
+        <div><p class="kicker">All my cases</p><h2>Ask about your practice</h2><p class="quiet small">Choose a sample question to see the data and source records behind the answer.</p></div>
+        <div class="chips" id="prompts" aria-label="Sample questions">
+          <button type="button" data-query="week" aria-pressed="true">What is due this week?</button>
+          <button type="button" data-query="missing" aria-pressed="false">Which matters lack a date?</button>
+          <button type="button" data-query="day" aria-pressed="false">What is on the selected day?</button>
+        </div>
+        <div id="answer" aria-live="polite"></div>
+      </section>
+    </div>
+  </section>
+  <section id="drafting" aria-label="Drafting walkthrough" hidden>
+    <div class="grid">
+      <section class="panel stack">
+        <div><p class="kicker">Case scope</p><h2>Brief the assistant</h2><p class="quiet small">Select the case and tell the assistant what to prepare. The console uses fixed sample facts.</p></div>
+        <label>Case<select id="case-choice"></select></label>
+        <label>Output<select id="output-kind"><option value="document">Case status memo (.docx)</option><option value="note">Personal hearing prep note</option></select></label>
+        <label>Audience and preferences<textarea id="brief" maxlength="300">For my own review. Keep it brief and flag the next deadline.</textarea></label>
+        <button class="primary" type="button" id="generate">Generate sample draft</button>
+        <div id="draft-evidence" class="small quiet"></div>
+      </section>
+      <section class="panel stack">
+        <div><p class="kicker">Review gate</p><h2>Preview and approve</h2></div>
+        <ol class="steps" aria-label="Draft stage"><li data-stage="brief">Brief</li><li data-stage="edit">Draft</li><li data-stage="review">Review</li><li data-stage="approved">Approved</li><li data-stage="exported">Output ready</li></ol>
+        <p id="draft-state" class="notice small" role="status">Select a case and generate a preview.</p>
+        <label>Editable preview<textarea class="editor" id="editor" disabled placeholder="The draft appears here."></textarea></label>
+        <div class="actions">
+          <button type="button" id="request-review" disabled>Submit for review</button>
+          <button type="button" id="approve" disabled>Approve revision</button>
+          <button type="button" class="primary" id="export" disabled>Simulate DOCX export</button>
+        </div>
+      </section>
+    </div>
+  </section>
+  <section id="delivery" aria-label="Implementation review" hidden>
+    <div class="phase-grid">
+      <div class="panel phase-nav" id="phase-nav" aria-label="Implementation milestones">
+        <button type="button" data-phase="scope" aria-pressed="true">1. Scope and sources</button>
+        <button type="button" data-phase="dashboard" aria-pressed="false">2. Dashboard and calendar</button>
+        <button type="button" data-phase="drafting" aria-pressed="false">3. Draft generation</button>
+        <button type="button" data-phase="release" aria-pressed="false">4. Approval and release</button>
+      </div>
+      <article class="panel phase-detail" id="phase-detail" aria-live="polite"></article>
+    </div>
+  </section>
+  <footer class="small quiet">Standalone prototype. All names and records are fictional. Buttons simulate actions locally.</footer>
+</main>
+<script>
+"use strict";
+const byId = id => document.getElementById(id);
+const cases = [
+  {id:"CI-104", name:"Harbour Textiles v. Meridian Supply", court:"Commercial Court", hearing:"2026-11-10", order:"Order 24, page 2", fact:"The order records a direction to exchange the exhibit index."},
+  {id:"CI-207", name:"Meadow Estates v. Northbank Realty", court:"District Court", hearing:"2026-11-12", order:"Order 19, page 1", fact:"The last order records that the matter was adjourned for a status update."},
+  {id:"CI-309", name:"Lantern Works v. Cedar Transport", court:"District Court", hearing:null, order:null, fact:null}
+];
+const rows = [
+  {id:"H-18",caseId:"CI-104",day:"2026-11-10",kind:"hearing",label:"Status hearing",time:"10:30 IST",state:"listed"},
+  {id:"T-42",caseId:"CI-104",day:"2026-11-11",kind:"task",label:"Exchange exhibit index",time:"Due date",state:"open"},
+  {id:"H-22",caseId:"CI-207",day:"2026-11-12",kind:"hearing",label:"Case management hearing",time:"11:00 IST",state:"listed"},
+  {id:"E-09",caseId:"CI-207",day:"2026-11-12",kind:"event",label:"Client preparation call",time:"16:00 IST",state:"scheduled"},
+  {id:"T-56",caseId:"CI-207",day:"2026-11-13",kind:"task",label:"Prepare a case status summary",time:"Due date",state:"open"}
+];
+const days = Array.from({length:7}, (_, i) => ({day:"2026-11-" + String(9+i).padStart(2,"0"), name:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][i], number:9+i}));
+const kinds = {hearing:"Hearing",task:"Deadline",event:"Appointment"};
+const dateText = day => day ? Number(day.slice(8)) + " November 2026" : "No date recorded";
+const caseFor = id => cases.find(record => record.id === id);
+const el = (tag, text, className) => {
+  const node = document.createElement(tag);
+  if (text) node.textContent = text;
+  if (className) node.className = className;
+  return node;
+};
+const state = { day:"2026-11-10", query:"week", stage:"brief", revision:0, approved:null, previewKind:"document", draftCase:null, savedText:"" };
+const press = (selector, attribute, value) => document.querySelectorAll(selector).forEach(button => button.setAttribute("aria-pressed",String(button.dataset[attribute]===value)));
+function openView(view) {
+  ["dashboard","drafting","delivery"].forEach(name => { byId(name).hidden = name !== view; });
+  press("[data-view]","view",view);
+}
+document.querySelectorAll("[data-view]").forEach(button => button.addEventListener("click", () => openView(button.dataset.view)));
+function startDraft(id) {
+  byId("case-choice").value = id;
+  resetDraft();
+  openView("drafting");
+  byId("case-choice").focus();
+}
+function rowList(items, linkCase) {
+  const list = el("ul", "", "item-list");
+  items.forEach(record => {
+    const li = el("li");
+    li.append(el("span",kinds[record.kind],"label " + record.kind), el("h3",record.label),el("p",dateText(record.day) + " · " + record.time + " · " + record.caseId,"small quiet"));
+    if (linkCase) {
+      const detail = el("details");
+      detail.append(el("summary","Source " + record.id,"small"));
+      detail.append(el("p",caseFor(record.caseId).name + " · " + caseFor(record.caseId).court,"small quiet"));
+      const button = el("button","Draft for " + record.caseId,"small");
+      button.type = "button";
+      button.addEventListener("click",()=>startDraft(record.caseId));
+      detail.append(button);
+      li.append(detail);
+    }
+    list.append(li);
+  });
+  return list;
+}
+function renderDay() {
+  press("#week button","day",state.day);
+  const onDay = rows.filter(row => row.day === state.day);
+  byId("agenda").replaceChildren(el("h3", dateText(state.day)));
+  byId("agenda").append(onDay.length ? rowList(onDay,false) : el("p","No recorded items for this date.","small quiet"));
+}
+function renderAnswer() {
+  const target = byId("answer");
+  press("#prompts button","query",state.query);
+  if (state.query === "missing") {
+    const missing = cases.filter(record=>!record.hearing);
+    target.replaceChildren(el("p", missing.length + " active case has no next hearing recorded.", "response"));
+    missing.forEach(record => {
+      const detail = el("details");
+      detail.append(el("summary","Case " + record.id),el("p",record.name + " · " + record.court,"small quiet"));
+      target.append(detail);
+    });
+    return;
+  }
+  const filtered = state.query === "day" ? rows.filter(row=>row.day === state.day) : rows.filter(row=>row.kind === "task" && row.state === "open");
+  const scope = state.query === "day" ? " for " + dateText(state.day) : " this week";
+  target.replaceChildren(el("p",filtered.length ? filtered.length + (state.query === "day" ? " recorded items" : " open deadlines") + scope + "." : "No matching records" + scope + ".", "response"));
+  if (filtered.length) target.append(rowList(filtered,true));
+}
+days.forEach(day => {
+  const count = rows.filter(row=>row.day===day.day).length;
+  const button = el("button");
+  button.type = "button";
+  button.dataset.day = day.day;
+  button.setAttribute("aria-label", dateText(day.day) + ", " + count + " calendar items");
+  button.append(el("span",day.name),el("b",day.number),el("span",count + (count === 1 ? " item" : " items")));
+  button.addEventListener("click",()=>{ state.day=day.day; renderDay(); renderAnswer(); });
+  byId("week").append(button);
+});
+[["Active matters",cases.length],["Hearings this week",rows.filter(row=>row.kind==="hearing").length],["Open deadlines",rows.filter(row=>row.kind==="task" && row.state==="open").length]].forEach(([label,value])=>{
+  const card = el("article"); card.append(el("b",value),el("span",label,"quiet")); byId("metrics").append(card);
+});
+cases.forEach(record=>{
+  const li=el("li");
+  const details=el("details");
+  const draft=el("button","Start a draft for " + record.id,"small");
+  draft.type="button";
+  draft.addEventListener("click",()=>startDraft(record.id));
+  details.append(el("summary",record.name),el("p",record.id + " · " + record.court,"small quiet"),el("p","Next hearing: " + dateText(record.hearing),"small quiet"),draft);
+  li.append(details);
+  byId("case-list").append(li);
+});
+document.querySelectorAll("[data-query]").forEach(button=>button.addEventListener("click",()=>{ state.query=button.dataset.query;renderAnswer(); }));
+renderDay();
+renderAnswer();
+
+const editor = byId("editor");
+const review = byId("request-review");
+const approve = byId("approve");
+const exportButton = byId("export");
+const choice = byId("case-choice");
+const outputKind = byId("output-kind");
+cases.forEach(record=>{
+  const option = el("option",record.id + " · " + record.name);
+  option.value = record.id;
+  choice.append(option);
+});
+function setStage(stage, message, status) {
+  state.stage=stage;
+  document.querySelectorAll("[data-stage]").forEach(node=>{
+    if(node.dataset.stage===stage) node.setAttribute("aria-current","step"); else node.removeAttribute("aria-current");
+  });
+  byId("draft-state").className="notice small"+(status ? " " + status : "");
+  byId("draft-state").textContent=message;
+  editor.disabled=stage==="brief";
+  review.disabled=stage!=="edit";
+  approve.disabled=stage!=="review";
+  exportButton.disabled=stage!=="approved";
+  exportButton.textContent=state.previewKind==="note" ? "Simulate saving note" : "Simulate DOCX export";
+}
+function resetDraft() {
+  editor.value="";
+  state.revision=0;
+  state.approved=null;
+  state.draftCase=null;
+  state.savedText="";
+  state.previewKind=outputKind.value;
+  byId("draft-evidence").textContent="";
+  setStage("brief","Generate a preview for the selected case and output.");
+}
+[choice,outputKind].forEach(input=>input.addEventListener("change",resetDraft));
+byId("generate").addEventListener("click",()=>{
+  const record=caseFor(choice.value);
+  state.draftCase=record.id;
+  state.previewKind=outputKind.value;
+  state.approved=null;
+  const deadline=rows.find(row=>row.caseId===record.id && row.kind==="task");
+  const format=state.previewKind==="note" ? "Personal hearing prep note" : "Case status memo";
+  const request=byId("brief").value.trim();
+  const body=[format,record.name + " (" + record.id + ")","",record.fact || "No order excerpt is available.",
+    "Next hearing: " + (record.hearing ? dateText(record.hearing) : "[Confirm hearing status]"),
+    deadline ? "Deadline: " + deadline.label + ", " + dateText(deadline.day) + "." : "No open deadline in the sample records.",
+    "",request ? "Requested focus: " + request : "Requested focus: Case status and next action."];
+  editor.value=body.join("\n");
+  byId("draft-evidence").textContent="Evidence: case " + record.id + (record.order ? " · " + record.order : " · No available order") + (deadline ? " · Task " + deadline.id : "");
+  setStage("edit","Preview generated. Edit it or submit it for review.");
+});
+editor.addEventListener("input",()=>{
+  if(state.stage==="edit") return;
+  state.approved=null;
+  setStage("edit","Edits invalidate prior approval. Submit the new revision for review.");
+});
+review.addEventListener("click",()=>{
+  if(!editor.value.trim() || /\[Confirm[^\]]*\]/i.test(editor.value)) {
+    setStage("edit","Resolve the bracketed verification item or state that the date is unconfirmed before review.","error");
+    return;
+  }
+  state.revision+=1;
+  state.savedText=editor.value;
+  setStage("review","Revision " + state.revision + " is ready for your approval.");
+});
+approve.addEventListener("click",()=>{
+  state.approved=state.revision;
+  setStage("approved","Revision " + state.revision + " approved for the selected output.","ok");
+});
+exportButton.addEventListener("click",()=>{
+  if(state.approved!==state.revision || editor.value!==state.savedText) return;
+  const output = state.previewKind==="note" ? "Note saved" : "DOCX ready";
+  setStage("exported",output + " in the simulation · " + state.draftCase + " · Revision " + state.revision + ".","ok");
+});
+resetDraft();
+
+const phases = {
+  scope:{name:"Scope and evidence", goal:"Separate all-cases conversations from individual case and legacy document conversations.",
+    work:["Resolve the owner and scope on the server before retrieving any records.","Create typed case, hearing, task, and event source references.","Prove cross-owner denials and replay behavior."], check:"Two authenticated users with similarly named cases cannot read each other's sources."},
+  dashboard:{name:"Dashboard assistant and calendar",goal:"Show a small calendar and a practice-wide assistant on the same dashboard.",
+    work:["Use the existing dashboard bot slot and the mobile dashboard layout.","Use one bounded calendar read model for the embedded calendar and grounded answers.","Keep case counts deterministic and preserve IST day boundaries."],check:"A selected date shows the same records in the calendar and the assistant."},
+  drafting:{name:"Case-scoped drafts and notes",goal:"Generate an editable revision using verified case facts and the advocate's brief.",
+    work:["Reuse the case retrieval path and route drafting through bounded LangGraph nodes.","Validate structured output, evidence links, and missing facts.","Keep a revision history and expose retry or clarification states."],check:"A draft with an unresolved required fact cannot pass the approval gate."},
+  release:{name:"Approval and output",goal:"Publish only the revision the advocate reviewed.",
+    work:["Approve a specific immutable revision under an authenticated Django transaction.","Render DOCX deterministically or save an approved personal note.","Make repeated approvals, exports, and worker retries safe."],check:"Editing an approved draft invalidates approval for the new revision."}
+};
+function renderPhase(key) {
+  const phase=phases[key];
+  press("#phase-nav button","phase",key);
+  const list=el("ul");
+  phase.work.forEach(item=>list.append(el("li",item)));
+  byId("phase-detail").replaceChildren(el("p","Implementation milestone","kicker"),el("h2",phase.name),el("p",phase.goal,"quiet"),list,el("p","Acceptance · " + phase.check,"response small"));
+}
+document.querySelectorAll("[data-phase]").forEach(button=>button.addEventListener("click",()=>renderPhase(button.dataset.phase)));
+renderPhase("scope");
+</script>
+</body>
+</html>

@@ -241,7 +241,7 @@ function NextDateLine({
         <span className="text-gray-500">Next date: </span>
         <span className="font-medium text-gray-900">{format(parseISO(nextDate), "d MMM yyyy")}</span>
         {summary.next_date_purpose && (
-          <span className="text-gray-500"> — {summary.next_date_purpose}</span>
+          <span className="text-gray-500"> · {summary.next_date_purpose}</span>
         )}
       </div>
     );

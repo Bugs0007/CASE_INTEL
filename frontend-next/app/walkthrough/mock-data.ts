@@ -18,7 +18,7 @@ export const mockAttentionItems = [
   {
     key: "hearing-1",
     title: "Ramesh Kumar vs. TSSPDCL",
-    message: "has a Writ Petition hearing tomorrow — arguments on interim stay",
+    message: "has a writ petition hearing tomorrow for arguments on interim stay",
     meta: "12 Aug, 10:30 AM · WP/14562/2024",
     kind: "hearing" as const,
   },
@@ -31,7 +31,7 @@ export const mockAttentionItems = [
   },
   {
     key: "doc-1",
-    title: "Suresh Chandra — Bail Application",
+    title: "Suresh Chandra · Bail Application",
     message: "bail-order-scan.pdf failed processing",
     meta: "CRLP/887/2024",
     kind: "failed" as const,
@@ -43,7 +43,7 @@ export const mockDensityDays = [0, 1, 0, 2, 1, 0, 0, 3, 1, 0, 0, 1, 2, 0];
 export const mockUrgentCases = [
   { title: "Ramesh Kumar vs. TSSPDCL", number: "WP/14562/2024", days: "Tomorrow", priority: "High" as const },
   { title: "Lakshmi Traders vs. Union of India", number: "CA/2231/2023", days: "In 6 days", priority: "Medium" as const },
-  { title: "Suresh Chandra — Bail Application", number: "CRLP/887/2024", days: "In 9 days", priority: "High" as const },
+  { title: "Suresh Chandra · Bail Application", number: "CRLP/887/2024", days: "In 9 days", priority: "High" as const },
 ];
 
 // ---------------------------------------------------------------------------
@@ -168,5 +168,5 @@ export const mockInvoice = {
 
 export const mockTravelBookings = [
   { type: "Train", label: "Secunderabad → Hyderabad Deccan, Chair Car", status: "Booked", file: "irctc-ticket-12aug.pdf" },
-  { type: "Hotel", label: "Hotel Minerva Grand, Hyderabad — 1 night", status: "Booked", file: "hotel-confirmation.pdf" },
+  { type: "Hotel", label: "Hotel Minerva Grand, Hyderabad · 1 night", status: "Booked", file: "hotel-confirmation.pdf" },
 ];

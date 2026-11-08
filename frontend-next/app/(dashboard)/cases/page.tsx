@@ -225,7 +225,7 @@ export default function CasesPage() {
             <span className="font-semibold text-gray-900">
               {othersToShow.length} case{othersToShow.length === 1 ? "" : "s"}
             </span>{" "}
-            with nothing due this week — nothing urgent to review.
+            with nothing due this week. Nothing urgent to review.
           </div>
         ) : (
           <CaseGrid

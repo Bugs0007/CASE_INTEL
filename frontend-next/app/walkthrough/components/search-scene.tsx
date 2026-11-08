@@ -39,7 +39,7 @@ export function SearchScene({ highlight, sceneState }: SearchSceneProps) {
         <h1 className="text-page-title text-gray-900 mt-2 mb-1.5">Search by Advocate</h1>
         <p className="text-sm text-gray-600">
           Pick a state and enter your advocate name or bar registration number. Case Intel
-          searches district courts and gathers all your cases — then you choose which to add.
+          searches district courts and gathers your cases. Choose which ones to add.
         </p>
       </div>
 

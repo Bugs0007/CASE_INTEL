@@ -62,7 +62,7 @@ function nextDateLine(summary: OrderSummary, currentNext: string | null | undefi
     return (
       <>
         Next date: <span className="font-semibold text-gray-900">{when}</span>
-        {summary.next_date_purpose ? ` — ${summary.next_date_purpose}` : ""}
+        {summary.next_date_purpose ? ` · ${summary.next_date_purpose}` : ""}
       </>
     );
   }
@@ -213,7 +213,7 @@ function HearingLine({
         <div className="w-[104px] flex-shrink-0 text-[13.5px] font-bold text-gray-900">
           {dayMonth(row.day)} {row.day.slice(0, 4)}
         </div>
-        <div className="min-w-0 flex-1 truncate text-[13px] text-gray-600">{row.text || "—"}</div>
+        <div className="min-w-0 flex-1 truncate text-[13px] text-gray-600">{row.text || "No details"}</div>
       </div>
       <span className="flex-shrink-0 font-mono text-[11px] tracking-[0.06em] text-gray-500">{row.status}</span>
       {order?.has_file && (
@@ -541,7 +541,7 @@ export function CompactCalendar({
     return (
       <div
         key={day}
-        title={`${shortDay(day)}${counts.hearing + counts.task + counts.event ? ` — ${counts.hearing} hearing, ${counts.event} event, ${counts.task} deadline` : ""}`}
+        title={`${shortDay(day)}${counts.hearing + counts.task + counts.event ? ` · ${counts.hearing} hearing, ${counts.event} event, ${counts.task} deadline` : ""}`}
         className={cn(
           "flex flex-col items-center justify-center border-b border-r border-gray-100 text-[12px]",
           big ? "h-10 rounded border border-gray-200" : "h-[30px]",
