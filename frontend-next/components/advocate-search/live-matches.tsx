@@ -33,7 +33,7 @@ export function LiveMatches({ rows, hiddenCount }: { rows: AdvocateResultRow[]; 
                 <tr key={r.cnr_number} className="border-b border-gray-100">
                   <td className="whitespace-nowrap px-3 py-2 font-mono font-bold">{r.case_number}</td>
                   <td className="px-3 py-2">
-                    {r.petitioner || "—"} vs. {r.respondent || "—"}
+                    {r.petitioner || "Unknown"} vs. {r.respondent || "Unknown"}
                   </td>
                   <td className="px-3 py-2">
                     <MatchChip status={r.match_status ?? "check"} label={r.match_status === "matched" ? r.listed_advocate_name || r.match_label : r.match_status === "check" ? "Check" : r.match_label} />

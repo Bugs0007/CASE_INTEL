@@ -22,6 +22,7 @@ from core.services.conflict_check import (
     record_acknowledgement,
 )
 from core.services.order_sync_status import annotate_order_sync
+from core.services.parties import court_names_for_cases
 from core.services.tasks.from_orders import sync_order_tasks_for_case
 from core.views.mixins import OwnerScopedMixin
 
@@ -162,11 +163,16 @@ class CaseListView(OwnerScopedMixin, generics.ListCreateAPIView):
 
     def list(self, request, *args, **kwargs):
         # Same as ListModelMixin.list, plus every case's fee totals in one
-        # query (CaseSerializer.get_fee_summary reads them from the context).
+        # query (CaseSerializer.get_fee_summary reads them from the context)
+        # and every case's court name in two (get_court_name).
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
         cases = page if page is not None else list(queryset)
-        context = {**self.get_serializer_context(), "fee_summaries": fee_totals_by_case(c.id for c in cases)}
+        context = {
+            **self.get_serializer_context(),
+            "fee_summaries": fee_totals_by_case(c.id for c in cases),
+            "court_names": court_names_for_cases(cases),
+        }
         serializer = self.get_serializer(cases, many=True, context=context)
         if page is not None:
             return self.get_paginated_response(serializer.data)

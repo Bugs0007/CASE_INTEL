@@ -89,11 +89,11 @@ export function ResultsTable({
                 </td>
                 <td className="whitespace-nowrap px-2.5 py-2 font-mono font-bold">{r.case_number}</td>
                 <td className="px-2.5 py-2">
-                  {r.petitioner || "—"} vs. {r.respondent || "—"}
+                  {r.petitioner || "Unknown"} vs. {r.respondent || "Unknown"}
                 </td>
                 <td className="px-2.5 py-2">{listed || <span className="text-gray-400">not listed</span>}</td>
-                <td className="px-2.5 py-2">{r.complex_name || r.court_name || "—"}</td>
-                {showStatus && <td className="px-2.5 py-2">{r.status || "—"}</td>}
+                <td className="px-2.5 py-2">{r.complex_name || r.court_name || "Unknown"}</td>
+                {showStatus && <td className="px-2.5 py-2">{r.status || "Unknown"}</td>}
                 <td className="px-2.5 py-2">
                   <MatchChip status={status} label={r.match_label} />
                 </td>

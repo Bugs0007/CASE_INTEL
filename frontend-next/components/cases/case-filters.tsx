@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { CaseStatus } from "@/types";
@@ -9,6 +9,8 @@ interface CaseFiltersProps {
   onStatusChange: (status: CaseStatus | "all") => void;
   onSearchChange: (search: string) => void;
   activeStatus: CaseStatus | "all";
+  /** Another control for the right-hand side, beside the status tabs. */
+  trailing?: ReactNode;
 }
 
 // Tabs filter on the app's own internal Case.status, not any live eCourts
@@ -27,6 +29,7 @@ export function CaseFilters({
   onStatusChange,
   onSearchChange,
   activeStatus,
+  trailing,
 }: CaseFiltersProps) {
   const [searchValue, setSearchValue] = useState("");
   const tabRefs = useRef<Partial<Record<string, HTMLButtonElement>>>({});
@@ -67,6 +70,8 @@ export function CaseFilters({
         />
       </div>
 
+      {/* Right-hand side: the status tabs, then any trailing control (Group by). */}
+      <div className="flex min-w-0 max-w-full flex-wrap items-center gap-4">
       {/* Status Tabs -- segmented control with a sliding active-tab pill.
           Scrolls horizontally, contained to this control, instead of
           overflowing the page when all 5 tabs don't fit a narrow screen. */}
@@ -93,6 +98,8 @@ export function CaseFilters({
             {tab.label}
           </button>
         ))}
+      </div>
+      {trailing}
       </div>
     </div>
   );

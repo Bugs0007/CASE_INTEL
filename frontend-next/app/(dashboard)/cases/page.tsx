@@ -6,17 +6,27 @@ import Link from "next/link";
 import { Search } from "lucide-react";
 import { CaseFilters } from "@/components/cases/case-filters";
 import { CaseGrid } from "@/components/cases/case-grid";
+import { CaseGroupList } from "@/components/cases/case-group-list";
+import { GroupByControl } from "@/components/cases/group-by-control";
 import { MobileCaseSearch, MobileStatusTabs } from "@/components/cases/mobile/mobile-case-filters";
+import {
+  MobileGroupChip,
+  MobileViewOptionsButton,
+  MobileViewOptionsSheet,
+} from "@/components/cases/mobile/mobile-group-options";
 import { CasesSkeleton } from "@/components/cases/cases-skeleton";
 import { MobileSubbar } from "@/components/layout/mobile-chrome";
 import { CASES_TABS, SectionTabs } from "@/components/layout/section-tabs";
 import { showToast } from "@/components/ui/toaster";
 import { useCases, useDeleteCase } from "@/hooks/use-cases";
+import { useCasesGrouping, useCollapsedGroups } from "@/hooks/use-cases-grouping";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { useUpcomingHearings } from "@/hooks/use-dashboard";
 import { useDocuments } from "@/hooks/use-documents";
 import { getLastDashboardVisit } from "@/lib/last-visit";
+import { groupCases } from "@/lib/case-grouping";
 import { reasonForCase, sortByUrgencyPriority, type UrgencyReason } from "@/lib/case-urgency";
+import { istDayKey } from "@/lib/dashboard/dates";
 import type { CaseStatus } from "@/types";
 
 export default function CasesPage() {
@@ -24,6 +34,9 @@ export default function CasesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [othersExpanded, setOthersExpanded] = useState(false);
   const isMobile = useIsMobile();
+  const { grouping, setGrouping } = useCasesGrouping();
+  const { collapsed, toggle: toggleGroup, setAll: setAllGroups } = useCollapsedGroups(grouping);
+  const [optionsOpen, setOptionsOpen] = useState(false);
 
   // Read (never write) the same "since last visit" marker the Dashboard
   // sets, so a case's urgency status agrees between the two screens.
@@ -111,6 +124,17 @@ export default function CasesPage() {
     return map;
   }, [needsAttentionCases, hearingSoonCaseIds, ecourtsUpdateCaseIds, failedDocCaseIds]);
 
+  // Grouped by court or client, the Needs Attention split gives way to one
+  // list of groups: a group's count must be every case it holds on screen. The
+  // cards keep their urgency chips, and keep the page's order within a group
+  // (needs-attention first, then the rest).
+  const today = istDayKey();
+  const groups = useMemo(
+    () => groupCases([...needsAttentionCases, ...otherCases], grouping, today),
+    [needsAttentionCases, otherCases, grouping, today],
+  );
+  const allGroupsCollapsed = groups.length > 0 && groups.every((g) => collapsed.has(g.key));
+
   if (isLoading && !hasLoadedOnce.current) {
     return <CasesSkeleton />;
   }
@@ -173,7 +197,23 @@ export default function CasesPage() {
           pinned under the top bar, so both stay in reach while scrolling. */}
       {isMobile ? (
         <div className="mb-3">
-          <MobileCaseSearch value={searchQuery} onChange={setSearchQuery} />
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <MobileCaseSearch value={searchQuery} onChange={setSearchQuery} />
+            </div>
+            <MobileViewOptionsButton onClick={() => setOptionsOpen(true)} active={grouping !== "none"} />
+          </div>
+          {grouping !== "none" && (
+            <div className="-mb-1 mt-0.5">
+              <MobileGroupChip grouping={grouping} onClick={() => setOptionsOpen(true)} />
+            </div>
+          )}
+          <MobileViewOptionsSheet
+            open={optionsOpen}
+            onClose={() => setOptionsOpen(false)}
+            grouping={grouping}
+            onGroupingChange={setGrouping}
+          />
         </div>
       ) : (
         <div className="mb-6">
@@ -181,12 +221,52 @@ export default function CasesPage() {
             activeStatus={activeStatus}
             onStatusChange={setActiveStatus}
             onSearchChange={setSearchQuery}
+            trailing={<GroupByControl value={grouping} onChange={setGrouping} />}
           />
         </div>
       )}
 
+      {/* Grouped by court or client: one list of groups instead of the two
+          sections below. */}
+      {grouping !== "none" && (
+        <div>
+          <div className="mb-3.5 flex items-center justify-between gap-3 max-md:mb-1">
+            <h2 className="min-w-0 truncate text-card-title text-gray-900">
+              Cases by {grouping}
+              {!isLoading && (
+                <span className="ml-2.5 text-[13px] font-normal text-gray-500">
+                  {pluralize(groups.length, grouping)}
+                </span>
+              )}
+            </h2>
+            {!isLoading && groups.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setAllGroups(groups.map((g) => g.key), !allGroupsCollapsed)}
+                className="-mr-2 flex h-11 flex-shrink-0 items-center px-2 text-[13px] font-semibold text-primary hover:text-primary-hover md:mr-0 md:h-8 md:px-0"
+              >
+                {allGroupsCollapsed ? "Expand all" : "Collapse all"}
+              </button>
+            )}
+          </div>
+          {isLoading || groups.length === 0 ? (
+            <CaseGrid cases={[]} isLoading={isLoading} />
+          ) : (
+            <CaseGroupList
+              groups={groups}
+              today={today}
+              collapsed={collapsed}
+              onToggle={toggleGroup}
+              onDelete={handleDeleteCase}
+              deletingId={deleteCase.variables}
+              urgencyReasons={urgencyReasons}
+            />
+          )}
+        </div>
+      )}
+
       {/* Needs Attention This Week */}
-      {!isLoading && hasUrgentGroup && (
+      {grouping === "none" && !isLoading && hasUrgentGroup && (
         <div className="mb-8 max-md:mt-3 max-md:mb-6">
           <div className="flex items-center gap-2.5 mb-3.5 max-md:mb-2.5">
             <h2 className="text-card-title text-gray-900">Needs Attention This Week</h2>
@@ -205,6 +285,7 @@ export default function CasesPage() {
 
       {/* All Other Cases -- collapsed by default, matching the design
           handoff's toggle behavior (was previously always-expanded). */}
+      {grouping === "none" && (
       <div>
         <div className="flex items-center justify-between mb-3.5">
           <h2 className="text-card-title text-gray-900">
@@ -225,7 +306,7 @@ export default function CasesPage() {
             <span className="font-semibold text-gray-900">
               {othersToShow.length} case{othersToShow.length === 1 ? "" : "s"}
             </span>{" "}
-            with nothing due this week — nothing urgent to review.
+            with nothing urgent to review this week.
           </div>
         ) : (
           <CaseGrid
@@ -236,6 +317,7 @@ export default function CasesPage() {
           />
         )}
       </div>
+      )}
 
       {/* Results Count */}
       {!isLoading && (

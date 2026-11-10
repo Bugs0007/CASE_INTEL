@@ -134,7 +134,7 @@ export default function SettingsPage() {
       <div className="mb-5">
         <h1 className="text-page-title max-md:!text-[26px] max-md:!leading-[1.1] text-gray-900 mb-1.5">Settings</h1>
         <p className="text-sm text-gray-600">
-          Your billing identity — this is what appears on generated invoices.
+          Your billing identity appears on generated invoices.
         </p>
       </div>
 
@@ -346,7 +346,7 @@ export default function SettingsPage() {
               <p className="text-xs text-gray-500">
                 Last issued: {profile.invoice_prefix}-
                 {String(profile.last_invoice_sequence).padStart(4, "0")}. Changing the prefix
-                only affects invoices issued from now on — numbers already sent to clients
+                only affects future invoices. Numbers already sent to clients
                 keep their original form.
               </p>
             )}

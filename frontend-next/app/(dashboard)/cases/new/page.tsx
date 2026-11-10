@@ -253,8 +253,8 @@ export default function NewCasePage() {
         </Link>
         <h1 className="text-page-title max-md:!text-[26px] max-md:!leading-[1.1] text-gray-900 mt-2 mb-1.5">Add a Case Manually</h1>
         <p className="text-sm text-gray-600">
-          Type in the case details yourself instead of searching eCourts — useful for a case
-          that hasn&apos;t shown up in a search yet, or one you&apos;d just rather enter by hand.
+          Enter the details by hand if the case doesn&apos;t appear in eCourts search results
+          or if you prefer to add it manually.
           You can add client contacts and link this case to its eCourts record (by CNR) from the
           case page any time after it&apos;s created.
         </p>
@@ -299,8 +299,7 @@ export default function NewCasePage() {
           <CardContent>
             <p className="text-sm text-gray-600 mb-4">
               Enter the case&apos;s CNR number to fetch its details from eCourts and pre-fill the
-              form below — faster than typing everything by hand. You&apos;ll still get to review
-              and edit before the case is created.
+              form below. You can review and edit the details before creating the case.
             </p>
             <form onSubmit={handleCnrFetch} className="space-y-4">
               <div>
@@ -358,10 +357,10 @@ export default function NewCasePage() {
       {mode === "cnr" && preview && (
         <div className="mb-5 rounded-lg bg-status-pending-soft border border-status-pending p-3 text-xs text-status-pending">
           <div className="mb-1 font-medium">
-            Fetched from eCourts — not saved yet. Review the details below before adding the case.
+            Fetched from eCourts. Review the details below before saving the case.
           </div>
           <div>
-            {preview.petitioner || "—"} vs {preview.respondent || "—"} · {preview.court_name || "—"}
+            {preview.petitioner || "Unknown"} vs {preview.respondent || "Unknown"} · {preview.court_name || "Unknown court"}
             {preview.court_type_detected && (
               <span className="ml-1.5 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
                 {preview.court_type === "high_court" ? "High Court" : "District Court"} detected from CNR

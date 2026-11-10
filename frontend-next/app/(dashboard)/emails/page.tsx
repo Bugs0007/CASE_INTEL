@@ -63,7 +63,7 @@ export default function EmailsPage() {
           <Construction className="h-5 w-5 text-status-pending flex-shrink-0 mt-0.5" />
           <div>
             <div className="font-medium text-status-pending">
-              Under development — coming soon
+              Coming soon
             </div>
             <div className="text-sm text-status-pending">
               Gmail integration is still being built. Connecting an account

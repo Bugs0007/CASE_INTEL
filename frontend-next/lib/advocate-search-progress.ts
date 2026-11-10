@@ -49,7 +49,7 @@ export function describeSearchProgress(job: ProgressJob, nowMs: number): SearchP
       "Waiting for the background worker to start this search. If other jobs (order checks, " +
       "refreshes, uploads, another search) are running, it starts when the worker is free.";
     if (Number.isFinite(waited) && waited >= LONG_WAIT_MS) {
-      waiting += ` Still waiting after ${formatElapsed(waited)} — the worker is probably busy with a long job.`;
+      waiting += ` Still waiting after ${formatElapsed(waited)}. The worker may be busy with another job.`;
     }
     return { ...NOTHING, waiting };
   }

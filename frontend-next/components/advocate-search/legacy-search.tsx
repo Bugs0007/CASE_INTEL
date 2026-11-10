@@ -225,7 +225,7 @@ export function LegacyAdvocateSearch() {
         <h1 className="text-page-title text-gray-900 mt-2 mb-1.5">Search by Advocate</h1>
         <p className="text-sm text-gray-600">
           Pick a state and enter your advocate name or bar registration number. Case Intel searches
-          district courts and gathers all your cases — then you choose which to add.
+          district courts and gathers your cases. Choose which ones to add.
         </p>
         <Link
           href="/cases/new"
@@ -331,7 +331,7 @@ export function LegacyAdvocateSearch() {
                       }}
                     />
                     <span>
-                      <span className="font-medium text-gray-900">Quick search</span> &mdash;{" "}
+                      <span className="font-medium text-gray-900">Quick search</span>{" · "}
                       {pluralize(quick.complexes, "court complex", "court complexes")} in{" "}
                       {pluralize(quick.districts, "district")} that returned cases for this advocate
                       {quick.updated_at ? ` (as of ${formatRelativeTime(quick.updated_at)})` : ""}
@@ -349,7 +349,7 @@ export function LegacyAdvocateSearch() {
                       }}
                     />
                     <span>
-                      <span className="font-medium text-gray-900">Full scan</span> &mdash;{" "}
+                      <span className="font-medium text-gray-900">Full scan</span>{" · "}
                       {distCodes.length > 0
                         ? `every court complex in the ${pluralize(distCodes.length, "district")} ticked`
                         : "every court complex in the state"}
@@ -384,7 +384,7 @@ export function LegacyAdvocateSearch() {
                   : distCodes.length > 0
                     ? `A search of ${pluralize(distCodes.length, "district")} usually takes a few minutes or less.`
                     : "A state-wide search checks every district and court complex, one at a time, and can take several minutes (longer for large states)."}{" "}
-                You can leave this page open — cases already found appear below as they come in.
+                You can leave this page open to see cases as they come in.
               </span>
             </div>
 
@@ -491,7 +491,7 @@ export function LegacyAdvocateSearch() {
                       · {failedDistrictCount} incomplete
                     </span>
                   )}
-                  {" — "}
+                  {" · "}
                   {districtsExpanded ? "hide" : "show"} details
                 </button>
                 {districtsExpanded && (
@@ -549,9 +549,8 @@ export function LegacyAdvocateSearch() {
             {resultsTruncated && (
               <div className="mb-4 rounded-lg border border-status-pending bg-status-pending-soft px-3.5 py-3 text-sm text-status-pending">
                 Showing the first {results.length.toLocaleString()} of{" "}
-                {resultsTotal.toLocaleString()} matches. Narrow the search — pick a
-                single district, or use a bar code instead of a name — to see the
-                rest.
+                {resultsTotal.toLocaleString()} matches. To see the rest, pick a
+                single district or search by bar code instead of name.
               </div>
             )}
 
@@ -566,7 +565,7 @@ export function LegacyAdvocateSearch() {
                     <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
                     <span>
                       {unverifiedCount.toLocaleString()} of {results.length.toLocaleString()} listing(s)
-                      below could not be checked against your search — the court didn&apos;t report an
+                      below could not be checked against your search. The court didn&apos;t report an
                       advocate for them (or you searched by bar code, which courts don&apos;t publish).
                       Review these yourself before adding them.
                     </span>
@@ -596,7 +595,7 @@ export function LegacyAdvocateSearch() {
                           </td>
                           <td className="px-3 py-2 font-mono whitespace-nowrap">{r.case_number}</td>
                           <td className="px-3 py-2 text-gray-700">
-                            {r.petitioner || "—"} vs {r.respondent || "—"}
+                            {r.petitioner || "Unknown"} vs {r.respondent || "Unknown"}
                           </td>
                           <td className="px-3 py-2 text-xs">
                             {r.advocate_match_verified ? (
@@ -618,8 +617,8 @@ export function LegacyAdvocateSearch() {
                                 "Court didn't report an advocate for this listing"}
                             </div>
                           </td>
-                          <td className="px-3 py-2 text-gray-600">{r.court_name || "—"}</td>
-                          <td className="px-3 py-2 text-gray-600">{r.status || "—"}</td>
+                          <td className="px-3 py-2 text-gray-600">{r.court_name || "Unknown"}</td>
+                          <td className="px-3 py-2 text-gray-600">{r.status || "Unknown"}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -628,8 +627,7 @@ export function LegacyAdvocateSearch() {
 
                 {selected.size > IMPORT_CAP && (
                   <p className="mb-2 text-xs text-status-alert">
-                    You can add up to {IMPORT_CAP} at a time — only the first {IMPORT_CAP} selected
-                    will be added.
+                    You can add up to {IMPORT_CAP} at a time. We&apos;ll add the first {IMPORT_CAP} you selected.
                   </p>
                 )}
                 <Button
@@ -688,8 +686,8 @@ export function LegacyAdvocateSearch() {
                   <div className="flex items-start gap-2 rounded-lg bg-status-alert-soft p-3 text-status-alert">
                     <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
                     <span>
-                      {ij.failed.length} case(s) could not be fetched (portal timeout or CAPTCHA) —
-                      you can select them again and retry.
+                      {ij.failed.length} case(s) could not be fetched (portal timeout or CAPTCHA).
+                      Select them again to retry.
                     </span>
                   </div>
                 )}

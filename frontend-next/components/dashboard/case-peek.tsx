@@ -60,7 +60,7 @@ export function CasePeek({
           {item.nextHearing ? (
             (chip && <CauseChipView chip={chip} />) || <span className="font-normal text-gray-500">Not checked yet</span>
           ) : (
-            <span className="font-normal text-gray-500">—</span>
+            <span className="font-normal text-gray-500">Not available</span>
           )}
         </Row>
         <Row label="Open tasks">{openTasks}</Row>

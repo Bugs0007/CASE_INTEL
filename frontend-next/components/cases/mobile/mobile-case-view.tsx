@@ -604,7 +604,7 @@ function HearingsTab(props: MobileCaseViewProps) {
                     <span className="block font-mono text-[10.5px] text-gray-500">{row.day.slice(0, 4)}</span>
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="line-clamp-2 text-[13px] leading-snug text-gray-700">{row.text || "—"}</span>
+                    <span className="line-clamp-2 text-[13px] leading-snug text-gray-700">{row.text || "No details"}</span>
                     {entry && <HearingBusinessPreview entry={entry} />}
                     <span className="mt-0.5 block font-mono text-[10.5px] tracking-[0.06em] text-gray-500">{row.status}</span>
                   </span>
