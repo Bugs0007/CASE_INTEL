@@ -3,6 +3,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { AlertTriangle, CalendarClock, ChevronRight, FileWarning, Gavel, Mail, Receipt } from "lucide-react";
+import { PortfolioBotSlot } from "@/components/dashboard/portfolio-bot-slot";
 import { RefreshAllButton } from "@/components/dashboard/refresh-all-button";
 import { CauseChipView, STATUS_COLOR } from "@/components/dashboard/status";
 import { panelId, tabId } from "@/components/dashboard/view-toggle";
@@ -10,6 +11,7 @@ import type { BillingState } from "@/components/dashboard/glance-column";
 import { AnimatedCheck, MSection, riseIn } from "@/components/mobile/primitives";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { DashboardView } from "@/hooks/use-dashboard-view";
+import { PORTFOLIO_BOT_ENABLED } from "@/lib/feature-flags";
 import { dateLabel, dayMonth, shortDay } from "@/lib/dashboard/dates";
 import {
   STATUS_LABEL,
@@ -352,6 +354,12 @@ export function MobileDashboard({
           </MSection>
 
           <BillingStrip billing={billing} />
+
+          {PORTFOLIO_BOT_ENABLED && (
+            <div className="mt-4">
+              <PortfolioBotSlot />
+            </div>
+          )}
 
           <div className="mt-4 flex items-center gap-2 text-[12px] text-gray-500">
             <Gavel className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />

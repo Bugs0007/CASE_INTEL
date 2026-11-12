@@ -30,6 +30,7 @@ import {
 } from "@/components/cases/compact/compact-rail";
 import { HearingDialog } from "@/components/hearings/hearing-dialog";
 import { ChatPanel } from "@/components/chat/chat-panel";
+import { CaseDraftingSection } from "@/components/drafting/case-drafting-section";
 import { UploadDocumentDialog } from "@/components/documents/upload-document-dialog";
 import { GenerateDocumentDialog } from "@/components/documents/generate-document-dialog";
 import { DocumentViewer } from "@/components/documents/document-viewer";
@@ -404,6 +405,9 @@ export default function CaseDetailPage() {
           // District courts only: they publish the day's business, not order documents.
           dailyStatusSlot={caseItem.court_type === "district" ? <DailyStatusCard caseId={caseId} /> : undefined}
         />
+        <div className="px-4 pb-24">
+          <CaseDraftingSection caseId={caseId} caseTitle={caseItem.title} />
+        </div>
         {overlays}
       </>
     );
@@ -487,6 +491,7 @@ export default function CaseDetailPage() {
             statusLine={<CaseOrderCheckLine caseItem={caseItem} />}
           />
           <CompactFees caseItem={caseItem} hearings={hearings} />
+          <CaseDraftingSection caseId={caseId} caseTitle={caseItem.title} />
           {budget.showClientUpdates && <CompactClientUpdates caseItem={caseItem} onEditDetails={openEditDetails} />}
         </aside>
       </div>
