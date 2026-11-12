@@ -69,13 +69,14 @@ from django.db import close_old_connections, connections, transaction
 from django.db.models import Case as SqlCase, IntegerField, Value, When
 from django.utils import timezone
 
-from core.models import Case, Document, ProcessingJob
+from core.models import AssistantDraft, Case, Document, ProcessingJob
 from core.services.advocate_import import run_advocate_import
 from core.services.advocate_search import AdvocateSearchCancelled, run_advocate_search
 from core.services.bulk_refresh import BulkRefreshCancelled, run_tracking_refresh
 from core.services.court_order_sync import sync_case_orders
 from core.services.daily_status import sync_case_business
 from core.services.document_processor import DocumentProcessor
+from core.services.drafting.generate import run_draft_generation
 from core.services.hearing_digest import generate_case_briefing
 from core.services.process_memory import current_rss_mb
 
@@ -91,9 +92,11 @@ MAX_ATTEMPTS = 3
 RECYCLE_EXIT_CODE = 75
 
 # Job types a worker running each lane may claim. "all" is every type.
-INTERACTIVE_JOB_TYPES = ("document", "case_briefing")
+INTERACTIVE_JOB_TYPES = ("document", "case_briefing", "draft_generation")
 SEARCH_JOB_TYPES = ("advocate_search", "advocate_import")
-PORTAL_JOB_TYPES = ("document", "case_briefing", "order_sync", "tracking_refresh")
+PORTAL_JOB_TYPES = (
+    "document", "case_briefing", "draft_generation", "order_sync", "tracking_refresh",
+)
 LANE_JOB_TYPES = {
     "interactive": INTERACTIVE_JOB_TYPES,
     "search": SEARCH_JOB_TYPES,
@@ -277,6 +280,18 @@ class Command(BaseCommand):
                 Document.objects.filter(id=job.document_id).update(
                     processing_status="failed"
                 )
+                if job.job_type == "draft_generation":
+                    # Otherwise the draft would read "generating" forever.
+                    payload = job.payload or {}
+                    AssistantDraft.objects.filter(
+                        id=payload.get("draft_id"),
+                        owner_id=job.owner_id,
+                        generation=payload.get("generation"),
+                        status__in=AssistantDraft.PENDING_STATUSES,
+                    ).update(
+                        status=AssistantDraft.STATUS_FAILED,
+                        error="The draft could not be generated. Try again.",
+                    )
             else:
                 logger.warning(
                     "Job %d (%s) looks abandoned (heartbeat stale) -- requeueing "
@@ -318,6 +333,8 @@ class Command(BaseCommand):
                 run_advocate_search(job, progress_callback=report_progress)
             elif job.job_type == "case_briefing":
                 generate_case_briefing(Case.objects.get(id=job.case_id))
+            elif job.job_type == "draft_generation":
+                run_draft_generation(job)
             elif job.job_type == "tracking_refresh":
                 run_tracking_refresh(job, progress_callback=report_progress)
             else:

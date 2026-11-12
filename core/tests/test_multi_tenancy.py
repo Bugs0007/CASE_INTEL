@@ -773,6 +773,23 @@ _MANUALLY_SCOPED_VIEWS = {
     "auth.SessionListView",
     "auth.SessionDetailView",
     "auth.SessionRevokeOthersView",
+    # Practice assistant: every read takes owner=request.user (reads.py);
+    # tenancy in TestPracticeAssistantIsolation below.
+    "practice_assistant.PracticeOverviewView",
+    "practice_assistant.PracticeChatView",
+    # Case assistant drafts: every lookup filters owner=request.user and
+    # resolves case/document/message ids under the owner
+    # (test_case_assistant_api.py, test_draft_approval_outputs.py).
+    "case_assistant.DraftListCreateView",
+    "case_assistant.DraftDetailView",
+    "case_assistant.DraftRevisionCreateView",
+    "case_assistant.DraftRevisionDetailView",
+    "case_assistant.DraftRetryView",
+    "case_assistant_outputs.DraftApproveView",
+    "case_assistant_outputs.DraftOutputCreateView",
+    "case_assistant_outputs.DraftOutputDownloadView",
+    "case_assistant_outputs.CaseNoteListView",
+    "case_assistant_outputs.CaseNoteDetailView",
 }
 
 
@@ -1147,3 +1164,177 @@ class TestTier2EndpointIsolation:
         assert client_a.get("/api/cases/refresh-all/").data == {"job_id": None}
         run.refresh_from_db()
         assert not run.cancel_requested
+
+
+@pytest.mark.django_db
+class TestPracticeAssistantIsolation:
+    """GET /api/practice-assistant/overview/ and POST .../chat/: Alice never
+    gets Bob's cases, hearings, tasks, events, sources, candidates or
+    conversations -- including when both own a case with the same title."""
+
+    OVERVIEW = "/api/practice-assistant/overview/"
+    CHAT = "/api/practice-assistant/chat/"
+    SHARED_TITLE = "Sharma vs State"
+
+    @pytest.fixture(autouse=True)
+    def _enabled(self, settings):
+        from core.services.graph import practice_nodes
+
+        settings.PRACTICE_ASSISTANT_ENABLED = True
+        with patch.object(
+            practice_nodes, "get_llm_client", side_effect=AssertionError("the model was reached")
+        ):
+            yield
+
+    @pytest.fixture
+    def rows(self, user_a, user_b, case_a, case_b):
+        from datetime import timedelta
+
+        from core.models import CaseEvent, Task
+        from core.services.india_time import india_now
+
+        # Both advocates own a case with the same title.
+        Case.objects.filter(id__in=[case_a.id, case_b.id]).update(title=self.SHARED_TITLE)
+        tomorrow = india_now() + timedelta(days=1)
+        made = {}
+        for name, owner, case in (("a", user_a, case_a), ("b", user_b, case_b)):
+            made[name] = {
+                "case": case,
+                "hearing": Hearing.objects.create(
+                    owner=owner,
+                    case=case,
+                    hearing_date=tomorrow,
+                    hearing_type="other",
+                    purpose=f"hearing-of-{name}",
+                ),
+                "task": Task.objects.create(
+                    owner=owner, case=case, title=f"task-of-{name}", due_date=tomorrow.date()
+                ),
+                "event": CaseEvent.objects.create(
+                    owner=owner, case=case, title=f"event-of-{name}", date=tomorrow.date()
+                ),
+            }
+        return made
+
+    def _ask(self, client, query, **extra):
+        import uuid
+
+        body = {"query": query, "client_request_id": str(uuid.uuid4()), **extra}
+        return client.post(self.CHAT, body, format="json")
+
+    @staticmethod
+    def _assert_only_alice(payload, rows):
+        import json
+
+        text = json.dumps(payload)
+        for label in ("hearing-of-b", "task-of-b", "event-of-b"):
+            assert label not in text
+        theirs = {(kind, rows["b"][kind].id) for kind in ("case", "hearing", "task", "event")}
+
+        def walk(node):
+            if isinstance(node, dict):
+                if {"kind", "id"} <= set(node):
+                    assert (node["kind"], node["id"]) not in theirs
+                if "case_id" in node:
+                    assert node["case_id"] != rows["b"]["case"].id
+                for value in node.values():
+                    walk(value)
+            elif isinstance(node, list):
+                for item in node:
+                    walk(item)
+
+        walk(payload)
+
+    def test_overview_is_alices_alone(self, client_a, rows):
+        resp = client_a.get(self.OVERVIEW)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["portfolio"]["total_cases"] == 1
+        assert [c["id"] for c in data["portfolio"]["cases"]] == [rows["a"]["case"].id]
+        assert {(e["kind"], e["id"]) for e in data["calendar"]["entries"]} == {
+            (kind, rows["a"][kind].id) for kind in ("hearing", "task", "event")
+        }
+        assert data["calendar"]["total"] == 3
+        self._assert_only_alice(data, rows)
+
+    @pytest.mark.parametrize(
+        "query",
+        [
+            "Give me an overview of my practice.",
+            "What is on my calendar this week?",
+            "What deadlines are open?",
+            "Which cases have no next date?",
+        ],
+    )
+    def test_every_chat_read_is_alices_alone(self, client_a, rows, query):
+        resp = self._ask(client_a, query)
+        assert resp.status_code == 200
+        turn = resp.json()
+        assert turn["status"] == "answer"
+        self._assert_only_alice(turn, rows)
+        assert all(ref["case_id"] in (None, rows["a"]["case"].id) for ref in turn["sources"])
+
+    def test_counts_do_not_include_bob(self, client_a, rows):
+        overview = self._ask(client_a, "Give me an overview of my practice.").json()
+        assert overview["summary"]["total_cases"] == 1
+        deadlines = self._ask(client_a, "What deadlines are open?").json()
+        assert deadlines["summary"]["total"] == 1
+        assert [s["id"] for s in deadlines["sources"]] == [rows["a"]["task"].id]
+
+    def test_case_facts_by_id_are_alices_alone(self, client_a, rows):
+        turn = self._ask(client_a, self.SHARED_TITLE, case_id=rows["a"]["case"].id).json()
+        assert turn["status"] == "answer"
+        assert turn["summary"]["case"]["id"] == rows["a"]["case"].id
+        assert turn["summary"]["open_tasks"]["total"] == 1
+        self._assert_only_alice(turn, rows)
+
+    def test_case_candidates_with_a_shared_title_are_alices_alone(self, client_a, rows):
+        import json
+
+        from core.services.graph import practice_nodes
+
+        llm = MagicMock()
+        llm.generate.return_value = json.dumps({"intent": "case_facts", "case_text": "Sharma"})
+        with patch.object(practice_nodes, "get_llm_client", return_value=llm):
+            turn = self._ask(client_a, "what about that Sharma matter").json()
+        assert turn["status"] == "needs_clarification"
+        assert [c["id"] for c in turn["case_candidates"]] == [rows["a"]["case"].id]
+        self._assert_only_alice(turn, rows)
+
+    def test_bobs_case_number_finds_nothing(self, client_a, rows):
+        Case.objects.filter(id=rows["b"]["case"].id).update(case_number="OS/777/2026")
+        turn = self._ask(client_a, "Status of OS/777/2026").json()
+        assert turn["intent"] == "case_facts"
+        assert turn["status"] == "needs_clarification"
+        assert turn["case_candidates"] == [] and turn["summary"] is None
+
+    def test_bobs_case_id_is_404(self, client_a, user_a, rows):
+        from core.models import Conversation
+
+        resp = self._ask(client_a, "x", case_id=rows["b"]["case"].id)
+        assert resp.status_code == 404
+        assert resp.json() == {"detail": f"Case with id {rows['b']['case'].id} does not exist."}
+        assert not Conversation.objects.filter(owner=user_a).exists()
+
+    def test_bobs_conversation_id_is_404_and_untouched(self, client_a, client_b, rows):
+        from core.models import Message
+
+        theirs = self._ask(client_b, "What deadlines are open?").json()
+        resp = self._ask(
+            client_a, "What deadlines are open?", conversation_id=theirs["conversation_id"]
+        )
+        assert resp.status_code == 404
+        assert Message.objects.filter(conversation_id=theirs["conversation_id"]).count() == 2
+        history = client_a.get(f"/api/conversations/{theirs['conversation_id']}/messages/")
+        assert history.status_code == 200 and history.json() == []
+
+    def test_bobs_request_id_does_not_replay_his_turn_to_alice(self, client_a, client_b, rows):
+        body = {"query": "What deadlines are open?", "client_request_id": "shared-request-id"}
+        theirs = client_b.post(self.CHAT, body, format="json").json()
+        mine = client_a.post(self.CHAT, body, format="json").json()
+        assert mine["conversation_id"] != theirs["conversation_id"]
+        assert [s["id"] for s in mine["sources"]] == [rows["a"]["task"].id]
+        self._assert_only_alice(mine, rows)
+        # ...and each still replays their own.
+        assert client_a.post(self.CHAT, body, format="json").json() == mine
+        assert client_b.post(self.CHAT, body, format="json").json() == theirs

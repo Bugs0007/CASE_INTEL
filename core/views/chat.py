@@ -51,9 +51,13 @@ class ChatView(APIView):
             )
 
         if conversation_id is not None:
-            conversation = Conversation.objects.filter(
-                id=conversation_id, owner=request.user
-            ).first()
+            # A practice-assistant conversation is not continuable here: it
+            # is answered exactly like one that does not exist.
+            conversation = (
+                Conversation.objects.filter(id=conversation_id, owner=request.user)
+                .exclude(scope=Conversation.SCOPE_PRACTICE)
+                .first()
+            )
             if conversation is None:
                 return Response(
                     {"detail": f"Conversation with id {conversation_id} does not exist."},

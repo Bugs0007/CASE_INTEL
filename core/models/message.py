@@ -15,6 +15,9 @@ class Message(OwnedModel):
     )
     role = models.CharField(max_length=20, choices=ROLE_CHOICES)
     content = models.TextField()
+    # Typed pointers to owned records a practice answer rests on; each item
+    # has the shape of `Reference` in core/services/practice_assistant/contracts.py.
+    references = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

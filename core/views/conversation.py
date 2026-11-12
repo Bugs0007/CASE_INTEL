@@ -51,6 +51,7 @@ class ConversationListView(OwnerScopedMixin, generics.ListAPIView):
 
     GET /api/conversations/
     GET /api/conversations/?case_id=1
+    GET /api/conversations/?scope=practice
 
     Scoped to request.user (OwnerScopedMixin).
     """
@@ -62,7 +63,11 @@ class ConversationListView(OwnerScopedMixin, generics.ListAPIView):
         case_id = self.request.query_params.get("case_id")
         if case_id is not None:
             qs = qs.filter(case_id=case_id)
-        return qs
+        # Practice-assistant conversations stay out of this list unless
+        # asked for by name.
+        if self.request.query_params.get("scope") == Conversation.SCOPE_PRACTICE:
+            return qs.filter(scope=Conversation.SCOPE_PRACTICE)
+        return qs.exclude(scope=Conversation.SCOPE_PRACTICE)
 
 
 class ConversationDetailView(OwnerScopedMixin, generics.RetrieveDestroyAPIView):
