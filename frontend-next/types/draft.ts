@@ -5,7 +5,7 @@
 
 export const DRAFT_SCHEMA_VERSION = 1;
 
-export type DraftSubtype = "status_memo" | "personal_note";
+export type DraftSubtype = "status_memo" | "personal_note" | "client_letter" | "list_of_dates";
 
 interface DraftBlockBase {
   /** Evidence IDs the server collected, e.g. "hearing:18", "doc:42:c310". */

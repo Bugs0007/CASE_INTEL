@@ -348,6 +348,153 @@ def invoice_send_answer(summary: dict, card: Optional[dict]) -> tuple[str, list[
 
 
 # ---------------------------------------------------------------------------
+# Action cards, drafts and reports
+# ---------------------------------------------------------------------------
+
+FEE_ACTIONS_OFF = (
+    "Adding, changing, invoicing and deleting fees from the assistant is turned off for your "
+    "account. You can do all of it on the Billing page."
+)
+DRAFTING_OFF = "Starting drafts from the assistant is turned off for your account."
+REPORTS_OFF = "Reports from the assistant are turned off for your account."
+WHICH_FEE = "Which fee do you mean? Give me the invoice number, or name the case."
+MANY_INVOICES = "More than one invoice number was named. Which one do you mean?"
+NOTHING_TO_CHANGE = (
+    "What should change? Tell me the new amount, the category (appearance, hotel, flight or "
+    "other) or a new description, for example: change INV-0042 to Rs 20,000."
+)
+DRAFT_KIND_NEEDED = (
+    "Which kind of draft do you want: a status memo, a personal note, a client letter or a list of dates?"
+)
+REPORT_KIND_NEEDED = (
+    "Which report do you want: billing, hearings, cases or deadlines? "
+    "You can add a period, for example: billing report for this month."
+)
+
+_CATEGORY_PHRASE = {
+    "appearance": "an appearance fee",
+    "hotel": "a hotel charge",
+    "flight": "a flight charge",
+    "other": "another charge",
+}
+_CATEGORY_NOUN = {
+    "appearance": "appearance fee",
+    "hotel": "hotel charge",
+    "flight": "flight charge",
+    "other": "other charge",
+}
+
+
+def no_fees_for_case(title: str) -> str:
+    return f"No fee is recorded for {title} in Case Intel."
+
+
+def _fee_label(card: dict) -> str:
+    if card.get("invoice_number"):
+        return f"Invoice {card['invoice_number']}"
+    noun = _CATEGORY_NOUN.get(card.get("category") or (card.get("current") or {}).get("category") or "", "fee")
+    return f"The {noun}"
+
+
+def _hearing_text(card: dict) -> str:
+    for option in card["hearing_options"]:
+        if option["id"] == card["hearing_id"]:
+            return f", for the hearing on {fmt_day(option['date'])}"
+    return ""
+
+
+def _blocked(prefix: str, card: dict) -> str:
+    return f"{prefix} " + " ".join(card["blockers"])
+
+
+def fee_action_answer(card: dict, summary: dict) -> tuple[str, list[Reference]]:
+    """The sentence above a fee action card. Wording only: every figure is the
+    card's own."""
+    sources = _fee_sources(summary, [summary["fee"]] if summary.get("fee") else [])
+    kind, title = card["kind"], card["case_title"]
+    if kind == "create_fee":
+        phrase = _CATEGORY_PHRASE.get(card["category"], "a charge")
+        amount = _inr(card["amount"]) if card["amount"] else "your default appearance fee"
+        if card["blockers"]:
+            return _blocked(f"I cannot add {phrase} on {title} yet.", card), sources
+        return (
+            f"Ready to add {phrase} of {amount} on {title}{_hearing_text(card)}. "
+            "Check the details and confirm below.",
+            sources,
+        )
+    label = _fee_label(card)
+    if kind == "update_fee":
+        if card["blockers"]:
+            return _blocked(f"{label} on {title} cannot be changed.", card), sources
+        current, proposed = card["current"], card["proposed"]
+        parts = []
+        if "amount" in proposed:
+            parts.append(f"the amount from {_inr(current['amount'])} to {_inr(proposed['amount'])}")
+        if "category" in proposed:
+            parts.append(
+                f"the category from {_CATEGORY_NOUN.get(current['category'], current['category'])} "
+                f"to {_CATEGORY_NOUN.get(proposed['category'], proposed['category'])}"
+            )
+        if "description" in proposed:
+            parts.append("the description")
+        text = f"Ready to change {' and '.join(parts)} on {label.lower() if label.startswith('The') else label} ({title})."
+        if card["regenerates_invoice"]:
+            text += f" The invoice PDF will be made again under the same number, {card['invoice_number']}."
+        return text + " Confirm below.", sources
+    if kind == "generate_invoice":
+        if card["blockers"]:
+            return _blocked(f"An invoice cannot be generated for the {title} fee yet.", card), sources
+        noun = _CATEGORY_NOUN.get(card["category"], "fee")
+        return (
+            f"Ready to generate the invoice for the {noun} of {_inr(card['amount'])} on {title}. "
+            "Generating it does not send it. Confirm below.",
+            sources,
+        )
+    if card["blockers"]:
+        return _blocked(f"The fee on {title} cannot be deleted.", card), sources
+    noun = _CATEGORY_NOUN.get(card["category"], "fee")
+    return (
+        f"Ready to delete the {noun} of {_inr(card['amount'])} on {title}, which has no invoice yet. "
+        "This cannot be undone. Confirm below.",
+        sources,
+    )
+
+
+def draft_answer(card: dict) -> tuple[str, list[Reference]]:
+    sources = [case_ref({"id": card["case_id"], "title": card["case_title"]})]
+    return (
+        f"Ready to start a {card['subtype_label'].lower()} draft for {card['case_title']}. "
+        "Check the instructions below and confirm to start it. Nothing is sent, and you review the draft before using it.",
+        sources,
+    )
+
+
+_REPORT_ROWS = {
+    "billing": ("fee", "fees"),
+    "hearings": ("hearing", "hearings"),
+    "cases": ("active case", "active cases"),
+    "deadlines": ("open task", "open tasks"),
+}
+
+
+def report_answer(summary: dict) -> tuple[str, list[Reference]]:
+    singular, plural = _REPORT_ROWS[summary["kind"]]
+    count = summary["row_count"]
+    period = "" if summary["kind"] == "cases" else f" for {summary['period_text']}" if summary["period_text"] != "All dates" else ""
+    if count == 0:
+        text = f"Your {summary['title'].lower()}{period} is ready, but no {plural} are recorded in Case Intel for it."
+    else:
+        text = f"Your {summary['title'].lower()}{period} is ready with {_n(count, singular, plural)}."
+    if summary["kind"] == "billing" and count:
+        figures = dict(summary["totals"])
+        text += (
+            f" Invoiced {figures.get('Invoiced (including paid)')}, paid {figures.get('Paid')}, "
+            f"outstanding {figures.get('Outstanding (invoiced, not paid)')}."
+        )
+    return text + " Download it below as a PDF or a Word file.", []
+
+
+# ---------------------------------------------------------------------------
 # Which references a read result contains
 # ---------------------------------------------------------------------------
 

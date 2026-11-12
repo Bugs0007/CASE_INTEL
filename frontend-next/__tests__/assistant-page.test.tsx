@@ -400,7 +400,7 @@ describe("past practice conversations", () => {
     const turn = rebuilt[1].role === "assistant" ? rebuilt[1].turn : null;
     expect(turn?.answer).toBe("I can send invoice INV-9 to the client.");
     expect(turn?.sources.map((s) => s.label)).toEqual(["Alpha vs Beta"]);
-    expect(turn?.action_card?.fee_id).toBe(55);
+    expect(turn?.action_card).toMatchObject({ kind: "send_invoice", fee_id: 55 });
   });
 
   it("shows the answer, sources and invoice card, and sends nothing until confirmed", async () => {

@@ -93,6 +93,8 @@ export function BriefForm({
         >
           <option value="status_memo">Case status memo</option>
           <option value="personal_note">Personal note</option>
+          <option value="client_letter">Letter to the client</option>
+          <option value="list_of_dates">List of dates</option>
         </select>
       </div>
 

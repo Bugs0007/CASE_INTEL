@@ -7,7 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { PracticeCaseCandidate, PracticeTurn } from "@/types/practice";
 import { formatAsOf } from "./format";
+import { PracticeActionCards } from "./practice-action-cards";
 import { PracticeInvoiceActionCard } from "./practice-invoice-action-card";
+import { PracticeReportCard } from "./practice-report-card";
 import { referenceHref } from "./routes";
 
 /** The closed set of questions the assistant answers from the chips. */
@@ -84,7 +86,7 @@ function AssistantTurn({ id, turn, handlers }: { id: string; turn: PracticeTurn;
         </div>
       )}
 
-      {turn.action_card && (
+      {turn.action_card?.kind === "send_invoice" && (
         <PracticeInvoiceActionCard
           card={turn.action_card}
           caseTitle={caseTitle}
@@ -93,6 +95,10 @@ function AssistantTurn({ id, turn, handlers }: { id: string; turn: PracticeTurn;
           onDismiss={() => handlers.onDismissAction(id)}
         />
       )}
+      {turn.action_card && turn.action_card.kind !== "send_invoice" && (
+        <PracticeActionCards card={turn.action_card} onDismiss={() => handlers.onDismissAction(id)} />
+      )}
+      {turn.report && <PracticeReportCard card={turn.report} />}
 
       {turn.sources.length > 0 && (
         <ul aria-label="Sources" className="flex flex-wrap gap-1.5">

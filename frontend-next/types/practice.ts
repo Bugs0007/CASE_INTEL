@@ -12,7 +12,13 @@ export type PracticeIntent =
   | "missing_next_date"
   | "case_facts"
   | "billing_summary"
-  | "propose_invoice_send";
+  | "propose_invoice_send"
+  | "propose_fee_create"
+  | "propose_fee_update"
+  | "propose_invoice_generate"
+  | "propose_fee_delete"
+  | "practice_report"
+  | "propose_draft";
 export type PracticeTurnStatus = "answer" | "needs_clarification" | "partial";
 
 /** A pointer to one owned record. Build links from `kind`, never from text. */
@@ -103,6 +109,89 @@ export interface PracticeActionCard {
   blockers: string[];
 }
 
+export type PracticeFeeCategory = "appearance" | "hotel" | "flight" | "other";
+
+interface PracticeCardBase {
+  case_id: number;
+  case_title: string;
+  /** non-empty = cannot be confirmed */
+  blockers: string[];
+}
+
+export interface PracticeCreateFeeCard extends PracticeCardBase {
+  kind: "create_fee";
+  hearing_id: number | null;
+  hearing_options: { id: number; label: string; date: string }[];
+  category: PracticeFeeCategory;
+  /** null = use the profile default (appearance only) */
+  amount: string | null;
+  description: string;
+}
+
+export interface PracticeFeeFields {
+  amount?: string;
+  category?: PracticeFeeCategory;
+  description?: string;
+}
+
+export interface PracticeUpdateFeeCard extends PracticeCardBase {
+  kind: "update_fee";
+  fee_id: number;
+  invoice_number: string | null;
+  fee_status: string;
+  current: { amount: string; category: PracticeFeeCategory; description: string };
+  /** only the fields that change */
+  proposed: PracticeFeeFields;
+  regenerates_invoice: boolean;
+}
+
+export interface PracticeGenerateInvoiceCard extends PracticeCardBase {
+  kind: "generate_invoice";
+  fee_id: number;
+  amount: string;
+  category: PracticeFeeCategory;
+}
+
+export interface PracticeDeleteFeeCard extends PracticeCardBase {
+  kind: "delete_fee";
+  fee_id: number;
+  amount: string;
+  category: PracticeFeeCategory;
+  fee_status: string;
+}
+
+export type PracticeDraftSubtype = "status_memo" | "personal_note" | "client_letter" | "list_of_dates";
+
+export interface PracticeStartDraftCard extends PracticeCardBase {
+  kind: "start_draft";
+  subtype: PracticeDraftSubtype;
+  subtype_label: string;
+  instructions: string;
+}
+
+/** Every card the assistant can propose. Each is only a proposal. */
+export type PracticeAnyActionCard =
+  | PracticeActionCard
+  | PracticeCreateFeeCard
+  | PracticeUpdateFeeCard
+  | PracticeGenerateInvoiceCard
+  | PracticeDeleteFeeCard
+  | PracticeStartDraftCard;
+
+export type PracticeReportKind = "billing" | "hearings" | "cases" | "deadlines";
+export type PracticeReportFormat = "pdf" | "docx";
+
+/** A report the server built from the advocate's data. Files are fetched
+ * from the fields here, never from a URL in the response. */
+export interface PracticeReportCard {
+  kind: PracticeReportKind;
+  title: string;
+  date_from: string | null;
+  date_to: string | null;
+  row_count: number;
+  formats: PracticeReportFormat[];
+}
+
 export interface PracticeTurn {
   conversation_id: number;
   user_message_id: number;
@@ -113,7 +202,8 @@ export interface PracticeTurn {
   sources: PracticeReference[];
   summary: Record<string, unknown> | null;
   case_candidates: PracticeCaseCandidate[];
-  action_card: PracticeActionCard | null;
+  action_card: PracticeAnyActionCard | null;
+  report?: PracticeReportCard | null;
   as_of: string;
 }
 

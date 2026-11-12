@@ -1,7 +1,8 @@
 import type { PracticeMessage } from "@/components/dashboard/practice/practice-assistant-panel";
 import type { Message } from "@/types/chat";
 import type {
-  PracticeActionCard,
+  PracticeAnyActionCard,
+  PracticeReportCard,
   PracticeCaseCandidate,
   PracticeIntent,
   PracticeReference,
@@ -18,7 +19,8 @@ interface RequestMarker {
     status?: PracticeTurnStatus;
     summary?: Record<string, unknown> | null;
     case_candidates?: PracticeCaseCandidate[];
-    action_card?: PracticeActionCard | null;
+    action_card?: PracticeAnyActionCard | null;
+    report?: PracticeReportCard | null;
     as_of?: string;
   };
 }
@@ -68,6 +70,7 @@ export function rebuildPracticeMessages(messages: Message[], conversationId: num
           summary: turn?.summary ?? null,
           case_candidates: turn?.case_candidates ?? [],
           action_card: turn?.action_card ?? null,
+          report: turn?.report ?? null,
           as_of: turn?.as_of ?? message.created_at,
         } satisfies PracticeTurn,
       });

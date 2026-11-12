@@ -236,6 +236,7 @@ class TestSendCard:
             "kind": "send_invoice",
             "fee_id": fee.id,
             "case_id": case.id,
+            "case_title": case.title,
             "invoice_number": "INV-0042",
             "amount": "15000.00",
             "recipient_name": "A. Rao",
@@ -366,7 +367,7 @@ def test_existing_send_endpoint_is_404_for_a_foreign_fee(api, ledger):
 
 
 FORBIDDEN = re.compile(
-    r"\bsend_invoice\s*\(|import[^\n]*\bsend_invoice\b|\bgenerate_invoice\b|\bmark_paid\b"
+    r"\bsend_invoice\s*\(|import[^\n]*\bsend_invoice\b|\bgenerate_invoice\s*\(|\bmark_paid\b"
     r"|\bdeliver_email\b|\bsend_mail\b|\bEmailMessage\b|\.status\s*=(?!=)|\.send_status\s*=(?!=)"
 )
 

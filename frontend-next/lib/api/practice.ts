@@ -1,5 +1,11 @@
-import type { PracticeChatRequest, PracticeOverview, PracticeTurn } from "@/types/practice";
-import { apiClient } from "./client";
+import type {
+  PracticeChatRequest,
+  PracticeOverview,
+  PracticeReportCard,
+  PracticeReportFormat,
+  PracticeTurn,
+} from "@/types/practice";
+import { apiBlob, apiClient } from "./client";
 
 export interface PracticeOverviewParams {
   /** YYYY-MM-DD, India day */
@@ -21,5 +27,12 @@ export const practiceApi = {
     apiClient<PracticeTurn>("/practice-assistant/chat/", {
       method: "POST",
       body: JSON.stringify(data),
+    }),
+
+  /** A report file, built from the card's fields. Fetched as a blob: the
+   * endpoint needs the auth header. Never a `format` query parameter. */
+  report: (card: Pick<PracticeReportCard, "kind" | "date_from" | "date_to">, format: PracticeReportFormat) =>
+    apiBlob(`/practice-assistant/reports/${card.kind}/${format}/`, {
+      params: { date_from: card.date_from ?? "", date_to: card.date_to ?? "" },
     }),
 };

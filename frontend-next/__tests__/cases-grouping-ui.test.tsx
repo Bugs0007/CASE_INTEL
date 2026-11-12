@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { QueryClientProvider, QueryClient } from "@tanstack/react-query";
 import CasesPage from "@/app/(dashboard)/cases/page";
 import { collapsedStorageKey, groupingStorageKey } from "@/hooks/use-cases-grouping";
+import { viewStorageKey } from "@/components/cases/list/use-cases-view";
 import type { Case } from "@/types";
 
 // "Group by court / client" on the Cases page: headers with counts, folding a
@@ -108,6 +109,8 @@ const isInert = (button: HTMLElement) => panelOf(button).closest("[inert]") !== 
 beforeEach(() => {
   vi.clearAllMocks();
   window.localStorage.clear();
+  // Cards are the default; these tests exercise the list, so choose it explicitly.
+  window.localStorage.setItem(viewStorageKey(null), "list");
   window.history.replaceState(null, "", "/cases");
   vi.mocked(useDeleteCase).mockReturnValue({ mutateAsync: vi.fn(), variables: undefined } as unknown as ReturnType<typeof useDeleteCase>);
   vi.mocked(useUpcomingHearings).mockReturnValue({ data: [] } as unknown as ReturnType<typeof useUpcomingHearings>);

@@ -27,25 +27,32 @@ from typing import Optional
 
 from django.conf import settings
 
+from core.models import Case
 from core.services.ai_service_factory import get_llm_client
-from core.services.practice_assistant import answers, billing, reads
+from core.services.practice_assistant import actions, answers, billing, parsing, reads, reports
 from core.services.practice_assistant.contracts import (
     DEFAULT_RANGE_DAYS,
     HARD_ROW_CAP,
     INTENTS,
     MAX_RANGE_DAYS,
     PAGE_SIZE,
+    REPORT_KINDS,
     SCOPE_PERSONAL,
 )
 
 logger = logging.getLogger(__name__)
 
 # The billing intents run only while settings.PRACTICE_INVOICE_ACTIONS_ENABLED
-# is on (checked per request). Off, a turn classified as one is told so and
-# never gets an action card. They only read: nothing in this module sends mail,
-# generates an invoice or changes a fee.
+# is on (checked per request), the draft intent only while
+# settings.CASE_DRAFTING_ENABLED is. Off, a turn classified as one is told so
+# and never gets a card. Nothing in this module writes: no mail is sent, no
+# invoice generated, no fee or draft created. A `propose_*` intent builds an
+# action card from the owner's rows; the advocate's click calls the existing
+# endpoint (see practice_assistant/actions.py).
 READ_INTENTS = ("overview", "calendar", "open_deadlines", "missing_next_date", "case_facts")
 BILLING_INTENTS = ("billing_summary", "propose_invoice_send")
+FEE_INTENTS = actions.FEE_ACTION_INTENTS
+GATED_BILLING_INTENTS = BILLING_INTENTS + FEE_INTENTS
 
 # The whole model budget of one turn: the intent classifier, once.
 MAX_LLM_CALLS_PER_TURN = 1
@@ -124,6 +131,14 @@ def invoice_actions_enabled() -> bool:
     return bool(getattr(settings, "PRACTICE_INVOICE_ACTIONS_ENABLED", False))
 
 
+def drafting_enabled() -> bool:
+    return bool(getattr(settings, "CASE_DRAFTING_ENABLED", False))
+
+
+def assistant_enabled() -> bool:
+    return bool(getattr(settings, "PRACTICE_ASSISTANT_ENABLED", False))
+
+
 def route_deterministic(
     query: str,
     *,
@@ -135,6 +150,12 @@ def route_deterministic(
     """(intent, args) when the rules below place the question, else None.
     First match wins:
 
+     -3. "draft / write / prepare ... a memo, note, letter or list of dates"
+                                                          -> propose_draft
+     -2. "report", "export", "as a PDF" (no case selected) -> practice_report
+     -1. a command that starts with delete / change / generate invoice / add
+         and names a fee, charge or invoice               -> a propose_fee_* or
+                                                             propose_invoice_generate
       0. billing words, only when `billing_enabled`       -> a billing intent
          (a `case_id` then narrows it instead of selecting case_facts)
       1. a verified `case_id` came with the request      -> case_facts
@@ -152,6 +173,13 @@ def route_deterministic(
      10. overview, portfolio, "how many cases"            -> overview
     """
     text = _normalise(query)
+    if parsing.parse_draft_request(text):
+        return "propose_draft", {}
+    if case_id is None and parsing.wants_report(text):
+        return "practice_report", {}
+    mutation = parsing.parse_fee_mutation(text)
+    if mutation:
+        return mutation, {}
     if billing_enabled and _BILLING_RE.search(text):
         return ("propose_invoice_send" if _SEND_RE.search(text) else "billing_summary"), {}
     if case_id is not None:
@@ -201,11 +229,18 @@ _CLASSIFIER_SYSTEM = (
     "Reply with a single JSON object and nothing else: "
     '{"intent": one of ' + ", ".join(f'"{name}"' for name in INTENTS) + ', or "none", '
     '"date_from": "YYYY-MM-DD" or null, "date_to": "YYYY-MM-DD" or null, '
-    '"case_text": a case number, CNR or party name copied from the question, or null}. '
+    '"case_text": a case number, CNR or party name copied from the question, or null, '
+    '"subtype": "status_memo", "personal_note", "client_letter" or "list_of_dates" for a draft, else null, '
+    '"report_kind": "billing", "hearings", "cases" or "deadlines" for a report, else null}. '
     "overview = counts across all cases. calendar = hearings, tasks and events on dates "
     "(give the dates, at most 31 days). open_deadlines = open tasks and due dates. "
     "missing_next_date = active cases with no next hearing date. case_facts = anything about "
     "one named case (set case_text). billing_summary and propose_invoice_send = fees and invoices. "
+    "propose_fee_create, propose_fee_update, propose_invoice_generate and propose_fee_delete = a "
+    "request to add, change, invoice or delete a fee (set case_text if a case is named). "
+    "practice_report = a request for a downloadable report (set report_kind). "
+    "propose_draft = a request to start a memo, note, letter or list of dates for one case "
+    "(set subtype and case_text). "
     'Use "none" when the question is about anything else. Never answer the question.'
 )
 
@@ -227,7 +262,7 @@ def _classify_with_model(query: str, today: date) -> Optional[dict]:
                 {"role": "user", "content": f"Today (India): {today.isoformat()}\nQuestion: {query}"},
             ],
             temperature=0,
-            max_tokens=120,
+            max_tokens=160,
             # The HyDE mechanism: a per-call timeout makes this a single
             # attempt of that length, no retries (LLMClient._client_for).
             timeout=budget,
@@ -261,6 +296,19 @@ def _from_model(data: dict, *, selected_day: Optional[date], today: date) -> dic
     intent = data.get("intent")
     if intent in BILLING_INTENTS:
         return {"intent": intent, "args": {}}
+    case_text = data.get("case_text")
+    case_text = case_text.strip()[:MAX_CASE_TEXT] if isinstance(case_text, str) else ""
+    if intent in FEE_INTENTS:
+        return {"intent": intent, "args": {"case_text": case_text} if case_text else {}}
+    if intent == "practice_report":
+        kind = data.get("report_kind")
+        return {"intent": intent, "args": {"report_kind": kind} if kind in REPORT_KINDS else {}}
+    if intent == "propose_draft":
+        subtype = data.get("subtype")
+        args = {"subtype": subtype} if subtype in actions.DRAFT_SUBTYPES else {}
+        if case_text:
+            args["case_text"] = case_text
+        return {"intent": intent, "args": args}
     if intent not in READ_INTENTS:
         return _clarify(answers.FALLBACK_CLARIFICATION)
     if intent == "calendar":
@@ -308,6 +356,7 @@ def validate_scope(state: dict) -> dict:
         "sources": [],
         "case_candidates": [],
         "action_card": None,
+        "report": None,
     }
 
 
@@ -392,16 +441,149 @@ def _read_billing(state: dict) -> dict:
     return {"summary": summary, "action_card": card}
 
 
+def _case_summary(case: Case) -> dict:
+    return {"cases": [{"id": case.id, "title": case.title}]}
+
+
+def _resolve_case(state: dict, *, no_text_message: str = answers.CASE_TEXT_NEEDED) -> tuple[Optional[Case], Optional[dict]]:
+    """The one case a command is about, as (case, None), or (None, a state
+    update that asks the advocate). A verified `case_id` (the chooser's pick)
+    is the case. Text from the question or the model is only ever searched
+    for under the owner and offered as a chooser; it becomes the case itself
+    only when the advocate typed that case's exact number or CNR."""
+    owner, query, intent = state["owner"], state["query"], state["intent"]
+    case_id = state.get("case_id")
+    if case_id is not None:
+        case = Case.objects.filter(id=case_id, owner=owner).first()
+        if case is None:
+            return None, _clarify(answers.CASE_NOT_FOUND, intent)
+        return case, None
+
+    model_text = state["args"].get("case_text")
+    needles = ([model_text] if model_text else []) + parsing.case_text_needles(query)
+    if not needles:
+        return None, _clarify(no_text_message, intent)
+    for needle in needles:
+        candidates = reads.resolve_case_candidates(owner=owner, text=needle, limit=CASE_CANDIDATE_LIMIT)
+        if candidates:
+            break
+    else:
+        return None, _clarify(answers.CASE_NOT_FOUND, intent)
+    if len(candidates) == 1:
+        case = Case.objects.filter(id=candidates[0]["id"], owner=owner).first()
+        wanted = _squash(needle)
+        if (
+            case is not None
+            and wanted
+            and wanted in _squash(query)
+            and wanted in (_squash(case.case_number), _squash(case.cnr_number))
+        ):
+            return case, None
+    return None, {**_clarify(answers.CHOOSE_CASE, intent), "case_candidates": candidates}
+
+
+def _read_fee_action(state: dict) -> dict:
+    """A card for adding, changing, invoicing or deleting one fee. Every field
+    is read from the owner's rows or from the advocate's own words."""
+    intent, owner, now, query = state["intent"], state["owner"], state["now"], state["query"]
+    if intent == "propose_fee_create":
+        case, ask = _resolve_case(state)
+        if ask:
+            return ask
+        return {
+            "summary": _case_summary(case),
+            "action_card": actions.build_create_card(owner=owner, case=case, query=query, now=now),
+        }
+
+    named = billing.named_fees(owner=owner, text=query, case_id=state.get("case_id"))
+    if len(named) > 1:
+        return _clarify(answers.MANY_INVOICES, intent)
+    if named:
+        fee = named[0]
+    else:
+        case, ask = _resolve_case(state, no_text_message=answers.WHICH_FEE)
+        if ask:
+            return ask
+        fee = actions.select_fee(intent, billing.case_fees(owner=owner, case_id=case.id))
+        if fee is None:
+            return _clarify(answers.no_fees_for_case(case.title), intent)
+
+    if intent == "propose_fee_update":
+        proposed = actions.proposed_changes(fee, query)
+        if not proposed:
+            return _clarify(answers.NOTHING_TO_CHANGE, intent)
+        card = actions.build_update_card(fee=fee, proposed=proposed)
+    elif intent == "propose_invoice_generate":
+        card = actions.build_generate_card(fee=fee)
+    else:
+        card = actions.build_delete_card(fee=fee)
+    rows = billing.candidate_rows([fee])
+    summary = {"fee": rows[0], "cases": billing.case_list(rows)}
+    return {"summary": summary, "action_card": card}
+
+
+def _read_draft(state: dict) -> dict:
+    intent, query = state["intent"], state["query"]
+    subtype = state["args"].get("subtype") or parsing.parse_draft_request(query)
+    if subtype not in actions.DRAFT_SUBTYPES:
+        return _clarify(answers.DRAFT_KIND_NEEDED, intent)
+    case, ask = _resolve_case(state)
+    if ask:
+        return ask
+    return {
+        "summary": _case_summary(case),
+        "action_card": actions.build_draft_card(case=case, subtype=subtype, query=query),
+    }
+
+
+def _read_report(state: dict) -> dict:
+    """A report card for a downloadable file (the file itself is the report
+    endpoint's job). The data is built once here only to count its rows."""
+    intent, today = state["intent"], state["now"].date()
+    kind = state["args"].get("report_kind") or parsing.parse_report_kind(state["query"])
+    if kind not in REPORT_KINDS:
+        return _clarify(answers.REPORT_KIND_NEEDED, intent)
+    period = parsing.parse_period(state["query"], today=today)
+    try:
+        report = reports.build_report(
+            owner=state["owner"],
+            kind=kind,
+            date_from=period[0] if period else None,
+            date_to=period[1] if period else None,
+            now=state["now"],
+        )
+    except reports.ReportError as exc:
+        return _clarify(str(exc), intent)
+    summary = {
+        "kind": report["kind"],
+        "title": report["title"],
+        "period_text": report["period_text"],
+        "row_count": report["row_count"],
+        "totals": reports.totals_for_answer(report),
+    }
+    return {"summary": summary, "report": reports.report_card(report)}
+
+
 def run_read(state: dict) -> dict:
     """The typed read for the chosen intent, under the request's owner."""
     if state["answer"]:
         return {}
     intent = state["intent"]
     owner, now = state["owner"], state["now"]
-    if intent in BILLING_INTENTS:
+    if intent in GATED_BILLING_INTENTS:
         if not invoice_actions_enabled():
-            return _clarify(answers.BILLING_NOT_AVAILABLE, intent)
-        return _read_billing(state)
+            return _clarify(
+                answers.FEE_ACTIONS_OFF if intent in FEE_INTENTS else answers.BILLING_NOT_AVAILABLE, intent
+            )
+        return _read_fee_action(state) if intent in FEE_INTENTS else _read_billing(state)
+    if intent == "propose_draft":
+        if not drafting_enabled():
+            return _clarify(answers.DRAFTING_OFF, intent)
+        return _read_draft(state)
+    if intent == "practice_report":
+        if not assistant_enabled():
+            return _clarify(answers.REPORTS_OFF, intent)
+        return _read_report(state)
     if intent == "overview":
         return {"summary": reads.portfolio_snapshot(owner=owner, page=1, page_size=PAGE_SIZE, now=now)}
     if intent == "calendar":
@@ -436,6 +618,12 @@ def present(state: dict) -> dict:
         return {}
     if state["intent"] == "billing_summary":
         text, sources = answers.billing_summary_answer(state["summary"])
+    elif state["intent"] in FEE_INTENTS:
+        text, sources = answers.fee_action_answer(state["action_card"], state["summary"])
+    elif state["intent"] == "propose_draft":
+        text, sources = answers.draft_answer(state["action_card"])
+    elif state["intent"] == "practice_report":
+        text, sources = answers.report_answer(state["summary"])
     elif state["intent"] == "propose_invoice_send":
         card = state.get("action_card")
         text, sources = answers.invoice_send_answer(state["summary"], card)
