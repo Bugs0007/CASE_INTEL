@@ -101,6 +101,11 @@ export interface Case {
   last_fetched_at: string | null;
   needs_attention: boolean;
   next_hearing_date: string | null;
+  /** The court's name -- from the latest court-record fetch, else a hearing's
+   * recorded court, else the High Court named by the CNR; null when none is
+   * known. What "Group by court" groups on. Optional: a server older than
+   * this field leaves it out (every case then lands in "No court set"). */
+  court_name?: string | null;
   fee_summary: CaseFeeSummary;
   order_sync: OrderSyncStatus;
   // --- Case detail only (GET /api/cases/<id>/, CaseDetailSerializer) ---

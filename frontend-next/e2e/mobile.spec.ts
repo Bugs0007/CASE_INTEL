@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { mobileCases, mobileHearings, mockMobileApi } from "./mobile-fixtures";
+import { mockFeeApi } from "./billing-fixtures";
 
 // The phone layouts (< 768px wide): nothing scrolls sideways, the key content
 // of each screen shows, the bottom bar works, and the sheets behave. The API
@@ -378,9 +379,14 @@ test("the calendar is an agenda: pick a day from the week strip", async ({ page 
 });
 
 test("billing shows a card per client, not a table", async ({ page }) => {
-  await openScreen(page, 390, "/billing");
+  // The charges come from /appearance-fees/ (billing-fixtures.ts): two clients owe money.
+  await page.setViewportSize({ width: 390, height: HEIGHT });
+  await mockMobileApi(page);
+  await mockFeeApi(page);
+  await page.goto("/billing");
+  await expect(page.getByRole("heading", { name: "Outstanding by client" })).toBeVisible();
   await expect(page.locator("table")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Statement" })).toHaveCount(2);
+  await expect(page.getByRole("button", { name: /^Statement for/ })).toHaveCount(2);
 });
 
 test("documents: filters fold away, actions are in a sheet", async ({ page }) => {

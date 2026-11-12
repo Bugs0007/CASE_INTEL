@@ -1,10 +1,12 @@
 from .account_lock import AccountLock
 from .advocate_profile import AdvocateProfile
 from .appearance_fee import AppearanceFee
+from .assistant_draft import AssistantDraft, AssistantDraftRevision, DraftOutput
 from .case import Case
 from .case_briefing import CaseBriefing
 from .case_business_entry import CaseBusinessEntry
 from .case_event import CaseEvent
+from .case_note import CaseNote
 from .case_tag import CaseTag, CaseTagMap
 from .client import Client
 from .client_contact import ClientContact
@@ -43,6 +45,10 @@ __all__ = [
     "SocialIdentity",
     "AdvocateProfile",
     "AppearanceFee",
+    "AssistantDraft",
+    "AssistantDraftRevision",
+    "DraftOutput",
+    "CaseNote",
     "Case",
     "CaseBriefing",
     "CaseBusinessEntry",

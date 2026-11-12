@@ -12,3 +12,9 @@ export const WALKTHROUGH_ENABLED = true;
  * components/dashboard/portfolio-bot-slot.tsx.
  */
 export const PORTFOLIO_BOT_ENABLED = process.env.NEXT_PUBLIC_PORTFOLIO_BOT === "true";
+
+/**
+ * Case drafting ("Draft with assistant" on the case page). Off unless
+ * NEXT_PUBLIC_CASE_DRAFTING is "true". Saved case notes stay visible either way.
+ */
+export const CASE_DRAFTING_ENABLED = process.env.NEXT_PUBLIC_CASE_DRAFTING === "true";
