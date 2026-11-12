@@ -77,28 +77,32 @@ function names() {
 }
 
 describe("Documents page", () => {
-  it("renders the table columns and a row per document", async () => {
+  it("renders a card per document and no table", () => {
     render(<DocumentsPage />);
-    // Grouped by case (the default), the group header names the case.
-    for (const col of ["Name", "Date", "Size", "Status"]) {
-      expect(screen.getByRole("columnheader", { name: new RegExp(col, "i") })).toBeInTheDocument();
-    }
-    expect(screen.queryByRole("columnheader", { name: /^Case$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
     expect(names()).toHaveLength(4);
-    await userEvent.setup().click(screen.getByRole("button", { name: "None" }));
-    expect(screen.getByRole("columnheader", { name: /^Case$/i })).toBeInTheDocument();
+    // Grouped by case (the default): the group header names the case, the card does not repeat the case link.
+    expect(screen.getAllByRole("link", { name: /Sharma v State/ }).length).toBeGreaterThan(0);
   });
 
-  it("shows a status badge only for documents that are not completed", () => {
+  it("shows a status chip only for documents that are not completed", () => {
     render(<DocumentsPage />);
-    const rows = screen.getAllByRole("row");
-    const rowOf = (name: string) => rows.find((r) => within(r).queryByText(name))!;
-    expect(rowOf("alpha.pdf").querySelector(".ci-chip")).toBeNull();
-    expect(rowOf("delta.pdf").querySelector(".ci-chip")).not.toBeNull();
-    expect(rowOf("bravo.pdf").querySelector(".ci-chip--alert")).not.toBeNull();
+    const cardOf = (name: string) => screen.getByText(name).closest(".ci-card") as HTMLElement;
+    expect(cardOf("alpha.pdf").querySelector(".ci-chip--ok, .ci-chip--pending, .ci-chip--alert")).toBeNull();
+    expect(cardOf("delta.pdf").querySelector(".ci-chip--pending")).not.toBeNull();
+    expect(cardOf("bravo.pdf").querySelector(".ci-chip--alert")).not.toBeNull();
   });
 
-  it("shows Retry inline only on failed rows", async () => {
+  it("shows case, date and size on a card", () => {
+    render(<DocumentsPage />);
+    const card = screen.getByText("charlie.pdf").closest(".ci-card") as HTMLElement;
+    expect(within(card).getByText("Rao v Rao")).toBeInTheDocument();
+    expect(within(card).getByText("CS/7/2025")).toBeInTheDocument();
+    expect(within(card).getByText("Oct 9, 2026")).toBeInTheDocument();
+    expect(within(card).getByText("8.8 KB")).toBeInTheDocument();
+  });
+
+  it("shows Retry only on failed cards", async () => {
     render(<DocumentsPage />);
     const retry = screen.getAllByRole("button", { name: "Retry" });
     expect(retry).toHaveLength(1);
@@ -107,13 +111,13 @@ describe("Documents page", () => {
     expect(h.view).not.toHaveBeenCalled();
   });
 
-  it("opens the viewer when a row is clicked", () => {
+  it("opens the viewer when a card is clicked", () => {
     render(<DocumentsPage />);
-    fireEvent.click(screen.getByText("alpha.pdf").closest("tr")!);
+    fireEvent.click(screen.getByText("alpha.pdf").closest(".ci-card")!);
     expect(h.view).toHaveBeenCalledWith(1, expect.anything());
   });
 
-  it("has View, Edit, Retry and Delete in the row menu", async () => {
+  it("has View, Edit, Retry and Delete in the card menu", async () => {
     render(<DocumentsPage />);
     await userEvent.click(screen.getByRole("button", { name: "Actions for bravo.pdf" }));
     const menu = screen.getByRole("menu", { name: "Document actions" });
@@ -136,6 +140,9 @@ describe("Documents page", () => {
 
   it("groups by case with counts, newest case first, and collapses", async () => {
     render(<DocumentsPage />);
+    // A flat grid by default; grouping by case is one click away.
+    expect(screen.queryByRole("button", { expanded: true })).not.toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Case" }));
     const heads = screen.getAllByRole("button", { expanded: true });
     const labels = heads.map((b) => b.getAttribute("aria-label"));
     expect(labels).toEqual(["Collapse Rao v Rao", "Collapse Sharma v State", "Collapse No case"]);
@@ -172,18 +179,19 @@ describe("Documents page", () => {
     expect(screen.getByText("1 document across all cases")).toBeInTheDocument();
   });
 
-  it("sorts by the column header, flipping direction on a second click", async () => {
+  it("sorts with the Sort by select", async () => {
     render(<DocumentsPage />);
     await userEvent.click(screen.getByRole("button", { name: "None" }));
-    // default: date, newest first
+    const sort = screen.getByRole("combobox", { name: "Sort by" });
+    // default: newest first
     expect(names()).toEqual(["charlie.pdf", "alpha.pdf", "bravo.pdf", "delta.pdf"]);
-    await userEvent.click(screen.getByRole("button", { name: /^Name/ }));
+    await userEvent.selectOptions(sort, "oldest");
+    expect(names()).toEqual(["delta.pdf", "bravo.pdf", "alpha.pdf", "charlie.pdf"]);
+    await userEvent.selectOptions(sort, "name");
     expect(names()).toEqual(["alpha.pdf", "bravo.pdf", "charlie.pdf", "delta.pdf"]);
-    await userEvent.click(screen.getByRole("button", { name: /^Name/ }));
-    expect(names()).toEqual(["delta.pdf", "charlie.pdf", "bravo.pdf", "alpha.pdf"]);
-    await userEvent.click(screen.getByRole("button", { name: /^Size/ }));
+    await userEvent.selectOptions(sort, "size");
     expect(names()[0]).toBe("charlie.pdf");
-    expect(screen.getByRole("columnheader", { name: /Size/ })).toHaveAttribute("aria-sort", "descending");
+    expect(names()[3]).toBe("bravo.pdf");
   });
 
   it("has a Failed (n) chip that filters to failed documents", async () => {

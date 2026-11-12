@@ -37,7 +37,10 @@ export const appearanceFeesApi = {
       body: JSON.stringify(data),
     }),
 
-  update: (id: number, data: { amount?: string; notes?: string; category?: FeeCategory }) =>
+  update: (
+    id: number,
+    data: { amount?: string; notes?: string; description?: string; category?: FeeCategory; hearing?: number },
+  ) =>
     apiClient<AppearanceFee>(`/appearance-fees/${id}/`, {
       method: "PATCH",
       body: JSON.stringify(data),

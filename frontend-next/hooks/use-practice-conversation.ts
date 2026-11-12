@@ -10,7 +10,12 @@ import {
   useSendPracticeChat,
 } from "@/hooks/use-practice-assistant";
 import type { PracticeMessage } from "@/components/dashboard/practice/practice-assistant-panel";
-import type { PracticeChatRequest } from "@/types/practice";
+import type { PracticeChatRequest, PracticeTurn } from "@/types/practice";
+
+/** The send-invoice card of a turn, if that is the card it carries. */
+function sendCardOf(turn: PracticeTurn) {
+  return turn.action_card?.kind === "send_invoice" ? turn.action_card : null;
+}
 
 interface Options {
   /** Messages already in the conversation (a past chat being reopened). */
@@ -110,8 +115,8 @@ export function usePracticeConversation({ initialMessages = [], conversationId: 
 
   function confirm(feeId: number) {
     if (sending.current || confirmingFeeId !== null) return;
-    const owner = messages.find((m) => m.role === "assistant" && m.turn.action_card?.fee_id === feeId);
-    const card = owner && owner.role === "assistant" ? owner.turn.action_card : null;
+    const owner = messages.find((m) => m.role === "assistant" && sendCardOf(m.turn)?.fee_id === feeId);
+    const card = owner && owner.role === "assistant" ? sendCardOf(owner.turn) : null;
     if (!card) return;
     const label = card.invoice_number ? `Invoice ${card.invoice_number}` : "The invoice";
     sending.current = true;
@@ -127,7 +132,7 @@ export function usePracticeConversation({ initialMessages = [], conversationId: 
             : "Mail is not configured on this server. The send was recorded but no email went out.";
           setMessages((current) => [
             ...current.map((m) =>
-              m.role === "assistant" && m.turn.action_card?.fee_id === feeId
+              m.role === "assistant" && sendCardOf(m.turn)?.fee_id === feeId
                 ? { ...m, turn: { ...m.turn, action_card: null } }
                 : m,
             ),

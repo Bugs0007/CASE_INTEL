@@ -50,8 +50,41 @@ function Session({
     onAskConsumed?.(ask.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ask]);
+  // Keep the newest exchange in view: scroll down when a question goes out
+  // and when its answer arrives.
+  // Keep the newest exchange in view. The chat sticks to its end while the
+  // advocate is at (or near) the bottom, including when an opened chat or a
+  // card finishes laying out; scrolling up to read stops the following.
+  const scroller = useRef<HTMLDivElement>(null);
+  const atEnd = useRef(true);
+  useEffect(() => {
+    const box = scroller.current;
+    if (!box) return;
+    const toEnd = () => {
+      if (atEnd.current) box.scrollTop = box.scrollHeight;
+    };
+    const onScroll = () => {
+      atEnd.current = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+    };
+    box.addEventListener("scroll", onScroll, { passive: true });
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(toEnd);
+    if (box.firstElementChild) observer?.observe(box.firstElementChild);
+    toEnd();
+    return () => {
+      box.removeEventListener("scroll", onScroll);
+      observer?.disconnect();
+    };
+  }, []);
+  // A question just sent always brings the end back into view.
+  useEffect(() => {
+    if (!convo.pending) return;
+    atEnd.current = true;
+    const box = scroller.current;
+    if (box) box.scrollTop = box.scrollHeight;
+  }, [convo.pending]);
+
   return (
-    <div className="h-full overflow-y-auto overscroll-contain px-3 pt-3">
+    <div ref={scroller} className="h-full overflow-y-auto overscroll-contain px-3 pt-3">
       {convo.unavailable ? (
         <div role="alert" className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
           <p className="text-sm text-amber-900">The practice assistant is not switched on yet.</p>

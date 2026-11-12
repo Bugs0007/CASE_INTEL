@@ -17,6 +17,8 @@ const STATUS_LABEL: Record<DraftStatus, string> = {
 const TYPE_LABEL: Record<DraftSubtype, string> = {
   status_memo: "Case status memo",
   personal_note: "Personal note",
+  client_letter: "Letter to the client",
+  list_of_dates: "List of dates",
 };
 
 function formatTime(value: string): string {
