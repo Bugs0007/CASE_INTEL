@@ -9,19 +9,47 @@ import {
 import { useConversationMessages } from "@/hooks/use-chat";
 import { usePracticeConversation } from "@/hooks/use-practice-conversation";
 import { rebuildPracticeMessages } from "@/lib/practice-history";
+import type { AssistantAsk } from "@/providers/assistant-provider";
+import type { PracticeCaseCandidate } from "@/types/practice";
+
+/** The latest thing the advocate typed in this chat. */
+function lastQuestion(messages: PracticeMessage[]): string {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const message = messages[i];
+    if (message.role === "user") return message.text;
+  }
+  return "";
+}
 
 function Session({
   initialMessages,
   conversationId,
   onConversation,
   onUseCase,
+  ask,
+  onAskConsumed,
+  onAskInCase,
 }: {
   initialMessages: PracticeMessage[];
   conversationId?: number;
   onConversation: (id: number) => void;
   onUseCase?: () => void;
+  ask?: AssistantAsk | null;
+  onAskConsumed?: (id: number) => void;
+  onAskInCase?: (candidate: PracticeCaseCandidate, question: string) => void;
 }) {
   const convo = usePracticeConversation({ initialMessages, conversationId, onConversation });
+
+  // A question handed in from outside (the dashboard ask bar) is sent once,
+  // as the first message of this new chat.
+  const handledAsk = useRef<number | null>(null);
+  useEffect(() => {
+    if (!ask || !ask.send || ask.scope.kind !== "practice" || handledAsk.current === ask.id) return;
+    handledAsk.current = ask.id;
+    convo.send(ask.question, undefined, ask.selectedDay);
+    onAskConsumed?.(ask.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ask]);
   return (
     <div className="h-full overflow-y-auto overscroll-contain px-3 pt-3">
       {convo.unavailable ? (
@@ -46,6 +74,7 @@ function Session({
           onConfirmInvoice={convo.confirm}
           onDismissAction={convo.dismissAction}
           confirmingFeeId={convo.confirmingFeeId}
+          onAskInCase={onAskInCase ? (candidate) => onAskInCase(candidate, lastQuestion(convo.messages)) : undefined}
           stickyInput
         />
       )}
@@ -60,11 +89,19 @@ export function PracticeChat({
   conversationId,
   onConversationChange,
   onUseCase,
+  ask,
+  onAskConsumed,
+  onAskInCase,
 }: {
   conversationId: number | null;
   onConversationChange: (id: number | null) => void;
   /** Offered when the server has the practice assistant switched off. */
   onUseCase?: () => void;
+  /** A question waiting to be sent as this new chat's first message. */
+  ask?: AssistantAsk | null;
+  onAskConsumed?: (id: number) => void;
+  /** "Ask in this case" on a case candidate. */
+  onAskInCase?: (candidate: PracticeCaseCandidate, question: string) => void;
 }) {
   // The id this session itself created: selecting it from outside is not a
   // new selection, so it must not remount the session.
@@ -101,6 +138,9 @@ export function PracticeChat({
       initialMessages={session.id !== null && messages.data ? rebuildPracticeMessages(messages.data, session.id) : []}
       conversationId={session.id ?? undefined}
       onUseCase={onUseCase}
+      ask={ask}
+      onAskConsumed={onAskConsumed}
+      onAskInCase={onAskInCase}
       onConversation={(id) => {
         ownId.current = id;
         onConversationChange(id);

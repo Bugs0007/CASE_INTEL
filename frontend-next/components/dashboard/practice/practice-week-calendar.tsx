@@ -97,7 +97,7 @@ export function PracticeWeekCalendar({
   const asOf = calendar ? formatAsOf(calendar.as_of) : "";
 
   return (
-    <Card aria-labelledby="practice-calendar-title">
+    <Card aria-labelledby="practice-calendar-title" className="h-full">
       <CardHeader className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <CardTitle id="practice-calendar-title">This week</CardTitle>

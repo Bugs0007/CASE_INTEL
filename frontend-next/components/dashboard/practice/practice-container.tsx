@@ -2,24 +2,23 @@
 
 import { useState } from "react";
 import { isPracticeUnavailable, usePracticeOverview } from "@/hooks/use-practice-assistant";
-import { usePracticeConversation } from "@/hooks/use-practice-conversation";
+import { useAssistant } from "@/providers/assistant-provider";
 import { addDaysToKey, formatDayLong, todayDayKey, weekDayKeys, weekStartOf } from "./format";
 import { PracticeSection } from "./practice-section";
 
 /** The dashboard's practice block, wired to the server. It owns the shown
- * week, the selected day and the conversation; the parts below it are
- * presentational. */
+ * week and the selected day; the parts below it are presentational. Questions
+ * go to the Case Bot, which opens in "Your practice" scope and sends them. */
 export function PracticeContainer() {
   const [weekStart, setWeekStart] = useState(() => weekStartOf(todayDayKey()));
   const [selectedDay, setSelectedDay] = useState(() => todayDayKey());
-  const [casePage, setCasePage] = useState(1);
+  const { openWith } = useAssistant();
 
-  const overview = usePracticeOverview({ from: weekStart, to: addDaysToKey(weekStart, 6), casePage });
-
-  const convo = usePracticeConversation();
+  // The first page of cases is all the summary needs: it names five of them.
+  const overview = usePracticeOverview({ from: weekStart, to: addDaysToKey(weekStart, 6), casePage: 1 });
 
   function askAboutDay(day: string) {
-    convo.askAbout(day, `What is on ${formatDayLong(day)}?`);
+    openWith({ scope: { kind: "practice" }, question: `What is on ${formatDayLong(day)}?`, selectedDay: day });
   }
 
   function changeWeek(next: string) {
@@ -49,21 +48,8 @@ export function PracticeContainer() {
         loading: overview.isLoading,
         error: overview.isError,
         onRetry: () => overview.refetch(),
-        onPageChange: setCasePage,
       }}
-      assistant={{
-        messages: convo.messages,
-        pending: convo.pending,
-        error: convo.error,
-        onRetry: convo.retry,
-        draft: convo.draft,
-        onDraftChange: convo.setDraft,
-        onSend: convo.send,
-        onChooseCase: convo.chooseCase,
-        onConfirmInvoice: convo.confirm,
-        onDismissAction: convo.dismissAction,
-        confirmingFeeId: convo.confirmingFeeId,
-      }}
+      onAsk={(question) => openWith({ scope: { kind: "practice" }, question })}
     />
   );
 }

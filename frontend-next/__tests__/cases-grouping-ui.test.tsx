@@ -116,10 +116,11 @@ beforeEach(() => {
 });
 
 describe("Cases page grouping", () => {
-  it("with no grouping the page is the plain list: Needs Attention first, no groups", () => {
+  it("with no grouping the page is one plain list, soonest hearing first, no groups", () => {
     renderPage();
     expect(screen.queryByTestId("case-groups")).not.toBeInTheDocument();
-    expect(screen.getByText("Needs Attention This Week")).toBeInTheDocument();
+    expect(screen.queryByText("Needs Attention This Week")).not.toBeInTheDocument();
+    expect(screen.getAllByTestId("case-row")[0]).toHaveTextContent("Charlie v. Bank");
     expect(screen.getByRole("button", { name: "None", pressed: true })).toBeInTheDocument();
   });
 
@@ -142,9 +143,20 @@ describe("Cases page grouping", () => {
     // Next hearing of the group, from the case that has one.
     expect(headers()[0]).toMatch(/Next: /);
     expect(headers()[1]).toMatch(/No upcoming hearing/);
-    // Within a group the page's own order holds: the urgent case first.
-    const titles = within(groups[0]).getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
-    expect(titles.indexOf("Charlie v. Bank")).toBeLessThan(titles.indexOf("Alpha v. State"));
+    // Within a group the sort holds: the case with a hearing first.
+    const rows = within(groups[0]).getAllByTestId("case-row").map((r) => r.textContent ?? "");
+    expect(rows[0]).toContain("Charlie v. Bank");
+    expect(rows.findIndex((t) => t.includes("Charlie v. Bank"))).toBeLessThan(rows.findIndex((t) => t.includes("Alpha v. State")));
+  });
+
+  it("grouped cards still work after switching to the Cards view", async () => {
+    window.history.replaceState(null, "", "/cases?group=court");
+    renderPage();
+    expect(screen.getAllByTestId("case-row")).toHaveLength(5);
+    await userEvent.click(screen.getByRole("button", { name: "Cards" }));
+    expect(screen.queryByTestId("case-row")).not.toBeInTheDocument();
+    expect(screen.getAllByTestId("case-group")).toHaveLength(3);
+    expect(screen.getByText("Delta v. Delta")).toBeInTheDocument();
   });
 
   it("?group=client groups on the linked client", () => {
@@ -214,7 +226,7 @@ describe("Cases page grouping", () => {
     expect(new URL(window.location.href).searchParams.has("group")).toBe(false);
     expect(window.localStorage.getItem(groupingStorageKey(null))).toBe("none");
     expect(screen.queryByTestId("case-groups")).not.toBeInTheDocument();
-    expect(screen.getByText("Needs Attention This Week")).toBeInTheDocument();
+    expect(screen.getAllByTestId("case-row")).toHaveLength(5);
   });
 
   it("opens grouped the way it was left, and the address bar wins over that", () => {

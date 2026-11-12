@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PracticeWeekCalendar } from "@/components/dashboard/practice/practice-week-calendar";
-import { PortfolioSummary } from "@/components/dashboard/practice/portfolio-summary";
+import { PortfolioSummary, casesNeedingAttention } from "@/components/dashboard/practice/portfolio-summary";
 import { entryHref, referenceHref } from "@/components/dashboard/practice/routes";
 import {
   FIXTURE_DAY,
@@ -156,7 +156,7 @@ describe("PracticeWeekCalendar", () => {
 
 describe("PortfolioSummary", () => {
   it("shows the exact totals and the case rows", () => {
-    render(<PortfolioSummary snapshot={samplePortfolio} loading={false} error={false} onRetry={() => {}} onPageChange={() => {}} />);
+    render(<PortfolioSummary snapshot={samplePortfolio} loading={false} error={false} onRetry={() => {}} />);
     const stat = (label: string) => screen.getByText(label).nextElementSibling;
     expect(stat("Total cases")).toHaveTextContent("16");
     expect(stat("Active")).toHaveTextContent("12");
@@ -173,26 +173,50 @@ describe("PortfolioSummary", () => {
     expect(screen.getByRole("link", { name: "Open all cases" })).toHaveAttribute("href", "/cases");
   });
 
-  it("pages with onPageChange from the matching total, not the row count", async () => {
-    const user = userEvent.setup();
-    const onPageChange = vi.fn();
-    render(<PortfolioSummary snapshot={samplePortfolio} loading={false} error={false} onRetry={() => {}} onPageChange={onPageChange} />);
-    expect(screen.getByText("Page 1 of 2")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Previous page" })).toBeDisabled();
-    await user.click(screen.getByRole("button", { name: "Next page" }));
-    expect(onPageChange).toHaveBeenCalledWith(2);
+  it("names at most five cases, soonest hearing first, and has no pagination", () => {
+    const many = Array.from({ length: 8 }, (_, index) => ({
+      id: 100 + index,
+      title: `Matter ${index}`,
+      case_number: null,
+      court: null,
+      status: "open",
+      next_hearing_at: index === 7 ? null : `2026-12-0${index + 1}T00:00:00Z`,
+    }));
+    render(
+      <PortfolioSummary
+        snapshot={{ ...samplePortfolio, cases: [...many].reverse(), total: 8 }}
+        loading={false}
+        error={false}
+        onRetry={() => {}}
+      />,
+    );
+    const rows = within(screen.getByRole("list", { name: "Cases" })).getAllByRole("link");
+    expect(rows).toHaveLength(5);
+    expect(rows[0]).toHaveTextContent("Matter 0");
+    expect(rows[4]).toHaveTextContent("Matter 4");
+    expect(screen.queryByRole("navigation", { name: "Case list pages" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Next page" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open all cases" })).toHaveAttribute("href", "/cases");
+  });
+
+  it("leaves closed and archived cases out of the attention list", () => {
+    const rows = [
+      { ...samplePortfolio.cases[0], id: 1, title: "Done", status: "closed" },
+      { ...samplePortfolio.cases[0], id: 2, title: "Live", status: "open" },
+    ];
+    expect(casesNeedingAttention(rows).map((row) => row.title)).toEqual(["Live"]);
   });
 
   it("has loading, empty and error states", async () => {
     const user = userEvent.setup();
     const onRetry = vi.fn();
-    const { rerender } = render(<PortfolioSummary snapshot={null} loading error={false} onRetry={onRetry} onPageChange={() => {}} />);
+    const { rerender } = render(<PortfolioSummary snapshot={null} loading error={false} onRetry={onRetry} />);
     expect(screen.getByText("Loading your cases.")).toBeInTheDocument();
 
-    rerender(<PortfolioSummary snapshot={{ ...samplePortfolio, total_cases: 0, total: 0, cases: [] }} loading={false} error={false} onRetry={onRetry} onPageChange={() => {}} />);
+    rerender(<PortfolioSummary snapshot={{ ...samplePortfolio, total_cases: 0, total: 0, cases: [] }} loading={false} error={false} onRetry={onRetry} />);
     expect(screen.getByText("You have no cases yet.")).toBeInTheDocument();
 
-    rerender(<PortfolioSummary snapshot={null} loading={false} error onRetry={onRetry} onPageChange={() => {}} />);
+    rerender(<PortfolioSummary snapshot={null} loading={false} error onRetry={onRetry} />);
     await user.click(screen.getByRole("button", { name: "Try again" }));
     expect(onRetry).toHaveBeenCalledTimes(1);
   });

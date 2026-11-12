@@ -18,9 +18,9 @@ export function CasesSkeleton() {
         <Skeleton className="h-10 w-[420px] rounded-lg" />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-80 rounded-xl" />
+      <div className="flex flex-col gap-px overflow-hidden rounded-xl">
+        {Array.from({ length: 12 }).map((_, i) => (
+          <Skeleton key={i} className="h-12 rounded-none" />
         ))}
       </div>
     </div>

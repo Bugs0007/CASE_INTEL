@@ -9,6 +9,12 @@ const mocks = vi.hoisted(() => ({
   send: vi.fn(),
 }));
 
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/dashboard",
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 vi.mock("@/lib/api/practice", () => ({
   practiceApi: { overview: mocks.overview, chat: mocks.chat },
 }));
@@ -20,6 +26,7 @@ vi.mock("@/lib/api/billing", async (importOriginal) => {
 
 import { APIError } from "@/lib/api/client";
 import { PracticeContainer } from "@/components/dashboard/practice/practice-container";
+import { PracticeChat } from "@/components/assistant/practice-chat";
 import { addDaysToKey, todayDayKey, weekStartOf } from "@/components/dashboard/practice/format";
 import {
   clearActionCard,
@@ -27,15 +34,33 @@ import {
   samplePortfolio,
   sampleTurn,
 } from "@/components/dashboard/practice/fixtures";
+import { AssistantProvider, useAssistant, type AssistantAsk } from "@/providers/assistant-provider";
 import type { PracticeOverview, PracticeTurn } from "@/types/practice";
 
 const overview: PracticeOverview = { portfolio: samplePortfolio, calendar: sampleCalendar };
+
+/** Shows what the container asked the Case Bot to do. */
+function Probe() {
+  const { open, scope, ask } = useAssistant();
+  return (
+    <output aria-label="Case Bot state">
+      {JSON.stringify({ open, scope, question: ask?.question ?? null, day: ask?.selectedDay ?? null, send: ask?.send ?? null })}
+    </output>
+  );
+}
+
+function probeState() {
+  return JSON.parse(screen.getByLabelText("Case Bot state").textContent ?? "{}");
+}
 
 function renderContainer() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <PracticeContainer />
+      <AssistantProvider>
+        <PracticeContainer />
+        <Probe />
+      </AssistantProvider>
     </QueryClientProvider>,
   );
 }
@@ -70,22 +95,90 @@ describe("PracticeContainer", () => {
     );
   });
 
-  it("Ask about this day fills the input and sends nothing", async () => {
+  it("has no inline chat: no message box, chips or Send button on the dashboard", async () => {
+    renderContainer();
+    await screen.findByText("This week");
+    expect(screen.queryByLabelText("Your question")).not.toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Suggested questions" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Send" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("log")).not.toBeInTheDocument();
+  });
+
+  it("the ask bar opens the Case Bot in practice scope with the question to send", async () => {
     const user = userEvent.setup();
     renderContainer();
-    await user.click(screen.getByRole("button", { name: "Ask about this day" }));
-    expect((screen.getByLabelText("Your question") as HTMLInputElement).value).toMatch(/^What is on .+\?$/);
+    expect(probeState().open).toBe(false);
+    await user.type(screen.getByLabelText("Ask about your practice"), "Which cases are listed tomorrow?");
+    await user.click(screen.getByRole("button", { name: "Ask" }));
+    expect(probeState()).toMatchObject({
+      open: true,
+      scope: { kind: "practice" },
+      question: "Which cases are listed tomorrow?",
+      send: true,
+    });
+    // The dashboard itself sent nothing: the Case Bot does that when it opens.
     expect(mocks.chat).not.toHaveBeenCalled();
   });
 
-  it("sends the asked day with the next message, then not again", async () => {
+  it("Ask about this day opens the Case Bot with the day question and the day", async () => {
     const user = userEvent.setup();
     renderContainer();
-    await user.click(screen.getByRole("button", { name: "Ask about this day" }));
-    await user.click(screen.getByRole("button", { name: "Send" }));
+    await user.click(await screen.findByRole("button", { name: "Ask about this day" }));
+    const state = probeState();
+    expect(state).toMatchObject({ open: true, scope: { kind: "practice" }, day: todayDayKey(), send: true });
+    expect(state.question).toMatch(/^What is on .+\?$/);
+    expect(mocks.chat).not.toHaveBeenCalled();
+  });
+
+  it("shows an overview failure on the calendar and cases only, and keeps the ask bar", async () => {
+    mocks.overview.mockRejectedValue(new APIError(500, null));
+    renderContainer();
+    await screen.findByText("The calendar could not be loaded.", {}, { timeout: 4000 });
+    expect(screen.getByText("Your cases could not be loaded.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Ask about your practice")).toBeInTheDocument();
+  });
+
+  it("renders nothing, and no error, when the server has the assistant switched off", async () => {
+    mocks.overview.mockRejectedValue(new APIError(404, null));
+    renderContainer();
+    await waitFor(() => expect(mocks.overview).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Your practice" })).not.toBeInTheDocument(), {
+      timeout: 4000,
+    });
+    expect(screen.queryByLabelText("Ask about your practice")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+});
+
+/** The practice conversation itself now lives in the Case Bot: the same
+ * behaviours the dashboard chat had, exercised through PracticeChat. */
+describe("PracticeChat (Case Bot practice conversation)", () => {
+  function renderChat(props: { ask?: AssistantAsk | null; onAskConsumed?: (id: number) => void } = {}) {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return render(
+      <QueryClientProvider client={client}>
+        <PracticeChat conversationId={null} onConversationChange={() => {}} {...props} />
+      </QueryClientProvider>,
+    );
+  }
+
+  const askOf = (over: Partial<AssistantAsk> = {}): AssistantAsk => ({
+    id: 1,
+    scope: { kind: "practice" },
+    question: "What is on Wednesday 11 November?",
+    send: true,
+    ...over,
+  });
+
+  it("sends a handed-in question once as the first message, with its day, then not again", async () => {
+    const user = userEvent.setup();
+    const onAskConsumed = vi.fn();
+    renderChat({ ask: askOf({ selectedDay: "2026-11-11" }), onAskConsumed });
     await waitFor(() => expect(mocks.chat).toHaveBeenCalledTimes(1));
-    expect(mocks.chat.mock.calls[0][0]).toMatchObject({ selected_day: todayDayKey() });
+    expect(mocks.chat.mock.calls[0][0]).toMatchObject({ query: "What is on Wednesday 11 November?", selected_day: "2026-11-11" });
     expect(mocks.chat.mock.calls[0][0].conversation_id).toBeUndefined();
+    expect(onAskConsumed).toHaveBeenCalledWith(1);
+    await screen.findByText(sampleTurn.answer);
 
     await user.click(screen.getByRole("button", { name: "Open deadlines" }));
     await waitFor(() => expect(mocks.chat).toHaveBeenCalledTimes(2));
@@ -95,10 +188,16 @@ describe("PracticeContainer", () => {
     expect(second.client_request_id).not.toBe(mocks.chat.mock.calls[0][0].client_request_id);
   });
 
+  it("does not send a question that is only meant to be prefilled", async () => {
+    renderChat({ ask: askOf({ send: false }) });
+    await screen.findByRole("button", { name: "Practice overview" });
+    expect(mocks.chat).not.toHaveBeenCalled();
+  });
+
   it("reuses the same client_request_id when a failed send is retried", async () => {
     const user = userEvent.setup();
     mocks.chat.mockRejectedValueOnce(new APIError(500, null)).mockResolvedValueOnce(sampleTurn);
-    renderContainer();
+    renderChat();
     await user.click(screen.getByRole("button", { name: "Practice overview" }));
     await screen.findByText("That question could not be answered.");
 
@@ -110,38 +209,11 @@ describe("PracticeContainer", () => {
     expect(screen.getAllByText("Give me an overview of my practice.")).toHaveLength(1);
   });
 
-  it("keeps the calendar visible when the chat fails", async () => {
-    const user = userEvent.setup();
-    mocks.chat.mockRejectedValue(new APIError(500, null));
-    renderContainer();
-    await waitFor(() => expect(mocks.overview).toHaveBeenCalled());
-    await user.click(screen.getByRole("button", { name: "Practice overview" }));
-    await screen.findByText("That question could not be answered.");
-    expect(screen.getByRole("region", { name: /^Agenda for/ })).toBeInTheDocument();
-    expect(screen.queryByText("The calendar could not be loaded.")).not.toBeInTheDocument();
-  });
-
-  it("shows an overview failure on the calendar only, not on the assistant", async () => {
-    mocks.overview.mockRejectedValue(new APIError(500, null));
-    renderContainer();
-    await screen.findByText("The calendar could not be loaded.", {}, { timeout: 4000 });
-    expect(screen.getByRole("button", { name: "Send" })).toBeInTheDocument();
-    expect(screen.queryByText("That question could not be answered.")).not.toBeInTheDocument();
-  });
-
-  it("renders nothing, and no error, when the server has the assistant switched off", async () => {
-    mocks.overview.mockRejectedValue(new APIError(404, null));
-    const { container } = renderContainer();
-    await waitFor(() => expect(mocks.overview).toHaveBeenCalled());
-    await waitFor(() => expect(container).toBeEmptyDOMElement(), { timeout: 4000 });
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-  });
-
   describe("invoice card", () => {
     async function openCard() {
       const user = userEvent.setup();
       mocks.chat.mockResolvedValue(cardTurn);
-      renderContainer();
+      renderChat();
       await user.click(screen.getByRole("button", { name: "Practice overview" }));
       await screen.findByRole("region", { name: "Invoice to send" });
       return user;

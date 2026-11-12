@@ -1,6 +1,6 @@
 import { PracticeContainer } from "@/components/dashboard/practice/practice-container";
 
-/** The advocate-wide assistant and compact calendar on the dashboard.
+/** The practice block on the dashboard: an ask bar for the Case Bot, the week calendar and a short cases summary.
  * The briefing and the phone dashboard render this only when
  * NEXT_PUBLIC_PORTFOLIO_BOT is "true" (see lib/feature-flags.ts); with the
  * flag off, as it ships, the layout is complete without it. The server has

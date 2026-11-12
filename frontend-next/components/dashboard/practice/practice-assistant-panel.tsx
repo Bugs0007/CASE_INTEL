@@ -5,7 +5,7 @@ import { useId, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import type { PracticeTurn } from "@/types/practice";
+import type { PracticeCaseCandidate, PracticeTurn } from "@/types/practice";
 import { formatAsOf } from "./format";
 import { PracticeInvoiceActionCard } from "./practice-invoice-action-card";
 import { referenceHref } from "./routes";
@@ -28,6 +28,8 @@ interface MessageHandlers {
   onChooseCase: (caseId: number) => void;
   onConfirmInvoice: (feeId: number) => void;
   onDismissAction: (messageId: string) => void;
+  /** Opens a new chat for this case with the question typed but not sent. */
+  onAskInCase?: (candidate: PracticeCaseCandidate) => void;
   /** The fee whose send is in flight, if any. */
   confirmingFeeId?: number | null;
 }
@@ -55,17 +57,27 @@ function AssistantTurn({ id, turn, handlers }: { id: string; turn: PracticeTurn;
           <p className="text-xs font-semibold text-gray-600">Which case do you mean?</p>
           <ul className="space-y-1">
             {turn.case_candidates.map((candidate) => (
-              <li key={candidate.id}>
+              <li key={candidate.id} className="flex items-stretch gap-1">
                 <button
                   type="button"
                   onClick={() => handlers.onChooseCase(candidate.id)}
-                  className="flex min-h-[44px] w-full flex-col items-start rounded-lg border border-gray-200 bg-surface px-3 py-2 text-left hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  className="flex min-h-[44px] min-w-0 flex-1 flex-col items-start rounded-lg border border-gray-200 bg-surface px-3 py-2 text-left hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   <span className="break-words text-sm font-medium text-gray-900">{candidate.title}</span>
                   <span className="break-words text-xs text-gray-500">
                     {[candidate.case_number, candidate.court].filter(Boolean).join(" · ")}
                   </span>
                 </button>
+                {handlers.onAskInCase && (
+                  <button
+                    type="button"
+                    aria-label={`Ask in this case: ${candidate.title}`}
+                    onClick={() => handlers.onAskInCase?.(candidate)}
+                    className="min-h-[44px] flex-shrink-0 rounded-lg border border-gray-200 bg-surface px-2.5 text-xs font-semibold text-primary hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  >
+                    Ask in this case
+                  </button>
+                )}
               </li>
             ))}
           </ul>

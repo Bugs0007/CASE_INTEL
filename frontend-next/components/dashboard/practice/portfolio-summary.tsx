@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { PortfolioSnapshot } from "@/types/practice";
+import type { PortfolioSnapshot, PracticeCaseRow } from "@/types/practice";
 import { formatAsOf, formatHearingDay, humanize } from "./format";
 import { CASES_ROUTE, caseHref } from "./routes";
 
@@ -12,8 +12,18 @@ export interface PortfolioSummaryProps {
   loading: boolean;
   error: boolean;
   onRetry: () => void;
-  /** 1-based page number to show next. */
-  onPageChange: (page: number) => void;
+}
+
+/** How many cases the dashboard names; the rest are one click away on /cases. */
+export const DASHBOARD_CASE_LIMIT = 5;
+
+/** The cases worth a look first: still open, soonest next hearing first (an
+ * overdue date sorts ahead of a future one), cases with no date last. The
+ * snapshot has no attention flag, so the next hearing is the signal. */
+export function casesNeedingAttention(cases: PracticeCaseRow[], limit = DASHBOARD_CASE_LIMIT): PracticeCaseRow[] {
+  const live = cases.filter((row) => row.status !== "closed" && row.status !== "archived");
+  const time = (row: PracticeCaseRow) => (row.next_hearing_at ? Date.parse(row.next_hearing_at) : Infinity);
+  return [...live].sort((a, b) => time(a) - time(b)).slice(0, limit);
 }
 
 function Stat({ label, value }: { label: string; value: number }) {
@@ -25,13 +35,13 @@ function Stat({ label, value }: { label: string; value: number }) {
   );
 }
 
-/** Exact portfolio totals and one page of the case list. */
-export function PortfolioSummary({ snapshot, loading, error, onRetry, onPageChange }: PortfolioSummaryProps) {
-  const pageCount = snapshot ? Math.max(1, Math.ceil(snapshot.total / snapshot.page_size)) : 1;
+/** Exact portfolio totals and the few cases that need a look first. The full
+ * list lives on the Cases page. */
+export function PortfolioSummary({ snapshot, loading, error, onRetry }: PortfolioSummaryProps) {
   const asOf = snapshot ? formatAsOf(snapshot.as_of) : "";
 
   return (
-    <Card aria-labelledby="practice-portfolio-title">
+    <Card aria-labelledby="practice-portfolio-title" className="h-full">
       <CardHeader className="flex flex-wrap items-center justify-between gap-2">
         <CardTitle id="practice-portfolio-title">Your cases</CardTitle>
         <Link
@@ -79,8 +89,9 @@ export function PortfolioSummary({ snapshot, loading, error, onRetry, onPageChan
               ))}
             </ul>
 
+            <h3 className="pt-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Needs attention</h3>
             <ul aria-label="Cases" className="space-y-1">
-              {snapshot.cases.map((row) => (
+              {casesNeedingAttention(snapshot.cases).map((row) => (
                 <li key={row.id}>
                   <Link
                     href={caseHref(row.id)}
@@ -100,29 +111,6 @@ export function PortfolioSummary({ snapshot, loading, error, onRetry, onPageChan
               ))}
             </ul>
 
-            <nav aria-label="Case list pages" className="flex items-center justify-between gap-2">
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                disabled={snapshot.page <= 1}
-                onClick={() => onPageChange(snapshot.page - 1)}
-              >
-                Previous page
-              </Button>
-              <span className="text-xs text-gray-600">
-                Page {snapshot.page} of {pageCount}
-              </span>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                disabled={snapshot.page >= pageCount}
-                onClick={() => onPageChange(snapshot.page + 1)}
-              >
-                Next page
-              </Button>
-            </nav>
             {asOf && <p className="text-xs text-gray-500">Updated {asOf}</p>}
           </>
         )}

@@ -1,33 +1,48 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { Briefcase, User } from "lucide-react";
 import { ScopeChoices } from "@/components/assistant/scope-choices";
 import { useCase } from "@/hooks/use-cases";
+import { cn } from "@/lib/utils";
 import type { AssistantScope } from "@/providers/assistant-provider";
 
-/** The name of what a chat is about. A case without a known title is looked up. */
-export function useScopeLabel(scope: AssistantScope | null): string {
+/** The name and number of what a chat is about. A case whose title or number
+ * is not known yet is looked up. */
+export function useScopeInfo(scope: AssistantScope | null): { label: string; number: string | null } {
   const caseId = scope?.kind === "case" ? scope.caseId : 0;
-  const known = scope?.kind === "case" ? scope.caseTitle : null;
-  const lookup = useCase(caseId, caseId !== 0 && !known);
-  if (scope === null) return "Choose a scope";
-  if (scope.kind === "practice") return "Your practice";
-  return known || lookup.data?.title || "This case";
+  const knownTitle = scope?.kind === "case" ? scope.caseTitle : null;
+  const knownNumber = scope?.kind === "case" ? scope.caseNumber : null;
+  const lookup = useCase(caseId, caseId !== 0 && !(knownTitle && knownNumber));
+  if (scope === null) return { label: "Choose a scope", number: null };
+  if (scope.kind === "practice") return { label: "Your practice", number: null };
+  return {
+    label: knownTitle || lookup.data?.title || "This case",
+    number: knownNumber || lookup.data?.case_number || null,
+  };
 }
 
-/** "Your practice" or a case, with a panel to change it. Changing it starts a
- * new chat in the new scope. */
-export function ScopePicker({
+/** The name of what a chat is about. */
+export function useScopeLabel(scope: AssistantScope | null): string {
+  return useScopeInfo(scope).label;
+}
+
+/** Always-visible "Asking about" line by the input: the scope as a chip, with
+ * a Change action that opens the chooser. Changing it starts a new chat in
+ * the new scope. */
+export function ScopeChip({
   scope,
   onChange,
+  className,
 }: {
   scope: AssistantScope | null;
   onChange: (scope: AssistantScope) => void;
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const label = useScopeLabel(scope);
+  const { label, number } = useScopeInfo(scope);
   const rootRef = useRef<HTMLDivElement>(null);
+  const Icon = scope?.kind === "case" ? Briefcase : User;
 
   // Esc closes the panel only, not the popover around it.
   useEffect(() => {
@@ -44,19 +59,32 @@ export function ScopePicker({
   }, [open]);
 
   return (
-    <div ref={rootRef} className="relative min-w-0 flex-1">
+    <div
+      ref={rootRef}
+      role="group"
+      aria-label="Chat scope"
+      className={cn("relative flex min-w-0 items-center gap-2", className)}
+    >
+      <span className="flex-shrink-0 text-xs text-gray-500">Asking about</span>
+      <span
+        title={number ? `${label} (${number})` : label}
+        className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-2.5 py-1 text-xs font-semibold text-gray-900"
+      >
+        <Icon className="h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden="true" />
+        <span className="truncate">{label}</span>
+        {number && <span className="flex-shrink-0 font-normal text-gray-500">{number}</span>}
+      </span>
       <button
         type="button"
         aria-expanded={open}
         aria-label={`Scope: ${label}. Change scope`}
         onClick={() => setOpen((value) => !value)}
-        className="flex h-11 w-full min-w-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-surface px-2.5 text-left text-sm font-medium text-gray-900 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:h-9"
+        className="flex h-11 flex-shrink-0 items-center rounded px-1.5 text-xs font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:h-8"
       >
-        <span className="min-w-0 flex-1 truncate">{label}</span>
-        <ChevronDown className="h-4 w-4 flex-shrink-0 text-gray-500" aria-hidden="true" />
+        Change
       </button>
       {open && (
-        <div className="absolute left-0 top-full z-10 mt-1 w-[min(20rem,calc(100vw-2rem))] rounded-lg border border-gray-200 bg-surface p-2 shadow-lg">
+        <div className="absolute bottom-full left-0 z-10 mb-1 w-[min(22rem,calc(100vw-2rem))] rounded-lg border border-gray-200 bg-surface p-2 shadow-lg">
           <ScopeChoices
             onPick={(next) => {
               setOpen(false);
