@@ -291,13 +291,13 @@ describe("Menu", () => {
 });
 
 describe("Sidebar", () => {
-  it("has five tabs, Messages (not Client Messages), and no Documents or Clients tab", async () => {
+  it("has six tabs (Case Bot after Messages), Messages (not Client Messages), and no Documents or Clients tab", async () => {
     render(withClient(<Sidebar />));
     const nav = screen.getByRole("navigation", { name: "Main" });
     const labels = within(nav)
       .getAllByRole("link")
       .map((a) => a.textContent?.replace(/\d+\+?$/, "").trim());
-    expect(labels).toEqual(["Dashboard", "Cases", "Calendar", "Messages", "Billing"]);
+    expect(labels).toEqual(["Dashboard", "Cases", "Calendar", "Messages", "Case Bot", "Billing"]);
   });
 
   it("lights Cases on a case page and on /documents, and Billing on /clients", () => {

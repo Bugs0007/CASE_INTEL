@@ -25,9 +25,10 @@ export const chatApi = {
 };
 
 export const conversationsApi = {
-  list: (caseId?: number) =>
+  /** No scope: case and older document chats. "practice": practice chats only. */
+  list: (caseId?: number, scope?: "practice") =>
     apiClient<Conversation[]>("/conversations/", {
-      params: { case_id: caseId },
+      params: { case_id: caseId, scope },
     }),
 
   get: (id: number) => apiClient<Conversation>(`/conversations/${id}/`),

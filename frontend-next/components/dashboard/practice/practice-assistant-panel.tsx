@@ -151,9 +151,11 @@ export interface PracticeAssistantPanelProps extends MessageHandlers {
   onSend: (query: string) => void;
 }
 
-/** "Ask about your practice": suggested questions, the conversation, and the
- * input. It sends only when the advocate presses Send or picks a chip. */
-export function PracticeAssistantPanel({
+/** The assistant's body without its card: suggested questions, the
+ * conversation, and the input. The dashboard wraps it in a card; the Case Bot
+ * popover and page use it as it is. It sends only when the advocate presses
+ * Send or picks a chip. */
+export function PracticeAssistantBody({
   messages,
   pending,
   error,
@@ -161,8 +163,12 @@ export function PracticeAssistantPanel({
   draft,
   onDraftChange,
   onSend,
+  stickyInput = false,
   ...handlers
-}: PracticeAssistantPanelProps) {
+}: PracticeAssistantPanelProps & {
+  /** Keep the input at the bottom of a scrolling parent. */
+  stickyInput?: boolean;
+}) {
   const inputId = useId();
 
   function submit(event: FormEvent) {
@@ -174,61 +180,73 @@ export function PracticeAssistantPanel({
   }
 
   return (
+    <div className="space-y-3">
+      <ul aria-label="Suggested questions" className="flex flex-wrap gap-1.5">
+        {SUGGESTED_QUESTIONS.map((item) => (
+          <li key={item.intent}>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => onSend(item.query)}
+              className={cn(
+                "min-h-[44px] rounded-full border border-gray-200 bg-surface px-3 text-xs font-medium text-gray-800 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 md:min-h-8",
+              )}
+            >
+              {item.label}
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      {messages.length > 0 && <PracticeMessageList messages={messages} {...handlers} />}
+
+      {pending && (
+        <p role="status" className="text-sm text-gray-500">
+          Looking through your records.
+        </p>
+      )}
+
+      {error && !pending && (
+        <div role="alert" className="space-y-2 rounded-lg border border-red-200 bg-red-50 p-3">
+          <p className="text-sm text-red-800">That question could not be answered.</p>
+          <Button type="button" variant="secondary" size="sm" onClick={onRetry}>
+            Try again
+          </Button>
+        </div>
+      )}
+
+      <form
+        onSubmit={submit}
+        className={cn("flex gap-2", stickyInput && "sticky bottom-0 -mx-3 border-t border-gray-100 bg-surface p-3")}
+      >
+        <label htmlFor={inputId} className="sr-only">
+          Your question
+        </label>
+        <input
+          id={inputId}
+          type="text"
+          value={draft}
+          onChange={(event) => onDraftChange(event.target.value)}
+          placeholder="Ask about your cases, hearings or deadlines"
+          className="h-11 min-w-0 flex-1 rounded-lg border border-gray-200 bg-surface px-3 text-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:h-10"
+        />
+        <Button type="submit" size="md" disabled={pending || draft.trim() === ""}>
+          Send
+        </Button>
+      </form>
+    </div>
+  );
+}
+
+/** "Ask about your practice" on the dashboard: the body in a card. */
+export function PracticeAssistantPanel(props: PracticeAssistantPanelProps) {
+  return (
     <Card aria-labelledby="practice-assistant-title">
       <CardHeader>
         <CardTitle id="practice-assistant-title">Ask about your practice</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3 px-3 sm:px-5">
-        <ul aria-label="Suggested questions" className="flex flex-wrap gap-1.5">
-          {SUGGESTED_QUESTIONS.map((item) => (
-            <li key={item.intent}>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => onSend(item.query)}
-                className={cn(
-                  "min-h-[44px] rounded-full border border-gray-200 bg-surface px-3 text-xs font-medium text-gray-800 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 md:min-h-8",
-                )}
-              >
-                {item.label}
-              </button>
-            </li>
-          ))}
-        </ul>
-
-        {messages.length > 0 && <PracticeMessageList messages={messages} {...handlers} />}
-
-        {pending && (
-          <p role="status" className="text-sm text-gray-500">
-            Looking through your records.
-          </p>
-        )}
-
-        {error && !pending && (
-          <div role="alert" className="space-y-2 rounded-lg border border-red-200 bg-red-50 p-3">
-            <p className="text-sm text-red-800">That question could not be answered.</p>
-            <Button type="button" variant="secondary" size="sm" onClick={onRetry}>
-              Try again
-            </Button>
-          </div>
-        )}
-
-        <form onSubmit={submit} className="flex gap-2">
-          <label htmlFor={inputId} className="sr-only">
-            Your question
-          </label>
-          <input
-            id={inputId}
-            type="text"
-            value={draft}
-            onChange={(event) => onDraftChange(event.target.value)}
-            placeholder="Ask about your cases, hearings or deadlines"
-            className="h-11 min-w-0 flex-1 rounded-lg border border-gray-200 bg-surface px-3 text-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:h-10"
-          />
-          <Button type="submit" size="md" disabled={pending || draft.trim() === ""}>
-            Send
-          </Button>
-        </form>
+      <CardContent className="px-3 sm:px-5">
+        <PracticeAssistantBody {...props} />
       </CardContent>
     </Card>
   );

@@ -5,6 +5,7 @@ import { MobileChromeController } from "@/components/layout/mobile-chrome";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { AuthGuard } from "@/components/auth-guard";
 import { DialogProvider } from "@/providers/dialog-provider";
+import { AssistantProvider } from "@/providers/assistant-provider";
 
 export default function DashboardLayout({
   children,
@@ -14,6 +15,7 @@ export default function DashboardLayout({
   return (
     <AuthGuard>
       <DialogProvider>
+        <AssistantProvider>
         {/* dvh, not vh: on a phone 100vh is taller than what is visible
             while the browser's own address bar is showing. Same value on a
             desktop. */}
@@ -42,6 +44,7 @@ export default function DashboardLayout({
           <MobileNav />
           <MobileChromeController />
         </div>
+        </AssistantProvider>
       </DialogProvider>
     </AuthGuard>
   );
