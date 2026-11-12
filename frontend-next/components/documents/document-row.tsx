@@ -5,11 +5,10 @@ import Link from "next/link";
 import { Eye, Trash2, Play, Loader2, Pencil, MoreVertical } from "lucide-react";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { useIsMobile } from "@/hooks/use-is-mobile";
-import { cn, formatDate, getFileIcon, staggerDelay } from "@/lib/utils";
-import {
-  DocumentStatusBadge,
-  isDocumentActive,
-} from "./document-status-badge";
+import { cn, formatDate, formatFileSize, getFileIcon, staggerDelay } from "@/lib/utils";
+import { DocumentActionsMenu } from "./list/document-actions-menu";
+import { docDate, docName } from "./list/model";
+import { DocumentStatusBadge, isDocumentActive } from "./document-status-badge";
 import type { Document } from "@/types";
 
 interface DocumentRowProps {
@@ -23,10 +22,9 @@ interface DocumentRowProps {
   isProcessing?: boolean;
   isDeleting?: boolean;
   isViewing?: boolean;
+  /** Desktop table: false when the rows sit under a case group header. */
+  showCase?: boolean;
 }
-
-const ACTION_BTN =
-  "inline-flex items-center gap-1.5 h-11 md:h-8 px-3 rounded-md border border-gray-200 bg-white text-gray-700 text-xs font-semibold hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors";
 
 export function DocumentRow(props: DocumentRowProps) {
   const isMobile = useIsMobile();
@@ -65,7 +63,10 @@ function MobileDocumentRow({
         aria-label={`Open ${name}`}
         className="flex w-full items-start gap-3 p-3 pr-14 text-left [--press-scale:0.985]"
       >
-        <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gray-100 text-lg" aria-hidden="true">
+        <span
+          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gray-100 text-lg"
+          aria-hidden="true"
+        >
           {isViewing ? <Loader2 className="h-4 w-4 animate-spin" /> : getFileIcon(document.file_type)}
         </span>
         <span className="min-w-0 flex-1">
@@ -73,16 +74,15 @@ function MobileDocumentRow({
           <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 font-mono text-[11.5px] text-gray-500">
             <span>{document.case ? document.case.case_number : "No case"}</span>
             <span>·</span>
-            <span>{formatDate(document.document_date || document.created_at, "MMM d, yyyy")}</span>
+            <span>{formatDate(docDate(document), "MMM d, yyyy")}</span>
           </span>
-          {document.case && <span className="mt-0.5 block truncate text-[12px] text-gray-500">{document.case.title}</span>}
+          {document.case && (
+            <span className="mt-0.5 block truncate text-[12px] text-gray-500">{document.case.title}</span>
+          )}
           <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            <DocumentStatusBadge document={document} />
+            {document.processing_status !== "completed" && <DocumentStatusBadge document={document} />}
             {document.document_type === "court_order" && <span className="ci-chip ci-chip--none">From eCourts</span>}
           </span>
-          {document.ai_summary && (
-            <span className="mt-1.5 line-clamp-2 block text-[12.5px] leading-snug text-gray-600">{document.ai_summary}</span>
-          )}
         </span>
       </button>
       <button
@@ -155,6 +155,8 @@ function MobileDocumentRow({
   );
 }
 
+/** One desktop table row. Clicking anywhere on it opens the document; the
+ * case link, Retry and the menu do their own thing. */
 function DesktopDocumentRow({
   document,
   onProcess,
@@ -162,106 +164,107 @@ function DesktopDocumentRow({
   onEdit,
   onView,
   isProcessing,
-  isDeleting,
   isViewing,
+  showCase = true,
 }: DocumentRowProps) {
-  const fileIcon = getFileIcon(document.file_type);
-  // No Process/Retry button while a background job is queued or running.
-  const canProcess =
-    !isDocumentActive(document) &&
-    (document.processing_status === "pending" ||
-      document.processing_status === "failed");
+  const name = docName(document);
+  const isFailed = document.processing_status === "failed" && !isDocumentActive(document);
+  const completed = document.processing_status === "completed" && !isDocumentActive(document);
+  const stop = (e: React.MouseEvent) => e.stopPropagation();
 
   return (
-    <div className="bg-white border border-gray-100 rounded-lg px-[18px] py-4 flex items-center gap-4 flex-wrap">
-      <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 text-lg">
-        {fileIcon}
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2.5 mb-0.5 flex-wrap">
+    <tr
+      onClick={() => onView(document.id)}
+      className="cursor-pointer border-t border-gray-100 hover:bg-[var(--ci-ink-08)]"
+    >
+      <td className="w-[40%] max-w-0 py-1.5 pl-3 pr-2">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span
+            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-gray-100 text-sm"
+            aria-hidden="true"
+          >
+            {isViewing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : getFileIcon(document.file_type)}
+          </span>
           <button
             type="button"
-            onClick={() => onView(document.id)}
-            className="text-sm font-semibold text-gray-900 truncate hover:text-primary hover:underline text-left"
+            onClick={(e) => {
+              stop(e);
+              onView(document.id);
+            }}
             title={`Open ${document.filename}`}
+            className="min-w-0 truncate text-left text-[13.5px] font-semibold text-gray-900 hover:text-primary hover:underline"
           >
-            {document.display_name || document.filename}
+            {name}
           </button>
           {document.document_type === "court_order" ? (
-            <span className="ci-chip ci-chip--none flex-shrink-0">
-              From eCourts
-            </span>
+            <span className="ci-chip ci-chip--none flex-shrink-0">From eCourts</span>
           ) : (
-            <span className="text-[11px] text-gray-400 capitalize">
-              {document.document_type}
-            </span>
+            document.document_type && (
+              <span className="flex-shrink-0 text-[11px] capitalize text-gray-400">{document.document_type}</span>
+            )
           )}
         </div>
-        <div className="flex items-center gap-2.5 text-xs text-gray-400 flex-wrap font-mono">
+      </td>
+      {showCase && (
+        <td className="w-[28%] max-w-0 px-2 py-1.5">
           {document.case ? (
-            <Link href={`/cases/${document.case.id}`} className="font-semibold text-primary hover:text-primary-hover">
-              {document.case.case_number}
+            <Link
+              href={`/cases/${document.case.id}`}
+              onClick={stop}
+              title={`${document.case.title} (${document.case.case_number})`}
+              className="block min-w-0 hover:text-primary"
+            >
+              <span className="block truncate text-[13px] text-gray-800">{document.case.title}</span>
+              <span className="block truncate font-mono text-[11px] text-gray-500">{document.case.case_number}</span>
             </Link>
           ) : (
-            <span className="font-sans">No case</span>
+            <span className="text-[13px] text-gray-400">No case</span>
           )}
-          {document.case && (
-            <>
-              <span>·</span>
-              <span className="truncate font-sans">{document.case.title}</span>
-            </>
+        </td>
+      )}
+      <td className="whitespace-nowrap px-2 py-1.5 text-[13px] text-gray-700">
+        {formatDate(docDate(document), "MMM d, yyyy")}
+      </td>
+      <td className="whitespace-nowrap px-2 py-1.5 text-right font-mono text-[12px] text-gray-500">
+        {formatFileSize(document.file_size)}
+      </td>
+      <td className="whitespace-nowrap px-2 py-1.5">
+        <div className="flex items-center gap-1.5">
+          {isFailed && (
+            <button
+              type="button"
+              onClick={(e) => {
+                stop(e);
+                onProcess(document.id);
+              }}
+              disabled={isProcessing}
+              className="inline-flex h-7 items-center gap-1 rounded-md border border-gray-200 bg-white px-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              {isProcessing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
+              {isProcessing ? "Retrying…" : "Retry"}
+            </button>
           )}
-          <span>·</span>
-          <span>{formatDate(document.document_date || document.created_at, "MMM d, yyyy")}</span>
-        </div>
-        {document.ai_summary && (
-          <div className="text-[12.5px] text-gray-600 mt-1.5 leading-relaxed line-clamp-2">
-            {document.ai_summary}
-          </div>
-        )}
-      </div>
-
-      <DocumentStatusBadge document={document} />
-
-      <div className="flex items-center gap-1.5 flex-shrink-0">
-        {canProcess && (
-          <button className={ACTION_BTN} onClick={() => onProcess(document.id)} disabled={isProcessing}>
-            {isProcessing ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Play className="h-3.5 w-3.5" />
-            )}
-            {isProcessing ? "Processing…" : document.processing_status === "failed" ? "Retry" : "Process"}
-          </button>
-        )}
-        <button className={ACTION_BTN} onClick={() => onEdit(document)} title="Edit">
-          <Pencil className="h-3.5 w-3.5" />
-          Edit
-        </button>
-        <button
-          className={ACTION_BTN}
-          onClick={() => onView(document.id)}
-          disabled={isViewing}
-          title="View"
-        >
-          {isViewing ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          {completed ? (
+            <span
+              role="img"
+              aria-label="Processed"
+              title="Processed"
+              className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--ci-listed)]"
+            />
           ) : (
-            <Eye className="h-3.5 w-3.5" />
+            <DocumentStatusBadge document={document} />
           )}
-          View
-        </button>
-        <button
-          className="inline-flex items-center gap-1.5 h-11 md:h-8 px-3 rounded-md border border-status-alert-soft bg-white text-destructive text-xs font-semibold hover:bg-status-alert-soft disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          onClick={() => onDelete(document.id)}
-          disabled={isDeleting}
-          title="Delete"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-          Delete
-        </button>
-      </div>
-    </div>
+        </div>
+      </td>
+      <td className="w-10 py-1 pr-2 text-right" onClick={stop}>
+        <DocumentActionsMenu
+          document={document}
+          onProcess={onProcess}
+          onDelete={onDelete}
+          onEdit={onEdit}
+          onView={onView}
+        />
+      </td>
+    </tr>
   );
 }

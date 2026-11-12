@@ -8,8 +8,9 @@ import { MessagesSquare, PanelLeft } from "lucide-react";
 import { AssistantConversation } from "@/components/assistant/assistant-conversation";
 import { ConversationSidebar } from "@/components/assistant/conversation-sidebar";
 import { ScopeChoices } from "@/components/assistant/scope-choices";
-import { useScopeLabel } from "@/components/assistant/scope-picker";
+import { ScopeChip, useScopeInfo } from "@/components/assistant/scope-picker";
 import { Button } from "@/components/ui/button";
+import { useCases } from "@/hooks/use-cases";
 import { useConversationList, useConversationMessages, useDeleteConversation } from "@/hooks/use-chat";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { isPracticeUnavailable } from "@/hooks/use-practice-assistant";
@@ -59,7 +60,7 @@ function LegacyTranscript({ id }: { id: number }) {
 
 /** What the open chat is about, with a link to the case. */
 function ScopeHeading({ scope, legacy }: { scope: AssistantScope | null; legacy: boolean }) {
-  const label = useScopeLabel(scope);
+  const { label, number } = useScopeInfo(scope);
   if (legacy) return <h1 className="min-w-0 flex-1 truncate font-serif text-[17px] font-bold text-gray-900">Older document chat</h1>;
   if (scope?.kind === "case") {
     return (
@@ -70,6 +71,7 @@ function ScopeHeading({ scope, legacy }: { scope: AssistantScope | null; legacy:
         >
           {label}
         </Link>
+        {number && <span className="ml-2 text-sm font-normal text-gray-500">{number}</span>}
       </h1>
     );
   }
@@ -95,6 +97,11 @@ export function AssistantPage() {
   const defaultList = useConversationList("default");
   const practiceList = useConversationList("practice", PORTFOLIO_BOT_ENABLED);
   const remove = useDeleteConversation();
+  const cases = useCases();
+  const caseNumbers = useMemo(
+    () => Object.fromEntries((cases.data ?? []).map((item) => [item.id, item.case_number])),
+    [cases.data],
+  );
 
   const rows: Conversation[] = useMemo(
     () => [...(defaultList.data ?? []), ...(PORTFOLIO_BOT_ENABLED ? practiceList.data ?? [] : [])],
@@ -163,6 +170,7 @@ export function AssistantPage() {
       onDelete={onDelete}
       deletingId={remove.isPending ? (remove.variables ?? null) : null}
       deleteError={remove.isError}
+      caseNumbers={caseNumbers}
     />
   );
 
@@ -236,6 +244,13 @@ export function AssistantPage() {
             />
           )}
         </div>
+        {scope !== null && !legacy && !waiting && !notFound && (
+          <ScopeChip
+            scope={scope}
+            onChange={(next) => go(assistantHref(next, null))}
+            className="border-t border-gray-200 px-3 py-1"
+          />
+        )}
       </section>
     </div>
   );

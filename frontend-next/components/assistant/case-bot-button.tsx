@@ -3,9 +3,9 @@
 import { useEffect, useRef, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { Bot, Maximize2, Plus, X } from "lucide-react";
+import { Bot, ChevronLeft, Maximize2, Plus, X } from "lucide-react";
 import { AssistantConversation } from "@/components/assistant/assistant-conversation";
-import { ScopePicker } from "@/components/assistant/scope-picker";
+import { ScopeChip, useScopeLabel } from "@/components/assistant/scope-picker";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { assistantHref } from "@/lib/assistant";
@@ -17,7 +17,9 @@ const ICON_BUTTON =
 /** The "Case Bot" button in the top bar, and the small chat it opens: a
  * popover under the button on a desktop, a full-height sheet on a phone. */
 export function CaseBotButton() {
-  const { open, scope, conversationId, openPopover, closePopover, setScope, setConversationId } = useAssistant();
+  const { open, scope, conversationId, openPopover, closePopover, setScope, setConversationId, chatKey, previous, backToPrevious } =
+    useAssistant();
+  const previousLabel = useScopeLabel(previous?.scope ?? null);
   const router = useRouter();
   const isMobile = useIsMobile();
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -46,8 +48,7 @@ export function CaseBotButton() {
   }
 
   const toolbar = (
-    <div className="flex items-center gap-1.5 border-b border-gray-100 p-2">
-      <ScopePicker scope={scope} onChange={setScope} />
+    <div className="flex items-center justify-end gap-1.5 px-2 max-md:border-b max-md:border-gray-100 max-md:py-1">
       <button type="button" aria-label="New chat" title="New chat" onClick={() => setConversationId(null)} className={ICON_BUTTON}>
         <Plus className="h-[18px] w-[18px]" />
       </button>
@@ -59,6 +60,7 @@ export function CaseBotButton() {
 
   const conversation = (
     <AssistantConversation
+      key={chatKey}
       scope={scope}
       conversationId={conversationId}
       onConversationChange={setConversationId}
@@ -67,6 +69,20 @@ export function CaseBotButton() {
       className="h-full"
     />
   );
+
+  // What the chat is about, always visible beside the input, and the way
+  // back to the chat a case page replaced.
+  const backLink = previous && (
+    <button
+      type="button"
+      onClick={backToPrevious}
+      className="flex min-h-[44px] w-full items-center gap-1 border-b border-gray-100 px-3 text-left text-xs font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:min-h-8"
+    >
+      <ChevronLeft className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
+      <span className="truncate">Back to {previousLabel}</span>
+    </button>
+  );
+  const scopeBar = <ScopeChip scope={scope} onChange={setScope} className="border-t border-gray-100 px-3 py-1" />;
 
   return (
     <>
@@ -87,7 +103,9 @@ export function CaseBotButton() {
       {open && isMobile && (
         <BottomSheet open onClose={close} label="Case Bot" size="full" bodyClassName="flex flex-col overflow-hidden">
           {toolbar}
+          {backLink}
           <div className="min-h-0 flex-1">{conversation}</div>
+          {scopeBar}
         </BottomSheet>
       )}
 
@@ -105,12 +123,16 @@ export function CaseBotButton() {
           >
             <div className="flex items-center justify-between gap-2 border-b border-gray-100 px-3 pt-2">
               <h2 className="font-serif text-[15px] font-bold text-gray-900">Case Bot</h2>
-              <button type="button" aria-label="Close Case Bot" onClick={close} className={ICON_BUTTON}>
-                <X className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-1">
+                {toolbar}
+                <button type="button" aria-label="Close Case Bot" onClick={close} className={ICON_BUTTON}>
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
-            {toolbar}
+            {backLink}
             <div className="min-h-0 flex-1">{conversation}</div>
+            {scopeBar}
           </div>,
           document.body,
         )}

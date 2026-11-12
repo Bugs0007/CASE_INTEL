@@ -23,9 +23,8 @@ interface Options {
 
 /** One practice-assistant conversation: its messages, the send and retry of
  * a question, the case chooser, and the invoice confirm. Used by the
- * dashboard block and by the Case Bot popover and page, so the three behave
- * the same. Nothing is sent except by `send` and `confirm`, which a person
- * triggers. */
+ * Case Bot popover and page. Nothing is sent except by `send` and `confirm`,
+ * which a person triggers (a button, or the dashboard ask bar). */
 export function usePracticeConversation({ initialMessages = [], conversationId: initialId, onConversation }: Options = {}) {
   const queryClient = useQueryClient();
   const [messages, setMessages] = useState<PracticeMessage[]>(initialMessages);
@@ -67,13 +66,14 @@ export function usePracticeConversation({ initialMessages = [], conversationId: 
     });
   }
 
-  function send(query: string, caseId?: number) {
+  /** `day` is the day an "Ask about this day" question is about. */
+  function send(query: string, caseId?: number, day?: string) {
     if (chat.isPending) return;
     const request: PracticeChatRequest = {
       query,
       client_request_id: crypto.randomUUID(),
       ...(conversationId.current !== undefined ? { conversation_id: conversationId.current } : {}),
-      ...(askedDay.current ? { selected_day: askedDay.current } : {}),
+      ...((day ?? askedDay.current) ? { selected_day: day ?? askedDay.current } : {}),
       ...(caseId !== undefined ? { case_id: caseId } : {}),
     };
     askedDay.current = undefined;

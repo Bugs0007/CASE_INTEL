@@ -15,6 +15,16 @@ import {
   MobileViewOptionsSheet,
 } from "@/components/cases/mobile/mobile-group-options";
 import { CasesSkeleton } from "@/components/cases/cases-skeleton";
+import { CaseList } from "@/components/cases/list/case-list";
+import { CasesToolbar } from "@/components/cases/list/cases-toolbar";
+import {
+  attentionReasons,
+  sortCases,
+  type AttentionContext,
+  type AttentionFilter,
+  type CaseSort,
+} from "@/components/cases/list/model";
+import { useCasesView } from "@/components/cases/list/use-cases-view";
 import { MobileSubbar } from "@/components/layout/mobile-chrome";
 import { CASES_TABS, SectionTabs } from "@/components/layout/section-tabs";
 import { showToast } from "@/components/ui/toaster";
@@ -25,14 +35,16 @@ import { useUpcomingHearings } from "@/hooks/use-dashboard";
 import { useDocuments } from "@/hooks/use-documents";
 import { getLastDashboardVisit } from "@/lib/last-visit";
 import { groupCases } from "@/lib/case-grouping";
-import { reasonForCase, sortByUrgencyPriority, type UrgencyReason } from "@/lib/case-urgency";
+import { reasonForCase, type UrgencyReason } from "@/lib/case-urgency";
 import { istDayKey } from "@/lib/dashboard/dates";
 import type { CaseStatus } from "@/types";
 
 export default function CasesPage() {
   const [activeStatus, setActiveStatus] = useState<CaseStatus | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [othersExpanded, setOthersExpanded] = useState(false);
+  const [attentionFilter, setAttentionFilter] = useState<AttentionFilter | null>(null);
+  const [sort, setSort] = useState<CaseSort>("hearing");
+  const { view, setView } = useCasesView();
   const isMobile = useIsMobile();
   const { grouping, setGrouping } = useCasesGrouping();
   const { collapsed, toggle: toggleGroup, setAll: setAllGroups } = useCollapsedGroups(grouping);
@@ -69,6 +81,13 @@ export default function CasesPage() {
     () => new Set(ecourtsUpdates.map((h) => h.case_id)),
     [ecourtsUpdates],
   );
+  const failedDocCounts = useMemo(() => {
+    const counts = new Map<number, number>();
+    for (const d of failedDocuments) {
+      if (d.case_id != null) counts.set(d.case_id, (counts.get(d.case_id) ?? 0) + 1);
+    }
+    return counts;
+  }, [failedDocuments]);
   const failedDocCaseIds = useMemo(
     () =>
       new Set(
@@ -108,31 +127,43 @@ export default function CasesPage() {
     );
   }, [cases, searchQuery]);
 
-  const needsAttentionCases = useMemo(
-    () => sortByUrgencyPriority(filteredCases.filter((c) => c.needs_attention)),
-    [filteredCases],
+  const today = istDayKey();
+  const attention = useMemo<AttentionContext>(
+    () => ({ today, hearingSoonIds: hearingSoonCaseIds, failedDocCounts, ecourtsUpdateIds: ecourtsUpdateCaseIds }),
+    [today, hearingSoonCaseIds, failedDocCounts, ecourtsUpdateCaseIds],
   );
-  const otherCases = useMemo(
-    () => filteredCases.filter((c) => !c.needs_attention),
-    [filteredCases],
-  );
+
+  // The strip's counts are read off the cases the search and status tabs leave,
+  // so a chip's number is what clicking it would show.
+  const attentionCounts = useMemo(() => {
+    const counts: Record<AttentionFilter, number> = { hearing: 0, order: 0, docs: 0 };
+    for (const c of filteredCases) {
+      for (const r of attentionReasons(c, attention)) {
+        if (r.kind === "hearing" || r.kind === "order" || r.kind === "docs") counts[r.kind] += 1;
+      }
+    }
+    return counts;
+  }, [filteredCases, attention]);
+
+  const visibleCases = useMemo(() => {
+    const filtered = attentionFilter
+      ? filteredCases.filter((c) => attentionReasons(c, attention).some((r) => r.kind === attentionFilter))
+      : filteredCases;
+    return sortCases(filtered, sort, today);
+  }, [filteredCases, attentionFilter, attention, sort, today]);
+
+  // The cards keep the urgency chip for a case the server flags.
   const urgencyReasons = useMemo(() => {
     const map = new Map<number, UrgencyReason>();
-    for (const c of needsAttentionCases) {
-      map.set(c.id, reasonForCase(c.id, hearingSoonCaseIds, ecourtsUpdateCaseIds, failedDocCaseIds));
+    for (const c of visibleCases) {
+      if (c.needs_attention) {
+        map.set(c.id, reasonForCase(c.id, hearingSoonCaseIds, ecourtsUpdateCaseIds, failedDocCaseIds));
+      }
     }
     return map;
-  }, [needsAttentionCases, hearingSoonCaseIds, ecourtsUpdateCaseIds, failedDocCaseIds]);
+  }, [visibleCases, hearingSoonCaseIds, ecourtsUpdateCaseIds, failedDocCaseIds]);
 
-  // Grouped by court or client, the Needs Attention split gives way to one
-  // list of groups: a group's count must be every case it holds on screen. The
-  // cards keep their urgency chips, and keep the page's order within a group
-  // (needs-attention first, then the rest).
-  const today = istDayKey();
-  const groups = useMemo(
-    () => groupCases([...needsAttentionCases, ...otherCases], grouping, today),
-    [needsAttentionCases, otherCases, grouping, today],
-  );
+  const groups = useMemo(() => groupCases(visibleCases, grouping, today), [visibleCases, grouping, today]);
   const allGroupsCollapsed = groups.length > 0 && groups.every((g) => collapsed.has(g.key));
 
   if (isLoading && !hasLoadedOnce.current) {
@@ -154,9 +185,6 @@ export default function CasesPage() {
     );
   }
 
-  const hasUrgentGroup = needsAttentionCases.length > 0;
-  const othersToShow = hasUrgentGroup ? otherCases : filteredCases;
-
   return (
     <div className="px-4 sm:px-7 pt-4 sm:pt-7 pb-[60px] max-w-[1240px] mx-auto">
       {/* The status tabs live in the phone's top bar, first thing on the page
@@ -173,7 +201,7 @@ export default function CasesPage() {
         <div className="min-w-0">
           <h1 className="text-page-title max-md:!text-[26px] max-md:!leading-[1.1] text-gray-900 mb-1.5 max-md:mb-0.5">Cases</h1>
           <p className="text-sm text-gray-600">
-            {pluralize(filteredCases.length, "case")} across your workspace
+            {pluralize(visibleCases.length, "case")} across your workspace
           </p>
         </div>
         <div className="grid grid-cols-2 sm:flex items-center gap-2">
@@ -216,7 +244,7 @@ export default function CasesPage() {
           />
         </div>
       ) : (
-        <div className="mb-6">
+        <div className="mb-4">
           <CaseFilters
             activeStatus={activeStatus}
             onStatusChange={setActiveStatus}
@@ -226,8 +254,17 @@ export default function CasesPage() {
         </div>
       )}
 
-      {/* Grouped by court or client: one list of groups instead of the two
-          sections below. */}
+      <CasesToolbar
+        counts={attentionCounts}
+        active={attentionFilter}
+        onToggleFilter={(key) => setAttentionFilter((cur) => (cur === key ? null : key))}
+        sort={sort}
+        onSortChange={setSort}
+        view={view}
+        onViewChange={setView}
+      />
+
+      {/* Grouped by court or client: one list of groups instead of the plain list. */}
       {grouping !== "none" && (
         <div>
           <div className="mb-3.5 flex items-center justify-between gap-3 max-md:mb-1">
@@ -260,70 +297,37 @@ export default function CasesPage() {
               onDelete={handleDeleteCase}
               deletingId={deleteCase.variables}
               urgencyReasons={urgencyReasons}
+              view={view}
+              attention={attention}
             />
           )}
         </div>
       )}
 
-      {/* Needs Attention This Week */}
-      {grouping === "none" && !isLoading && hasUrgentGroup && (
-        <div className="mb-8 max-md:mt-3 max-md:mb-6">
-          <div className="flex items-center gap-2.5 mb-3.5 max-md:mb-2.5">
-            <h2 className="text-card-title text-gray-900">Needs Attention This Week</h2>
-            <span className="ci-chip ci-chip--pending">
-              {needsAttentionCases.length}
-            </span>
-          </div>
-          <CaseGrid
-            cases={needsAttentionCases}
-            onDelete={handleDeleteCase}
-            deletingId={deleteCase.variables}
-            urgencyReasons={urgencyReasons}
-          />
-        </div>
-      )}
-
-      {/* All Other Cases -- collapsed by default, matching the design
-          handoff's toggle behavior (was previously always-expanded). */}
-      {grouping === "none" && (
-      <div>
-        <div className="flex items-center justify-between mb-3.5">
-          <h2 className="text-card-title text-gray-900">
-            {hasUrgentGroup ? "All Other Cases" : "Cases"}
-          </h2>
-          {hasUrgentGroup && (
-            <button
-              onClick={() => setOthersExpanded((v) => !v)}
-              className="text-[13px] font-semibold text-primary hover:text-primary-hover"
-            >
-              {othersExpanded ? "Collapse" : "View All"}
-            </button>
-          )}
-        </div>
-
-        {hasUrgentGroup && !othersExpanded ? (
-          <div className="bg-white border border-gray-100 rounded-xl px-5 py-4 text-sm text-gray-600">
-            <span className="font-semibold text-gray-900">
-              {othersToShow.length} case{othersToShow.length === 1 ? "" : "s"}
-            </span>{" "}
-            with nothing urgent to review this week.
-          </div>
-        ) : (
-          <CaseGrid
-            cases={othersToShow}
+      {grouping === "none" &&
+        (view === "list" ? (
+          <CaseList
+            cases={visibleCases}
+            attention={attention}
             isLoading={isLoading}
             onDelete={handleDeleteCase}
             deletingId={deleteCase.variables}
           />
-        )}
-      </div>
-      )}
+        ) : (
+          <CaseGrid
+            cases={visibleCases}
+            isLoading={isLoading}
+            onDelete={handleDeleteCase}
+            deletingId={deleteCase.variables}
+            urgencyReasons={urgencyReasons}
+          />
+        ))}
 
       {/* Results Count */}
       {!isLoading && (
         <div className="mt-6 text-center text-sm text-gray-500">
-          Showing {filteredCases.length}{" "}
-          {filteredCases.length === 1 ? "case" : "cases"}
+          Showing {visibleCases.length}{" "}
+          {visibleCases.length === 1 ? "case" : "cases"}
           {searchQuery && ` matching "${searchQuery}"`}
         </div>
       )}

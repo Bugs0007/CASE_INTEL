@@ -1,12 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { CaseOptionsMenu } from "@/components/cases/list/case-options-menu";
 import { StatusBadge, PriorityBadge } from "@/components/ui/badge";
-import { MoreVertical, Trash2 } from "lucide-react";
 import { cn, hasPlaceholderTitle, pluralize, staggerDelay, primaryClientContact } from "@/lib/utils";
 import type { UrgencyReason } from "@/lib/case-urgency";
 import { orderCheckMarker } from "./order-sync-status";
@@ -28,7 +25,6 @@ export function CaseCard({ case: caseItem, onDelete, isDeleting, urgencyReason, 
   const router = useRouter();
   const client = primaryClientContact(caseItem.client_contacts);
   const orderMarker = orderCheckMarker(caseItem);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
     <Card
@@ -47,70 +43,13 @@ export function CaseCard({ case: caseItem, onDelete, isDeleting, urgencyReason, 
               {urgencyReason.label}
             </span>
           )}
-          <StatusBadge status={caseItem.status} />
-          <PriorityBadge priority={caseItem.priority} />
-        </div>
-        <div className="relative flex-shrink-0">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="p-1 h-11 w-11 md:h-8 md:w-8"
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsMenuOpen((open) => !open);
-            }}
-            aria-haspopup="true"
-            aria-expanded={isMenuOpen}
-            aria-label="Case options"
-          >
-            <MoreVertical className="h-4 w-4" />
-          </Button>
-          {isMenuOpen && (
-            <>
-              {/* Full-screen backdrop, portaled to <body> -- the Card
-                  itself carries a CSS transform (animate-fade-up's
-                  keyframe, plus the hover translate), which makes
-                  position:fixed on a plain descendant relative to the
-                  CARD's box instead of the viewport (a CSS containing-
-                  block rule), so a non-portaled backdrop would only cover
-                  the card's own footprint. Portaling escapes that.
-                  z-40 sits above every other fixed/sticky layout element
-                  (sidebar z-10, header z-[5], mobile nav z-30) so a click
-                  ANYWHERE outside the menu -- including over those
-                  regions -- is consumed here and never reaches the Card's
-                  onClick underneath. */}
-              {typeof document !== "undefined" &&
-                createPortal(
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsMenuOpen(false);
-                    }}
-                  />,
-                  document.body,
-                )}
-              <div
-                role="menu"
-                onClick={(e) => e.stopPropagation()}
-                className="absolute right-0 top-full mt-1 w-40 bg-surface rounded-lg shadow-lg border border-gray-100 py-1 z-50"
-              >
-                <button
-                  role="menuitem"
-                  disabled={isDeleting}
-                  onClick={() => {
-                    setIsMenuOpen(false);
-                    onDelete?.(caseItem.id);
-                  }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-status-alert-soft disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  {isDeleting ? "Deleting..." : "Delete Case"}
-                </button>
-              </div>
-            </>
+          {/* Only what is out of the ordinary: an open, medium case stays quiet. */}
+          {caseItem.status !== "open" && <StatusBadge status={caseItem.status} />}
+          {(caseItem.priority === "high" || caseItem.priority === "critical") && (
+            <PriorityBadge priority={caseItem.priority} />
           )}
         </div>
+        <CaseOptionsMenu onDelete={() => onDelete?.(caseItem.id)} isDeleting={isDeleting} />
       </div>
 
       {/* Case number + title + client -- case number is an identifier, so
@@ -129,13 +68,11 @@ export function CaseCard({ case: caseItem, onDelete, isDeleting, urgencyReason, 
       </h3>
       {/* The billed Client when one is linked, else the contact -- each
           labelled, so a contact never reads as a client Billing can't find. */}
-      <div className="text-meta text-gray-600 mb-3.5 truncate">
-        {caseItem.client_detail
-          ? `Client: ${caseItem.client_detail.name}`
-          : client
-            ? `Contact: ${client.name}`
-            : "No client or contact yet"}
-      </div>
+      {(caseItem.client_detail || client) && (
+        <div className="text-meta text-gray-600 mb-3.5 truncate">
+          {caseItem.client_detail ? `Client: ${caseItem.client_detail.name}` : `Contact: ${client?.name}`}
+        </div>
+      )}
 
       {/* Footer */}
       <div className="flex items-center gap-3.5 pt-3 border-t border-gray-100 text-xs text-gray-400">
