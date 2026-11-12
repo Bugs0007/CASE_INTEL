@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, Search } from "lucide-react";
+import { CaseBotButton } from "@/components/assistant/case-bot-button";
 import { AccountMenu } from "@/components/layout/account-menu";
 import { HelpMenu } from "@/components/layout/help-menu";
 import { NewMenu } from "@/components/layout/new-menu";
@@ -99,6 +100,8 @@ export function Header() {
           <div className="lg:hidden">
             <NewMenu variant="icon" />
           </div>
+
+          <CaseBotButton />
 
           {/* Guided tour and keyboard shortcuts: nothing a touch screen needs. */}
           <div className="max-md:hidden">

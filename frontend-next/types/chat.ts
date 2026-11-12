@@ -13,11 +13,18 @@ export interface Message {
   content: string;
   created_at: string;
   citations?: Citation[];
+  /** Practice chats only: sources on an assistant message, the stored
+   * request marker on a user message. Read through lib/practice-history.ts. */
+  references?: unknown[];
 }
+
+export type ConversationScope = "case" | "legacy_documents" | "practice";
 
 export interface Conversation {
   id: number;
   case_id: number | null;
+  case_title?: string | null;
+  scope?: ConversationScope;
   title: string | null;
   started_at: string;
   last_message_at: string | null;

@@ -17,12 +17,16 @@ class ConversationListSerializer(serializers.ModelSerializer):
     title = serializers.SerializerMethodField()
     message_count = serializers.IntegerField(read_only=True)
     preview = serializers.SerializerMethodField()
+    # For the Case Bot sidebar, which groups chats by case. The queryset
+    # already select_related("case"), so this adds no query.
+    case_title = serializers.CharField(source="case.title", read_only=True, default=None)
 
     class Meta:
         model = Conversation
         fields = [
             "id",
             "case_id",
+            "case_title",
             "scope",
             "title",
             "started_at",
