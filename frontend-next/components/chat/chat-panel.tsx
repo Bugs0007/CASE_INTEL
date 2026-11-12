@@ -37,6 +37,15 @@ interface ChatPanelProps {
   /** A source was clicked: the citation under "Sources", or an inline
    * [Doc N] marker that could be matched to one. */
   onOpenCitation?: (citation: Citation) => void;
+  /** Select a conversation from outside: a number opens that chat, null is
+   * a new chat. Leave it out and the panel picks its own, as before. */
+  conversationId?: number | null;
+  /** The chat the panel is on changed (opened, started, or answered): the
+   * id, or null for a new chat. */
+  onConversationChange?: (id: number | null) => void;
+  /** The caller has its own chat list and New Chat button: drop this
+   * panel's History rail and its buttons. */
+  hideHistory?: boolean;
 }
 
 interface PendingChatRequest {
@@ -74,6 +83,9 @@ export function ChatPanel({
   onClose,
   compact = false,
   onOpenCitation,
+  conversationId,
+  onConversationChange,
+  hideHistory = false,
 }: ChatPanelProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -138,6 +150,21 @@ export function ChatPanel({
     return () => window.clearInterval(timer);
   }, [isSending, sendStartedAt]);
 
+  // A caller that owns the selection (the Case Bot popover and page).
+  const lastCaseRef = useRef(caseId);
+  useEffect(() => {
+    if (conversationId === undefined) return;
+    const caseChanged = lastCaseRef.current !== caseId;
+    lastCaseRef.current = caseId;
+    if (conversationId === null) {
+      if (caseChanged || activeConversationId !== null || !isDraftChat) startNewChat();
+    } else if (caseChanged || conversationId !== activeConversationId) {
+      void handleSelectConversation(conversationId);
+    }
+    // Only an outside change should re-apply the selection.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId, caseId]);
+
   const loadConversations = async () => {
     setIsLoadingConversations(true);
     try {
@@ -171,6 +198,7 @@ export function ChatPanel({
     setMessages([]);
     setLastFailedRequest(null);
     setMobileHistoryView(false);
+    onConversationChange?.(conversationId);
     await loadConversationMessages(conversationId);
   };
 
@@ -183,6 +211,7 @@ export function ChatPanel({
     setSendError(null);
     setLastFailedRequest(null);
     setMobileHistoryView(false);
+    onConversationChange?.(null);
   };
 
   const sendMessage = async (
@@ -219,6 +248,7 @@ export function ChatPanel({
       if (request.isNewChat && nextConversationId !== null) {
         setIsDraftChat(false);
       }
+      onConversationChange?.(nextConversationId);
 
       let content = response.answer;
       if (response.requires_clarification && response.clarification_question) {
@@ -301,6 +331,7 @@ export function ChatPanel({
         className,
       )}
     >
+      {!hideHistory && (
       <aside
         className={cn(
           "w-full shrink-0 flex-col border-r border-gray-200 bg-gray-50",
@@ -382,11 +413,12 @@ export function ChatPanel({
           )}
         </div>
       </aside>
+      )}
 
       <div
         className={cn(
           "flex min-w-0 flex-1 flex-col",
-          mobileHistoryView && (compact ? "hidden" : "max-lg:hidden"),
+          !hideHistory && mobileHistoryView && (compact ? "hidden" : "max-lg:hidden"),
         )}
       >
         <div className="border-b border-gray-200 bg-white px-4 py-4">
@@ -411,24 +443,28 @@ export function ChatPanel({
                   next to New Chat's much bigger hit area -- easy to mis-tap
                   on a real touchscreen, which silently opens a draft chat
                   instead and makes History look like it does nothing. */}
-              <Button
-                variant="secondary"
-                size="sm"
-                className={cn("w-11 flex-shrink-0", !compact && "lg:hidden")}
-                onClick={() => setMobileHistoryView(true)}
-                aria-label="View conversation history"
-              >
-                <History className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                className={cn(!compact && "lg:hidden")}
-                onClick={startNewChat}
-              >
-                <Plus className="h-4 w-4" />
-                New Chat
-              </Button>
+              {!hideHistory && (
+                <>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className={cn("w-11 flex-shrink-0", !compact && "lg:hidden")}
+                    onClick={() => setMobileHistoryView(true)}
+                    aria-label="View conversation history"
+                  >
+                    <History className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className={cn(!compact && "lg:hidden")}
+                    onClick={startNewChat}
+                  >
+                    <Plus className="h-4 w-4" />
+                    New Chat
+                  </Button>
+                </>
+              )}
               <div className={cn("hidden items-center gap-2", !compact && "sm:flex")}>
                 <Select
                   value={exportFormat}

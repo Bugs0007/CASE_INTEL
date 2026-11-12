@@ -1,4 +1,4 @@
-import { Briefcase, Calendar, Inbox, LayoutDashboard, Receipt, type LucideIcon } from "lucide-react";
+import { Bot, Briefcase, Calendar, Inbox, LayoutDashboard, Receipt, type LucideIcon } from "lucide-react";
 
 export interface NavItem {
   href: string;
@@ -17,6 +17,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/cases", label: "Cases", icon: Briefcase, match: ["/cases", "/documents"] },
   { href: "/calendar", label: "Calendar", icon: Calendar, match: ["/calendar"] },
   { href: "/messages", label: "Messages", icon: Inbox, match: ["/messages"] },
+  { href: "/assistant", label: "Case Bot", icon: Bot, match: ["/assistant"] },
   { href: "/billing", label: "Billing", icon: Receipt, match: ["/billing", "/clients"] },
 ];
 

@@ -7,7 +7,31 @@ export const chatKeys = {
   all: ["chat"] as const,
   conversations: () => [...chatKeys.all, "conversations"] as const,
   conversation: (id: number) => [...chatKeys.conversations(), id] as const,
+  list: (scope: "practice" | "default") => [...chatKeys.conversations(), "list", scope] as const,
+  messages: (id: number) => [...chatKeys.all, "messages", id] as const,
 };
+
+/** The sidebar's lists: case and older document chats (default) or practice
+ * chats. Practice chats are never in the default list. */
+export function useConversationList(scope: "practice" | "default", enabled = true) {
+  return useQuery({
+    queryKey: chatKeys.list(scope),
+    queryFn: () => conversationsApi.list(undefined, scope === "practice" ? "practice" : undefined),
+    enabled,
+  });
+}
+
+/** A conversation's messages, always re-read when it is opened: a chat that
+ * was continued elsewhere must not show its old copy. */
+export function useConversationMessages(id: number | null) {
+  return useQuery({
+    queryKey: chatKeys.messages(id ?? 0),
+    queryFn: () => conversationsApi.getMessages(id as number),
+    enabled: id !== null,
+    staleTime: 0,
+    refetchOnMount: "always",
+  });
+}
 
 // List conversations hook
 export function useConversations() {
@@ -44,7 +68,8 @@ export function useDeleteConversation() {
 
   return useMutation({
     mutationFn: (id: number) => conversationsApi.delete(id),
-    onSuccess: () => {
+    onSuccess: (_result, id) => {
+      queryClient.removeQueries({ queryKey: chatKeys.messages(id) });
       queryClient.invalidateQueries({ queryKey: chatKeys.conversations() });
     },
   });

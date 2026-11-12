@@ -361,3 +361,11 @@ def test_practice_conversation_is_invisible_to_another_owner(
         )
     assert chat.status_code == 404
     assert Conversation.objects.filter(id=practice.id).exists()
+
+
+@pytest.mark.django_db
+def test_list_carries_case_title_for_the_case_bot_sidebar(user_a, case_a, conversations):
+    rows = {r["id"]: r for r in _rows(_client(user_a).get("/api/conversations/"))}
+    assert rows[conversations["case"].id]["case_title"] == case_a.title
+    practice = _rows(_client(user_a).get("/api/conversations/?scope=practice"))[0]
+    assert practice["case_title"] is None
