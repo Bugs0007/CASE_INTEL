@@ -3,7 +3,7 @@
 import { pluralize } from "@/lib/utils";
 import { useState, useMemo } from "react";
 import { DocumentFilters } from "@/components/documents/document-filters";
-import { DocumentTable } from "@/components/documents/document-table";
+import { DocumentGrid } from "@/components/documents/document-grid";
 import { DocumentsSkeleton } from "@/components/documents/documents-skeleton";
 import { CASES_TABS, SectionTabs } from "@/components/layout/section-tabs";
 import { EditDocumentDialog } from "@/components/documents/edit-document-dialog";
@@ -164,8 +164,8 @@ export default function DocumentsPage() {
         />
       </div>
 
-      {/* Documents Table */}
-      <DocumentTable
+      {/* Documents */}
+      <DocumentGrid
         documents={filteredDocuments}
         isLoading={isLoading}
         onProcess={handleProcess}
@@ -173,7 +173,6 @@ export default function DocumentsPage() {
         onEdit={handleEdit}
         onView={handleView}
         processingId={processDocument.variables}
-        deletingId={deleteDocument.variables}
         viewingId={viewDocument.variables}
       />
 

@@ -13,6 +13,7 @@ transition rules.
 import logging
 
 from django.core.files.storage import default_storage
+from django.db import transaction
 from django.http import FileResponse
 from rest_framework import generics, status
 from rest_framework.exceptions import ValidationError
@@ -106,6 +107,37 @@ class AppearanceFeeDetailView(OwnerScopedMixin, generics.RetrieveUpdateDestroyAP
 
     serializer_class = AppearanceFeeSerializer
     queryset = AppearanceFee.objects.select_related("hearing__case")
+
+    # The rules live in invoice_service: a fee may change while it is pending,
+    # or invoiced and not yet sent (its PDF is then rendered again under the
+    # same number); only a pending fee may be deleted. Anything else is a 409
+    # whatever the caller (the Billing page, the Case Bot card) believes.
+
+    def update(self, request, *args, **kwargs):
+        try:
+            return super().update(request, *args, **kwargs)
+        except invoice_service.FeeNotChangeableError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            return super().destroy(request, *args, **kwargs)
+        except invoice_service.FeeNotChangeableError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+
+    def perform_update(self, serializer):
+        with transaction.atomic():
+            locked = AppearanceFee.objects.select_for_update().get(pk=serializer.instance.pk)
+            invoice_service.ensure_changeable(locked)
+            serializer.instance.refresh_from_db()
+            fee = serializer.save()
+            invoice_service.rerender_if_invoiced(fee)
+
+    def perform_destroy(self, instance):
+        with transaction.atomic():
+            locked = AppearanceFee.objects.select_for_update().get(pk=instance.pk)
+            invoice_service.ensure_deletable(locked)
+            locked.delete()
 
 
 class AppearanceFeeInvoiceView(APIView):

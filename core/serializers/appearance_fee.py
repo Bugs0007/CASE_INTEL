@@ -11,6 +11,11 @@ class AppearanceFeeSerializer(serializers.ModelSerializer):
     case_id = serializers.IntegerField(source="hearing.case_id", read_only=True)
     case_title = serializers.CharField(source="hearing.case.title", read_only=True)
     hearing_date = serializers.DateTimeField(source="hearing.hearing_date", read_only=True)
+    # The Case Bot card and the Billing page call the free-text field
+    # "description"; it is stored in `notes` (the text printed on the invoice).
+    description = serializers.CharField(
+        source="notes", required=False, allow_blank=True, max_length=2000
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -43,6 +48,7 @@ class AppearanceFeeSerializer(serializers.ModelSerializer):
             "sent_to_email",
             "send_status",
             "notes",
+            "description",
             "created_at",
             "updated_at",
         ]

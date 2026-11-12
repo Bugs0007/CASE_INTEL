@@ -777,6 +777,7 @@ _MANUALLY_SCOPED_VIEWS = {
     # tenancy in TestPracticeAssistantIsolation below.
     "practice_assistant.PracticeOverviewView",
     "practice_assistant.PracticeChatView",
+    "practice_assistant.PracticeReportView",  # build_report(owner=request.user); test_practice_reports.py
     # Case assistant drafts: every lookup filters owner=request.user and
     # resolves case/document/message ids under the owner
     # (test_case_assistant_api.py, test_draft_approval_outputs.py).

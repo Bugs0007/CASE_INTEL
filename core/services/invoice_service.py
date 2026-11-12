@@ -64,6 +64,69 @@ class NotInvoicedError(InvoiceError):
     """Raised when an action needs an invoice PDF that doesn't exist yet."""
 
 
+class FeeNotChangeableError(InvoiceError):
+    """Raised when a fee that has gone out (paid, or its invoice emailed or
+    logged as sent) is edited, or a fee that is not pending is deleted. The
+    message is plain text meant for the advocate."""
+
+
+# ---------------------------------------------------------------------------
+# Which fees may still change
+# ---------------------------------------------------------------------------
+
+MSG_PAID = "This fee is already paid, so it can no longer be changed."
+MSG_SENT = "This invoice has already been sent to the client, so the fee can no longer be changed."
+MSG_DELETE_NOT_PENDING = (
+    "Only a fee with no invoice yet can be deleted. This one has already been invoiced."
+)
+
+
+def invoice_sent(fee: AppearanceFee) -> bool:
+    """True once the invoice has gone out: emailed, or logged as emailed on a
+    box with no mail credentials ("sent" and "logged" both count)."""
+    return fee.send_status in (AppearanceFee.SEND_SENT, AppearanceFee.SEND_LOGGED)
+
+
+def change_blocker(fee: AppearanceFee) -> str | None:
+    """Why this fee's amount, category, description or hearing cannot change,
+    or None. Allowed while PENDING, or INVOICED and not yet sent."""
+    if fee.status == AppearanceFee.STATUS_PAID:
+        return MSG_PAID
+    if fee.status == AppearanceFee.STATUS_INVOICED and invoice_sent(fee):
+        return MSG_SENT
+    return None
+
+
+def delete_blocker(fee: AppearanceFee) -> str | None:
+    """Why this fee cannot be deleted, or None. Only a PENDING fee can."""
+    if fee.status == AppearanceFee.STATUS_PENDING:
+        return None
+    if fee.status == AppearanceFee.STATUS_PAID:
+        return MSG_PAID
+    return MSG_DELETE_NOT_PENDING
+
+
+def ensure_changeable(fee: AppearanceFee) -> None:
+    reason = change_blocker(fee)
+    if reason:
+        raise FeeNotChangeableError(reason)
+
+
+def ensure_deletable(fee: AppearanceFee) -> None:
+    reason = delete_blocker(fee)
+    if reason:
+        raise FeeNotChangeableError(reason)
+
+
+def rerender_if_invoiced(fee: AppearanceFee) -> AppearanceFee:
+    """After an edit: an invoiced, unsent fee gets its PDF rendered again in
+    place under the SAME invoice number (generate_invoice never reissues a
+    number). A pending fee has no PDF yet, so nothing happens."""
+    if fee.status == AppearanceFee.STATUS_INVOICED and fee.invoice_number:
+        return generate_invoice(fee)
+    return fee
+
+
 # ---------------------------------------------------------------------------
 # Profile + invoice numbering
 # ---------------------------------------------------------------------------

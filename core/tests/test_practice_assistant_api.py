@@ -229,7 +229,7 @@ class TestDeterministicIntents:
         turn = resp.json()
         assert set(turn) == {
             "conversation_id", "user_message_id", "assistant_message_id", "answer", "intent",
-            "status", "sources", "summary", "case_candidates", "action_card", "as_of",
+            "status", "sources", "summary", "case_candidates", "action_card", "report", "as_of",
         }
         assert turn["as_of"] == NOW.isoformat()
         assert turn["action_card"] is None and turn["case_candidates"] == []
@@ -375,7 +375,8 @@ class TestDeterministicIntents:
             ("Send the invoice for Rao", "propose_invoice_send"),
         ],
     )
-    def test_billing_is_not_available_yet_and_has_no_action_card(self, api, practice, query, intent):
+    def test_billing_is_not_available_yet_and_has_no_action_card(self, api, practice, settings, query, intent):
+        settings.PRACTICE_INVOICE_ACTIONS_ENABLED = False
         turn = ask(api, query).json()
         assert (turn["intent"], turn["status"]) == (intent, "needs_clarification")
         assert turn["answer"] == answers.BILLING_NOT_AVAILABLE
@@ -453,7 +454,8 @@ class TestClassifier:
         assert turn["status"] == "needs_clarification"
         assert turn["answer"] == answers.RANGE_TOO_LONG
 
-    def test_billing_from_the_model_gets_no_action_card(self, api, practice):
+    def test_billing_from_the_model_gets_no_action_card(self, api, practice, settings):
+        settings.PRACTICE_INVOICE_ACTIONS_ENABLED = False
         raw = json.dumps(
             {"intent": "propose_invoice_send", "action_card": {"kind": "send_invoice", "fee_id": 1}}
         )

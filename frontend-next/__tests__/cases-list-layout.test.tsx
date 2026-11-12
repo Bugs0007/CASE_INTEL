@@ -94,6 +94,8 @@ const rowTitles = () => screen.getAllByTestId("case-row").map((r) => r.querySele
 beforeEach(() => {
   vi.clearAllMocks();
   window.localStorage.clear();
+  // Cards are the default; these tests exercise the list, so choose it explicitly.
+  window.localStorage.setItem(viewStorageKey(null), "list");
   window.history.replaceState(null, "", "/cases");
   vi.mocked(useDeleteCase).mockReturnValue({ mutateAsync: vi.fn(), variables: undefined } as unknown as ReturnType<typeof useDeleteCase>);
   vi.mocked(useUpcomingHearings).mockReturnValue({
@@ -103,6 +105,17 @@ beforeEach(() => {
     data: [{ case_id: 1 }, { case_id: 1 }],
   } as unknown as ReturnType<typeof useDocuments>);
   vi.mocked(useCases).mockReturnValue({ data: CASES, isLoading: false, error: null } as unknown as ReturnType<typeof useCases>);
+});
+
+describe("Cases default view", () => {
+  it("opens on Cards when no view has been chosen", () => {
+    window.localStorage.removeItem(viewStorageKey(null));
+    renderPage();
+    expect(screen.getByRole("button", { name: "Cards" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "List" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByTestId("case-row")).not.toBeInTheDocument();
+    expect(screen.getByText("Zulu v. State")).toBeInTheDocument();
+  });
 });
 
 describe("Cases list view", () => {

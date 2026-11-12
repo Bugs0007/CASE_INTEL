@@ -19,13 +19,19 @@ class AssistantDraft(OwnedModel):
 
     SUBTYPE_STATUS_MEMO = "status_memo"
     SUBTYPE_PERSONAL_NOTE = "personal_note"
+    SUBTYPE_CLIENT_LETTER = "client_letter"
+    SUBTYPE_LIST_OF_DATES = "list_of_dates"
     SUBTYPE_CHOICES = [
         (SUBTYPE_STATUS_MEMO, "Case status memo"),
         (SUBTYPE_PERSONAL_NOTE, "Personal note"),
+        (SUBTYPE_CLIENT_LETTER, "Client letter"),
+        (SUBTYPE_LIST_OF_DATES, "List of dates"),
     ]
     KIND_FOR_SUBTYPE = {
         SUBTYPE_STATUS_MEMO: KIND_DOCUMENT,
         SUBTYPE_PERSONAL_NOTE: KIND_NOTE,
+        SUBTYPE_CLIENT_LETTER: KIND_DOCUMENT,
+        SUBTYPE_LIST_OF_DATES: KIND_DOCUMENT,
     }
 
     STATUS_QUEUED = "queued"
