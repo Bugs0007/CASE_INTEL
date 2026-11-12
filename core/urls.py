@@ -7,7 +7,7 @@ All endpoints are prefixed with /api/ when included in the project root URLconf.
 from django.urls import include, path
 
 from core.views.daily_status import CaseDailyStatusView
-from core.views.practice_assistant import PracticeChatView, PracticeOverviewView
+from core.views.practice_assistant import PracticeChatView, PracticeOverviewView, PracticeReportView
 from core.views import (
     AdvocateProfileView,
     BillingPortfolioView,
@@ -169,6 +169,11 @@ urlpatterns = [
         "practice-assistant/chat/",
         PracticeChatView.as_view(),
         name="practice-assistant-chat",
+    ),
+    path(
+        "practice-assistant/reports/<str:kind>/<str:fmt>/",
+        PracticeReportView.as_view(),
+        name="practice-assistant-report",
     ),
 
     # Conversations

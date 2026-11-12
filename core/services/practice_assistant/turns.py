@@ -7,7 +7,9 @@ Message.references exists for it yet):
     entry `{"kind": "practice_request", "v": 1, "client_request_id": ...,
     "turn": {...}}` whose `turn` holds everything of the PracticeTurn that is
     not on the assistant row (ids, intent, status, summary, case_candidates,
-    action_card, as_of);
+    action_card, report, as_of). A replay rebuilds the cards from it and
+    writes nothing; a turn stored before `report` existed replays with
+    report null;
   - the assistant Message: `content` = the answer; `references` = the
     turn's sources, a plain list of contract `Reference`s.
 
@@ -117,6 +119,7 @@ def find_replay(owner, client_request_id: str) -> Optional[PracticeTurn]:
         "summary": stored.get("summary"),
         "case_candidates": stored.get("case_candidates") or [],
         "action_card": stored.get("action_card"),
+        "report": stored.get("report"),
         "as_of": stored.get("as_of"),
     }
 
@@ -164,6 +167,7 @@ def store_turn(
         "summary": result["summary"],
         "case_candidates": result["case_candidates"],
         "action_card": result["action_card"],
+        "report": result.get("report"),
         "as_of": result["now"].isoformat(),
     }
     user_message.references = [
@@ -186,5 +190,6 @@ def store_turn(
         "summary": stored["summary"],
         "case_candidates": stored["case_candidates"],
         "action_card": stored["action_card"],
+        "report": stored["report"],
         "as_of": stored["as_of"],
     }

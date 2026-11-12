@@ -1,4 +1,5 @@
-"""The dashboard practice assistant: an overview read and a read-only chat.
+"""The dashboard practice assistant: an overview read, a chat that only reads
+and proposes, and downloadable reports.
 
 Both are plain APIViews scoped by hand: the owner of every read and write is
 `request.user`, never anything in the request. Both answer 404 while
@@ -11,6 +12,7 @@ from datetime import datetime, timedelta
 
 from django.conf import settings
 from django.db import transaction
+from django.http import HttpResponse
 from rest_framework import status
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.request import Request
@@ -21,8 +23,13 @@ from core.models import Case
 from core.serializers.practice_assistant import DAY_FORMAT, PracticeChatRequestSerializer
 from core.services.graph.practice_graph import run_practice_turn
 from core.services.india_time import india_now
-from core.services.practice_assistant import reads, turns
-from core.services.practice_assistant.contracts import DEFAULT_RANGE_DAYS, MAX_RANGE_DAYS
+from core.services.practice_assistant import report_render, reports, reads, turns
+from core.services.practice_assistant.contracts import (
+    DEFAULT_RANGE_DAYS,
+    MAX_RANGE_DAYS,
+    REPORT_FORMATS,
+    REPORT_KINDS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -140,3 +147,32 @@ class PracticeChatView(APIView):
             int((time.monotonic() - started) * 1000),
         )
         return Response(turn, status=status.HTTP_200_OK)
+
+
+class PracticeReportView(APIView):
+    """GET /api/practice-assistant/reports/<kind>/<fmt>/?date_from=&date_to=
+
+    kind: billing | hearings | cases | deadlines;  fmt: pdf | docx (a path
+    segment, never a `format` query parameter: DRF reserves that one).
+    Both dates (YYYY-MM-DD, India days) or neither; with neither, billing is
+    this financial year and hearings are today to +30 days. Built from the
+    caller's own rows only, with no model call. 404 while the assistant is off.
+    """
+
+    def get(self, request: Request, kind: str, fmt: str) -> HttpResponse:
+        _require_enabled()
+        if kind not in REPORT_KINDS or fmt not in REPORT_FORMATS:
+            raise NotFound()
+        date_from = _day_param(request, "date_from")
+        date_to = _day_param(request, "date_to")
+        try:
+            report = reports.build_report(
+                owner=request.user, kind=kind, date_from=date_from, date_to=date_to, now=india_now()
+            )
+        except reports.ReportError as exc:
+            raise ValidationError({"detail": str(exc)})
+        content = report_render.render(report, fmt)
+        response = HttpResponse(content, content_type=report_render.CONTENT_TYPES[fmt])
+        response["Content-Disposition"] = f'attachment; filename="{report_render.filename(report, fmt)}"'
+        response["Cache-Control"] = "no-store"
+        return response

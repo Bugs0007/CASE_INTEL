@@ -22,7 +22,7 @@ from core.services.india_time import INDIA_TZ, india_now
 from core.services.invoice_service import MissingBillingContactError, get_billing_contact
 from core.services.money import pdf_inr
 
-from .contracts import SCOPE_PERSONAL, TIMEZONE, ActionCard, Reference
+from .contracts import SCOPE_PERSONAL, TIMEZONE, Reference, SendInvoiceCard
 
 UNPAID_ROW_LIMIT = 25
 PAID_WINDOW_DAYS = 30
@@ -137,6 +137,22 @@ def billing_summary(
     }
 
 
+def named_fees(*, owner, text: str, case_id: Optional[int] = None) -> list[AppearanceFee]:
+    """The owner's fees whose invoice number appears in `text` (any status),
+    oldest first. Numbers that are not the owner's own name nothing."""
+    base = _owned(owner, case_id).select_related("hearing__case")
+    tokens = list(dict.fromkeys(t.lower().rstrip(".") for t in _TOKEN_RE.findall(text or "")))
+    tokens = [t for t in tokens if t][:MAX_INVOICE_TOKENS]
+    if not tokens:
+        return []
+    return list(
+        base.exclude(invoice_number="")
+        .annotate(_number=Lower("invoice_number"))
+        .filter(_number__in=tokens)
+        .order_by("id")
+    )
+
+
 def invoice_send_candidates(
     *, owner, scope: str, case_id: Optional[int] = None, text: str = ""
 ) -> list[AppearanceFee]:
@@ -145,24 +161,21 @@ def invoice_send_candidates(
     (whatever their status, so a paid one answers with its blocker). Otherwise
     every invoiced fee, narrowed by `case_id`. Unsent first."""
     _check_scope(scope)
+    named = named_fees(owner=owner, text=text, case_id=case_id)
+    if named:
+        return named
     base = _owned(owner, case_id).select_related("hearing__case")
-    tokens = list(dict.fromkeys(t.lower().rstrip(".") for t in _TOKEN_RE.findall(text or "")))
-    tokens = [t for t in tokens if t][:MAX_INVOICE_TOKENS]
-    if tokens:
-        named = list(
-            base.exclude(invoice_number="")
-            .annotate(_number=Lower("invoice_number"))
-            .filter(_number__in=tokens)
-            .order_by("id")
-        )
-        if named:
-            return named
     return list(
         base.filter(status=AppearanceFee.STATUS_INVOICED).order_by("send_status", "hearing__case__title", "id")
     )
 
 
-def build_send_card(*, owner, fee: AppearanceFee) -> ActionCard:
+def case_fees(*, owner, case_id: int) -> list[AppearanceFee]:
+    """Every fee on one of the owner's cases, newest first."""
+    return list(_owned(owner, case_id).select_related("hearing__case").order_by("-id"))
+
+
+def build_send_card(*, owner, fee: AppearanceFee) -> SendInvoiceCard:
     """The confirmation card for one fee, every field read from rows. `fee`
     is re-fetched under `owner`; a fee that is not theirs raises DoesNotExist."""
     fee = AppearanceFee.objects.select_related("hearing__case").get(
@@ -184,6 +197,7 @@ def build_send_card(*, owner, fee: AppearanceFee) -> ActionCard:
         "kind": "send_invoice",
         "fee_id": fee.id,
         "case_id": case.id,
+        "case_title": case.title,
         "invoice_number": fee.invoice_number or None,
         "amount": _money(fee.amount),
         "recipient_name": name,

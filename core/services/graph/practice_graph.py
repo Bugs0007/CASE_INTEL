@@ -40,6 +40,7 @@ class PracticeState(TypedDict, total=False):
     sources: list
     case_candidates: list
     action_card: Optional[dict]
+    report: Optional[dict]  # a ReportCard (contracts.py), never a file
 
 
 def build_practice_graph():

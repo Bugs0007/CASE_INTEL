@@ -11,7 +11,7 @@ from typing import Any, Iterable
 
 SCHEMA_VERSION = 1
 
-SUBTYPES = ("status_memo", "personal_note")
+SUBTYPES = ("status_memo", "personal_note", "client_letter", "list_of_dates")
 BLOCK_TYPES = ("paragraph", "bullets", "table")
 
 MAX_TITLE = 200

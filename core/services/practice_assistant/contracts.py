@@ -24,6 +24,12 @@ Intent = Literal[
     "case_facts",
     "billing_summary",
     "propose_invoice_send",
+    "propose_fee_create",
+    "propose_fee_update",
+    "propose_invoice_generate",
+    "propose_fee_delete",
+    "practice_report",
+    "propose_draft",
 ]
 INTENTS: tuple[str, ...] = (
     "overview",
@@ -33,6 +39,12 @@ INTENTS: tuple[str, ...] = (
     "case_facts",
     "billing_summary",
     "propose_invoice_send",
+    "propose_fee_create",
+    "propose_fee_update",
+    "propose_invoice_generate",
+    "propose_fee_delete",
+    "practice_report",
+    "propose_draft",
 )
 TurnStatus = Literal["answer", "needs_clarification", "partial"]
 
@@ -131,17 +143,124 @@ class CaseCandidate(TypedDict):
     court: Optional[str]
 
 
-class ActionCard(TypedDict):
-    """A proposed action the advocate must confirm. Built from server data only."""
+class SendInvoiceCard(TypedDict):
+    """Confirm: the existing send endpoint. Built from server data only."""
 
     kind: Literal["send_invoice"]
     fee_id: int
     case_id: int
+    case_title: str
     invoice_number: Optional[str]
     amount: str  # decimal as a string
     recipient_name: Optional[str]
     recipient_email: Optional[str]
     blockers: list[str]  # non-empty = cannot be confirmed
+
+
+class HearingOption(TypedDict):
+    id: int
+    label: str
+    date: str  # India date, YYYY-MM-DD
+
+
+class CreateFeeCard(TypedDict):
+    """Confirm: POST /api/appearance-fees/ {hearing, category, amount?, notes}."""
+
+    kind: Literal["create_fee"]
+    case_id: int
+    case_title: str
+    hearing_id: Optional[int]
+    hearing_options: list[HearingOption]
+    category: str
+    amount: Optional[str]  # None = the profile default (appearance only)
+    description: str
+    blockers: list[str]
+
+
+class FeeFields(TypedDict, total=False):
+    amount: str
+    category: str
+    description: str
+
+
+class UpdateFeeCard(TypedDict):
+    """Confirm: PATCH /api/appearance-fees/<fee_id>/ with `proposed`."""
+
+    kind: Literal["update_fee"]
+    case_id: int
+    case_title: str
+    fee_id: int
+    invoice_number: Optional[str]
+    fee_status: str
+    current: FeeFields
+    proposed: FeeFields  # only the fields that change
+    regenerates_invoice: bool
+    blockers: list[str]
+
+
+class GenerateInvoiceCard(TypedDict):
+    """Confirm: POST /api/appearance-fees/<fee_id>/invoice/."""
+
+    kind: Literal["generate_invoice"]
+    case_id: int
+    case_title: str
+    fee_id: int
+    amount: str
+    category: str
+    blockers: list[str]
+
+
+class DeleteFeeCard(TypedDict):
+    """Confirm: DELETE /api/appearance-fees/<fee_id>/."""
+
+    kind: Literal["delete_fee"]
+    case_id: int
+    case_title: str
+    fee_id: int
+    amount: str
+    category: str
+    fee_status: str
+    blockers: list[str]
+
+
+class StartDraftCard(TypedDict):
+    """Confirm: POST /api/case-assistant/drafts/ (the drafting studio's
+    payload), then link to that draft in the drafting UI."""
+
+    kind: Literal["start_draft"]
+    case_id: int
+    case_title: str
+    subtype: str
+    subtype_label: str
+    instructions: str
+    blockers: list[str]
+
+
+ActionCard = (
+    SendInvoiceCard
+    | CreateFeeCard
+    | UpdateFeeCard
+    | GenerateInvoiceCard
+    | DeleteFeeCard
+    | StartDraftCard
+)
+
+ReportKind = Literal["billing", "hearings", "cases", "deadlines"]
+REPORT_KINDS: tuple[str, ...] = ("billing", "hearings", "cases", "deadlines")
+REPORT_FORMATS: tuple[str, ...] = ("pdf", "docx")
+
+
+class ReportCard(TypedDict):
+    """A report the advocate can download. The file is
+    GET /api/practice-assistant/reports/<kind>/<fmt>/?date_from=&date_to=,
+    built by the client from these fields (never from a URL in a response)."""
+
+    kind: ReportKind
+    title: str
+    date_from: Optional[str]
+    date_to: Optional[str]
+    row_count: int
+    formats: list[str]
 
 
 class PracticeTurn(TypedDict):
@@ -155,4 +274,5 @@ class PracticeTurn(TypedDict):
     summary: Optional[dict]  # the structured read result the answer was built from
     case_candidates: list[CaseCandidate]
     action_card: Optional[ActionCard]
+    report: Optional[ReportCard]
     as_of: str

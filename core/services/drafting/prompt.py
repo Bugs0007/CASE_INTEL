@@ -28,7 +28,7 @@ Return ONE JSON object and nothing else, in exactly this shape:
 {{
   "schema_version": {SCHEMA_VERSION},
   "title": "short title",
-  "subtype": "status_memo" or "personal_note",
+  "subtype": "status_memo", "personal_note", "client_letter" or "list_of_dates" (the one you are asked for),
   "sections": [
     {{
       "heading": "section heading",
@@ -62,6 +62,22 @@ SUBTYPE_GUIDANCE = {
         "Write a personal working note for the advocate's own file. Use one to three short "
         "sections, for example Key points, To do and Open questions. Keep it brief and "
         "direct. Suggestions go in their own blocks marked as suggestions."
+    ),
+    "client_letter": (
+        "Write a letter from the advocate to their client about this matter. Use these "
+        "sections, leaving out one that has nothing recorded: Subject, Where the matter "
+        "stands, What happens next, What we need from you. Address the client in the "
+        "second person and avoid legal jargon. Put only recorded facts in fact blocks; "
+        "anything the advocate might advise or ask for goes in a block marked as a "
+        "suggestion. Do not state a fee, an outcome or a promise unless a recorded fact "
+        "gives it; list what must be confirmed in verification_items."
+    ),
+    "list_of_dates": (
+        "Write a list of dates and events for this matter, oldest first. Use one section "
+        "with one table (columns Date and Event, plus a Source column if the facts give "
+        "one) built only from recorded hearings, orders, tasks and events; every row's "
+        "block cites the facts it comes from. Add a second section only for dates that "
+        "must be confirmed. Never fill a gap with a guessed date."
     ),
 }
 
