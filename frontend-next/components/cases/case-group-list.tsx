@@ -3,6 +3,9 @@
 import { useId } from "react";
 import { ChevronDown } from "lucide-react";
 import { CaseGrid } from "@/components/cases/case-grid";
+import { CaseList } from "@/components/cases/list/case-list";
+import type { AttentionContext } from "@/components/cases/list/model";
+import type { CasesView } from "@/components/cases/list/use-cases-view";
 import { Reveal } from "@/components/mobile/primitives";
 import type { CaseGroup } from "@/lib/case-grouping";
 import type { UrgencyReason } from "@/lib/case-urgency";
@@ -19,15 +22,19 @@ interface CaseGroupListProps {
   onDelete?: (id: number) => void;
   deletingId?: number;
   urgencyReasons?: Map<number, UrgencyReason>;
+  /** Dense rows (default) or cards inside each group. */
+  view?: CasesView;
+  /** What the rows' attention column reads. Needed for the list view. */
+  attention: AttentionContext;
 }
 
 /** The cases as groups: a header per group (name, how many cases, the soonest
  * hearing) above that group's cards, which are the same cards the plain list
  * uses. A header folds its group; on a phone it stays pinned under the top
  * bar while its group scrolls past. */
-export function CaseGroupList({ groups, today, collapsed, onToggle, onDelete, deletingId, urgencyReasons }: CaseGroupListProps) {
+export function CaseGroupList({ groups, today, collapsed, onToggle, onDelete, deletingId, urgencyReasons, view = "list", attention }: CaseGroupListProps) {
   return (
-    <div data-testid="case-groups" className="flex flex-col gap-7 max-md:gap-4">
+    <div data-testid="case-groups" className={cn("flex flex-col max-md:gap-4", view === "list" ? "gap-5" : "gap-7")}>
       {groups.map((group, index) => (
         <CaseGroupSection
           key={group.key}
@@ -39,6 +46,8 @@ export function CaseGroupList({ groups, today, collapsed, onToggle, onDelete, de
           onDelete={onDelete}
           deletingId={deletingId}
           urgencyReasons={urgencyReasons}
+          view={view}
+          attention={attention}
         />
       ))}
     </div>
@@ -54,7 +63,11 @@ function CaseGroupSection({
   onDelete,
   deletingId,
   urgencyReasons,
+  view,
+  attention,
 }: {
+  view: CasesView;
+  attention: AttentionContext;
   group: CaseGroup;
   index: number;
   today: string;
@@ -82,6 +95,8 @@ function CaseGroupSection({
           "animate-fade-up border-b border-[var(--ci-ink-14)] bg-page !text-[14px] !leading-normal motion-reduce:animate-none",
           "max-md:sticky max-md:z-[4] max-md:animate-rise-in max-md:top-[44px] max-md:transition-[top] max-md:duration-300 max-md:ease-out",
           "max-md:[html[data-chrome=hidden]_&]:top-[calc(44px_-_var(--mobile-header-h))] max-md:motion-reduce:transition-none",
+          // The list view pins the header under the 67px app bar on desktop.
+          view === "list" && "md:sticky md:top-[67px] md:z-[4]",
         )}
       >
         <button
@@ -116,12 +131,16 @@ function CaseGroupSection({
           and shadow are not cut off at its edge. */}
       <Reveal open={open} className="-mx-2">
         <div id={panelId} className="px-2 pb-2 pt-3 max-md:pt-2.5">
-          <CaseGrid
-            cases={group.cases}
-            onDelete={onDelete}
-            deletingId={deletingId}
-            urgencyReasons={urgencyReasons}
-          />
+          {view === "list" ? (
+            <CaseList cases={group.cases} attention={attention} onDelete={onDelete} deletingId={deletingId} bare />
+          ) : (
+            <CaseGrid
+              cases={group.cases}
+              onDelete={onDelete}
+              deletingId={deletingId}
+              urgencyReasons={urgencyReasons}
+            />
+          )}
         </div>
       </Reveal>
     </section>

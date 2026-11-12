@@ -15,6 +15,7 @@ import {
   useViewDocument,
 } from "@/hooks/use-documents";
 import { useDialogs } from "@/providers/dialog-provider";
+import { casesOf } from "@/components/documents/list/model";
 import { Upload } from "lucide-react";
 import type { Document, DocumentType, ProcessingStatus } from "@/types";
 
@@ -32,6 +33,12 @@ export default function DocumentsPage() {
   const processDocument = useProcessDocument();
   const deleteDocument = useDeleteDocument();
   const viewDocument = useViewDocument();
+
+  const caseOptions = useMemo(() => casesOf(documents), [documents]);
+  const failedCount = useMemo(
+    () => documents.filter((d) => d.processing_status === "failed").length,
+    [documents],
+  );
 
   // Filter documents
   const filteredDocuments = useMemo(() => {
@@ -123,6 +130,16 @@ export default function DocumentsPage() {
             {pluralize(filteredDocuments.length, "document")} across all cases
           </p>
         </div>
+        {failedCount > 0 && (
+          <button
+            type="button"
+            aria-pressed={selectedStatus === "failed"}
+            onClick={() => setSelectedStatus(selectedStatus === "failed" ? null : "failed")}
+            className={`ci-chip ci-chip--alert inline-flex h-8 items-center self-start sm:mr-auto sm:ml-4 sm:self-center ${selectedStatus === "failed" ? "ring-2 ring-[var(--ci-seal)]" : ""}`}
+          >
+            Failed ({failedCount})
+          </button>
+        )}
         <button
           onClick={openUploadDocument}
           className="inline-flex items-center justify-center gap-2 h-11 sm:h-10 px-4 rounded-lg border-none bg-primary text-white text-sm font-semibold hover:bg-primary-hover transition-colors"
@@ -135,6 +152,11 @@ export default function DocumentsPage() {
       {/* Filters */}
       <div className="mb-5 max-md:mb-3">
         <DocumentFilters
+          cases={caseOptions}
+          caseId={selectedCase}
+          type={selectedType}
+          status={selectedStatus}
+          failedCount={failedCount}
           onSearchChange={setSearchQuery}
           onCaseChange={setSelectedCase}
           onTypeChange={setSelectedType}

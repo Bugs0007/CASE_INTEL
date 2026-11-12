@@ -15,7 +15,7 @@ vi.mock("@/lib/api/billing", async (importOriginal) => {
 });
 
 import { APIError } from "@/lib/api/client";
-import { PracticeContainer } from "@/components/dashboard/practice/practice-container";
+import { PracticeChat } from "@/components/assistant/practice-chat";
 import { PracticeInvoiceActionCard } from "@/components/dashboard/practice/practice-invoice-action-card";
 import {
   blockedActionCard,
@@ -33,7 +33,7 @@ function renderContainer() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <PracticeContainer />
+      <PracticeChat conversationId={null} onConversationChange={() => {}} />
     </QueryClientProvider>,
   );
 }
@@ -91,7 +91,7 @@ describe("PracticeInvoiceActionCard", () => {
   });
 });
 
-describe("invoice card in the dashboard", () => {
+describe("invoice card in the Case Bot practice chat", () => {
   async function openCard() {
     const user = userEvent.setup();
     renderContainer();

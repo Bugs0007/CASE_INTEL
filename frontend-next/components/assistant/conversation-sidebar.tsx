@@ -2,10 +2,10 @@
 
 import { useId, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronRight, Plus, Search, Trash2 } from "lucide-react";
+import { ArrowUpRight, ChevronDown, ChevronRight, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScopeChoices } from "@/components/assistant/scope-choices";
-import { chatTime, chatTitle, groupConversations } from "@/lib/assistant";
+import { chatCaseLabel, chatTime, chatTitle, groupConversations, recentChats } from "@/lib/assistant";
 import { PORTFOLIO_BOT_ENABLED } from "@/lib/feature-flags";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import type { AssistantScope } from "@/providers/assistant-provider";
@@ -24,7 +24,12 @@ interface SidebarProps {
   deletingId: number | null;
   /** A delete failed. */
   deleteError: boolean;
+  /** Case id to case number, so the filter can match a number. */
+  caseNumbers?: Record<number, string | null | undefined>;
 }
+
+/** Practice chats shown before "Show all". */
+const PRACTICE_VISIBLE = 5;
 
 function ChatRow({
   chat,
@@ -79,13 +84,42 @@ function ChatRow({
   );
 }
 
-function GroupHeading({ children }: { children: React.ReactNode }) {
-  return <h3 className="px-2 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-gray-500">{children}</h3>;
+/** A row in "Recent": title, when, and which case (or Practice) it is about. */
+function RecentRow({ chat, active, onSelect }: { chat: Conversation; active: boolean; onSelect: () => void }) {
+  const label = chatCaseLabel(chat);
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-current={active ? "true" : undefined}
+      className={cn(
+        "flex min-h-[44px] w-full min-w-0 flex-col items-start rounded-lg px-2 py-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+        active ? "bg-gray-200" : "hover:bg-gray-100",
+      )}
+    >
+      <span className="w-full truncate text-sm font-medium text-gray-900">{chatTitle(chat)}</span>
+      <span className="flex w-full min-w-0 items-center gap-1.5 text-xs text-gray-500">
+        <span className="ci-chip ci-chip--none max-w-[55%] truncate" title={label}>
+          {label}
+        </span>
+        <span className="flex-shrink-0">{formatRelativeTime(chatTime(chat))}</span>
+      </span>
+    </button>
+  );
+}
+
+function GroupHeading({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-2 px-2 pb-1 pt-3">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">{children}</h3>
+      {action}
+    </div>
+  );
 }
 
 /** The full page's chat list: a New chat button that asks for a scope, a
- * filter, then the practice chats, one group per case, and older document
- * chats. */
+ * filter, then the eight newest chats, the practice chats, one collapsed
+ * group per case, and older document chats. */
 export function ConversationSidebar({
   conversations,
   loading,
@@ -97,12 +131,24 @@ export function ConversationSidebar({
   onDelete,
   deletingId,
   deleteError,
+  caseNumbers,
 }: SidebarProps) {
   const [filter, setFilter] = useState("");
   const [choosing, setChoosing] = useState(false);
-  const [collapsed, setCollapsed] = useState<Record<number, boolean>>({});
+  /** A group the advocate opened or closed by hand; absent means the default. */
+  const [manual, setManual] = useState<Record<number, boolean>>({});
+  const [showAllPractice, setShowAllPractice] = useState(false);
   const filterId = useId();
-  const groups = groupConversations(conversations, filter);
+  const filtering = filter.trim() !== "";
+  const groups = groupConversations(conversations, filter, caseNumbers);
+  const recent = filtering ? [] : recentChats(conversations);
+  const activeCaseId = conversations.find((chat) => chat.id === activeId)?.case_id ?? null;
+  // Closed unless it holds the open chat or the filter matched it.
+  const isOpen = (caseId: number) => manual[caseId] ?? (filtering || caseId === activeCaseId);
+  const practiceVisible =
+    filtering || showAllPractice || groups.practice.length <= PRACTICE_VISIBLE
+      ? groups.practice
+      : groups.practice.filter((chat, index) => index < PRACTICE_VISIBLE || chat.id === activeId);
   const empty = groups.practice.length + groups.cases.length + groups.legacy.length === 0;
 
   const row = (chat: Conversation) => (
@@ -174,38 +220,87 @@ export function ConversationSidebar({
           </p>
         ) : (
           <>
+            {recent.length > 0 && (
+              <section aria-label="Recent">
+                <GroupHeading>Recent</GroupHeading>
+                <ul className="space-y-0.5">
+                  {recent.map((chat) => (
+                    <li key={chat.id}>
+                      <RecentRow chat={chat} active={chat.id === activeId} onSelect={() => onSelect(chat.id)} />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
             {PORTFOLIO_BOT_ENABLED && groups.practice.length > 0 && (
               <section aria-label="Your practice">
                 <GroupHeading>Your practice</GroupHeading>
-                <ul className="space-y-0.5">{groups.practice.map(row)}</ul>
+                <ul className="space-y-0.5">{practiceVisible.map(row)}</ul>
+                {!filtering && groups.practice.length > PRACTICE_VISIBLE && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="mt-1 w-full"
+                    onClick={() => setShowAllPractice((value) => !value)}
+                  >
+                    {showAllPractice ? "Show fewer" : `Show all (${groups.practice.length})`}
+                  </Button>
+                )}
               </section>
             )}
             {groups.cases.length > 0 && (
               <section aria-label="Cases">
-                <GroupHeading>Cases</GroupHeading>
+                <GroupHeading
+                  action={
+                    groups.cases.some((group) => isOpen(group.caseId)) ? (
+                      <button
+                        type="button"
+                        onClick={() => setManual(Object.fromEntries(groups.cases.map((group) => [group.caseId, false])))}
+                        className="rounded px-1 text-xs font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      >
+                        Collapse all
+                      </button>
+                    ) : null
+                  }
+                >
+                  Cases
+                </GroupHeading>
                 <ul className="space-y-1">
                   {groups.cases.map((group) => {
-                    const isCollapsed = collapsed[group.caseId] === true;
+                    const open = isOpen(group.caseId);
+                    const count = `${group.chats.length} ${group.chats.length === 1 ? "chat" : "chats"}`;
                     return (
                       <li key={group.caseId} aria-label={group.title}>
                         <div className="flex items-center">
                           <button
                             type="button"
-                            aria-expanded={!isCollapsed}
-                            aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${group.title}`}
-                            onClick={() => setCollapsed((current) => ({ ...current, [group.caseId]: !isCollapsed }))}
-                            className="flex h-11 w-8 flex-shrink-0 items-center justify-center text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:h-8"
+                            aria-expanded={open}
+                            title={group.caseNumber ? `${group.title} (${group.caseNumber})` : group.title}
+                            onClick={() => setManual((current) => ({ ...current, [group.caseId]: !open }))}
+                            className="flex min-h-[44px] min-w-0 flex-1 items-center gap-1 rounded-lg text-left hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:min-h-9"
                           >
-                            {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                            {open ? (
+                              <ChevronDown className="h-4 w-4 flex-shrink-0 text-gray-500" aria-hidden="true" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4 flex-shrink-0 text-gray-500" aria-hidden="true" />
+                            )}
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-semibold text-gray-900">{group.title}</span>
+                              <span className="block truncate text-xs text-gray-500">
+                                {count} · {formatRelativeTime(chatTime(group.chats[0]))}
+                              </span>
+                            </span>
                           </button>
                           <Link
                             href={`/cases/${group.caseId}`}
-                            className="min-w-0 flex-1 truncate rounded px-1 py-2 text-sm font-semibold text-gray-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                            aria-label={`Open case ${group.title}`}
+                            className="flex h-11 w-9 flex-shrink-0 items-center justify-center rounded-lg text-gray-500 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:h-9"
                           >
-                            {group.title}
+                            <ArrowUpRight className="h-4 w-4" />
                           </Link>
                         </div>
-                        {!isCollapsed && <ul className="ml-4 space-y-0.5">{group.chats.map(row)}</ul>}
+                        {open && <ul className="ml-4 space-y-0.5">{group.chats.map(row)}</ul>}
                       </li>
                     );
                   })}

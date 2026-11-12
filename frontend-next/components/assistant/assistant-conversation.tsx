@@ -7,7 +7,7 @@ import { PracticeChat } from "@/components/assistant/practice-chat";
 import { ScopeChoices } from "@/components/assistant/scope-choices";
 import { chatKeys } from "@/hooks/use-chat";
 import { cn } from "@/lib/utils";
-import type { AssistantScope } from "@/providers/assistant-provider";
+import { sameScope, useAssistant, type AssistantScope } from "@/providers/assistant-provider";
 import type { Citation } from "@/types";
 
 /** The open chat for a scope, shared by the popover and the full page.
@@ -31,6 +31,8 @@ export function AssistantConversation({
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { ask, prefill, consumeAsk } = useAssistant();
+  const caseAsk = ask && !ask.send && scope?.kind === "case" && sameScope(ask.scope, scope) ? ask : null;
 
   function changed(id: number | null) {
     // A new chat or a new answer moves the chat lists.
@@ -49,17 +51,21 @@ export function AssistantConversation({
 
   if (scope.kind === "case") {
     return (
-      <ChatPanel
-        caseId={scope.caseId}
-        compact={compact}
-        hideHistory
-        conversationId={conversationId}
-        onConversationChange={changed}
-        onOpenCitation={(citation: Citation) => {
-          if (citation.document_id !== null) router.push(`/cases/${scope.caseId}?doc=${citation.document_id}`);
-        }}
-        className={cn("border-0 shadow-none", className)}
-      />
+      <div className={cn("min-h-0", className)}>
+        <ChatPanel
+          caseId={scope.caseId}
+          compact={compact}
+          hideHistory
+          conversationId={conversationId}
+          onConversationChange={changed}
+          initialDraft={caseAsk?.question ?? null}
+          onDraftUsed={() => caseAsk && consumeAsk(caseAsk.id)}
+          onOpenCitation={(citation: Citation) => {
+            if (citation.document_id !== null) router.push(`/cases/${scope.caseId}?doc=${citation.document_id}`);
+          }}
+          className="h-full border-0 shadow-none"
+        />
+      </div>
     );
   }
 
@@ -69,6 +75,18 @@ export function AssistantConversation({
         conversationId={conversationId}
         onConversationChange={changed}
         onUseCase={() => onChangeScope(null)}
+        ask={ask}
+        onAskConsumed={consumeAsk}
+        onAskInCase={(candidate, question) => {
+          const next: AssistantScope = {
+            kind: "case",
+            caseId: candidate.id,
+            caseTitle: candidate.title,
+            caseNumber: candidate.case_number,
+          };
+          prefill(next, question);
+          onChangeScope(next);
+        }}
       />
     </div>
   );

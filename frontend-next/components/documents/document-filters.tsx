@@ -5,10 +5,18 @@ import { SlidersHorizontal, Search } from "lucide-react";
 import { Reveal } from "@/components/mobile/primitives";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { Select } from "@/components/ui/select";
-import { useCases } from "@/hooks/use-cases";
+import { CaseCombobox } from "./list/case-combobox";
+import type { DocCase } from "./list/model";
 import type { DocumentType, ProcessingStatus } from "@/types";
 
 interface DocumentFiltersProps {
+  /** Cases that have documents, for the case picker. */
+  cases: DocCase[];
+  caseId: number | null;
+  type: DocumentType | null;
+  status: ProcessingStatus | null;
+  /** How many documents failed processing (shown on the Failed option). */
+  failedCount: number;
   onSearchChange: (query: string) => void;
   onCaseChange: (caseId: number | null) => void;
   onTypeChange: (type: DocumentType | null) => void;
@@ -16,12 +24,21 @@ interface DocumentFiltersProps {
 }
 
 const DOCUMENT_TYPES: DocumentType[] = [
+  "court_order",
+  "order",
+  "pleading",
   "motion",
+  "brief",
   "evidence",
   "correspondence",
   "contract",
   "other",
 ];
+
+function typeLabel(type: DocumentType): string {
+  if (type === "court_order") return "From eCourts";
+  return type.charAt(0).toUpperCase() + type.slice(1);
+}
 
 const PROCESSING_STATUSES: ProcessingStatus[] = [
   "pending",
@@ -31,27 +48,31 @@ const PROCESSING_STATUSES: ProcessingStatus[] = [
 ];
 
 export function DocumentFilters({
+  cases,
+  caseId,
+  type,
+  status,
+  failedCount,
   onSearchChange,
   onCaseChange,
   onTypeChange,
   onStatusChange,
 }: DocumentFiltersProps) {
-  const { data: cases = [] } = useCases();
   const isMobile = useIsMobile();
   // On a phone the three selects fold away behind one Filters button (they
   // stay mounted, so a chosen filter is kept while hidden).
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [active, setActive] = useState({ case: false, type: false, status: false });
-  const activeCount = Number(active.case) + Number(active.type) + Number(active.status);
+  const activeCount = Number(caseId !== null) + Number(type !== null) + Number(status !== null);
 
   return (
     <div className="bg-white border border-gray-100 rounded-xl p-4 max-md:p-3">
-      <div className="grid grid-cols-1 md:grid-cols-[1.4fr_1fr_1fr_1fr] gap-3 max-md:gap-0">
+      <div className="grid grid-cols-1 md:grid-cols-[1.3fr_1.4fr_0.8fr_0.8fr] gap-3 max-md:gap-0">
         {/* Search */}
         <div className="flex items-center gap-2.5 h-10 max-md:h-12 rounded-lg border border-gray-200 px-3">
           <Search className="h-4 w-4 text-gray-400 flex-shrink-0" strokeWidth={1.8} />
           <input
             type="text"
+            aria-label="Search documents"
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Search documents…"
             className="flex-1 min-w-0 bg-transparent text-sm text-gray-800 placeholder:text-gray-400 outline-none"
@@ -78,47 +99,31 @@ export function DocumentFilters({
         </div>
 
         <FiltersWrap mobile={isMobile} open={filtersOpen}>
-        {/* Case Filter */}
+        <CaseCombobox cases={cases} value={caseId} onChange={onCaseChange} />
+
         <Select
-          onChange={(e) => {
-            setActive((a) => ({ ...a, case: !!e.target.value }));
-            onCaseChange(e.target.value ? Number(e.target.value) : null);
-          }}
+          aria-label="Filter by type"
+          value={type ?? ""}
+          onChange={(e) => onTypeChange((e.target.value as DocumentType) || null)}
         >
-          <option value="">All Cases</option>
-          {cases.map((caseItem) => (
-            <option key={caseItem.id} value={caseItem.id}>
-              {caseItem.case_number} - {caseItem.title}
+          <option value="">All types</option>
+          {DOCUMENT_TYPES.map((t) => (
+            <option key={t} value={t}>
+              {typeLabel(t)}
             </option>
           ))}
         </Select>
 
-        {/* Type Filter */}
         <Select
-          onChange={(e) => {
-            setActive((a) => ({ ...a, type: !!e.target.value }));
-            onTypeChange((e.target.value as DocumentType) || null);
-          }}
+          aria-label="Filter by status"
+          value={status ?? ""}
+          onChange={(e) => onStatusChange((e.target.value as ProcessingStatus) || null)}
         >
-          <option value="">All Types</option>
-          {DOCUMENT_TYPES.map((type) => (
-            <option key={type} value={type}>
-              {type.charAt(0).toUpperCase() + type.slice(1)}
-            </option>
-          ))}
-        </Select>
-
-        {/* Status Filter */}
-        <Select
-          onChange={(e) => {
-            setActive((a) => ({ ...a, status: !!e.target.value }));
-            onStatusChange((e.target.value as ProcessingStatus) || null);
-          }}
-        >
-          <option value="">All Statuses</option>
-          {PROCESSING_STATUSES.map((status) => (
-            <option key={status} value={status}>
-              {status.charAt(0).toUpperCase() + status.slice(1)}
+          <option value="">All statuses</option>
+          {PROCESSING_STATUSES.map((st) => (
+            <option key={st} value={st}>
+              {st.charAt(0).toUpperCase() + st.slice(1)}
+              {st === "failed" && failedCount > 0 ? ` (${failedCount})` : ""}
             </option>
           ))}
         </Select>

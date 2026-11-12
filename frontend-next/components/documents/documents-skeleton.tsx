@@ -21,9 +21,9 @@ export function DocumentsSkeleton() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-2.5">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-[72px] rounded-[10px]" />
+      <div className="flex flex-col gap-1.5">
+        {Array.from({ length: 12 }).map((_, i) => (
+          <Skeleton key={i} className="h-11 rounded-lg" />
         ))}
       </div>
     </div>

@@ -179,7 +179,7 @@ describe("PracticeInvoiceActionCard", () => {
 });
 
 describe("PracticeSection", () => {
-  function Section({ assistantError }: { assistantError: boolean }) {
+  function Section({ onAsk = () => {} }: { onAsk?: (question: string) => void }) {
     const [day, setDay] = useState(FIXTURE_DAY);
     return (
       <PracticeSection
@@ -194,18 +194,32 @@ describe("PracticeSection", () => {
           onSelectDay: setDay,
           onAskAboutDay: () => {},
         }}
-        portfolio={{ snapshot: samplePortfolio, loading: false, error: false, onRetry: () => {}, onPageChange: () => {} }}
-        assistant={panelProps({ error: assistantError })}
+        portfolio={{ snapshot: samplePortfolio, loading: false, error: false, onRetry: () => {} }}
+        onAsk={onAsk}
       />
     );
   }
 
-  it("keeps the calendar and summary when the assistant fails", () => {
-    render(<Section assistantError />);
-    expect(screen.getByRole("alert")).toHaveTextContent("That question could not be answered.");
+  it("has the calendar and the cases summary, and no inline chat", () => {
+    render(<Section />);
     expect(screen.getByText("This week")).toBeInTheDocument();
     expect(screen.getByText("Mediation sitting")).toBeInTheDocument();
     expect(screen.getByText("Your cases")).toBeInTheDocument();
-    expect(screen.getByText("Ask about your practice")).toBeInTheDocument();
+    // The chatting moved to the Case Bot: no message log, chips or Send button.
+    expect(screen.queryByRole("log")).not.toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Suggested questions" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Send" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Ask about your practice", { selector: "h2, h3" })).not.toBeInTheDocument();
+  });
+
+  it("hands a question from the ask bar to onAsk and clears the line", async () => {
+    const user = userEvent.setup();
+    const onAsk = vi.fn();
+    render(<Section onAsk={onAsk} />);
+    const input = screen.getByLabelText("Ask about your practice");
+    expect(screen.getByRole("button", { name: "Ask" })).toBeDisabled();
+    await user.type(input, "What is pending this week?{Enter}");
+    expect(onAsk).toHaveBeenCalledWith("What is pending this week?");
+    expect(input).toHaveValue("");
   });
 });

@@ -46,6 +46,10 @@ interface ChatPanelProps {
   /** The caller has its own chat list and New Chat button: drop this
    * panel's History rail and its buttons. */
   hideHistory?: boolean;
+  /** Text to put in the question box of the next new chat, unsent. */
+  initialDraft?: string | null;
+  /** Called once initialDraft has been taken. */
+  onDraftUsed?: () => void;
 }
 
 interface PendingChatRequest {
@@ -86,10 +90,20 @@ export function ChatPanel({
   conversationId,
   onConversationChange,
   hideHistory = false,
+  initialDraft = null,
+  onDraftUsed,
 }: ChatPanelProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
+  // A prefilled question survives the resets a new chat goes through and is
+  // used once: by the next new chat, or dropped on the next send.
+  const draftRef = useRef<string | null>(null);
+  const takeDraft = () => {
+    const text = draftRef.current ?? "";
+    draftRef.current = null;
+    return text;
+  };
   const [activeConversationId, setActiveConversationId] = useState<number | null>(
     null,
   );
@@ -131,13 +145,22 @@ export function ChatPanel({
     setIsDraftChat(false);
     setConversations([]);
     setMessages([]);
-    setInputValue("");
+    setInputValue(draftRef.current ?? "");
     setSendError(null);
     setMessagesError(null);
     setLastFailedRequest(null);
 
     void loadConversations();
   }, [caseId]);
+
+  useEffect(() => {
+    if (initialDraft === null || initialDraft === undefined) return;
+    draftRef.current = initialDraft;
+    setInputValue(initialDraft);
+    onDraftUsed?.();
+    // onDraftUsed is a callback from the caller; only a new draft matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialDraft]);
 
   useEffect(() => {
     if (!isSending || sendStartedAt === null) {
@@ -206,7 +229,7 @@ export function ChatPanel({
     setActiveConversationId(null);
     setIsDraftChat(true);
     setMessages([]);
-    setInputValue("");
+    setInputValue(takeDraft());
     setMessagesError(null);
     setSendError(null);
     setLastFailedRequest(null);
@@ -277,6 +300,7 @@ export function ChatPanel({
   const handleSend = async () => {
     if (!canSend) return;
     const query = inputValue.trim();
+    draftRef.current = null;
     setInputValue("");
     await sendMessage(
       {
