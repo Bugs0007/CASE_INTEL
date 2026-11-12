@@ -47,6 +47,10 @@ from core.models import (
     InviteToken,
     Message,
     ProcessingJob,
+    AssistantDraft,
+    AssistantDraftRevision,
+    DraftOutput,
+    CaseNote,
     SentMessage,
     Task,
     TravelBooking,
@@ -428,6 +432,50 @@ class TravelBookingAdmin(admin.ModelAdmin):
     readonly_fields = (
         "filename", "file_path", "file_type", "file_size", "created_at", "updated_at",
     )
+    date_hierarchy = "created_at"
+
+
+@admin.register(AssistantDraft)
+class AssistantDraftAdmin(admin.ModelAdmin):
+    list_display = ("id", "owner", "case", "subtype", "status", "generation", "created_at")
+    list_filter = ("subtype", "status")
+    raw_id_fields = (
+        "owner", "case", "origin_conversation", "origin_message",
+        "current_revision", "job",
+    )
+    readonly_fields = ("client_request_id", "created_at", "updated_at")
+    date_hierarchy = "created_at"
+
+
+@admin.register(AssistantDraftRevision)
+class AssistantDraftRevisionAdmin(admin.ModelAdmin):
+    """Read-only: a revision is immutable and approval goes through the API."""
+
+    list_display = ("id", "owner", "draft", "version", "source", "approved_at", "created_at")
+    list_filter = ("source",)
+    raw_id_fields = ("owner", "draft", "approved_by")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(DraftOutput)
+class DraftOutputAdmin(admin.ModelAdmin):
+    list_display = ("id", "owner", "revision", "destination", "status", "created_at")
+    list_filter = ("destination", "status")
+    raw_id_fields = ("owner", "revision", "case_note")
+    readonly_fields = ("file_path", "filename", "checksum", "created_at", "updated_at")
+
+
+@admin.register(CaseNote)
+class CaseNoteAdmin(admin.ModelAdmin):
+    list_display = ("id", "owner", "case", "title", "created_at")
+    search_fields = ("title",)
+    raw_id_fields = ("owner", "case", "origin_revision")
+    readonly_fields = ("created_at", "updated_at")
     date_hierarchy = "created_at"
 
 

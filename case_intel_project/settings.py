@@ -520,6 +520,12 @@ ADVOCATE_SEARCH_REUSE_SESSION = config("ADVOCATE_SEARCH_REUSE_SESSION", default=
 # and not built (see docs/advocate-search-redesign.md). A failed court complex
 # links to the court's own site instead.
 ADVOCATE_SEARCH_V2 = config("ADVOCATE_SEARCH_V2", default=False, cast=bool)
+
+# Case Bot expansion (docs/case-bot-execution-plan.md). Each gates its own
+# endpoints server-side and is independent of the others; all ship off.
+PRACTICE_ASSISTANT_ENABLED = config("PRACTICE_ASSISTANT_ENABLED", default=False, cast=bool)
+CASE_DRAFTING_ENABLED = config("CASE_DRAFTING_ENABLED", default=False, cast=bool)
+PRACTICE_INVOICE_ACTIONS_ENABLED = config("PRACTICE_INVOICE_ACTIONS_ENABLED", default=False, cast=bool)
 # What the search page tells the advocate to expect, per portal request (one
 # query on one court complex). Display only; measure it from the timing line in
 # the worker log before trusting it.

@@ -4,9 +4,10 @@ URL routing for the core application API.
 All endpoints are prefixed with /api/ when included in the project root URLconf.
 """
 
-from django.urls import path
+from django.urls import include, path
 
 from core.views.daily_status import CaseDailyStatusView
+from core.views.practice_assistant import PracticeChatView, PracticeOverviewView
 from core.views import (
     AdvocateProfileView,
     BillingPortfolioView,
@@ -157,6 +158,18 @@ urlpatterns = [
 
     # Chat
     path("chat/", ChatView.as_view(), name="chat"),
+
+    # Practice assistant (404 unless PRACTICE_ASSISTANT_ENABLED)
+    path(
+        "practice-assistant/overview/",
+        PracticeOverviewView.as_view(),
+        name="practice-assistant-overview",
+    ),
+    path(
+        "practice-assistant/chat/",
+        PracticeChatView.as_view(),
+        name="practice-assistant-chat",
+    ),
 
     # Conversations
     path("conversations/", ConversationListView.as_view(), name="conversation-list"),
@@ -506,4 +519,9 @@ urlpatterns = [
     # Emails
     path("emails/", EmailListView.as_view(), name="email-list"),
     path("emails/<int:pk>/link/", EmailLinkView.as_view(), name="email-link"),
+
+    # Case assistant: drafts (urls_case_assistant) and approval, outputs,
+    # case notes (urls_case_outputs). Both 404 unless CASE_DRAFTING_ENABLED.
+    path("", include("core.urls_case_assistant")),
+    path("", include("core.urls_case_outputs")),
 ]

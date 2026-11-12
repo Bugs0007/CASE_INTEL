@@ -191,3 +191,68 @@ class TestPortalCallBudget:
         from django.conf import settings
 
         assert settings.COURT_PORTAL_CALL_TIMEOUT_SECONDS < 120
+
+
+class TestPracticeTurnIsBounded:
+    """A practice-assistant turn is a web request: at most one model call,
+    one attempt, on the short HyDE timeout."""
+
+    @staticmethod
+    def _state(query):
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+
+        return {
+            "query": query,
+            "selected_day": None,
+            "case_id": None,
+            "now": datetime(2026, 11, 11, 10, 0, tzinfo=ZoneInfo("Asia/Kolkata")),
+        }
+
+    def test_the_classifier_is_one_short_single_attempt(self):
+        from datetime import date
+
+        from core.services.graph import practice_nodes
+
+        llm = MagicMock()
+        llm.generate.return_value = '{"intent": "overview"}'
+        with override_settings(AI_HYDE_TIMEOUT_SECONDS=7), \
+                patch.object(practice_nodes, "get_llm_client", return_value=llm):
+            proposal = practice_nodes._classify_with_model("anything", date(2026, 11, 11))
+
+        assert proposal == {"intent": "overview"}
+        # A per-call timeout is what makes LLMClient drop its retries.
+        assert llm.generate.call_count == 1
+        assert llm.generate.call_args.kwargs["timeout"] == 7
+
+    def test_a_classifier_timeout_becomes_a_clarification_without_a_retry(self):
+        from core.services.graph import practice_nodes
+
+        llm = MagicMock()
+        llm.generate.side_effect = openai.APITimeoutError(request=httpx.Request("POST", "http://x"))
+        with patch.object(practice_nodes, "get_llm_client", return_value=llm):
+            update = practice_nodes.select_intent(self._state("how are things looking"))
+
+        assert update["status"] == "needs_clarification"
+        assert update["llm_calls"] == 1
+        assert llm.generate.call_count == 1
+
+    def test_a_question_the_rules_place_never_reaches_the_model(self):
+        from core.services.graph import practice_nodes
+
+        with patch.object(practice_nodes, "get_llm_client", side_effect=AssertionError) as factory:
+            update = practice_nodes.select_intent(self._state("What deadlines are open?"))
+
+        assert update == {"intent": "open_deadlines", "args": {}, "routed_by": "rule"}
+        factory.assert_not_called()
+
+    def test_worst_case_for_one_practice_turn_fits_inside_the_gunicorn_timeout(self):
+        """The classifier (single short attempt) is the only outbound call:
+        no answer call, no embedding, no portal."""
+        from django.conf import settings
+
+        from core.services.graph import practice_nodes
+
+        assert practice_nodes.MAX_LLM_CALLS_PER_TURN == 1
+        worst = settings.AI_HYDE_TIMEOUT_SECONDS * practice_nodes.MAX_LLM_CALLS_PER_TURN
+        assert worst < 120

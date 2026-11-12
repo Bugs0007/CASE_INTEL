@@ -14,7 +14,8 @@ import {
   useUpdateClientMessage,
 } from "@/hooks/use-clients";
 import { apiErrorDetail } from "@/lib/api/client";
-import { cn, formatDate, formatHearingDate } from "@/lib/utils";
+import { messageCaseLabel, messagePreview, recipientNames } from "@/lib/messages-model";
+import { cn, formatDate, formatHearingDate, formatRelativeTime } from "@/lib/utils";
 import { differenceInCalendarDays, parseISO } from "date-fns";
 import type { ClientMessage } from "@/types";
 
@@ -23,6 +24,10 @@ interface ClientMessageCardProps {
   /** Show which case it belongs to (the inbox does; the case page doesn't). */
   showCase?: boolean;
   defaultOpen?: boolean;
+  /** "inbox": the Messages page's scannable row -- who it is to, the case, the
+   * first words of it and how long ago, with a coloured edge by kind. The
+   * editor underneath is the same. */
+  variant?: "default" | "inbox";
 }
 
 /** Mirrors CLIENT_UPDATE_MAX_AGE_DAYS on the server (no new drafts past it). */
@@ -38,7 +43,12 @@ function kindNoun(message: ClientMessage): string {
  * presses Send. The send result is branched on explicitly: "logged" (the
  * server has no email credentials) gets its own warning toast and must
  * never read as delivered. */
-export function ClientMessageCard({ message, showCase = false, defaultOpen = false }: ClientMessageCardProps) {
+export function ClientMessageCard({
+  message,
+  showCase = false,
+  defaultOpen = false,
+  variant = "default",
+}: ClientMessageCardProps) {
   const [open, setOpen] = useState(defaultOpen);
   const [subject, setSubject] = useState(message.subject);
   const [body, setBody] = useState(message.body);
@@ -136,13 +146,28 @@ export function ClientMessageCard({ message, showCase = false, defaultOpen = fal
   const statusChip =
     message.status === "sent" ? "ci-chip--ok" : message.status === "logged" ? "ci-chip--pending" : "ci-chip--none";
 
+  const inbox = variant === "inbox";
+  const noContact = isDraft && message.eligible_recipients.length === 0;
+  // The edge colour is the quickest thing to scan: a reminder is about money
+  // (amber), a stale update is a warning (red), anything else is quiet.
+  const edge = !inbox
+    ? ""
+    : message.kind === "payment_reminder"
+      ? "border-l-[3px] border-l-[var(--ci-warn)]"
+      : stale
+        ? "border-l-[3px] border-l-[var(--ci-seal)]"
+        : "border-l-[3px] border-l-[var(--ci-ink-14)]";
+
   return (
-    <div className="rounded-lg border border-gray-100">
+    <div className={cn("rounded-lg border border-gray-100", edge)}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="w-full flex items-start gap-3 px-3 py-2.5 text-left hover:bg-gray-50 rounded-lg"
+        className={cn(
+          "w-full flex items-start gap-3 px-3 py-2.5 text-left hover:bg-gray-50 rounded-lg",
+          inbox && "min-h-[44px] md:px-4",
+        )}
       >
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -156,21 +181,44 @@ export function ClientMessageCard({ message, showCase = false, defaultOpen = fal
                 {daysOld} days old
               </span>
             )}
-          </div>
-          <div className="mt-1 text-sm font-medium text-gray-900 truncate">{message.subject}</div>
-          <div className="text-xs text-gray-500">
-            {showCase && (
-              <>
-                {/* Imported titles usually already start with the number. */}
-                {message.case_title.includes(message.case_number)
-                  ? message.case_title
-                  : `${message.case_number} · ${message.case_title}`}{" "}
-                ·{" "}
-              </>
+            {inbox && noContact && (
+              <span className="ci-chip ci-chip--alert" title="No contact on this case has an email address to send this to.">
+                No email contact
+              </span>
             )}
-            {message.hearing_date ? `Hearing ${formatHearingDate(message.hearing_date)} · ` : ""}
-            {message.sent_at ? `Sent ${formatDate(message.sent_at)}` : `Drafted ${formatDate(message.created_at)}`}
+            {inbox && (
+              <span className="ml-auto flex-shrink-0 text-xs text-gray-500">
+                {formatRelativeTime(message.sent_at ?? message.created_at)}
+              </span>
+            )}
           </div>
+          <div className={cn("mt-1 text-sm text-gray-900 truncate", inbox ? "font-semibold" : "font-medium")}>
+            {message.subject}
+          </div>
+          {inbox ? (
+            <>
+              <div className="truncate text-xs text-gray-700">
+                {recipientNames(message) ? `To ${recipientNames(message)}` : "No recipient chosen"}
+                {showCase && ` · ${messageCaseLabel(message)}`}
+                {message.hearing_date ? ` · Hearing ${formatHearingDate(message.hearing_date)}` : ""}
+              </div>
+              <div className="truncate text-xs text-gray-500">{messagePreview(message.body)}</div>
+            </>
+          ) : (
+            <div className="text-xs text-gray-500">
+              {showCase && (
+                <>
+                  {/* Imported titles usually already start with the number. */}
+                  {message.case_title.includes(message.case_number)
+                    ? message.case_title
+                    : `${message.case_number} · ${message.case_title}`}{" "}
+                  ·{" "}
+                </>
+              )}
+              {message.hearing_date ? `Hearing ${formatHearingDate(message.hearing_date)} · ` : ""}
+              {message.sent_at ? `Sent ${formatDate(message.sent_at)}` : `Drafted ${formatDate(message.created_at)}`}
+            </div>
+          )}
         </div>
         {open ? <ChevronUp className="h-4 w-4 text-gray-400 mt-1" /> : <ChevronDown className="h-4 w-4 text-gray-400 mt-1" />}
       </button>

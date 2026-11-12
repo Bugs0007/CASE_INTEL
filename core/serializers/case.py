@@ -10,6 +10,7 @@ from rest_framework import serializers
 
 from core.models import AppearanceFee, Case
 from core.services.order_sync_status import order_sync_summary
+from core.services.parties import court_names_for_cases
 
 from .client import ClientSummarySerializer, scope_client_field
 from .client_contact import ClientContactSerializer
@@ -39,6 +40,7 @@ class CaseSerializer(serializers.ModelSerializer):
     conversation_count = serializers.IntegerField(read_only=True, default=0)
     needs_attention = serializers.SerializerMethodField()
     next_hearing_date = serializers.SerializerMethodField()
+    court_name = serializers.SerializerMethodField()
     client_contacts = ClientContactSerializer(many=True, read_only=True)
     fee_summary = serializers.SerializerMethodField()
     order_sync = serializers.SerializerMethodField()
@@ -80,6 +82,7 @@ class CaseSerializer(serializers.ModelSerializer):
             "party_advocate_data",
             "needs_attention",
             "next_hearing_date",
+            "court_name",
             "fee_summary",
             "order_sync",
         ]
@@ -121,6 +124,16 @@ class CaseSerializer(serializers.ModelSerializer):
             .first()
         )
         return hearing.hearing_date if hearing else None
+
+    def get_court_name(self, obj: Case):
+        """The court's name, or None when none is known -- what the Cases page
+        groups on. The case list computes every case's court in two queries
+        (court_names_for_cases) and hands them over in the serializer context as
+        "court_names"; a single case runs the same lookup for itself."""
+        names = self.context.get("court_names")
+        if names is None:
+            names = court_names_for_cases([obj])
+        return names.get(obj.id) or None
 
     def get_fee_summary(self, obj: Case) -> dict:
         """Pending/invoiced/paid totals for the case page's fee summary.

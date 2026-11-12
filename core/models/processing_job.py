@@ -47,6 +47,7 @@ class ProcessingJob(OwnedModel):
         ("advocate_search", "Advocate Search (state-wide fan-out)"),
         ("case_briefing", "Case Briefing (hearing prep sheet)"),
         ("tracking_refresh", "Refresh All Tracked Cases"),
+        ("draft_generation", "Assistant Draft Generation"),
     ]
 
     # Explicit pk so this model doesn't add to the pre-existing W042
@@ -159,6 +160,32 @@ class ProcessingJob(OwnedModel):
         if existing is not None:
             return existing, False
         return cls.objects.create(owner=case.owner, case=case, job_type="case_briefing"), True
+
+    @classmethod
+    def enqueue_draft_generation(cls, draft) -> tuple["ProcessingJob", bool]:
+        """Enqueue generation of an assistant draft's preview
+        (core/services/drafting/). One active job per draft. The payload
+        carries the draft id and the generation it was queued for, so a late
+        job cannot overwrite a newer request."""
+        existing = (
+            cls.objects
+            .filter(
+                job_type="draft_generation",
+                owner=draft.owner,
+                payload__draft_id=draft.id,
+                status__in=["queued", "running"],
+            )
+            .order_by("created_at")
+            .first()
+        )
+        if existing is not None:
+            return existing, False
+        return cls.objects.create(
+            owner=draft.owner,
+            case=draft.case,
+            job_type="draft_generation",
+            payload={"draft_id": draft.id, "generation": draft.generation},
+        ), True
 
     @classmethod
     def active_of_type_exists(cls, job_type: str) -> bool:

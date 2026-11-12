@@ -253,8 +253,14 @@ export function BriefingView({
 
       <div className="flex min-w-0 flex-col gap-4">
         <GlanceColumn model={model} billing={billing} onOpenMap={onOpenMap} />
-        {PORTFOLIO_BOT_ENABLED && <PortfolioBotSlot />}
       </div>
+
+      {/* Full width under both columns: the practice block is two panes wide. */}
+      {PORTFOLIO_BOT_ENABLED && (
+        <div className="min-w-0 @[1000px]:col-span-2">
+          <PortfolioBotSlot />
+        </div>
+      )}
 
       <ListDialog
         isOpen={dialog === "today"}

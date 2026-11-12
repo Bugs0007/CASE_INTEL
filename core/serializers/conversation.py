@@ -23,6 +23,7 @@ class ConversationListSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "case_id",
+            "scope",
             "title",
             "started_at",
             "last_message_at",
@@ -46,6 +47,7 @@ class ConversationDetailSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "case_id",
+            "scope",
             "title",
             "started_at",
             "last_message_at",

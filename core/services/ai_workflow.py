@@ -156,7 +156,11 @@ class AIWorkflowService:
             # for the chat pipeline (not just a view-layer courtesy check),
             # so a conversation_id belonging to another user raises
             # DoesNotExist here rather than being silently reused.
-            return Conversation.objects.get(id=conversation_id, owner=user)
+            # A practice-assistant conversation is never continued by this
+            # pipeline: it is DoesNotExist here, like a missing id.
+            return Conversation.objects.exclude(
+                scope=Conversation.SCOPE_PRACTICE
+            ).get(id=conversation_id, owner=user)
         return Conversation.objects.create(
             owner=user,
             case_id=case_id,

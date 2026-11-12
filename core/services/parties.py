@@ -103,3 +103,42 @@ def case_court_name(case) -> str:
     if hearing is not None:
         return hearing.location
     return court_name_from_cnr(case.cnr_number)
+
+
+def court_names_for_cases(cases) -> dict[int, str]:
+    """{case_id: court name} for many cases in two queries -- the case list's
+    twin of case_court_name (same order of preference: the latest tracking
+    snapshot, a hearing's recorded location, the High Court the CNR names), for
+    where a query per case would be an N+1. "" when no court is known.
+
+    Like case_court_name, only the latest successful fetch is read: if that
+    fetch carried no snapshot, the answer falls through to the hearing."""
+    from django.db.models.fields.json import KeyTextTransform, KeyTransform
+
+    from core.models import CourtFetchLog, Hearing
+
+    cases = list(cases)
+    ids = [case.id for case in cases]
+    if not ids:
+        return {}
+    snapshot_courts = dict(
+        CourtFetchLog.objects.filter(case_id__in=ids, success=True)
+        .order_by("case_id", "-timestamp", "-id")
+        .distinct("case_id")
+        .annotate(court=KeyTextTransform("court_name", KeyTransform("snapshot", "fields_changed")))
+        .values_list("case_id", "court")
+    )
+    hearing_locations = dict(
+        Hearing.objects.filter(case_id__in=ids)
+        .exclude(location__isnull=True)
+        .exclude(location="")
+        .order_by("case_id", "-hearing_date", "-id")
+        .distinct("case_id")
+        .values_list("case_id", "location")
+    )
+    return {
+        case.id: (snapshot_courts.get(case.id) or "").strip()
+        or hearing_locations.get(case.id, "")
+        or court_name_from_cnr(case.cnr_number)
+        for case in cases
+    }

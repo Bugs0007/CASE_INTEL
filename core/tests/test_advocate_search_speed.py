@@ -102,6 +102,7 @@ class TestSearchAndPortalLanes:
         assert set(SEARCH_JOB_TYPES) | set(PORTAL_JOB_TYPES) == every_type
         assert set(SEARCH_JOB_TYPES) & set(PORTAL_JOB_TYPES) == set()
         assert set(SEARCH_JOB_TYPES) == {"advocate_search", "advocate_import"}
+        assert "draft_generation" in PORTAL_JOB_TYPES
 
     def test_the_search_lane_claims_only_search_and_import(self, user_a):
         case = Case.objects.create(owner=user_a, case_number="OS/1/2026", title="t", client_name="")
