@@ -30,6 +30,13 @@ Intent = Literal[
     "propose_fee_delete",
     "practice_report",
     "propose_draft",
+    "compare",
+    "today_focus",
+    "attention",
+    "propose_task",
+    "propose_mark_paid",
+    "propose_bulk_fees",
+    "propose_bulk_send",
 ]
 INTENTS: tuple[str, ...] = (
     "overview",
@@ -45,6 +52,13 @@ INTENTS: tuple[str, ...] = (
     "propose_fee_delete",
     "practice_report",
     "propose_draft",
+    "compare",
+    "today_focus",
+    "attention",
+    "propose_task",
+    "propose_mark_paid",
+    "propose_bulk_fees",
+    "propose_bulk_send",
 )
 TurnStatus = Literal["answer", "needs_clarification", "partial"]
 
@@ -236,6 +250,72 @@ class StartDraftCard(TypedDict):
     blockers: list[str]
 
 
+class CreateTaskCard(TypedDict):
+    """Confirm: POST /api/tasks/ {case, title, due_date}. case_id may be None."""
+
+    kind: Literal["create_task"]
+    case_id: Optional[int]
+    case_title: str
+    title: str
+    due_date: Optional[str]
+    blockers: list[str]
+
+
+class MarkPaidCard(TypedDict):
+    """Confirm: POST /api/appearance-fees/<fee_id>/mark-paid/."""
+
+    kind: Literal["mark_invoice_paid"]
+    case_id: int
+    case_title: str
+    fee_id: int
+    invoice_number: Optional[str]
+    amount: str
+    category: str
+    fee_status: str
+    blockers: list[str]
+
+
+class BulkFeeRow(TypedDict):
+    hearing_id: int
+    case_id: int
+    case_title: str
+    date: str
+    label: str
+
+
+class BulkCreateFeesCard(TypedDict):
+    """Confirm: POST /api/appearance-fees/ once per ticked row."""
+
+    kind: Literal["bulk_create_fees"]
+    case_id: None
+    case_title: str
+    category: str
+    amount: Optional[str]
+    period_text: str
+    rows: list[BulkFeeRow]
+    blockers: list[str]
+
+
+class BulkSendRow(TypedDict):
+    fee_id: int
+    case_id: int
+    case_title: str
+    invoice_number: Optional[str]
+    amount: str
+    recipient_email: Optional[str]
+    blockers: list[str]
+
+
+class BulkSendInvoicesCard(TypedDict):
+    """Confirm: POST /api/appearance-fees/<id>/send/ once per ticked row."""
+
+    kind: Literal["bulk_send_invoices"]
+    case_id: None
+    case_title: str
+    rows: list[BulkSendRow]
+    blockers: list[str]
+
+
 ActionCard = (
     SendInvoiceCard
     | CreateFeeCard
@@ -243,10 +323,14 @@ ActionCard = (
     | GenerateInvoiceCard
     | DeleteFeeCard
     | StartDraftCard
+    | CreateTaskCard
+    | MarkPaidCard
+    | BulkCreateFeesCard
+    | BulkSendInvoicesCard
 )
 
-ReportKind = Literal["billing", "hearings", "cases", "deadlines"]
-REPORT_KINDS: tuple[str, ...] = ("billing", "hearings", "cases", "deadlines")
+ReportKind = Literal["billing", "hearings", "cases", "deadlines", "brief"]
+REPORT_KINDS: tuple[str, ...] = ("billing", "hearings", "cases", "deadlines", "brief")
 REPORT_FORMATS: tuple[str, ...] = ("pdf", "docx")
 
 
@@ -261,6 +345,7 @@ class ReportCard(TypedDict):
     date_to: Optional[str]
     row_count: int
     formats: list[str]
+    briefings_missing: list[int]  # hearing ids (brief only)
 
 
 class PracticeTurn(TypedDict):

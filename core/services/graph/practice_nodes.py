@@ -29,7 +29,18 @@ from django.conf import settings
 
 from core.models import Case
 from core.services.ai_service_factory import get_llm_client
-from core.services.practice_assistant import actions, answers, billing, parsing, reads, reports
+from core.services.practice_assistant import (
+    actions,
+    answers,
+    billing,
+    boundaries,
+    cards,
+    followup,
+    insights,
+    parsing,
+    reads,
+    reports,
+)
 from core.services.practice_assistant.contracts import (
     DEFAULT_RANGE_DAYS,
     HARD_ROW_CAP,
@@ -49,10 +60,24 @@ logger = logging.getLogger(__name__)
 # invoice generated, no fee or draft created. A `propose_*` intent builds an
 # action card from the owner's rows; the advocate's click calls the existing
 # endpoint (see practice_assistant/actions.py).
-READ_INTENTS = ("overview", "calendar", "open_deadlines", "missing_next_date", "case_facts")
+READ_INTENTS = (
+    "overview",
+    "calendar",
+    "open_deadlines",
+    "missing_next_date",
+    "case_facts",
+    "compare",
+    "today_focus",
+    "attention",
+)
 BILLING_INTENTS = ("billing_summary", "propose_invoice_send")
 FEE_INTENTS = actions.FEE_ACTION_INTENTS
-GATED_BILLING_INTENTS = BILLING_INTENTS + FEE_INTENTS
+# Cards on fees that are not one fee's add/change/invoice/delete.
+BILLING_CARD_INTENTS = ("propose_mark_paid", "propose_bulk_fees", "propose_bulk_send")
+GATED_BILLING_INTENTS = BILLING_INTENTS + FEE_INTENTS + BILLING_CARD_INTENTS
+# Intents that act on one case: a follow-up ("that", "the one on Friday")
+# may supply it from the previous answer.
+CASE_INTENTS = ("case_facts", "propose_draft", "propose_task", "propose_mark_paid") + FEE_INTENTS
 
 # The whole model budget of one turn: the intent classifier, once.
 MAX_LLM_CALLS_PER_TURN = 1
@@ -80,7 +105,7 @@ _MISSING_RE = re.compile(
 )
 _DEADLINE_RE = re.compile(r"\b(deadlines?|overdue|tasks?|to-?dos?|due)\b")
 _CALENDAR_RE = re.compile(
-    r"\b(calendar|schedule|agenda|hearings?|today|tomorrow|this week|next week|listed)\b"
+    r"\b(calendar|schedule|agenda|hearings?|today|tomorrow|yesterday|this week|next week|last week|past week|listed|in court)\b"
 )
 _DAY_RE = re.compile(
     r"(\bwhat(?:'s| is) on\b|\b(this day|that day|selected day|calendar|schedule|agenda|hearings?|listed|happening)\b)"
@@ -94,7 +119,8 @@ _CASE_NUMBER_RE = re.compile(r"\b[A-Za-z][A-Za-z.()]*\s?[/.\-]?\s?\d+\s?/\s?\d{4
 
 
 def _normalise(text: str) -> str:
-    return " ".join((text or "").lower().split()).rstrip("?.! ")
+    """Lower case, single spaces, shorthand spelled out ("tmrw" -> "tomorrow")."""
+    return boundaries.normalise_words(" ".join((text or "").lower().split()).rstrip("?.! "))
 
 
 def _squash(text: Optional[str]) -> str:
@@ -108,6 +134,18 @@ def _parse_day(value) -> Optional[date]:
         return date.fromisoformat(value)
     except ValueError:
         return None
+
+
+def _period_words(text: str, today: date) -> Optional[tuple[date, date]]:
+    """"tomorrow", "this week", "next few days"... as an India date range."""
+    if "day after tomorrow" in text:
+        return today + timedelta(days=2), today + timedelta(days=2)
+    for phrase in ("today", "tomorrow", "this week", "next week", "last week", "this month", "next month"):
+        if re.search(rf"\b{phrase}\b", text):
+            return insights.period_bounds(phrase, today)
+    if boundaries.wants_upcoming(text):
+        return _default_week(today)
+    return None
 
 
 def _default_week(today: date) -> tuple[date, date]:
@@ -175,8 +213,29 @@ def route_deterministic(
     text = _normalise(query)
     if parsing.parse_draft_request(text):
         return "propose_draft", {}
+    if boundaries.wants_task(text):
+        return "propose_task", {}
+    if boundaries.wants_mark_paid(text):
+        return "propose_mark_paid", {}
+    if boundaries.wants_bulk_fees(text):
+        return "propose_bulk_fees", {}
+    if boundaries.wants_bulk_send(text):
+        return "propose_bulk_send", {}
+    if case_id is None and boundaries.wants_hearing_brief(text):
+        # One section per hearing with status, last order, directions, tasks,
+        # the written state of the matter and points to cover.
+        period = _period_words(text, today) or parsing.parse_period(text, today=today) or _default_week(today)
+        return "practice_report", {"report_kind": "brief", "period": period}
     if case_id is None and parsing.wants_report(text):
         return "practice_report", {}
+    if case_id is None and boundaries.wants_comparison(text):
+        found = insights.compare_kind(text)
+        if found:
+            return "compare", {"compare": found[0], **found[1]}
+    if case_id is None and boundaries.wants_earnings(text):
+        return "practice_report", {"report_kind": "billing"}
+    if case_id is None and boundaries.wants_focus(text):
+        return "today_focus", {}
     mutation = parsing.parse_fee_mutation(text)
     if mutation:
         return mutation, {}
@@ -197,18 +256,35 @@ def route_deterministic(
     token = _CNR_RE.search(query) or _CASE_NUMBER_RE.search(query)
     if token:
         return "case_facts", {"case_text": token.group(0).strip()}
+    named = boundaries.named_case_text(text)
+    if named:
+        return "case_facts", {"case_text": named}
     if _PARTIES_RE.search(text):
         return None
+    if boundaries.wants_attention(text):
+        return "attention", {}
     if _DEADLINE_RE.search(text):
         return "open_deadlines", {}
+    if boundaries.wants_upcoming(text):
+        return "calendar", _calendar_args(*_default_week(today))
+    festival = boundaries.festival_period(text, today)
+    if festival:
+        return "calendar", {**_calendar_args(festival[0], festival[1]), "note": festival[2]}
     days = [d for d in (_parse_day(m) for m in _ISO_DATE_RE.findall(text)) if d]
     if days or _CALENDAR_RE.search(text):
         if days:
             date_from, date_to = min(days), max(days)
+        elif "day after tomorrow" in text:
+            date_from = date_to = today + timedelta(days=2)
         elif "tomorrow" in text:
             date_from = date_to = today + timedelta(days=1)
+        elif "yesterday" in text:
+            date_from = date_to = today - timedelta(days=1)
         elif "today" in text:
             date_from = date_to = today
+        elif "last week" in text or "past week" in text:
+            date_from = today - timedelta(days=DEFAULT_RANGE_DAYS)
+            date_to = today - timedelta(days=1)
         elif "next week" in text:
             date_from = today + timedelta(days=DEFAULT_RANGE_DAYS)
             date_to = date_from + timedelta(days=DEFAULT_RANGE_DAYS - 1)
@@ -231,14 +307,19 @@ _CLASSIFIER_SYSTEM = (
     '"date_from": "YYYY-MM-DD" or null, "date_to": "YYYY-MM-DD" or null, '
     '"case_text": a case number, CNR or party name copied from the question, or null, '
     '"subtype": "status_memo", "personal_note", "client_letter" or "list_of_dates" for a draft, else null, '
-    '"report_kind": "billing", "hearings", "cases" or "deadlines" for a report, else null}. '
+    '"report_kind": "billing", "hearings", "cases", "deadlines" or "brief" for a report, else null}. '
     "overview = counts across all cases. calendar = hearings, tasks and events on dates "
     "(give the dates, at most 31 days). open_deadlines = open tasks and due dates. "
     "missing_next_date = active cases with no next hearing date. case_facts = anything about "
     "one named case (set case_text). billing_summary and propose_invoice_send = fees and invoices. "
     "propose_fee_create, propose_fee_update, propose_invoice_generate and propose_fee_delete = a "
     "request to add, change, invoice or delete a fee (set case_text if a case is named). "
-    "practice_report = a request for a downloadable report (set report_kind). "
+    "practice_report = a request for a downloadable report (set report_kind; \"brief\" is a hearing brief "
+    "with talking points per hearing). compare = comparing or ranking fees, clients' dues, case ages or two periods. "
+    "today_focus = what to do today. attention = which cases need attention. propose_task = add a task or reminder. "
+    "propose_mark_paid = mark an invoice paid. propose_bulk_fees = add fees for several hearings. "
+    "propose_bulk_send = send several invoices. "
+    "The question may mix Hindi and English (kal, aaj, agle hafte): read it as the advocate means it. "
     "propose_draft = a request to start a memo, note, letter or list of dates for one case "
     "(set subtype and case_text). "
     'Use "none" when the question is about anything else. Never answer the question.'
@@ -247,16 +328,17 @@ _CLASSIFIER_SYSTEM = (
 
 def _classify_with_model(query: str, today: date) -> Optional[dict]:
     """One bounded attempt. None on any failure or unusable output."""
-    budget = getattr(settings, "AI_HYDE_TIMEOUT_SECONDS", 10)
+    budget = getattr(settings, "PRACTICE_CLASSIFIER_TIMEOUT_SECONDS", 6)
     # The per-call timeout below bounds the OpenAI/Groq client, but the Ollama
     # client ignores it and waits up to its own 120 s. The wall-clock wait on
     # the future bounds every provider: a slow model costs this turn a
     # clarification, never a request thread held for minutes.
     pool = ThreadPoolExecutor(max_workers=1)
     try:
-        llm = get_llm_client()
+        # The client is built inside the timed call too: building an Ollama
+        # client checks the server, which can itself hang.
         future = pool.submit(
-            llm.generate,
+            lambda *args, **kwargs: get_llm_client().generate(*args, **kwargs),
             [
                 {"role": "system", "content": _CLASSIFIER_SYSTEM},
                 {"role": "user", "content": f"Today (India): {today.isoformat()}\nQuestion: {query}"},
@@ -267,7 +349,7 @@ def _classify_with_model(query: str, today: date) -> Optional[dict]:
             # attempt of that length, no retries (LLMClient._client_for).
             timeout=budget,
         )
-        raw = future.result(timeout=budget + 2)
+        raw = future.result(timeout=budget + 1)
     except Exception as exc:
         pool.shutdown(wait=False, cancel_futures=True)
         logger.warning("Practice intent classifier failed: %s", type(exc).__name__)
@@ -290,7 +372,7 @@ def _clarify(message: str, intent: Optional[str] = None) -> dict:
     return {"intent": intent, "status": STATUS_CLARIFY, "answer": message}
 
 
-def _from_model(data: dict, *, selected_day: Optional[date], today: date) -> dict:
+def _from_model(data: dict, *, selected_day: Optional[date], today: date, query: str = "") -> dict:
     """Validate a classifier proposal into a state update. Only the enum, two
     dates and a bounded piece of case text are read; anything else is ignored."""
     intent = data.get("intent")
@@ -309,6 +391,13 @@ def _from_model(data: dict, *, selected_day: Optional[date], today: date) -> dic
         if case_text:
             args["case_text"] = case_text
         return {"intent": intent, "args": args}
+    if intent in BILLING_CARD_INTENTS or intent == "propose_task":
+        return {"intent": intent, "args": {"case_text": case_text} if case_text else {}}
+    if intent == "compare":
+        found = insights.compare_kind(_normalise(query))
+        if not found:
+            return _clarify(boundaries.COMPARE_NOT_YET.format(suggestion=boundaries._COMPARE_SUGGESTIONS["billing"]))
+        return {"intent": intent, "args": {"compare": found[0], **found[1]}}
     if intent not in READ_INTENTS:
         return _clarify(answers.FALLBACK_CLARIFICATION)
     if intent == "calendar":
@@ -357,10 +446,75 @@ def validate_scope(state: dict) -> dict:
         "case_candidates": [],
         "action_card": None,
         "report": None,
+        "notes": [],
     }
 
 
 def select_intent(state: dict) -> dict:
+    """Route the first request of the message. Anything after it ("... and
+    email the clients") is named in a note on the answer, never dropped
+    silently; a request the assistant cannot do gets a fixed boundary answer
+    before any keyword rule or model call can misread it."""
+    parts = boundaries.split_request(_normalise(state["query"]))
+    notes = [boundaries.skipped_part_note(part) for part in parts[1:]]
+    query = state["query"] if len(parts) == 1 else parts[0]
+    boundary = boundaries.boundary_message(parts[0])
+    if boundary:
+        return {"routed_by": "rule", "status": STATUS_ANSWER, "answer": boundary, "notes": notes}
+    pointer = _follow_up(state, query)
+    if pointer is not None and "case_id" not in pointer:
+        return {"routed_by": "rule", **pointer, "notes": notes}
+    if pointer is not None:
+        state = {**state, "case_id": pointer["case_id"]}
+        notes = [pointer["note"], *notes]
+    update = _select_intent({**state, "query": query})
+    note = (update.get("args") or {}).pop("note", None)
+    if pointer is not None:
+        update["case_id"] = pointer["case_id"]
+    return {**update, "notes": ([note] if note else []) + notes}
+
+
+def _follow_up(state: dict, query: str) -> Optional[dict]:
+    """A case the question points back at ("that", "the one on Friday"), from
+    the previous answer in this conversation: {"case_id", "note"}; a state
+    update that asks (several cases, or nothing that matches); or None when
+    the question is not a follow-up or names its own case."""
+    previous = state.get("previous")
+    if not previous or state.get("case_id") is not None:
+        return None
+    text = _normalise(query)
+    if not followup.is_followup(text):
+        return None
+    routed = route_deterministic(
+        query, selected_day=state.get("selected_day"), case_id=None, today=state["now"].date(),
+        billing_enabled=invoice_actions_enabled(),
+    )
+    if routed is not None and (routed[0] not in CASE_INTENTS or routed[1].get("case_text")):
+        return None
+    # The question names a case of its own only if its words find one.
+    for needle in parsing.case_text_needles(query):
+        if needle.casefold() not in followup.POINTER_WORDS and reads.resolve_case_candidates(
+            owner=state["owner"], text=needle, limit=1
+        ):
+            return None
+    found = followup.resolve(text, previous, state["owner"])
+    if found is None:
+        return None
+    ids = found["case_ids"]
+    if not ids:
+        return _clarify(f"I couldn't find {found['described']}. Name the case, or ask again with its number or title.")
+    if len(ids) > 1:
+        return {
+            **_clarify(f"Your last answer had {len(ids)} cases there. Which one do you mean?"),
+            "case_candidates": reads.case_candidates_by_ids(owner=state["owner"], ids=ids[:CASE_CANDIDATE_LIMIT]),
+        }
+    case = Case.objects.filter(owner=state["owner"], id=ids[0]).first()
+    if case is None:
+        return None
+    return {"case_id": case.id, "note": f"Taking that to mean **{case.title}**, from {found['described']}."}
+
+
+def _select_intent(state: dict) -> dict:
     today = state["now"].date()
     routed = route_deterministic(
         state["query"],
@@ -379,7 +533,7 @@ def select_intent(state: dict) -> dict:
     update = {"routed_by": "llm", "llm_calls": 1}
     if proposal is None:
         return {**update, **_clarify(answers.FALLBACK_CLARIFICATION)}
-    return {**update, **_from_model(proposal, selected_day=state.get("selected_day"), today=today)}
+    return {**update, **_from_model(proposal, selected_day=state.get("selected_day"), today=today, query=state["query"])}
 
 
 def _is_exact_case_match(text: str, query: str, candidate: dict, facts: dict) -> bool:
@@ -445,6 +599,11 @@ def _case_summary(case: Case) -> dict:
     return {"cases": [{"id": case.id, "title": case.title}]}
 
 
+def _person_names(case: Case) -> list[str]:
+    """The client and contact names of a case, as the advocate would type them."""
+    return [case.client_name or ""] + list(case.client_contacts.values_list("name", flat=True))
+
+
 def _resolve_case(state: dict, *, no_text_message: str = answers.CASE_TEXT_NEEDED) -> tuple[Optional[Case], Optional[dict]]:
     """The one case a command is about, as (case, None), or (None, a state
     update that asks the advocate). A verified `case_id` (the chooser's pick)
@@ -476,10 +635,52 @@ def _resolve_case(state: dict, *, no_text_message: str = answers.CASE_TEXT_NEEDE
             case is not None
             and wanted
             and wanted in _squash(query)
-            and wanted in (_squash(case.case_number), _squash(case.cnr_number))
+            and (
+                wanted in (_squash(case.case_number), _squash(case.cnr_number))
+                or wanted in {_squash(name) for name in _person_names(case)}
+            )
         ):
             return case, None
     return None, {**_clarify(answers.CHOOSE_CASE, intent), "case_candidates": candidates}
+
+
+def _fee_without_case(state: dict) -> tuple[list, Optional[dict]]:
+    """([fee], None) when the words pick exactly one fee without naming its
+    case: "remove the hotel charge" (the only pending hotel fee), or "bump the
+    Rao fee" when only one of the Rao cases has a fee this could change.
+    ([], ask) when the category matches none or several; ([], None) to fall
+    back to asking which case."""
+    intent, owner, query = state["intent"], state["owner"], state["query"]
+    needles = ([state["args"]["case_text"]] if state["args"].get("case_text") else []) + parsing.case_text_needles(query)
+    if needles:
+        for needle in needles:
+            candidates = reads.resolve_case_candidates(owner=owner, text=needle, limit=CASE_CANDIDATE_LIMIT)
+            if candidates:
+                break
+        else:
+            return [], None
+        fees = [
+            fee
+            for fee in (
+                actions.select_fee(intent, billing.case_fees(owner=owner, case_id=c["id"])) for c in candidates
+            )
+            if fee is not None
+        ]
+        return (fees, None) if len(fees) == 1 else ([], None)
+    category = parsing.parse_category(query)
+    if not category:
+        return [], None
+    label = actions.category_label(category).lower()
+    fees = [
+        fee
+        for fee in billing._owned(owner, None).select_related("hearing__case").filter(category=category).order_by("-id")
+        if actions._eligible(intent, fee)
+    ]
+    if not fees:
+        return [], _clarify(f"No {label} charge that could be changed this way is recorded.", intent)
+    if len(fees) > 1:
+        return [], _clarify(_fee_list_question(f"You have {len(fees)} {label} charges. Which one? Name its invoice number or case:", fees), intent)
+    return fees, None
 
 
 def _read_fee_action(state: dict) -> dict:
@@ -498,6 +699,10 @@ def _read_fee_action(state: dict) -> dict:
     named = billing.named_fees(owner=owner, text=query, case_id=state.get("case_id"))
     if len(named) > 1:
         return _clarify(answers.MANY_INVOICES, intent)
+    if not named and state.get("case_id") is None:
+        named, ask = _fee_without_case(state)
+        if ask:
+            return ask
     if named:
         fee = named[0]
     else:
@@ -522,6 +727,84 @@ def _read_fee_action(state: dict) -> dict:
     return {"summary": summary, "action_card": card}
 
 
+def _fee_list_question(head: str, fees: list) -> str:
+    lines = [head] + [
+        f"- {fee.invoice_number or actions.category_label(fee.category)}, {fee.hearing.case.title}, "
+        f"{billing.amount_text(billing._money(fee.amount))}"
+        for fee in fees[:MAX_LISTED_FEES]
+    ]
+    return "\n".join(lines)
+
+
+MAX_LISTED_FEES = 8
+
+
+def _read_task(state: dict) -> dict:
+    today = state["now"].date()
+    parsed = cards.parse_task(state["query"], today)
+    case = None
+    if state.get("case_id") is not None or parsed["case_text"]:
+        state = {**state, "args": {**state["args"], "case_text": state["args"].get("case_text") or parsed["case_text"]}}
+        case, ask = _resolve_case(state)
+        if ask:
+            return ask
+    card = cards.build_task_card(case=case, title=parsed["title"], due_date=parsed["due_date"])
+    return {"summary": _case_summary(case) if case else {"cases": []}, "action_card": card}
+
+
+def _read_billing_card(state: dict) -> dict:
+    intent, owner, now, query = state["intent"], state["owner"], state["now"], state["query"]
+    if intent == "propose_mark_paid":
+        named = billing.named_fees(owner=owner, text=query, case_id=state.get("case_id"))
+        number = boundaries.invoice_number_in(query)
+        if not named and number:
+            # A number that is not one of the owner's: never a different invoice.
+            return _clarify(f"No invoice numbered {number} is recorded in your account.", intent)
+        if not named:
+            if state.get("case_id") is not None or parsing.case_text_needles(query):
+                case, ask = _resolve_case(state, no_text_message=answers.WHICH_FEE)
+                if ask:
+                    return ask
+                named = cards.payable_fees(owner=owner, case_id=case.id)
+                if not named:
+                    return _clarify(f"No invoice of {case.title} is waiting for payment.", intent)
+            else:
+                named = cards.payable_fees(owner=owner)
+                if not named:
+                    return _clarify("No invoice is waiting for payment.", intent)
+        if len(named) > 1:
+            return _clarify(_fee_list_question("Which invoice was paid? Name its number:", named), intent)
+        fee = named[0]
+        rows = billing.candidate_rows([fee])
+        return {"summary": {"fee": rows[0], "cases": billing.case_list(rows)}, "action_card": cards.build_mark_paid_card(fee=fee)}
+
+    if intent == "propose_bulk_fees":
+        text = _normalise(query)
+        today = now.date()
+        period = _period_words(text, today) or parsing.parse_period(text, today=today)
+        if period is None:
+            period = (today - timedelta(days=30), today)
+        period_text = reports.period_text(*period)
+        hearings = cards.unbilled_hearings(owner=owner, date_from=period[0], date_to=period[1], now=now)
+        if not hearings:
+            return {
+                "status": STATUS_ANSWER,
+                "answer": f"Every past hearing from {period_text} already has an appearance fee, so there is nothing to add.",
+                "summary": {"cases": []},
+            }
+        amount = parsing.parse_amount(query)
+        card = cards.build_bulk_fees_card(owner=owner, hearings=hearings, amount=amount, period_text=period_text)
+        cases = list({h.case_id: {"id": h.case_id, "title": h.case.title} for h in hearings}.values())
+        return {"summary": {"cases": cases, "period_text": period_text}, "action_card": card}
+
+    fees = cards.unsent_invoices(owner=owner)
+    if not fees:
+        return {"status": STATUS_ANSWER, "answer": "Every generated invoice has already been sent.", "summary": {"cases": []}}
+    card = cards.build_bulk_send_card(owner=owner, fees=fees)
+    cases = list({row["case_id"]: {"id": row["case_id"], "title": row["case_title"]} for row in card["rows"]}.values())
+    return {"summary": {"cases": cases}, "action_card": card}
+
+
 def _read_draft(state: dict) -> dict:
     intent, query = state["intent"], state["query"]
     subtype = state["args"].get("subtype") or parsing.parse_draft_request(query)
@@ -543,7 +826,7 @@ def _read_report(state: dict) -> dict:
     kind = state["args"].get("report_kind") or parsing.parse_report_kind(state["query"])
     if kind not in REPORT_KINDS:
         return _clarify(answers.REPORT_KIND_NEEDED, intent)
-    period = parsing.parse_period(state["query"], today=today)
+    period = state["args"].get("period") or parsing.parse_period(state["query"], today=today)
     try:
         report = reports.build_report(
             owner=state["owner"],
@@ -560,6 +843,7 @@ def _read_report(state: dict) -> dict:
         "period_text": report["period_text"],
         "row_count": report["row_count"],
         "totals": reports.totals_for_answer(report),
+        "briefings_missing": len(report.get("briefings_missing") or []),
     }
     return {"summary": summary, "report": reports.report_card(report)}
 
@@ -575,7 +859,18 @@ def run_read(state: dict) -> dict:
             return _clarify(
                 answers.FEE_ACTIONS_OFF if intent in FEE_INTENTS else answers.BILLING_NOT_AVAILABLE, intent
             )
+        if intent in BILLING_CARD_INTENTS:
+            return _read_billing_card(state)
         return _read_fee_action(state) if intent in FEE_INTENTS else _read_billing(state)
+    if intent == "propose_task":
+        return _read_task(state)
+    if intent == "compare":
+        args = state["args"]
+        return {"summary": insights.compare(owner=owner, kind=args["compare"], args=args, now=now)}
+    if intent == "today_focus":
+        return {"summary": insights.today_focus(owner=owner, now=now)}
+    if intent == "attention":
+        return {"summary": insights.attention(owner=owner, now=now)}
     if intent == "propose_draft":
         if not drafting_enabled():
             return _clarify(answers.DRAFTING_OFF, intent)
@@ -613,7 +908,20 @@ _PRESENTERS = {
 
 
 def present(state: dict) -> dict:
-    """Deterministic text from the read result. No synthesis in this wave."""
+    """Deterministic text from the read result with any notes: how the
+    question was read ("Taking Diwali as ...", "Taking that to mean ...")
+    before it, the part of the message not acted on after it."""
+    update = _present(state)
+    notes = state.get("notes") or []
+    if notes:
+        answer = update.get("answer", state["answer"])
+        lead = [note for note in notes if note.startswith("Taking ")]
+        tail = [note for note in notes if not note.startswith("Taking ")]
+        update["answer"] = "\n\n".join(part for part in [*lead, answer, *tail] if part)
+    return update
+
+
+def _present(state: dict) -> dict:
     if state["answer"] or state["summary"] is None:
         return {}
     if state["intent"] == "billing_summary":
@@ -624,6 +932,14 @@ def present(state: dict) -> dict:
         text, sources = answers.draft_answer(state["action_card"])
     elif state["intent"] == "practice_report":
         text, sources = answers.report_answer(state["summary"])
+    elif state["intent"] == "compare":
+        text, sources = insights.compare_answer(state["summary"], state["now"].date())
+    elif state["intent"] == "today_focus":
+        text, sources = insights.today_focus_answer(state["summary"])
+    elif state["intent"] == "attention":
+        text, sources = insights.attention_answer(state["summary"])
+    elif state["intent"] in BILLING_CARD_INTENTS or state["intent"] == "propose_task":
+        text, sources = cards.card_answer(state["action_card"])
     elif state["intent"] == "propose_invoice_send":
         card = state.get("action_card")
         text, sources = answers.invoice_send_answer(state["summary"], card)

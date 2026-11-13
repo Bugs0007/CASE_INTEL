@@ -190,7 +190,7 @@ class TestBillingSummary:
     def test_chat_answer_and_sources(self, api, ledger):
         turn = ask(api, SUMMARY_Q).json()
         assert (turn["intent"], turn["status"]) == ("billing_summary", "answer")
-        assert "1 with no invoice yet" in turn["answer"] and "INV-0042" in turn["answer"]
+        assert "**1 fee** with no invoice yet (Rs. 1,000)" in turn["answer"] and "INV-0042" in turn["answer"]
         assert "INV-0001" not in turn["answer"]
         assert turn["action_card"] is None
         kinds = {(r["kind"], r["id"]) for r in turn["sources"]}

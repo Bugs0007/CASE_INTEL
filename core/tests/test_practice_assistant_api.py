@@ -250,7 +250,7 @@ class TestDeterministicIntents:
         turn = ask(api, CHIP_OVERVIEW).json()
         assert (turn["intent"], turn["status"]) == ("overview", "answer")
         assert turn["summary"] == as_json(reads.portfolio_snapshot(owner=anil, page=1, now=NOW))
-        assert "3 cases recorded" in turn["answer"]
+        assert "**3 cases** recorded (2 open, 1 closed)" in turn["answer"]
         assert "2 cases are active" in turn["answer"]
         assert "1 with a scheduled next hearing recorded and 1 with none recorded" in turn["answer"]
         assert "11 Nov 2026, 10:00 IST" in turn["answer"]
@@ -270,7 +270,7 @@ class TestDeterministicIntents:
         )
         assert turn["summary"]["total"] == 4
         assert "From 11 Nov 2026 to 17 Nov 2026 (India dates)" in turn["answer"]
-        assert "4 items recorded: 1 hearing, 2 tasks and 1 event" in turn["answer"]
+        assert "Case Intel has **1 hearing, 2 tasks and 1 event**." in turn["answer"]
         assert "12 Nov 2026: Hearing, Arguments, Rao vs State (scheduled)" in turn["answer"]
         assert ("hearing", practice["hearing"].id) in source_keys(turn)
         assert ("event", practice["event"].id) in source_keys(turn)
@@ -326,7 +326,7 @@ class TestDeterministicIntents:
         assert (turn["intent"], turn["status"]) == ("open_deadlines", "answer")
         assert turn["summary"] == as_json(reads.open_deadlines(owner=anil, now=NOW))
         assert turn["summary"]["total"] == 3
-        assert "3 open tasks recorded, 1 overdue" in turn["answer"]
+        assert "**3 open tasks** recorded, **1 overdue**" in turn["answer"]
         assert "Due 10 Nov 2026 (overdue): File counter, Rao vs State" in turn["answer"]
         assert "No due date recorded: Call client, Mehta vs Union" in turn["answer"]
         assert source_keys(turn) == {("task", practice[k].id) for k in ("overdue", "loose", "undated")}
@@ -399,7 +399,7 @@ class TestClassifier:
         assert (turn["intent"], turn["status"]) == ("open_deadlines", "answer")
         assert turn["summary"]["total"] == 3
         assert llm.generate.call_count == 1
-        assert llm.generate.call_args.kwargs["timeout"] == 10
+        assert llm.generate.call_args.kwargs["timeout"] == 6
 
     def test_fenced_json_with_dates(self, api, practice):
         raw = '```json\n{"intent": "calendar", "date_from": "2026-11-12", "date_to": "2026-11-13"}\n```'

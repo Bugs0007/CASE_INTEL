@@ -281,7 +281,8 @@ _TRAILING_RE = re.compile(r"\s+(?:case|matter|file|hearing|suit|petition|appeal)
 _PREPOSITION_RE = re.compile(r"\s(?:for|in|on|of|against|regarding|about|to)\s+", re.IGNORECASE)
 
 _BEFORE_NOUN_RE = re.compile(
-    r"\b(?:change|update|edit|delete|remove|correct|revise|generate|create|raise|issue|add|record|log)\s+"
+    r"\b(?:change|update|edit|delete|remove|correct|revise|generate|create|raise|issue|add|record|log|"
+    r"bump|hike|increase|reduce|lower|cut|decrease)\s+"
     r"(?:the\s+|a\s+|an\s+)?(?:new\s+)?(.+?)\s+(?:fee|invoice|charge|bill|hotel|flight)s?\b",
     re.IGNORECASE,
 )
@@ -291,6 +292,11 @@ _NOISE_WORDS = {
     "that", "me", "us", "all", "now", "today", "yesterday", "tomorrow", "the", "a", "an", "my", "pending",
     "latest", "last", "new", "old", "unpaid", "paid", "sent",
 }
+
+
+_PERSON_RE = re.compile(
+    r"\b(?:to|for|with|client|of|in)\s+((?:[A-Z]\.\s?){0,3}[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})\b"
+)
 
 
 def case_text_needles(query: str) -> list[str]:
@@ -308,6 +314,10 @@ def case_text_needles(query: str) -> list[str]:
         left = _PREPOSITION_RE.split(" " + parties.group(1))[-1].strip()
         right = _PREPOSITION_RE.split(" " + parties.group(3))[0].strip()
         needles += [f"{left} {parties.group(2)} {right}", left, right]
+    # A person named the way people write names: "a letter to K. Rao",
+    # "the fee for Sharma" (capitalised words after to/for/with/client).
+    for name in _PERSON_RE.findall(query):
+        needles.append(name.strip())
     before = _BEFORE_NOUN_RE.search(query)
     if before:
         needles.append(_TRAILING_RE.sub("", _LEADING_RE.sub("", before.group(1).strip())).strip())
@@ -382,6 +392,15 @@ _MUTATION_VERBS = (
         ),
     ),
     (
+        # "bump the Rao fee up by 2k", "reduce INV-0004 by 500": a change by
+        # an amount (see parse_amount_change), before "raise an invoice".
+        "propose_fee_update",
+        re.compile(
+            _LEAD + r"(?:bump|hike|raise|increase|reduce|lower|cut|decrease|drop)\b.*" + _FEE_NOUN + r".*\bby\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
         "propose_invoice_generate",
         re.compile(_LEAD + r"(?:generate|create|raise|issue|prepare|make|draw\s+up)\b.*\binvoices?\b", re.IGNORECASE),
     ),
@@ -393,6 +412,20 @@ _MUTATION_VERBS = (
         ),
     ),
 )
+
+
+_UP_BY_RE = re.compile(r"\b(?:up|bump\w*|hike\w*|raise\w*|increase\w*|add)\b.*\bby\b|\bby\b.*\bmore\b", re.IGNORECASE)
+_DOWN_BY_RE = re.compile(r"\b(?:down|reduce\w*|lower\w*|cut\w*|decrease\w*|drop\w*)\b.*\bby\b|\bby\b.*\bless\b", re.IGNORECASE)
+
+
+def parse_amount_change(text: str) -> int:
+    """+1 when the question changes an amount up BY something ("bump it up by
+    2k"), -1 when down by something, 0 when it names the new amount itself."""
+    if _DOWN_BY_RE.search(text or ""):
+        return -1
+    if _UP_BY_RE.search(text or ""):
+        return 1
+    return 0
 
 
 def parse_fee_mutation(text: str) -> Optional[str]:
