@@ -18,7 +18,14 @@ export type PracticeIntent =
   | "propose_invoice_generate"
   | "propose_fee_delete"
   | "practice_report"
-  | "propose_draft";
+  | "propose_draft"
+  | "compare"
+  | "today_focus"
+  | "attention"
+  | "propose_task"
+  | "propose_mark_paid"
+  | "propose_bulk_fees"
+  | "propose_bulk_send";
 export type PracticeTurnStatus = "answer" | "needs_clarification" | "partial";
 
 /** A pointer to one owned record. Build links from `kind`, never from text. */
@@ -169,6 +176,53 @@ export interface PracticeStartDraftCard extends PracticeCardBase {
   instructions: string;
 }
 
+export interface PracticeCreateTaskCard {
+  kind: "create_task";
+  /** null = a task on no case */
+  case_id: number | null;
+  case_title: string;
+  title: string;
+  due_date: string | null;
+  blockers: string[];
+}
+
+export interface PracticeMarkPaidCard extends PracticeCardBase {
+  kind: "mark_invoice_paid";
+  fee_id: number;
+  invoice_number: string | null;
+  amount: string;
+  category: PracticeFeeCategory;
+  fee_status: string;
+}
+
+export interface PracticeBulkCreateFeesCard {
+  kind: "bulk_create_fees";
+  case_id: null;
+  case_title: string;
+  category: PracticeFeeCategory;
+  /** null = the profile default */
+  amount: string | null;
+  period_text: string;
+  rows: { hearing_id: number; case_id: number; case_title: string; date: string; label: string }[];
+  blockers: string[];
+}
+
+export interface PracticeBulkSendInvoicesCard {
+  kind: "bulk_send_invoices";
+  case_id: null;
+  case_title: string;
+  rows: {
+    fee_id: number;
+    case_id: number;
+    case_title: string;
+    invoice_number: string | null;
+    amount: string;
+    recipient_email: string | null;
+    blockers: string[];
+  }[];
+  blockers: string[];
+}
+
 /** Every card the assistant can propose. Each is only a proposal. */
 export type PracticeAnyActionCard =
   | PracticeActionCard
@@ -176,9 +230,13 @@ export type PracticeAnyActionCard =
   | PracticeUpdateFeeCard
   | PracticeGenerateInvoiceCard
   | PracticeDeleteFeeCard
-  | PracticeStartDraftCard;
+  | PracticeStartDraftCard
+  | PracticeCreateTaskCard
+  | PracticeMarkPaidCard
+  | PracticeBulkCreateFeesCard
+  | PracticeBulkSendInvoicesCard;
 
-export type PracticeReportKind = "billing" | "hearings" | "cases" | "deadlines";
+export type PracticeReportKind = "billing" | "hearings" | "cases" | "deadlines" | "brief";
 export type PracticeReportFormat = "pdf" | "docx";
 
 /** A report the server built from the advocate's data. Files are fetched
@@ -190,6 +248,8 @@ export interface PracticeReportCard {
   date_to: string | null;
   row_count: number;
   formats: PracticeReportFormat[];
+  /** Hearings (brief only) whose "state of the matter" paragraph is not written yet. */
+  briefings_missing?: number[];
 }
 
 export interface PracticeTurn {

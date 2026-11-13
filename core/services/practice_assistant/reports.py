@@ -1,6 +1,6 @@
 """Practice reports: the data behind the Case Bot's downloadable reports.
 
-Four kinds (billing, hearings, cases, deadlines), each built from the owner's
+Five kinds (billing, hearings, cases, deadlines, brief), each built from the owner's
 own rows with no model call, in India dates. `build_report` returns one plain
 structure that report_render.py turns into a PDF or a DOCX, and whose
 `row_count` the chat turn shows on its report card.
@@ -40,6 +40,7 @@ TITLES = {
     "hearings": "Hearings report",
     "cases": "Cases report",
     "deadlines": "Deadlines report",
+    "brief": "Hearing brief",
 }
 
 
@@ -53,6 +54,8 @@ def default_period(kind: str, today: date) -> Optional[tuple[date, date]]:
         return start, date(start.year + 1, 3, 31)
     if kind == "hearings":
         return today, today + timedelta(days=30)
+    if kind == "brief":
+        return today, today + timedelta(days=6)
     return None
 
 
@@ -386,6 +389,12 @@ def build_report(
         body = _hearings(owner, date_from, date_to, current)
     elif kind == "cases":
         body = _cases(owner, current)
+    elif kind == "brief":
+        from .brief import build_brief
+
+        if (date_to - date_from).days > 30:
+            raise ReportError("A hearing brief can cover at most 31 days.")
+        body = build_brief(owner, date_from, date_to, current)
     else:
         body = _deadlines(owner, date_from, date_to, current)
     return {
@@ -408,6 +417,9 @@ def report_card(report: dict) -> dict:
         "date_to": report["date_to"],
         "row_count": report["row_count"],
         "formats": ["pdf", "docx"],
+        # Hearings whose "state of the matter" paragraph is not written yet:
+        # the card offers to ask for them (never done by building the report).
+        "briefings_missing": report.get("briefings_missing", []),
     }
 
 

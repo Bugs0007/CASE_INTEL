@@ -17,6 +17,7 @@ import type {
   PracticeUpdateFeeCard,
 } from "@/types/practice";
 import { PracticeActionCardShell } from "./practice-action-card-shell";
+import { BulkCreateFeesCard, BulkSendInvoicesCard, CreateTaskCard, MarkPaidCard } from "./practice-more-cards";
 import { caseHref } from "./routes";
 
 const CATEGORIES: { value: PracticeFeeCategory; label: string }[] = [
@@ -364,5 +365,13 @@ export function PracticeActionCards({
       return <DeleteFeeCard card={card} actions={actions} onDismiss={onDismiss} />;
     case "start_draft":
       return <StartDraftCard card={card} actions={actions} onDismiss={onDismiss} />;
+    case "create_task":
+      return <CreateTaskCard card={card} actions={actions} onDismiss={onDismiss} />;
+    case "mark_invoice_paid":
+      return <MarkPaidCard card={card} actions={actions} onDismiss={onDismiss} />;
+    case "bulk_create_fees":
+      return <BulkCreateFeesCard card={card} actions={actions} onDismiss={onDismiss} />;
+    case "bulk_send_invoices":
+      return <BulkSendInvoicesCard card={card} actions={actions} onDismiss={onDismiss} />;
   }
 }

@@ -291,6 +291,9 @@ LLM_MAX_RETRIES = config("LLM_MAX_RETRIES", default=1, cast=int)
 # HyDE only improves retrieval and already falls back to the raw query when it
 # fails, so it gets a short single attempt rather than the full budget.
 AI_HYDE_TIMEOUT_SECONDS = config("AI_HYDE_TIMEOUT_SECONDS", default=10, cast=float)
+# The practice assistant's one intent-classifier call: a single attempt, and
+# the whole wait (any provider, Ollama included) is this plus one second.
+PRACTICE_CLASSIFIER_TIMEOUT_SECONDS = config("PRACTICE_CLASSIFIER_TIMEOUT_SECONDS", default=6, cast=float)
 # A local Ollama model on CPU can legitimately take far longer than a hosted
 # API, so it has its own, looser bound. Not the production path (USE_GROQ).
 OLLAMA_REQUEST_TIMEOUT_SECONDS = config("OLLAMA_REQUEST_TIMEOUT_SECONDS", default=120, cast=float)

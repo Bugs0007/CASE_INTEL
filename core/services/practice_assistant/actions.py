@@ -185,6 +185,13 @@ def proposed_changes(fee: AppearanceFee, query: str) -> dict:
     current = _current(fee)
     proposed: dict = {}
     amount = parsing.parse_amount(query, extra_mask=(fee.invoice_number,))
+    direction = parsing.parse_amount_change(query)
+    if amount is not None and direction:
+        # "up by 2k" is relative to the stored amount; a cut that would take
+        # it to zero or below proposes nothing (the advocate is asked again).
+        amount = Decimal(current["amount"]) + direction * amount
+        if amount <= 0:
+            amount = None
     if amount is not None and money(amount) != current["amount"]:
         proposed["amount"] = money(amount)
     category = parsing.parse_category_change(query)

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { PracticeCaseCandidate, PracticeTurn } from "@/types/practice";
+import { AnswerText } from "./answer-text";
 import { formatAsOf } from "./format";
 import { PracticeActionCards } from "./practice-action-cards";
 import { PracticeInvoiceActionCard } from "./practice-invoice-action-card";
@@ -43,7 +44,7 @@ function AssistantTurn({ id, turn, handlers }: { id: string; turn: PracticeTurn;
     : null;
   return (
     <div className="max-w-full space-y-2 rounded-lg bg-gray-50 p-3">
-      <p className="whitespace-pre-wrap break-words text-sm text-gray-900">{turn.answer}</p>
+      <AnswerText text={turn.answer} />
 
       {turn.status === "partial" && (
         <p className="rounded bg-amber-50 p-2 text-xs text-amber-900">

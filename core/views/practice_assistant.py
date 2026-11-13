@@ -23,7 +23,7 @@ from core.models import Case
 from core.serializers.practice_assistant import DAY_FORMAT, PracticeChatRequestSerializer
 from core.services.graph.practice_graph import run_practice_turn
 from core.services.india_time import india_now
-from core.services.practice_assistant import report_render, reports, reads, turns
+from core.services.practice_assistant import followup, report_render, reports, reads, turns
 from core.services.practice_assistant.contracts import (
     DEFAULT_RANGE_DAYS,
     MAX_RANGE_DAYS,
@@ -124,6 +124,8 @@ class PracticeChatView(APIView):
                 now=india_now(),
                 selected_day=data.get("selected_day"),
                 case_id=case_id,
+                # Only this owner's own conversation, already checked above.
+                previous=followup.previous_turn(owner, conversation),
             )
             turn = turns.store_turn(
                 owner=owner,

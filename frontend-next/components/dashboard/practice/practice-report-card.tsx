@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { apiErrorDetail } from "@/lib/api/client";
+import { hearingDigestApi } from "@/lib/api/hearing-digest";
 import { practiceApi } from "@/lib/api/practice";
 import type { PracticeReportCard as ReportCard, PracticeReportFormat } from "@/types/practice";
 
@@ -32,6 +33,23 @@ function periodText(card: ReportCard): string {
 export function PracticeReportCard({ card }: { card: ReportCard }) {
   const [busy, setBusy] = useState<PracticeReportFormat | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const missing = card.briefings_missing ?? [];
+  const [briefing, setBriefing] = useState<"idle" | "working" | "asked">("idle");
+
+  /** Asks for each missing paragraph through the prep sheet's own endpoint;
+   * the worker writes them, and the next download includes them. */
+  async function writeBriefings() {
+    if (briefing !== "idle") return;
+    setBriefing("working");
+    setError(null);
+    try {
+      for (const hearingId of missing) await hearingDigestApi.requestBriefing(hearingId);
+      setBriefing("asked");
+    } catch (caught) {
+      setError(apiErrorDetail(caught, "The briefings could not be requested. Try again."));
+      setBriefing("idle");
+    }
+  }
 
   async function download(format: PracticeReportFormat) {
     if (busy) return;
@@ -60,12 +78,22 @@ export function PracticeReportCard({ card }: { card: ReportCard }) {
       <p className="text-sm text-gray-600">
         {periodText(card)}. {card.row_count === 1 ? "1 row" : `${card.row_count} rows`}.
       </p>
+      {briefing === "asked" && (
+        <p role="status" className="rounded-lg bg-green-50 p-2 text-sm text-green-900">
+          Briefings are being written. Download again in a minute or two to include them.
+        </p>
+      )}
       {error && (
         <p role="alert" className="rounded-lg bg-red-50 p-2 text-sm text-red-800">
           {error}
         </p>
       )}
       <div className="flex flex-wrap gap-2">
+        {missing.length > 0 && briefing !== "asked" && (
+          <Button type="button" size="sm" disabled={briefing === "working"} onClick={writeBriefings}>
+            Write missing briefings ({missing.length})
+          </Button>
+        )}
         {card.formats.map((format) => (
           <Button
             key={format}

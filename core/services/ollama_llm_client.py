@@ -5,6 +5,7 @@ Provides the same interface as LLMClient but uses local Ollama
 models instead of OpenAI API for 100% local operation.
 """
 
+import functools
 import logging
 import time
 from typing import Optional
@@ -88,8 +89,9 @@ class OllamaLLMClient:
             messages: List of message dicts with 'role' and 'content' keys.
             temperature: Sampling temperature (0 = deterministic).
             max_tokens: Maximum tokens in the response.
-            timeout: Accepted for interface parity with LLMClient; the
-                Ollama client uses its own OLLAMA_REQUEST_TIMEOUT_SECONDS.
+            timeout: Given, the call is a single attempt with no retries
+                (the caller bounds the wait). The HTTP read itself still uses
+                OLLAMA_REQUEST_TIMEOUT_SECONDS.
 
         Returns:
             The assistant's response text.
@@ -107,8 +109,10 @@ class OllamaLLMClient:
 
         start_time = time.perf_counter()
 
-        response = self._call_with_retry(
-            self._client.chat,
+        # A per-call timeout means "one bounded attempt" (as in LLMClient):
+        # no retries with back-off on top of the caller's wait.
+        call = self._client.chat if timeout is not None else functools.partial(self._call_with_retry, self._client.chat)
+        response = call(
             model=self.model,
             messages=messages,
             options={
