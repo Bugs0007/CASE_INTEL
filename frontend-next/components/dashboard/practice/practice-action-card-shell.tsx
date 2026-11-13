@@ -15,8 +15,9 @@ export interface CardOutcome {
 export interface PracticeActionCardShellProps {
   /** Accessible name of the card, and its visible heading. */
   title: string;
-  caseId: number;
-  caseTitle: string;
+  /** Omitted for a card that spans several cases or none. */
+  caseId?: number | null;
+  caseTitle?: string;
   blockers: string[];
   /** First button, before the confirm step. */
   actionLabel: string;
@@ -75,12 +76,14 @@ export function PracticeActionCardShell({
   return (
     <section aria-label={title} className="space-y-2 rounded-lg border border-gray-200 bg-surface p-3">
       <h4 className="text-sm font-semibold text-gray-900">{title}</h4>
-      <p className="break-words text-sm text-gray-900">
-        <span className="text-gray-500">Case </span>
-        <Link href={caseHref(caseId)} className="text-primary hover:underline">
-          {caseTitle || `Case ${caseId}`}
-        </Link>
-      </p>
+      {caseId != null && (
+        <p className="break-words text-sm text-gray-900">
+          <span className="text-gray-500">Case </span>
+          <Link href={caseHref(caseId)} className="text-primary hover:underline">
+            {caseTitle || `Case ${caseId}`}
+          </Link>
+        </p>
+      )}
 
       {children?.(editable)}
 
