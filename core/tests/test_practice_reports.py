@@ -270,6 +270,7 @@ class TestReportTurn:
             "date_to": "2026-11-30",
             "row_count": 0,
             "formats": ["pdf", "docx"],
+            "briefings_missing": [],
         }
         assert "PDF or a Word file" in turn["answer"]
 

@@ -26,6 +26,7 @@ class PracticeState(TypedDict, total=False):
     selected_day: Optional[date]
     case_id: Optional[int]  # already verified as the owner's by the view
     now: datetime  # aware India time; the turn's as_of
+    previous: Optional[dict]  # the conversation's previous turn (followup.previous_turn)
 
     # --- select_intent ---
     intent: Optional[str]
@@ -41,6 +42,7 @@ class PracticeState(TypedDict, total=False):
     case_candidates: list
     action_card: Optional[dict]
     report: Optional[dict]  # a ReportCard (contracts.py), never a file
+    notes: list  # sentences appended to the answer (a skipped part, a limit)
 
 
 def build_practice_graph():
@@ -77,6 +79,7 @@ def run_practice_turn(
     now: datetime,
     selected_day: Optional[date] = None,
     case_id: Optional[int] = None,
+    previous: Optional[dict] = None,
 ) -> PracticeState:
     """Run one turn. `owner` is the authenticated user and `case_id`, when
     given, must already be verified as theirs. Returns the final state."""
@@ -88,5 +91,6 @@ def run_practice_turn(
             "selected_day": selected_day,
             "case_id": case_id,
             "now": now,
+            "previous": previous,
         }
     )

@@ -17,9 +17,17 @@ MAX_SOURCES = 12
 MAX_LINES = 12
 
 FALLBACK_CLARIFICATION = (
-    "I could not tell what you are asking for. I can give you a practice overview, "
-    "your calendar for a day or a range of up to 31 days, your open deadlines, the "
-    "cases with no next date recorded, or the recorded facts of one case."
+    "I couldn't match that to something I can look up. I can:\n"
+    "- show your hearings, tasks and events for a day or up to 31 days (\"hearings tomorrow\", \"what's coming up\")\n"
+    "- list your open deadlines, or the cases with no next date\n"
+    "- look up one case by its number, CNR or title\n"
+    "- say what to focus on today, or which cases need attention and why\n"
+    "- compare fees, what clients owe, case ages, or two weeks\n"
+    "- summarise billing; add, change, invoice, send, mark paid or delete fees after you confirm\n"
+    "- add a task or reminder\n"
+    "- make a hearing brief with talking points, or a billing, hearings, cases or deadlines report, as PDF or Word\n"
+    "- start a status memo, client letter, personal note or list of dates for a case\n"
+    "I don't answer general law questions."
 )
 BILLING_NOT_AVAILABLE = (
     "Billing questions are not available in the assistant yet. "
@@ -135,9 +143,12 @@ def overview_answer(snapshot: dict) -> tuple[str, list[Reference]]:
     total = snapshot["total_cases"]
     if total == 0:
         return f"As of {_fmt_as_of(snapshot['as_of'])}, no cases are recorded in Case Intel.", []
-    statuses = ", ".join(f"{name} {count}" for name, count in sorted(snapshot["status_counts"].items()))
+    statuses = ", ".join(
+        f"{count} {name.replace('_', ' ')}"
+        for name, count in sorted(snapshot["status_counts"].items(), key=lambda item: (-item[1], item[0]))
+    )
     lines = [
-        f"As of {_fmt_as_of(snapshot['as_of'])}, Case Intel has {_n(total, 'case')} recorded "
+        f"As of {_fmt_as_of(snapshot['as_of'])}, Case Intel has **{_n(total, 'case')}** recorded "
         f"({statuses}).",
         f"{_n(snapshot['active_cases'], 'case')} {'is' if snapshot['active_cases'] == 1 else 'are'} "
         "active (not closed or archived): "
@@ -166,10 +177,8 @@ def calendar_answer(window: dict) -> tuple[str, list[Reference]]:
         counts = f"{_n(total, 'item')} recorded (the first {len(entries)} are available here)"
     else:
         by_kind = {kind: sum(1 for e in entries if e["kind"] == kind) for kind in ("hearing", "task", "event")}
-        counts = (
-            f"{_n(total, 'item')} recorded: {_n(by_kind['hearing'], 'hearing')}, "
-            f"{_n(by_kind['task'], 'task')} and {_n(by_kind['event'], 'event')}"
-        )
+        kinds = [_n(by_kind[kind], kind) for kind in ("hearing", "task", "event") if by_kind[kind]]
+        counts = "**" + (kinds[0] if len(kinds) == 1 else ", ".join(kinds[:-1]) + " and " + kinds[-1]) + "**"
     head = f"{'On' if single else 'From'} {span} (India dates), Case Intel has {counts}."
     lines = [head] + [_entry_line(e, with_day=not single) for e in entries[:MAX_LINES]]
     lines += _more(total, min(len(entries), MAX_LINES))
@@ -186,8 +195,9 @@ def open_deadlines_answer(result: dict) -> tuple[str, list[Reference]]:
     # its last row is overdue, there may be more overdue rows beyond it.
     at_least = result["truncated"] and bool(entries) and entries[-1]["overdue"]
     head = (
-        f"As of {_fmt_as_of(result['as_of'])}, Case Intel has {_n(total, 'open task')} recorded, "
-        f"{'at least ' if at_least else ''}{overdue} overdue. Due dates are the recorded ones."
+        f"As of {_fmt_as_of(result['as_of'])}, Case Intel has **{_n(total, 'open task')}** recorded"
+        + (f", **{'at least ' if at_least else ''}{overdue} overdue**" if overdue or at_least else ", none overdue")
+        + ". Due dates are the recorded ones."
     )
     lines = [head] + [_deadline_line(row) for row in entries[:MAX_LINES]]
     lines += _more(total, min(len(entries), MAX_LINES))
@@ -242,7 +252,7 @@ def case_facts_answer(facts: dict) -> tuple[str, list[Reference]]:
     head = _case_line(case)
     if case.get("court"):
         head += f", {case['court']}"
-    lines = [f"{head}. Status: {case['status']}."]
+    lines = [f"**{head}**. Status: {case['status'].replace('_', ' ')}."]
     refs: list[Reference] = [case["ref"]]
 
     hearing = facts["next_hearing"]
@@ -301,20 +311,19 @@ def billing_summary_answer(summary: dict) -> tuple[str, list[Reference]]:
     if not any(counts.values()):
         return "No fees or invoices are recorded in Case Intel.", []
 
-    def part(key: str, label: str) -> str:
-        return f"{counts[key]} {label} ({_inr(totals[key])})"
-
-    head = (
-        f"As of {_fmt_as_of(summary['as_of'])}, Case Intel has "
-        + part("pending", "with no invoice yet")
-        + ", "
-        + part("invoiced_unsent", "invoiced and not yet sent")
-        + ", "
-        + part("sent_unpaid", "sent and unpaid")
-        + " and "
-        + part("paid_30d", "paid in the last 30 days")
-        + "."
+    labels = (
+        ("pending", "fee", "fees", "with no invoice yet"),
+        ("invoiced_unsent", "invoice", "invoices", "not yet sent"),
+        ("sent_unpaid", "invoice", "invoices", "sent and unpaid"),
+        ("paid_30d", "fee", "fees", "paid in the last 30 days"),
     )
+    parts = [
+        f"**{_n(counts[key], one, many)}** {label} ({_inr(totals[key])})"
+        for key, one, many, label in labels
+        if counts[key]
+    ]
+    joined = parts[0] if len(parts) == 1 else "; ".join(parts[:-1]) + "; and " + parts[-1]
+    head = f"As of {_fmt_as_of(summary['as_of'])}, Case Intel has {joined}."
     rows = summary["rows"]
     lines = [head] + [_fee_line(row) for row in rows[:MAX_LINES]]
     lines += _more(summary["total"], min(len(rows), MAX_LINES))
@@ -474,6 +483,7 @@ _REPORT_ROWS = {
     "hearings": ("hearing", "hearings"),
     "cases": ("active case", "active cases"),
     "deadlines": ("open task", "open tasks"),
+    "brief": ("hearing", "hearings"),
 }
 
 
@@ -485,6 +495,17 @@ def report_answer(summary: dict) -> tuple[str, list[Reference]]:
         text = f"Your {summary['title'].lower()}{period} is ready, but no {plural} are recorded in Case Intel for it."
     else:
         text = f"Your {summary['title'].lower()}{period} is ready with {_n(count, singular, plural)}."
+    if summary["kind"] == "brief" and count:
+        text += (
+            " Each hearing has its own section: case status, the last order and your side's directions, "
+            "open tasks, the written state of the matter, and points to cover."
+        )
+        missing = summary.get("briefings_missing") or 0
+        if missing:
+            text += (
+                f" The state-of-the-matter paragraph is not written yet for {_n(missing, 'hearing')}: press "
+                "**Write missing briefings** below, then download again in a minute or two."
+            )
     if summary["kind"] == "billing" and count:
         figures = dict(summary["totals"])
         text += (

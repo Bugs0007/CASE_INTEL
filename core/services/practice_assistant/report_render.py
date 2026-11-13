@@ -53,7 +53,10 @@ def render_pdf(report: dict) -> bytes:
 
     for block in report["blocks"]:
         pdf.set_font("Helvetica", "B", 12)
-        pdf.cell(0, 8, pdf_safe(block["heading"]), new_x="LMARGIN", new_y="NEXT")
+        pdf.multi_cell(0, 7, pdf_safe(block["heading"]), new_x="LMARGIN", new_y="NEXT")
+        if block["type"] == "section":
+            _pdf_section(pdf, block)
+            continue
         if block["type"] == "summary":
             pdf.set_font("Helvetica", "", 10)
             for label, value in block["items"]:
@@ -88,6 +91,23 @@ def render_pdf(report: dict) -> bytes:
     return bytes(pdf.output())
 
 
+def _pdf_section(pdf, block: dict) -> None:
+    """A labelled list of long values, then bullet points (the hearing brief)."""
+    for label, value in block["items"]:
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.cell(42, 5, pdf_safe(label))
+        pdf.set_font("Helvetica", "", 9)
+        pdf.multi_cell(0, 5, pdf_safe(value or "-"), new_x="LMARGIN", new_y="NEXT")
+    if block.get("bullets"):
+        pdf.ln(1)
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.cell(0, 5, pdf_safe(block.get("bullets_heading") or "Points"), new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("Helvetica", "", 9)
+        for point in block["bullets"]:
+            pdf.multi_cell(0, 5, pdf_safe(f"-  {point}"), new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(4)
+
+
 def _bold():
     from fpdf.fonts import FontFace
 
@@ -117,6 +137,16 @@ def render_docx(report: dict) -> bytes:
 
     for block in report["blocks"]:
         doc.add_heading(_clean(block["heading"]), level=2)
+        if block["type"] == "section":
+            for label, value in block["items"]:
+                paragraph = doc.add_paragraph()
+                paragraph.add_run(_clean(label) + ": ").bold = True
+                paragraph.add_run(_clean(value or "-"))
+            if block.get("bullets"):
+                doc.add_paragraph().add_run(_clean(block.get("bullets_heading") or "Points")).bold = True
+                for point in block["bullets"]:
+                    doc.add_paragraph(_clean(point), style="List Bullet")
+            continue
         if block["type"] == "summary":
             table = doc.add_table(rows=0, cols=2)
             table.style = "Table Grid"

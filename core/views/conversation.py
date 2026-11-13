@@ -104,7 +104,9 @@ class ConversationMessagesView(OwnerScopedMixin, generics.ListAPIView):
                 "citations__chunk__document",
                 "citations__email",
             )
-            .order_by("created_at")
+            # id breaks ties: a question and its answer are saved in the
+            # same request and can share a timestamp.
+            .order_by("created_at", "id")
         )
 
 

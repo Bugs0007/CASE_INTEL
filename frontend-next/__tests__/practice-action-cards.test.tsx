@@ -58,6 +58,9 @@ function fakeActions(over: Partial<PracticeCardActions> = {}): PracticeCardActio
     updateFee: vi.fn().mockResolvedValue({}),
     generateInvoice: vi.fn().mockResolvedValue({}),
     deleteFee: vi.fn().mockResolvedValue(undefined),
+    markPaid: vi.fn().mockResolvedValue({}),
+    sendInvoice: vi.fn().mockResolvedValue({}),
+    createTask: vi.fn().mockResolvedValue({}),
     createDraft: vi.fn().mockResolvedValue(77),
     ...over,
   };

@@ -580,8 +580,9 @@ def resolve_case_candidates(
     limit: int = 5,
 ) -> list[CaseCandidate]:
     """The owner's cases whose title, case number or CNR contains `text`
-    (case-insensitive), for the "which case did you mean" chooser. Blank text
-    matches nothing. Ordered by title then id; `limit` is held to
+    (case-insensitive), or whose client, party or client-contact name does,
+    for the "which case did you mean" chooser. "K. Rao" also matches "K Rao".
+    Blank text matches nothing. Ordered by title then id; `limit` is held to
     HARD_ROW_CAP. 3 queries (cases, 2 for court names), 0 for blank text.
     """
     _check_scope(scope)
@@ -590,17 +591,34 @@ def resolve_case_candidates(
     needle = (text or "").strip()
     if not needle:
         return []
-    cases = list(
-        Case.objects.filter(owner=owner)
-        .filter(
-            Q(title__icontains=needle)
-            | Q(case_number__icontains=needle)
-            | Q(case_number_raw__icontains=needle)
-            | Q(cnr_number__icontains=needle)
+    match = Q()
+    for variant in dict.fromkeys([needle, " ".join(needle.replace(".", " ").split())]):
+        match |= (
+            Q(title__icontains=variant)
+            | Q(case_number__icontains=variant)
+            | Q(case_number_raw__icontains=variant)
+            | Q(cnr_number__icontains=variant)
+            | Q(client_name__icontains=variant)
+            | Q(petitioner_name__icontains=variant)
+            | Q(respondent_name__icontains=variant)
+            | Q(client_contacts__name__icontains=variant)
         )
+    ids = Case.objects.filter(owner=owner).filter(match).values("id")
+    cases = list(
+        Case.objects.filter(owner=owner, id__in=ids)
         .order_by("title", "id")
         .only("id", "title", "case_number", "cnr_number")[: min(limit, HARD_ROW_CAP)]
     )
+    return _candidates(cases)
+
+
+def case_candidates_by_ids(*, owner, ids: list[int]) -> list[CaseCandidate]:
+    """Chooser rows for these of the owner's cases, in the given order."""
+    found = {case.id: case for case in Case.objects.filter(owner=owner, id__in=ids[:HARD_ROW_CAP])}
+    return _candidates([found[case_id] for case_id in ids if case_id in found])
+
+
+def _candidates(cases: list[Case]) -> list[CaseCandidate]:
     courts = court_names_for_cases(cases)
     return [
         {

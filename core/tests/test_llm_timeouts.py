@@ -216,7 +216,7 @@ class TestPracticeTurnIsBounded:
 
         llm = MagicMock()
         llm.generate.return_value = '{"intent": "overview"}'
-        with override_settings(AI_HYDE_TIMEOUT_SECONDS=7), \
+        with override_settings(PRACTICE_CLASSIFIER_TIMEOUT_SECONDS=7), \
                 patch.object(practice_nodes, "get_llm_client", return_value=llm):
             proposal = practice_nodes._classify_with_model("anything", date(2026, 11, 11))
 
@@ -243,7 +243,7 @@ class TestPracticeTurnIsBounded:
         with patch.object(practice_nodes, "get_llm_client", side_effect=AssertionError) as factory:
             update = practice_nodes.select_intent(self._state("What deadlines are open?"))
 
-        assert update == {"intent": "open_deadlines", "args": {}, "routed_by": "rule"}
+        assert update == {"intent": "open_deadlines", "args": {}, "routed_by": "rule", "notes": []}
         factory.assert_not_called()
 
     def test_worst_case_for_one_practice_turn_fits_inside_the_gunicorn_timeout(self):
