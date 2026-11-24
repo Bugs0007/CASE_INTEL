@@ -1,15 +1,18 @@
-# Handles ONGOING code updates only. It does not set up a server.
+# Deploys the backend to the GCP VM that serves api.caseintel.in.
 #
-# Target: the GCP Compute Engine VM that serves api.caseintel.in.
-# The VM must already have: the repo cloned at VM_PROJECT_DIR, a venv in
-# .venv, the case-intel (gunicorn) and case-intel-worker systemd units, and a
-# sudoers rule that lets VM_USERNAME restart both units without a password.
+# How it works: GitHub's runner checks out this commit and copies the backend
+# files to the VM with rsync over SSH. The VM needs no git and no GitHub login.
 #
-# Required GitHub repository secrets:
-#   VM_HOST         public static IP of the VM
-#   VM_USERNAME     the Linux user that owns the project folder
-#   VM_SSH_KEY      private key of a key pair made only for deploys
-#   VM_PROJECT_DIR  optional. Default is ~/CASE_INTEL
+# SAFE BY DEFAULT: a push to main only LISTS what would change (dry run).
+# To really deploy: Actions tab -> "Deploy to GCP VM" -> Run workflow -> apply = true.
+#
+# Copied: manage.py, requirements.txt, pytest.ini, conftest.py,
+#         case_intel_project/, core/, deploy/, scripts/
+# Never touched: .env, .venv, media/, logs/, staticfiles/, tmp/, frontend-next/
+# Nothing is deleted on the VM.
+#
+# Required repository secrets: VM_HOST, VM_USERNAME, VM_SSH_KEY
+# Optional: VM_PROJECT_DIR (default /home/<VM_USERNAME>/CASE_INTEL)
 name: Deploy to GCP VM
 
 on:
@@ -17,8 +20,12 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      apply:
+        description: "true = really deploy. false = only list the changes."
+        type: boolean
+        default: false
 
-# Never run two deploys at the same time.
 concurrency:
   group: deploy-gcp-vm
   cancel-in-progress: false
@@ -26,41 +33,70 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
+    env:
+      VM_HOST: ${{ secrets.VM_HOST }}
+      VM_USER: ${{ secrets.VM_USERNAME }}
+      VM_PROJECT_DIR: ${{ secrets.VM_PROJECT_DIR }}
+      SSH_KEY: ${{ secrets.VM_SSH_KEY }}
+      APPLY: ${{ github.event_name == 'workflow_dispatch' && inputs.apply }}
     steps:
-      - name: Deploy over SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USERNAME }}
-          key: ${{ secrets.VM_SSH_KEY }}
-          command_timeout: 15m
-          script: |
-            set -euo pipefail
+      - name: Check out this commit
+        uses: actions/checkout@v4
 
-            PROJECT_DIR="${{ secrets.VM_PROJECT_DIR }}"
-            if [ -z "$PROJECT_DIR" ]; then PROJECT_DIR=~/CASE_INTEL; fi
-            cd "$PROJECT_DIR"
+      - name: Set up SSH
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$VM_HOST" >> ~/.ssh/known_hosts
+          if [ -z "$VM_PROJECT_DIR" ]; then VM_PROJECT_DIR="/home/$VM_USER/CASE_INTEL"; fi
+          echo "PROJECT_DIR=$VM_PROJECT_DIR" >> "$GITHUB_ENV"
+          ssh -i ~/.ssh/deploy_key "$VM_USER@$VM_HOST" "echo connected to \$(hostname); test -d '$VM_PROJECT_DIR' && echo 'project folder found'"
 
-            OLD_SHA=$(git rev-parse HEAD)
-            git fetch origin
-            git reset --hard origin/main
-            NEW_SHA=$(git rev-parse HEAD)
-            echo "Deploying $OLD_SHA -> $NEW_SHA"
+      - name: Show what would change (dry run)
+        run: |
+          set -euo pipefail
+          SSH_CMD="ssh -i $HOME/.ssh/deploy_key"
+          FILES="manage.py requirements.txt pytest.ini conftest.py case_intel_project core deploy scripts"
+          echo "=== Files that differ between this commit and the VM (content compare) ==="
+          rsync -rlc -n --itemize-changes --exclude '__pycache__/' --exclude '*.pyc' \
+            -e "$SSH_CMD" $FILES "$VM_USER@$VM_HOST:$PROJECT_DIR/" | tee /tmp/changes.txt
+          echo "=== Number of changed files: $(grep -c '^[<>c]' /tmp/changes.txt || true) ==="
+          echo "=== Files that exist only on the VM (information only, never deleted) ==="
+          for d in core case_intel_project deploy scripts; do
+            rsync -rlc -n --delete --itemize-changes --exclude '__pycache__/' --exclude '*.pyc' \
+              -e "$SSH_CMD" "$d/" "$VM_USER@$VM_HOST:$PROJECT_DIR/$d/" | grep '^\*deleting' | sed "s#^#$d/ #" || true
+          done
 
-            source .venv/bin/activate
-            pip install -r requirements.txt
-            python -m spacy download en_core_web_sm
+      - name: Copy files to the VM
+        if: env.APPLY == 'true'
+        run: |
+          set -euo pipefail
+          SSH_CMD="ssh -i $HOME/.ssh/deploy_key"
+          FILES="manage.py requirements.txt pytest.ini conftest.py case_intel_project core deploy scripts"
+          rsync -rlc --itemize-changes --exclude '__pycache__/' --exclude '*.pyc' \
+            -e "$SSH_CMD" $FILES "$VM_USER@$VM_HOST:$PROJECT_DIR/"
 
-            python manage.py check
-            python manage.py migrate --noinput
-            python manage.py collectstatic --noinput
-
-            sudo systemctl restart case-intel
-            sudo systemctl restart case-intel-worker
-
-            # Fail the job if a service did not come back.
-            sleep 8
-            systemctl is-active --quiet case-intel
-            systemctl is-active --quiet case-intel-worker
-            echo "Deploy OK at $NEW_SHA"
+      - name: Install, migrate, restart
+        if: env.APPLY == 'true'
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/deploy_key "$VM_USER@$VM_HOST" "PROJECT_DIR='$PROJECT_DIR' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd "$PROJECT_DIR"
+          source .venv/bin/activate
+          pip install -r requirements.txt
+          python -m spacy download en_core_web_sm
+          python manage.py check
+          python manage.py migrate --noinput
+          python manage.py collectstatic --noinput
+          sudo systemctl daemon-reload
+          sudo systemctl restart case-intel
+          sudo systemctl restart case-intel-worker
+          sleep 8
+          systemctl is-active --quiet case-intel
+          systemctl is-active --quiet case-intel-worker
+          echo "Deploy OK"
+          REMOTE
