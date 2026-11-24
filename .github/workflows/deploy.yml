@@ -1,52 +1,66 @@
-# Handles ONGOING code updates only -- not first-time server setup.
+# Handles ONGOING code updates only. It does not set up a server.
 #
-# This workflow assumes deploy/provision.sh has already been run once against
-# the target EC2 instance (system packages, swap, venv, Ollama + embedding
-# model, spaCy model, the gunicorn systemd unit it restarts below, the Nginx
-# site, and the narrow sudoers rule that lets EC2_USERNAME run
-# `sudo systemctl restart case-intel` without a password). If any of those
-# are missing on a fresh box, run provision.sh first -- see PROVISIONING.md
-# for the full path from a fresh AWS account to a live deploy.
-name: Deploy to EC2
+# Target: the GCP Compute Engine VM that serves api.caseintel.in.
+# The VM must already have: the repo cloned at VM_PROJECT_DIR, a venv in
+# .venv, the case-intel (gunicorn) and case-intel-worker systemd units, and a
+# sudoers rule that lets VM_USERNAME restart both units without a password.
+#
+# Required GitHub repository secrets:
+#   VM_HOST         public static IP of the VM
+#   VM_USERNAME     the Linux user that owns the project folder
+#   VM_SSH_KEY      private key of a key pair made only for deploys
+#   VM_PROJECT_DIR  optional. Default is ~/CASE_INTEL
+name: Deploy to GCP VM
 
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
+
+# Never run two deploys at the same time.
+concurrency:
+  group: deploy-gcp-vm
+  cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.EC2_SSH_KEY }}
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USERNAME }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          command_timeout: 15m
           script: |
-            set -e
+            set -euo pipefail
 
-            # PROJECT_DIR/VENV_DIR must match what provision.sh set up
-            # (PROJECT_DIR defaults there to ~<DEPLOY_USER>/CASE_INTEL).
-            PROJECT_DIR=~/CASE_INTEL
-            VENV_DIR=.venv
-
+            PROJECT_DIR="${{ secrets.VM_PROJECT_DIR }}"
+            if [ -z "$PROJECT_DIR" ]; then PROJECT_DIR=~/CASE_INTEL; fi
             cd "$PROJECT_DIR"
 
+            OLD_SHA=$(git rev-parse HEAD)
             git fetch origin
             git reset --hard origin/main
+            NEW_SHA=$(git rev-parse HEAD)
+            echo "Deploying $OLD_SHA -> $NEW_SHA"
 
-            source "$VENV_DIR/bin/activate"
+            source .venv/bin/activate
             pip install -r requirements.txt
             python -m spacy download en_core_web_sm
 
+            python manage.py check
             python manage.py migrate --noinput
             python manage.py collectstatic --noinput
 
             sudo systemctl restart case-intel
-            # The document-processing worker runs the same codebase -- it
-            # must pick up new code too, or it keeps processing with the
-            # old pipeline until the next reboot. provision.sh's sudoers
-            # rule covers both restarts.
             sudo systemctl restart case-intel-worker
+
+            # Fail the job if a service did not come back.
+            sleep 8
+            systemctl is-active --quiet case-intel
+            systemctl is-active --quiet case-intel-worker
+            echo "Deploy OK at $NEW_SHA"
