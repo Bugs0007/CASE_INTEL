@@ -7,7 +7,7 @@
 # To really deploy: Actions tab -> "Deploy to GCP VM" -> Run workflow -> apply = true.
 #
 # Copied: manage.py, requirements.txt, pytest.ini, conftest.py,
-#         case_intel_project/, core/, deploy/, scripts/
+#         case_intel_project/, core/, mcp_server/, deploy/, scripts/
 # Never touched: .env, .venv, media/, logs/, staticfiles/, tmp/, frontend-next/
 # Nothing is deleted on the VM.
 #
@@ -59,13 +59,17 @@ jobs:
         run: |
           set -euo pipefail
           SSH_CMD="ssh -i $HOME/.ssh/deploy_key"
-          FILES="manage.py requirements.txt pytest.ini conftest.py case_intel_project core deploy scripts"
+          FILES=""
+          for f in manage.py requirements.txt pytest.ini conftest.py case_intel_project core mcp_server deploy scripts; do
+            if [ -e "$f" ]; then FILES="$FILES $f"; fi
+          done
           echo "=== Files that differ between this commit and the VM (content compare) ==="
           rsync -rlc -n --itemize-changes --exclude '__pycache__/' --exclude '*.pyc' \
             -e "$SSH_CMD" $FILES "$VM_USER@$VM_HOST:$PROJECT_DIR/" | tee /tmp/changes.txt
           echo "=== Number of changed files: $(grep -c '^[<>c]' /tmp/changes.txt || true) ==="
           echo "=== Files that exist only on the VM (information only, never deleted) ==="
-          for d in core case_intel_project deploy scripts; do
+          for d in core case_intel_project mcp_server deploy scripts; do
+            if [ ! -d "$d" ]; then continue; fi
             rsync -rlc -n --delete --itemize-changes --exclude '__pycache__/' --exclude '*.pyc' \
               -e "$SSH_CMD" "$d/" "$VM_USER@$VM_HOST:$PROJECT_DIR/$d/" | grep '^\*deleting' | sed "s#^#$d/ #" || true
           done
@@ -75,7 +79,10 @@ jobs:
         run: |
           set -euo pipefail
           SSH_CMD="ssh -i $HOME/.ssh/deploy_key"
-          FILES="manage.py requirements.txt pytest.ini conftest.py case_intel_project core deploy scripts"
+          FILES=""
+          for f in manage.py requirements.txt pytest.ini conftest.py case_intel_project core mcp_server deploy scripts; do
+            if [ -e "$f" ]; then FILES="$FILES $f"; fi
+          done
           rsync -rlc --itemize-changes --exclude '__pycache__/' --exclude '*.pyc' \
             -e "$SSH_CMD" $FILES "$VM_USER@$VM_HOST:$PROJECT_DIR/"
 
@@ -95,8 +102,15 @@ jobs:
           sudo systemctl daemon-reload
           sudo systemctl restart case-intel
           sudo systemctl restart case-intel-worker
+          # The MCP service is optional until its systemd unit is installed.
+          MCP_UNIT=no
+          if systemctl cat case-intel-mcp.service >/dev/null 2>&1; then
+            MCP_UNIT=yes
+            sudo systemctl restart case-intel-mcp
+          fi
           sleep 8
           systemctl is-active --quiet case-intel
           systemctl is-active --quiet case-intel-worker
+          if [ "$MCP_UNIT" = "yes" ]; then systemctl is-active --quiet case-intel-mcp; fi
           echo "Deploy OK"
           REMOTE
