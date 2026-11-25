@@ -1,0 +1,34 @@
+{% extends "oauth/base.html" %}
+{% block title %}Allow access to Case Intel?{% endblock %}
+{% block content %}
+  {% if not error %}
+    <h1>Allow {{ application.name|default:redirect_host }} to use your Case Intel account?</h1>
+    <p class="muted">Signed in as <strong>{{ signed_in_as }}</strong>.</p>
+
+    <div class="box">
+      <p><strong>After you allow it, you return to:</strong> <span>{{ redirect_host }}</span>
+        {% if redirect_is_loopback %}<br><span class="muted">This is an app on your own computer (for example Claude Code).</span>{% endif %}
+      </p>
+      <p><strong>It will be able to:</strong></p>
+      <ul>
+        {% for scope in scopes_descriptions %}<li>{{ scope }}</li>{% endfor %}
+      </ul>
+    </div>
+
+    <p class="muted">Case data that the app reads goes to that app and to the AI model provider it uses. Your client data is confidential: allow this only if you accept that. The app cannot send email, create invoices, delete anything or fetch from eCourts. You can remove its access at any time in Case Intel: Settings, then Connected apps.</p>
+
+    <form id="authorizationForm" method="post">
+      {% csrf_token %}
+      {% for field in form %}{% if field.is_hidden %}{{ field }}{% endif %}{% endfor %}
+      {% if form.errors or form.non_field_errors %}<div class="error" role="alert">{{ form.errors }}{{ form.non_field_errors }}</div>{% endif %}
+      <div class="actions">
+        <button type="submit" name="allow" value="Authorize" class="primary">Allow</button>
+        <button type="submit">Do not allow</button>
+      </div>
+    </form>
+  {% else %}
+    <h1>This request cannot continue</h1>
+    <p class="error" role="alert">{{ error.description|default:error.error }}</p>
+    <p>Go back to the app and try to connect again.</p>
+  {% endif %}
+{% endblock %}

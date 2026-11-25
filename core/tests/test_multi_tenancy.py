@@ -720,6 +720,14 @@ _NO_TENANT_ROWS_VIEWS = {
     "advocate_search_profile.AdvocateSearchFeaturesView",  # two settings flags, no rows
     "high_court_search.HighCourtListView",  # the court library's registry
     "high_court_search.HighCourtBenchesView",  # public court structure, cached like court-structure/
+    # MCP connector OAuth pages (plain Django views on the API host, reviewed
+    # 2026-11-25; tests in test_mcp_oauth.py). Not DRF, so not in the
+    # AllowAny check: the sign-in page reads only the User being signed in;
+    # the consent page needs that Django session and writes only DOT grant
+    # rows for request.user.
+    "oauth.SignInView",
+    "oauth.SignOutView",
+    "oauth.ConsentView",
 }
 
 # Plain APIViews that scope every query to request.user by hand. Reviewed
@@ -791,6 +799,11 @@ _MANUALLY_SCOPED_VIEWS = {
     "case_assistant_outputs.DraftOutputDownloadView",
     "case_assistant_outputs.CaseNoteListView",
     "case_assistant_outputs.CaseNoteDetailView",
+    # MCP connector settings: OAuth tokens filtered by user=request.user;
+    # another user's app id answers 404 (test_mcp_oauth.py).
+    "oauth.ConnectedAppListView",
+    "oauth.ConnectedAppRevokeView",
+    "oauth.McpActivityView",  # ActivityLog filtered by owner=request.user (test_mcp_proposals.py)
 }
 
 

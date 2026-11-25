@@ -1,0 +1,17 @@
+{% extends "oauth/base.html" %}
+{% block title %}Sign in to Case Intel{% endblock %}
+{% block content %}
+  <h1>Sign in to Case Intel</h1>
+  <p class="muted">An app wants to connect to your Case Intel account. Sign in to see what it asks for. You can still say no on the next page.</p>
+  {% if error %}<p class="error" role="alert" id="form-error">{{ error }}</p>{% endif %}
+  <form method="post" action="/oauth/login/" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <label for="username">Username</label>
+    <input type="text" id="username" name="username" value="{{ username }}" autocomplete="username" autocapitalize="none" spellcheck="false" required {% if error %}aria-describedby="form-error"{% endif %} autofocus>
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password" autocomplete="current-password" required {% if error %}aria-describedby="form-error"{% endif %}>
+    <button type="submit" class="primary">Sign in</button>
+  </form>
+  <p class="muted">Signed up with Google? Set a password first in Case Intel: Settings, then Security.</p>
+{% endblock %}

@@ -51,6 +51,7 @@ from core.models import (
     AssistantDraftRevision,
     DraftOutput,
     CaseNote,
+    McpProposal,
     SentMessage,
     Task,
     TravelBooking,
@@ -468,6 +469,15 @@ class DraftOutputAdmin(admin.ModelAdmin):
     list_filter = ("destination", "status")
     raw_id_fields = ("owner", "revision", "case_note")
     readonly_fields = ("file_path", "filename", "checksum", "created_at", "updated_at")
+
+
+@admin.register(McpProposal)
+class McpProposalAdmin(admin.ModelAdmin):
+    list_display = ("id", "owner", "tool", "status", "case", "expires_at", "created_at")
+    list_filter = ("status", "tool")
+    raw_id_fields = ("owner", "case")
+    readonly_fields = ("args", "args_hash", "preview", "blockers", "result", "client_id", "token_id",
+                       "confirmed_at", "created_at", "updated_at")
 
 
 @admin.register(CaseNote)

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>{% block title %}Case Intel{% endblock %}</title>
+  {# Plain placeholder styling. This page needs a design reference before launch. #}
+  <style>
+    :root { color-scheme: light dark; --fg: #1b1f24; --muted: #57606a; --bg: #ffffff; --line: #d0d7de; --accent: #0b57d0; --error: #b3261e; }
+    @media (prefers-color-scheme: dark) { :root { --fg: #e6edf3; --muted: #9da7b3; --bg: #0d1117; --line: #30363d; --accent: #7aa7ff; --error: #ff8a80; } }
+    body { margin: 0; font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--fg); background: var(--bg); }
+    main { max-width: 28rem; margin: 3rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.5rem; margin: 0 0 1rem; }
+    p, li { color: var(--fg); }
+    .muted { color: var(--muted); font-size: .95rem; }
+    label { display: block; font-weight: 600; margin: 1rem 0 .25rem; }
+    input[type=text], input[type=password] { width: 100%; box-sizing: border-box; padding: .6rem; font: inherit; color: inherit; background: transparent; border: 1px solid var(--line); border-radius: 6px; }
+    button { font: inherit; padding: .6rem 1rem; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: inherit; cursor: pointer; margin-top: 1.25rem; }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    .error { color: var(--error); border-left: 4px solid var(--error); padding-left: .75rem; }
+    .box { border: 1px solid var(--line); border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+    .actions { display: flex; gap: .75rem; flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

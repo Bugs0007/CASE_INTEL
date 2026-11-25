@@ -24,6 +24,7 @@ from .conversation import Conversation
 from .message import Message
 from .citation import Citation
 from .activity_log import ActivityLog
+from .mcp_proposal import McpProposal
 from .task import Task
 from .hearing import Hearing
 from .hearing_reminder import HearingReminder
@@ -73,6 +74,7 @@ __all__ = [
     "Message",
     "Citation",
     "ActivityLog",
+    "McpProposal",
     "Task",
     "Hearing",
     "HearingReminder",

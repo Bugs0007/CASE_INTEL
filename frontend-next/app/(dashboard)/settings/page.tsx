@@ -14,6 +14,7 @@ import { changePassword, changeUsername, googleAccountApi } from "@/lib/api/auth
 import { setToken, setUsername as storeUsername } from "@/lib/auth";
 import { useAdvocateProfile, useUpdateAdvocateProfile } from "@/hooks/use-billing";
 import { SignedInSessionsCard } from "@/components/settings/signed-in-sessions-card";
+import { ConnectedAppsCard } from "@/components/settings/connected-apps-card";
 import { GoogleAccountCard } from "@/components/settings/google-account-card";
 import { SetPasswordCard } from "@/components/settings/set-password-card";
 
@@ -376,6 +377,9 @@ export default function SettingsPage() {
       )}
       <div className="mt-6">
         <SignedInSessionsCard locked={me?.credentials_locked ?? false} />
+      </div>
+      <div className="mt-6">
+        <ConnectedAppsCard />
       </div>
     </div>
   );
