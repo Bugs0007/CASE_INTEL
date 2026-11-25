@@ -1,0 +1,11 @@
+{% extends "oauth/base.html" %}
+{% block title %}Case Intel{% endblock %}
+{% block content %}
+  {% if signed_out %}
+    <h1>You are signed out</h1>
+    <p>You can close this page.</p>
+  {% else %}
+    <h1>You are signed in</h1>
+    <p>Go back to the app that sent you here to finish connecting it.</p>
+  {% endif %}
+{% endblock %}

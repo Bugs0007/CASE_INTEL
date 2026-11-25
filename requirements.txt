@@ -12,6 +12,19 @@ asgiref==3.11.1
 sqlparse==0.5.5
 
 # ============================================================================
+# MCP CONNECTOR (docs/MCP_PLAN.md)
+# ============================================================================
+# django-oauth-toolkit: the OAuth 2.1 authorization server (DCR, CIMD, RFC
+# 8707/8414/9207) -- 3.4.1 supports Django 4.2-6.0, so the 5.1.11 pin holds.
+# mcp: the 1.x line. mcp 2.x needs httpx2, which needs idna>=3.18, and idna
+# is pinned to 3.11 below; 1.30 has the same Streamable HTTP, stateless and
+# TokenVerifier/AuthSettings APIs. uvicorn runs the separate MCP process
+# (`uvicorn mcp_server.app:app`); gunicorn keeps serving Django.
+django-oauth-toolkit==3.4.1
+mcp==1.30.0
+uvicorn==0.54.0
+
+# ============================================================================
 # DATABASE & VECTOR SEARCH
 # ============================================================================
 psycopg2-binary==2.9.11

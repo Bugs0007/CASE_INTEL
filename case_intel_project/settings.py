@@ -49,6 +49,10 @@ INSTALLED_APPS = [
     "django_extensions",
     "storages",
     "core",
+    # OAuth 2.1 authorization server for the MCP connector (mcp_server/).
+    # Listed AFTER core so core/templates/oauth2_provider/authorize.html
+    # (the consent page) wins over the package's own template.
+    "oauth2_provider",
 ]
 
 MIDDLEWARE = [
@@ -651,5 +655,108 @@ LOGGING = {
             "level": "INFO",
             "propagate": False,
         },
+        "mcp_server": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
     },
 }
+
+# ============================================================================
+# MCP connector (docs/MCP_PLAN.md)
+# ============================================================================
+# The MCP server (mcp_server/, its own uvicorn process) is an OAuth 2.1
+# resource server. This Django app is its authorization server
+# (django-oauth-toolkit). Both sit on one host: the resource URL is
+# <host>/mcp and the issuer is <host>. Nothing here is a secret -- access
+# tokens are opaque rows in the shared database, so no signing key exists.
+#
+#   MCP_ENABLED        kill switch: false makes the MCP process answer 503
+#                      and run no tool (the OAuth pages keep working).
+#   MCP_RESOURCE_URL   the exact `resource` (RFC 8707 audience) every MCP
+#                      token must carry. A token for any other resource, or
+#                      for none, is refused.
+#   OAUTH_ISSUER       the authorization server's issuer (RFC 8414 / 9207).
+#   MCP_ALLOWED_HOSTS  Host header values the MCP process accepts.
+MCP_ENABLED = config("MCP_ENABLED", default=False, cast=bool)
+MCP_RESOURCE_URL = config("MCP_RESOURCE_URL", default="https://api.caseintel.in/mcp")
+OAUTH_ISSUER = config("OAUTH_ISSUER", default="https://api.caseintel.in")
+MCP_ALLOWED_HOSTS = config("MCP_ALLOWED_HOSTS", default="api.caseintel.in", cast=Csv())
+# Browser Origin values the MCP process accepts. A request with no Origin
+# (Claude's servers, Claude Code) is not affected.
+MCP_ALLOWED_ORIGINS = config("MCP_ALLOWED_ORIGINS", default="https://claude.ai", cast=Csv())
+# Hosts a Client ID Metadata Document (CIMD) client_id may live on. Claude
+# publishes its client metadata on claude.ai; anything else falls back to
+# Dynamic Client Registration, which only accepts the redirect URIs below.
+OAUTH_CIMD_ALLOWED_HOSTS = config(
+    "OAUTH_CIMD_ALLOWED_HOSTS", default="claude.ai,.claude.ai,.anthropic.com", cast=Csv()
+)
+
+# Per-user call limits in the MCP process (mcp_server/ratelimit.py).
+MCP_RATE_PER_MINUTE = config("MCP_RATE_PER_MINUTE", default=60, cast=int)
+MCP_RATE_PER_DAY = config("MCP_RATE_PER_DAY", default=1000, cast=int)
+MCP_RATE_SEARCH_PER_MINUTE = config("MCP_RATE_SEARCH_PER_MINUTE", default=10, cast=int)
+MCP_RATE_CONFIRM_PER_MINUTE = config("MCP_RATE_CONFIRM_PER_MINUTE", default=20, cast=int)
+
+MCP_SCOPE_READ = "cases:read"
+MCP_SCOPE_WRITE = "cases:write"
+
+# The only redirect URIs any OAuth client may use: hosted Claude's callback,
+# and a loopback callback (any port) for Claude Code / MCP Inspector. Enforced
+# in core/services/oauth_policy.py on DCR, CIMD and every authorize request.
+OAUTH_HOSTED_REDIRECT_URIS = ("https://claude.ai/api/mcp/auth_callback",)
+OAUTH_LOOPBACK_HOSTS = ("localhost", "127.0.0.1")
+
+OAUTH2_PROVIDER = {
+    "SCOPES": {
+        MCP_SCOPE_READ: "Read your cases, hearings, orders, tasks, documents, drafts and fees",
+        MCP_SCOPE_WRITE: "Propose and confirm tasks, notes, events and client-update drafts",
+    },
+    "DEFAULT_SCOPES": [MCP_SCOPE_READ],
+    "ACCESS_TOKEN_EXPIRE_SECONDS": 15 * 60,
+    "REFRESH_TOKEN_EXPIRE_SECONDS": 30 * 24 * 3600,
+    "AUTHORIZATION_CODE_EXPIRE_SECONDS": 60,
+    "ROTATE_REFRESH_TOKEN": True,
+    # A replayed (already rotated) refresh token revokes the whole family.
+    "REFRESH_TOKEN_REUSE_PROTECTION": True,
+    "PKCE_REQUIRED": True,
+    "OAUTH2_VALIDATOR_CLASS": "core.services.oauth_policy.CaseIntelOAuth2Validator",
+    "OIDC_ISS_ENDPOINT": OAUTH_ISSUER,
+    "ALLOWED_REDIRECT_URI_SCHEMES": ["http", "https"],
+    "ALLOW_LOCALHOST_LOOPBACK": True,
+    # RFC 9700 gates, all on: S256 only, no implicit/password grants, no
+    # token in a query string, tokens hashed at rest, `iss` on every
+    # authorization response (RFC 9207).
+    "COMPLIANT_BCP_RFC9700_IMPLICIT_GRANT": True,
+    "COMPLIANT_BCP_RFC9700_PASSWORD_GRANT": True,
+    "COMPLIANT_BCP_RFC9700_PKCE_METHOD": True,
+    "COMPLIANT_BCP_RFC9700_ACCESS_TOKEN_TRANSPORT": True,
+    "COMPLIANT_BCP_RFC9700_AUTHZ_RESPONSE_ISS": True,
+    "COMPLIANT_BCP_RFC9700_TOKEN_STORAGE": True,
+    "COMPLIANT_BCP_RFC9700_REFRESH_TOKEN": True,
+    # Stays a check --deploy WARNING, not an error: loopback callbacks
+    # (Claude Code, RFC 8252) need http, and core/services/oauth_policy.py
+    # allows http only for localhost / 127.0.0.1.
+    "COMPLIANT_BCP_RFC9700_REDIRECT_URI_SCHEME": False,
+    "COMPLIANT_BCP_RFC9700_REDIRECT_URI_MATCHING": True,
+    "COMPLIANT_BCP_RFC9700_PKCE_REQUIRED": True,
+    "DCR_ENABLED": True,
+    "DCR_REGISTRATION_PERMISSION_CLASSES": ("core.services.oauth_policy.McpDCRPermission",),
+    "CIMD_ENABLED": True,
+    "CIMD_REGISTRATION_PERMISSION_CLASSES": ("oauth2_provider.cimd.HostAllowlistCIMDPermission",),
+    "CIMD_ALLOWED_HOSTS": OAUTH_CIMD_ALLOWED_HOSTS,
+    "OAUTH2_RESPONSE_TYPES_SUPPORTED": ["code"],
+    # "none" first: Claude only uses CIMD when "none" is listed here.
+    "OAUTH2_TOKEN_ENDPOINT_AUTH_METHODS_SUPPORTED": ["none", "client_secret_post", "client_secret_basic"],
+    "OAUTH2_GRANT_TYPES_SUPPORTED": ["authorization_code", "refresh_token"],
+}
+
+# The OAuth sign-in page (core/views/oauth.py) is a plain Django page with a
+# session cookie on the API host. Secure cookies unless DEBUG (local http).
+SESSION_COOKIE_SECURE = config("SESSION_COOKIE_SECURE", default=not DEBUG, cast=bool)
+CSRF_COOKIE_SECURE = config("CSRF_COOKIE_SECURE", default=not DEBUG, cast=bool)
+LOGIN_URL = "/oauth/login/"
+# nginx terminates TLS; trust its X-Forwarded-Proto so the AS builds https
+# URLs (issuer, endpoints) behind the proxy.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
