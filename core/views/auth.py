@@ -26,6 +26,7 @@ from rest_framework.views import APIView
 from core.models import AuthSession, InviteToken
 from core.services import auth_sessions
 from core.services.account_security import is_credentials_locked
+from core.services.oauth_policy import revoke_user_grants
 
 
 class LoginView(APIView):
@@ -356,6 +357,8 @@ class ChangePasswordView(APIView):
         # the one this request came in on, and any a thief might hold --
         # ends now.
         auth_sessions.revoke_all(request.user)
+        # Apps connected through the MCP connector (OAuth) lose access too.
+        revoke_user_grants(request.user)
         _session, key = auth_sessions.create_session(
             request.user, request, source=AuthSession.SOURCE_PASSWORD_CHANGE
         )

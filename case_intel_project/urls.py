@@ -23,6 +23,8 @@ from django.urls import include, path
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include("core.urls")),
+    # OAuth authorization server for the MCP connector (docs/MCP_PLAN.md).
+    path("", include("core.oauth_urls")),
 ]
 
 # Local disk media (USE_S3=false) needs Django to serve /media/... itself in

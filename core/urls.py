@@ -7,6 +7,7 @@ All endpoints are prefixed with /api/ when included in the project root URLconf.
 from django.urls import include, path
 
 from core.views.daily_status import CaseDailyStatusView
+from core.views.oauth import ConnectedAppListView, ConnectedAppRevokeView, McpActivityView
 from core.views.practice_assistant import PracticeChatView, PracticeOverviewView, PracticeReportView
 from core.views import (
     AdvocateProfileView,
@@ -146,6 +147,14 @@ urlpatterns = [
         "auth/change-password/",
         ChangePasswordView.as_view(),
         name="auth-change-password",
+    ),
+    # MCP connector: apps connected through OAuth (core/views/oauth.py).
+    path("oauth/connected-apps/", ConnectedAppListView.as_view(), name="oauth-connected-apps"),
+    path("oauth/activity/", McpActivityView.as_view(), name="oauth-activity"),
+    path(
+        "oauth/connected-apps/<int:pk>/",
+        ConnectedAppRevokeView.as_view(),
+        name="oauth-connected-app-revoke",
     ),
 
     # Dashboard
