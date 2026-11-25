@@ -1,52 +1,102 @@
-# Handles ONGOING code updates only -- not first-time server setup.
+# Deploys the backend to the GCP VM that serves api.caseintel.in.
 #
-# This workflow assumes deploy/provision.sh has already been run once against
-# the target EC2 instance (system packages, swap, venv, Ollama + embedding
-# model, spaCy model, the gunicorn systemd unit it restarts below, the Nginx
-# site, and the narrow sudoers rule that lets EC2_USERNAME run
-# `sudo systemctl restart case-intel` without a password). If any of those
-# are missing on a fresh box, run provision.sh first -- see PROVISIONING.md
-# for the full path from a fresh AWS account to a live deploy.
-name: Deploy to EC2
+# How it works: GitHub's runner checks out this commit and copies the backend
+# files to the VM with rsync over SSH. The VM needs no git and no GitHub login.
+#
+# SAFE BY DEFAULT: a push to main only LISTS what would change (dry run).
+# To really deploy: Actions tab -> "Deploy to GCP VM" -> Run workflow -> apply = true.
+#
+# Copied: manage.py, requirements.txt, pytest.ini, conftest.py,
+#         case_intel_project/, core/, deploy/, scripts/
+# Never touched: .env, .venv, media/, logs/, staticfiles/, tmp/, frontend-next/
+# Nothing is deleted on the VM.
+#
+# Required repository secrets: VM_HOST, VM_USERNAME, VM_SSH_KEY
+# Optional: VM_PROJECT_DIR (default /home/<VM_USERNAME>/CASE_INTEL)
+name: Deploy to GCP VM
 
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "true = really deploy. false = only list the changes."
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-gcp-vm
+  cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      VM_HOST: ${{ secrets.VM_HOST }}
+      VM_USER: ${{ secrets.VM_USERNAME }}
+      VM_PROJECT_DIR: ${{ secrets.VM_PROJECT_DIR }}
+      SSH_KEY: ${{ secrets.VM_SSH_KEY }}
+      APPLY: ${{ github.event_name == 'workflow_dispatch' && inputs.apply }}
     steps:
-      - name: Deploy over SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            set -e
+      - name: Check out this commit
+        uses: actions/checkout@v4
 
-            # PROJECT_DIR/VENV_DIR must match what provision.sh set up
-            # (PROJECT_DIR defaults there to ~<DEPLOY_USER>/CASE_INTEL).
-            PROJECT_DIR=~/CASE_INTEL
-            VENV_DIR=.venv
+      - name: Set up SSH
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$VM_HOST" >> ~/.ssh/known_hosts
+          if [ -z "$VM_PROJECT_DIR" ]; then VM_PROJECT_DIR="/home/$VM_USER/CASE_INTEL"; fi
+          echo "PROJECT_DIR=$VM_PROJECT_DIR" >> "$GITHUB_ENV"
+          ssh -i ~/.ssh/deploy_key "$VM_USER@$VM_HOST" "echo connected to \$(hostname); test -d '$VM_PROJECT_DIR' && echo 'project folder found'"
 
-            cd "$PROJECT_DIR"
+      - name: Show what would change (dry run)
+        run: |
+          set -euo pipefail
+          SSH_CMD="ssh -i $HOME/.ssh/deploy_key"
+          FILES="manage.py requirements.txt pytest.ini conftest.py case_intel_project core deploy scripts"
+          echo "=== Files that differ between this commit and the VM (content compare) ==="
+          rsync -rlc -n --itemize-changes --exclude '__pycache__/' --exclude '*.pyc' \
+            -e "$SSH_CMD" $FILES "$VM_USER@$VM_HOST:$PROJECT_DIR/" | tee /tmp/changes.txt
+          echo "=== Number of changed files: $(grep -c '^[<>c]' /tmp/changes.txt || true) ==="
+          echo "=== Files that exist only on the VM (information only, never deleted) ==="
+          for d in core case_intel_project deploy scripts; do
+            rsync -rlc -n --delete --itemize-changes --exclude '__pycache__/' --exclude '*.pyc' \
+              -e "$SSH_CMD" "$d/" "$VM_USER@$VM_HOST:$PROJECT_DIR/$d/" | grep '^\*deleting' | sed "s#^#$d/ #" || true
+          done
 
-            git fetch origin
-            git reset --hard origin/main
+      - name: Copy files to the VM
+        if: env.APPLY == 'true'
+        run: |
+          set -euo pipefail
+          SSH_CMD="ssh -i $HOME/.ssh/deploy_key"
+          FILES="manage.py requirements.txt pytest.ini conftest.py case_intel_project core deploy scripts"
+          rsync -rlc --itemize-changes --exclude '__pycache__/' --exclude '*.pyc' \
+            -e "$SSH_CMD" $FILES "$VM_USER@$VM_HOST:$PROJECT_DIR/"
 
-            source "$VENV_DIR/bin/activate"
-            pip install -r requirements.txt
-            python -m spacy download en_core_web_sm
-
-            python manage.py migrate --noinput
-            python manage.py collectstatic --noinput
-
-            sudo systemctl restart case-intel
-            # The document-processing worker runs the same codebase -- it
-            # must pick up new code too, or it keeps processing with the
-            # old pipeline until the next reboot. provision.sh's sudoers
-            # rule covers both restarts.
-            sudo systemctl restart case-intel-worker
+      - name: Install, migrate, restart
+        if: env.APPLY == 'true'
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/deploy_key "$VM_USER@$VM_HOST" "PROJECT_DIR='$PROJECT_DIR' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd "$PROJECT_DIR"
+          source .venv/bin/activate
+          pip install -r requirements.txt
+          python -m spacy download en_core_web_sm
+          python manage.py check
+          python manage.py migrate --noinput
+          python manage.py collectstatic --noinput
+          sudo systemctl daemon-reload
+          sudo systemctl restart case-intel
+          sudo systemctl restart case-intel-worker
+          sleep 8
+          systemctl is-active --quiet case-intel
+          systemctl is-active --quiet case-intel-worker
+          echo "Deploy OK"
+          REMOTE
